@@ -1,6 +1,8 @@
 # ADR 0011: Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas
 
-- Status: accepted
+- Status: accepted; paths moved by ADR-0013 (the schema and the helper live in
+  `packages/jsonapi-kit/src/test-support/`, and the extension's examples are pinned by
+  `atomic/process.test.ts`)
 - Date: 2026-10-08
 
 ## Context

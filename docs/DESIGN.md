@@ -1,6 +1,7 @@
-# hono-jsonapi: design
+# jsonapi-kit: design
 
-This document describes what hono-jsonapi is, the API it exposes, and how it is built.
+This document describes what jsonapi-kit and hono-jsonapi are, the API they expose, and how they are
+built.
 
 Architecture decisions referenced as ADR-NNNN live in `docs/adr/`. The normative, clause-by-clause
 specification that implementers work from is `docs/SPEC.md`; this document explains the intent
@@ -8,7 +9,9 @@ behind it. When the two disagree, fix one in the same PR.
 
 ## 1. Purpose
 
-hono-jsonapi is the JSON:API layer for Hono applications. It gives an application:
+jsonapi-kit is the JSON:API layer for JavaScript servers: a framework-free core (`jsonapi-kit`) and
+a Hono adapter (`hono-jsonapi`) that re-exports it and adds the framework glue (ADR-0013). They give
+an application:
 
 1. one resource definition per type, from which field names, relationships, query capabilities,
    links, and validation all derive, so a response, a request check, and a query parser cannot
@@ -24,7 +27,8 @@ It is a library for teams who treat their JSON:API surface as a contract.
 
 ### Who it is for
 
-- API teams on Hono who want JSON:API 1.1 without re-reading the specification per endpoint.
+- API teams on Hono, or on any runtime with a `fetch` handler, who want JSON:API 1.1 without
+  re-reading the specification per endpoint.
 - Teams whose clients are JSON:API clients (Ember Data, JSON:API resources, generated SDKs) and who
   have been burned by servers that are "mostly" JSON:API.
 - Teams who paginate with keysets and want the one published cursor profile, with its links, meta,
@@ -58,8 +62,9 @@ It is a library for teams who treat their JSON:API surface as a contract.
    render as a constant 500; the thrown value stays on `cause` for `report` (ADR-0006).
 6. **Web standards only. No ambient environment.** `URL`, `URLSearchParams`, `Response`, `btoa`;
    nothing reads `process` (ADR-0003).
-7. **`hono` is the only peer dependency.** Validators arrive through Standard Schema; the types are
-   vendored (ADR-0002).
+7. **The core depends on nothing; the adapter on the core and its framework.** `jsonapi-kit` has no
+   dependencies and imports no framework; `hono` is `hono-jsonapi`'s only peer dependency.
+   Validators arrive through Standard Schema; the types are vendored (ADR-0002, ADR-0013).
 8. **Headers follow the body.** `Content-Type` parameters are derived from the document's `jsonapi`
    object; `Location` from the created resource's `self` link (ADR-0005).
 9. **Client input is hostile.** Prototype keys are rejected wherever a name becomes a key; lookups
@@ -67,6 +72,9 @@ It is a library for teams who treat their JSON:API surface as a contract.
 10. **Every non-obvious decision cites its source** with `@ref` in code and an ADR in docs.
 
 ## 3. The API by example
+
+The examples use `hono-jsonapi`. Every function in them that is not a Hono hook is `jsonapi-kit`'s,
+and the core README shows the same minimal server as a plain `fetch` handler.
 
 ### 3.1 Minimal
 
@@ -171,20 +179,23 @@ propagates after the rollback. No data in any result means `204`.
 ### 4.1 Modules
 
 ```
-media-type   RFC 9110 parsing and serialization; the JSON:API media type and its parameters
-negotiate    the server negotiation rules as a pure function of two header values
-errors       JsonApiError, the closed catalog, the registered status table
-document     types, member names, serialization, builders, full linkage
-resource     defineResource and query capability resolution
-query        parseQuery and the family parsers
-pagination   the Cursor Pagination profile
-request      identifiers, resource documents, relationship documents
-hono         middleware, respond, body, validators, handlers
-atomic       the extension: handler, document parser, lids, executors
+jsonapi-kit (packages/jsonapi-kit/src)
+  media-type   RFC 9110 parsing and serialization; the JSON:API media type and its parameters
+  negotiate    the server negotiation rules as a pure function of two header values
+  errors       JsonApiError, the closed catalog, the registered status table
+  document     types, member names, serialization, builders, full linkage
+  resource     defineResource and query capability resolution
+  query        parseQuery and the family parsers
+  pagination   the Cursor Pagination profile
+  request      identifiers, resource documents, relationship documents
+  atomic       the extension: processor, content type check, document parser, lids, executors
+hono-jsonapi (packages/hono-jsonapi/src)
+  middleware, respond, body, validators, handlers; atomic/handler wraps the core processor
 ```
 
-Imports form a DAG from `internal` outward; `hono` and `atomic` are the only modules that import
-from Hono. `import/no-cycle` is enforced.
+Imports form a DAG from `internal` outward. Nothing in `jsonapi-kit` imports a framework;
+`hono-jsonapi` imports `jsonapi-kit` and `hono`, and re-exports the core so applications see one
+package (ADR-0013). `import/no-cycle` is enforced.
 
 ### 4.2 Data flow for a read
 
@@ -219,7 +230,8 @@ Eight type parameters ride on `ResourceDefinition`: type, attribute names, relat
 sort names, filter names, create output, update output. Consumers never spell them: `AnyResource`
 erases them for registries, and helper types (`RowOf`, `RelationshipNameOf`, `CreateAttributesOf`,
 `UpdateAttributesOf`) recover them where a signature needs one. Handler objects for the atomic
-extension are typed with `ResourceHandlers<typeof Articles, Tx, Env>` and accepted by the erased
+extension are typed with `ResourceHandlers<typeof Articles, Tx, Ctx>`, where `Ctx` is whatever the
+host hands the processor per request (`Context<JsonApiEnv>` under Hono), and accepted by the erased
 `AnyResourceHandlers` through bivariant method signatures.
 
 ### 4.6 What the previous implementation got wrong
@@ -258,17 +270,18 @@ a cited clause with a test.
 
 ## 5. Decisions
 
-| ADR  | Decision                                                                              |
-| ---- | ------------------------------------------------------------------------------------- |
-| 0001 | Record architecture decisions                                                         |
-| 0002 | `hono` is the only peer dependency; validators through vendored Standard Schema types |
-| 0003 | Web standards only; no ambient environment reads                                      |
-| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                        |
-| 0005 | `Content-Type` parameters and `Location` are derived from the document                |
-| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own   |
-| 0007 | The `filter` grammar                                                                  |
-| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                 |
-| 0009 | A closed error catalog over registered status codes                                   |
-| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing          |
-| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas            |
-| 0012 | Definitions are validated at definition time, never at request time                   |
+| ADR  | Decision                                                                                        |
+| ---- | ----------------------------------------------------------------------------------------------- |
+| 0001 | Record architecture decisions                                                                   |
+| 0002 | Validators through vendored Standard Schema types; `hono` is the adapter's only peer dependency |
+| 0003 | Web standards only; no ambient environment reads                                                |
+| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                  |
+| 0005 | `Content-Type` parameters and `Location` are derived from the document                          |
+| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own             |
+| 0007 | The `filter` grammar                                                                            |
+| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                           |
+| 0009 | A closed error catalog over registered status codes                                             |
+| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing                    |
+| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas                      |
+| 0012 | Definitions are validated at definition time, never at request time                             |
+| 0013 | Two packages: the framework-neutral core `jsonapi-kit` and the Hono adapter `hono-jsonapi`      |

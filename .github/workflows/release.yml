@@ -4,9 +4,10 @@
 # one of:
 #   - `version`: pending changesets exist, so the "Version Packages" PR is
 #     opened or updated (bumps package.json and CHANGELOG.md);
-#   - `publish`: no pending changesets and package.json holds a version that
-#     is not on npm, so `changeset publish` publishes it, tags the commit, and
-#     creates a GitHub release;
+#   - `publish`: no pending changesets and at least one package
+#     (packages/*) holds a version that is not on npm, so `changeset publish`
+#     publishes those packages, tags the commit once per package, and
+#     creates a GitHub release for each;
 #   - `none`: nothing to do (running `version` here would open an empty PR).
 #
 # The CI workflow runs on the same push but as a separate workflow, so a
@@ -17,9 +18,12 @@
 #
 # Publishing uses npm trusted publishing (OIDC): no NPM_TOKEN secret. pnpm
 # publish exchanges the GitHub id-token for a short-lived npm token and npm
-# attaches provenance automatically. One-time setup on npmjs.com for the
-# package: Settings > Trusted publisher > GitHub Actions, repository
-# ali-issa/hono-jsonapi, workflow filename release.yml.
+# attaches provenance automatically. One-time setup on npmjs.com for each
+# package (jsonapi-kit and hono-jsonapi): Settings > Trusted publisher >
+# GitHub Actions, repository ali-issa/jsonapi-kit, workflow filename
+# release.yml. pnpm publish also applies each package's publishConfig (the
+# dist-only exports map) and rewrites the workspace: range of hono-jsonapi's
+# dependency on jsonapi-kit to the published version.
 # @ref https://changesets.dev/guide/automating#how-do-i-run-the-version-and-publish-commands
 # @ref https://docs.npmjs.com/trusted-publishers
 # @ref https://github.com/pnpm/pnpm/releases/tag/v11.0.7 (OIDC in pnpm publish)

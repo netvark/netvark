@@ -1,6 +1,7 @@
 # ADR 0002: `hono` is the only peer dependency; validators through Standard Schema
 
-- Status: accepted
+- Status: accepted; scope narrowed by ADR-0013 (`hono` is the peer dependency of `hono-jsonapi`;
+  `jsonapi-kit`, the core, has no dependencies at all)
 - Date: 2026-10-08
 
 ## Context

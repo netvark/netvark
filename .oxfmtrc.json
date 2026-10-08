@@ -47,12 +47,22 @@
       {
         "groupName": "self-type",
         "modifiers": ["type"],
-        "elementNamePattern": ["hono-jsonapi", "hono-jsonapi/**"]
+        "elementNamePattern": [
+          "jsonapi-kit",
+          "jsonapi-kit/**",
+          "hono-jsonapi",
+          "hono-jsonapi/**"
+        ]
       },
       {
         "groupName": "self-value",
         "modifiers": ["value"],
-        "elementNamePattern": ["hono-jsonapi", "hono-jsonapi/**"]
+        "elementNamePattern": [
+          "jsonapi-kit",
+          "jsonapi-kit/**",
+          "hono-jsonapi",
+          "hono-jsonapi/**"
+        ]
       }
     ]
   },

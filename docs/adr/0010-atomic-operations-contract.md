@@ -1,6 +1,8 @@
 # ADR 0010: Atomic operations: caller-owned transaction, lid scope, two-phase processing
 
-- Status: accepted
+- Status: accepted; amended by ADR-0013 (`transaction(c, run)` is `transaction(ctx, run)`, the
+  processor lives in `jsonapi-kit` as `operationsProcessor`, and "propagate to `app.onError`" reads
+  "propagate to the host")
 - Date: 2026-10-08
 
 ## Context

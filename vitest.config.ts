@@ -3,27 +3,24 @@ import type { ViteUserConfig } from 'vitest/config';
 import { defineConfig } from 'vitest/config';
 
 /**
+ * One Vitest run over every package's project (`packages/x/vitest.config.ts`).
+ * Coverage is a whole-process concern that Vitest configures only here, so
+ * the thresholds apply to the combined source of all packages.
+ * @ref https://vitest.dev/guide/projects
  * @ref https://vitest.dev/config/
  */
 const config: ViteUserConfig = defineConfig({
   test: {
-    include: ['src/**/*.test.ts'],
-    environment: 'node',
-    restoreMocks: true,
-    // The conformance tests compile the vendored JSON:API schema with Ajv on
-    // first use; on a two-core CI runner with coverage instrumentation and one
-    // worker per file that can pass Vitest's 5 s default. Same headroom as e2e/.
-    testTimeout: 20_000,
-    typecheck: {
-      enabled: true,
-      include: ['src/**/*.test-d.ts'],
-      tsconfig: './tsconfig.json',
-    },
+    projects: ['packages/*'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.ts'],
-      // Only the root barrel is excluded: every other index.ts holds real code.
-      exclude: ['src/**/*.test.ts', 'src/**/*.test-d.ts', 'src/index.ts'],
+      include: ['packages/*/src/**/*.ts'],
+      // Tests and the entry barrels (`index.ts` files hold re-exports only).
+      exclude: [
+        'packages/*/src/**/*.test.ts',
+        'packages/*/src/**/*.test-d.ts',
+        'packages/*/src/**/index.ts',
+      ],
       reporter: ['text', 'lcov', 'json-summary'],
       thresholds: {
         statements: 90,

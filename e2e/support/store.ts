@@ -8,9 +8,9 @@ import type {
   PageRequest,
   ParsedFilter,
   SortField,
-} from 'hono-jsonapi';
+} from 'jsonapi-kit';
 
-import { invalidCursor } from 'hono-jsonapi';
+import { invalidCursor } from 'jsonapi-kit';
 
 export interface PersonRow {
   readonly id: string;

@@ -1,4 +1,4 @@
-# hono-jsonapi: instructions for coding agents
+# jsonapi-kit: instructions for coding agents
 
 This file is read by AI coding agents working in this repository. Humans: see `CONTRIBUTING.md`.
 
@@ -16,10 +16,12 @@ This file is read by AI coding agents working in this repository. Humans: see `C
   normative words in the test name. Where the specification leaves a choice to the server, the
   choice is written down in `docs/SPEC.md` and an ADR.
 - Run the gates after every meaningful change, not at the end: `pnpm check:types`,
-  `pnpm check:lint`, then `pnpm test`. Run `pnpm build`, `pnpm check`, and `pnpm test:e2e` before
-  declaring done, in that order: the type-aware lint of `e2e/` and the package checks read `dist/`,
-  and the e2e suite is the only check that exercises `dist/` and the `exports` map.
-  `pnpm test:runtimes` (Bun, Deno, workerd smoke) needs `bun` and `deno` installed; CI runs it.
+  `pnpm check:lint`, then `pnpm test` (both packages; `hono-jsonapi` resolves `jsonapi-kit` from
+  source through the `source` export condition, so no build is needed between edits). Run
+  `pnpm build`, `pnpm check`, and `pnpm test:e2e` before declaring done, in that order: the
+  type-aware lint of `e2e/` and the package checks read `dist/`, and the e2e suite is the only check
+  that exercises `dist/` and the published `exports` maps. `pnpm test:runtimes` (Bun, Deno, workerd
+  smoke) needs `bun` and `deno` installed; CI runs it.
 - Tests are colocated (`x.test.ts`, `x.test-d.ts`) and cover behavior, not implementation. A test
   earns its place by pinning a specification clause, a server choice recorded in the SPEC, or a
   regression. Coverage thresholds are enforced; do not lower them.
@@ -30,30 +32,50 @@ This file is read by AI coding agents working in this repository. Humans: see `C
 - No `process.env` at module scope, no Node-only APIs in `src/` (web standards only), no enums or
   parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis.
 - Commit subjects use conventional commits. Every user-visible change needs a changeset in
-  `.changeset/` (`pnpm changeset`).
+  `.changeset/` (`pnpm changeset`) naming the package or packages it changes.
+- Framework code stays in the adapter. Nothing under `packages/jsonapi-kit/` imports `hono` or
+  another framework; what needs a request, a response, or a framework context lives in
+  `packages/hono-jsonapi/` and calls the core (ADR 0013). The host context handlers receive is the
+  `TContext` type parameter, never a concrete framework type, in the core.
 - Never mention AI assistance in commits, changesets, or docs.
 
 ## Repository map
 
-- `src/internal/` constants, prototype-safe object helpers, RFC 6901 pointers, vendored Standard
-  Schema types; never exported
-- `src/media-type/` RFC 9110 media type and `Accept` parsing and serialization, the JSON:API media
-  type and its `ext` and `profile` parameters
-- `src/negotiate/` the server content negotiation rules as a pure function
-- `src/errors/` `JsonApiError`, the closed error catalog, the registered status code table
-- `src/document/` document and resource object types, member name rules, resource serialization,
+A pnpm workspace: `packages/jsonapi-kit` (the framework-free core, published as `jsonapi-kit`),
+`packages/hono-jsonapi` (the Hono adapter, published as `hono-jsonapi`, depends on the core and
+re-exports it), and `e2e/` (private). Root configs (`vitest.config.ts` with `test.projects`,
+`tsconfig.base.json`, `knip.jsonc`, `.oxlintrc.json`, `.oxfmtrc.json`) apply to all of them.
+
+`packages/jsonapi-kit/src/`:
+
+- `internal/` constants, prototype-safe object helpers, RFC 6901 pointers, vendored Standard Schema
+  types; never exported
+- `media-type/` RFC 9110 media type and `Accept` parsing and serialization, the JSON:API media type
+  and its `ext` and `profile` parameters
+- `negotiate/` the server content negotiation rules as a pure function
+- `errors/` `JsonApiError`, the closed error catalog, the registered status code table
+- `document/` document and resource object types, member name rules, resource serialization,
   document builders, full linkage
-- `src/resource/` `defineResource`: the definition everything else reads from
-- `src/query/` `parseQuery`: `include`, `fields`, `sort`, `page`, `filter`, search, custom
-- `src/pagination/` the Cursor Pagination profile: links, meta, errors, `paginatedDocument`
-- `src/request/` request documents: identifiers, resource objects, relationship documents
-- `src/hono/` the Hono integration: `jsonApi()` middleware, `respond`, `readDocument`, validators,
-  `errorHandler` and `notFoundHandler`
-- `src/atomic/` the Atomic Operations extension (`hono-jsonapi/atomic`)
-- `src/test-support/` the vendored JSON:API 1.0 JSON Schema and the Ajv conformance helper for the
+- `resource/` `defineResource`: the definition everything else reads from
+- `query/` `parseQuery`: `include`, `fields`, `sort`, `page`, `filter`, search, custom
+- `pagination/` the Cursor Pagination profile: links, meta, errors, `paginatedDocument`
+- `request/` request documents: identifiers, resource objects, relationship documents
+- `atomic/` the Atomic Operations extension (`jsonapi-kit/atomic`): `operationsProcessor`,
+  `assertOperationsContentType`, the document parser, lids, executors
+- `test-support/` the vendored JSON:API 1.0 JSON Schema and the Ajv conformance helper for the
   repository's own tests; not published
-- `e2e/` end-to-end suite: a private workspace package that consumes the built `hono-jsonapi`
-  through `workspace:*` and drives a blog API over real HTTP with `@hono/node-server`; never imports
-  from `src/`. `e2e/smoke/` is the runtime smoke test (Bun, Deno, workerd)
+
+`packages/hono-jsonapi/src/`:
+
+- `index.ts` re-exports `jsonapi-kit` and adds the Hono integration: `jsonApi()` middleware
+  (`middleware.ts`), `respond` (`respond.ts`), `readDocument` (`body.ts`), validators
+  (`validators.ts`), `errorHandler` and `notFoundHandler` (`handlers.ts`)
+- `atomic/` re-exports `jsonapi-kit/atomic` and adds `atomicOperations()`, the operations endpoint
+  as a Hono handler
+
+`e2e/`: end-to-end suite, a private workspace package that consumes the built `jsonapi-kit` and
+`hono-jsonapi` through `workspace:*` and drives a blog API over real HTTP with `@hono/node-server`;
+never imports from `src/`. `e2e/smoke/` is the runtime smoke test (Bun, Deno, workerd).
+
 - `docs/DESIGN.md` what we are building and why; `docs/SPEC.md` the normative contract; `docs/adr/`
   decisions

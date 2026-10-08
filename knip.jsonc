@@ -2,9 +2,13 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      // Type tests are run by Vitest's typecheck mode, which knip's vitest
-      // plugin does not read; list them as entries so they are not reported
-      // as unused.
+      "project": ["*.config.ts"]
+    },
+    "packages/*": {
+      // Entries come from each package's tsdown config (knip's tsdown
+      // plugin). Type tests are run by Vitest's typecheck mode, which the
+      // vitest plugin does not read; list them so they are not reported as
+      // unused.
       "entry": ["src/**/*.test-d.ts"],
       "project": ["src/**/*.ts"]
     },

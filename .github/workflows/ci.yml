@@ -30,7 +30,9 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # Type-aware lint of e2e/ resolves `hono-jsonapi` into dist/, so build first.
+      # The type-aware lint of e2e/ resolves both packages into their dist/,
+      # so build first. The packages themselves resolve each other from
+      # source (the `source` export condition) and need no build.
       - run: pnpm run build
       - run: pnpm run check:format
       - run: pnpm run check:lint
@@ -55,6 +57,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: pnpm install --frozen-lockfile
+      # Both packages' projects in one run; hono-jsonapi resolves jsonapi-kit
+      # from source, so no build is needed here.
       - run: pnpm run test:coverage
       - if: matrix.node == 24
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -79,10 +83,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run check:pkg
-      # The build rewrites package.json exports; a diff means the committed
-      # exports drifted from the tsdown entry map.
-      - run: git diff --exit-code -- package.json
-      - run: pnpm pack --pack-destination /tmp/pack
+      # The build rewrites each package's exports maps; a diff means the
+      # committed maps drifted from the tsdown entry maps.
+      - run: git diff --exit-code -- packages/jsonapi-kit/package.json packages/hono-jsonapi/package.json
+      # pnpm pack applies publishConfig (the dist-only exports map) and
+      # rewrites workspace: ranges, as a publish would.
+      - run: pnpm -r --filter "./packages/**" exec pnpm pack --pack-destination /tmp/pack
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tarball
@@ -107,11 +113,11 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: pnpm install --frozen-lockfile
-      # The e2e workspace consumes the built package through `workspace:*`,
+      # The e2e workspace consumes both built packages through `workspace:*`,
       # so it type-checks and runs against dist/ exactly as an install would.
       - run: pnpm run build
-      - run: pnpm --filter hono-jsonapi-e2e run typecheck
-      - run: pnpm --filter hono-jsonapi-e2e run test
+      - run: pnpm --filter jsonapi-kit-e2e run typecheck
+      - run: pnpm --filter jsonapi-kit-e2e run test
 
   runtimes:
     name: Smoke (Bun, Deno, workerd)
@@ -134,11 +140,11 @@ jobs:
           deno-version: 2.x
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      # One app importing every subpath, driven in-process by each runtime
-      # (e2e/smoke/). workerd runs through Miniflare on Node.
-      - run: pnpm --filter hono-jsonapi-e2e run smoke:bun
-      - run: pnpm --filter hono-jsonapi-e2e run smoke:deno
-      - run: pnpm --filter hono-jsonapi-e2e run smoke:workerd
+      # One app importing every subpath of both packages, driven in-process
+      # by each runtime (e2e/smoke/). workerd runs through Miniflare on Node.
+      - run: pnpm --filter jsonapi-kit-e2e run smoke:bun
+      - run: pnpm --filter jsonapi-kit-e2e run smoke:deno
+      - run: pnpm --filter jsonapi-kit-e2e run smoke:workerd
 
   changeset:
     name: Changeset present
@@ -156,10 +162,11 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # Fails when src/ changed without a changeset. Docs-only PRs pass.
+      # Fails when a package's src/ changed without a changeset. Docs-only
+      # PRs pass.
       - run: |
-          if git diff --quiet origin/${{ github.base_ref }}...HEAD -- src; then
-            echo "No src changes; changeset not required."
+          if git diff --quiet origin/${{ github.base_ref }}...HEAD -- packages/jsonapi-kit/src packages/hono-jsonapi/src; then
+            echo "No package source changes; changeset not required."
           else
             pnpm changeset status --since=origin/${{ github.base_ref }}
           fi

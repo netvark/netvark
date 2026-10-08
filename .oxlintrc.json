@@ -247,7 +247,7 @@
         "**/*.spec.ts",
         "**/*.test-d.ts",
         "**/*.test.ts",
-        "src/test-support/**"
+        "packages/*/src/test-support/**"
       ],
       "env": {
         "node": true

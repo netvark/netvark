@@ -1,6 +1,7 @@
-# hono-jsonapi: implementation specification
+# jsonapi-kit: implementation specification
 
-- Status: normative for the 0.x line; `docs/DESIGN.md` explains the why
+- Status: normative for the 0.x line of `jsonapi-kit` and `hono-jsonapi`; `docs/DESIGN.md` explains
+  the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. When this document and the code
@@ -18,7 +19,7 @@ Contents
 7. Document building
 8. Cursor pagination
 9. Request documents
-10. Hono integration
+10. Hono integration (`hono-jsonapi`)
 11. Atomic operations
 12. Packaging
 13. Constants
@@ -28,31 +29,40 @@ Contents
 
 ## 1. Public surface and module map
 
-`hono` is the only peer dependency. Validators are consumed through Standard Schema V1, whose
-interfaces are vendored in `src/internal/standard-schema-types.ts` (ADR 0002), so installing
-`hono-jsonapi` never pulls in Zod, Valibot, ArkType, or Ajv.
+Two packages, one repository (ADR 0013). `jsonapi-kit` is the framework-free core: every module is a
+function over plain values (strings, parsed JSON, `URL`s) and none imports a web framework or a
+runtime API beyond web standards. `hono-jsonapi` is the Hono adapter: it depends on `jsonapi-kit`,
+re-exports all of it (one import for a Hono application), and adds the middleware, validators,
+response helpers, error handlers, and the operations endpoint (sections 10 and 11.1). `jsonapi-kit`
+has no dependencies and no peer dependencies; `hono` is `hono-jsonapi`'s only peer dependency (ADR
+0002). Validators are consumed through Standard Schema V1, whose interfaces are vendored in
+`packages/jsonapi-kit/src/internal/standard-schema-types.ts`, so installing either package never
+pulls in Zod, Valibot, ArkType, or Ajv.
 
-| Subpath               | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hono-jsonapi`        | Values: `defineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `JsonApiError`, `isJsonApiError`, `errorObject`, `errorDocument`, `responseStatus`, `ERROR_CATALOG`, `ERROR_CODES`, `isErrorStatusCode`, `reasonPhrase`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`, `toJsonApiError`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9, 10 |
-| `hono-jsonapi/atomic` | `atomicOperations`, `parseOperationsDocument`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Subpath               | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jsonapi-kit`         | Values: `defineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `JsonApiError`, `isJsonApiError`, `errorObject`, `errorDocument`, `responseStatus`, `ERROR_CATALOG`, `ERROR_CODES`, `isErrorStatusCode`, `reasonPhrase`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9 |
+| `jsonapi-kit/atomic`  | `operationsProcessor`, `assertOperationsContentType`, `parseOperationsDocument`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `hono-jsonapi`        | Everything of `jsonapi-kit` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`, `toJsonApiError`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `hono-jsonapi/atomic` | Everything of `jsonapi-kit/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-`e2e/package-surface.e2e.test.ts` asserts the exact value export list of both subpaths against the
-built package.
+`e2e/package-surface.e2e.test.ts` asserts the exact value export list of all four subpaths against
+the built packages, and that the adapter's re-exports are the core's own bindings.
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
 `*.test-d.ts`. Type-only modules (`types.ts` files, `standard-schema-types.ts`) and modules reached
 only through their consumers (`input.ts`, `registry.ts`, `identifiers.ts`, `resource-members.ts`,
 `format.ts`, `linkage.ts`, `query-capabilities.ts`, the atomic executors) are covered through those
-consumers; coverage thresholds apply to all of `src/`. Imports form a DAG (`import/no-cycle` is
-enforced, type-only imports included).
+consumers; coverage thresholds apply to all of `packages/*/src/`. Imports form a DAG
+(`import/no-cycle` is enforced, type-only imports included); nothing under `packages/jsonapi-kit`
+imports `hono`, and `packages/hono-jsonapi` imports the core only through its package name.
 
 ```
-src/
+packages/jsonapi-kit/src/
   index.ts                       root entry
   internal/
     constants.ts                 section 13
-    object.ts                    isRecord(), ownMember(), hasOwnMember(), ownKeys(), compact(): prototype-safe reads
+    object.ts                    isRecord(), ownMember(), hasOwnMember(), ownEntry(), ownKeys(), compact(): prototype-safe reads
     pointer.ts                   pointer(), escapePointerToken(): RFC 6901
     standard-schema-types.ts     vendored Standard Schema V1 interfaces
   media-type/
@@ -93,17 +103,11 @@ src/
     resource-document.ts         parseResourceObject(), parseCreateDocument(), parseUpdateDocument(), primaryData() (9.2)
     relationship-document.ts     parseToOneRelationshipDocument(), parseToManyRelationshipDocument() (9.3)
     cardinality.ts               toOneLinkage(), toManyLinkage() (9.4)
-  hono/
-    types.ts                     JsonApiEnv, JsonApiContext (10.1)
-    middleware.ts                jsonApi() (10.1)
-    respond.ts                   respond(), respondError(), isJsonApiResponse(), varyAccept() (10.2)
-    body.ts                      readDocument() (10.3)
-    validators.ts                queryValidator(), bodyValidator(), relationshipValidator() (10.4)
-    handlers.ts                  errorHandler(), notFoundHandler(), toJsonApiError() (10.5)
   atomic/
     index.ts                     subpath entry
     types.ts                     section 11
-    handler.ts                   atomicOperations() (11.1)
+    process.ts                   operationsProcessor() (11.1)
+    content-type.ts              assertOperationsContentType() (11.1)
     parse-document.ts            parseOperationsDocument() (11.2)
     parse-target.ts              ref and href (11.2)
     parse-support.ts             ParseDocumentOptions, unknownMembers()
@@ -112,10 +116,23 @@ src/
     execute-resource.ts          create(), update(), remove() (11.4)
     execute-relationship.ts      relationship() (11.4)
     execute-support.ts           shared lookups and checks (11.4)
-    test-fixtures.ts             the store and app the atomic tests share; not published
+    test-fixtures.ts             the store and handlers the atomic tests share; not published
+    test-run.ts                  the outcome runner the atomic tests share; not published
   test-support/
     jsonapi-schema-1-0.ts        the official JSON:API 1.0 JSON Schema, vendored; not published
     conformance.ts               schemaErrors(): Ajv over the schema with the 1.1 deltas; not published
+packages/hono-jsonapi/src/
+  index.ts                       root entry: re-exports jsonapi-kit, adds section 10
+  internal/object.ts             isRecord(), ownMember(): the two prototype-safe reads respond() needs
+  types.ts                       JsonApiEnv, JsonApiContext (10.1)
+  middleware.ts                  jsonApi() (10.1)
+  respond.ts                     respond(), respondError(), isJsonApiResponse(), varyAccept() (10.2)
+  body.ts                        readDocument() (10.3)
+  validators.ts                  queryValidator(), bodyValidator(), relationshipValidator() (10.4)
+  handlers.ts                    errorHandler(), notFoundHandler(), toJsonApiError() (10.5)
+  atomic/
+    index.ts                     subpath entry: re-exports jsonapi-kit/atomic, adds atomicOperations
+    handler.ts                   atomicOperations() (11.1)
 ```
 
 ---
@@ -279,9 +296,11 @@ occurrence to occurrence).
 
 ### 4.3 Status codes (`errors/status.ts`)
 
-`ErrorStatusCode` is Hono's `ClientErrorStatusCode | ServerErrorStatusCode`. `isErrorStatusCode(n)`
-is true for the registered 4xx and 5xx codes; `reasonPhrase(status)` gives the RFC 9110 / IANA
-phrase (`413 Content Too Large`, `422 Unprocessable Content`, `418 I'm a teapot`).
+`ErrorStatusCode` is `ClientErrorStatusCode | ServerErrorStatusCode`, the package's own literal
+unions of the registered codes (the same membership as Hono's unions, so `hono-jsonapi` hands a
+status to `c.json` without assertions). `isErrorStatusCode(n)` is true for the registered 4xx and
+5xx codes; `reasonPhrase(status)` gives the RFC 9110 / IANA phrase (`413 Content Too Large`,
+`422 Unprocessable Content`, `418 I'm a teapot`).
 
 Tests: `json-api-error.test.ts` (status derivation table, factories, structural narrowing),
 `status.test.ts` (every code round-trips; 499 and 299 are rejected).
@@ -665,7 +684,11 @@ Tests: `resource-document.test.ts`, `resource-update.test.ts`, `relationship-doc
 
 ---
 
-## 10. Hono integration (`hono/`)
+## 10. Hono integration (`hono-jsonapi`, `packages/hono-jsonapi/src/`)
+
+`hono-jsonapi` depends on `jsonapi-kit`, re-exports everything of both its subpaths (`export *`, so
+the bindings are the core's own), and adds the functions of this section and 11.1. `hono` is its
+only peer dependency.
 
 ### 10.1 `jsonApi(options?)` and types (`middleware.ts`, `types.ts`)
 
@@ -730,7 +753,7 @@ Tests: `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test
 
 ---
 
-## 11. Atomic operations (`atomic/`, ADR 0010)
+## 11. Atomic operations (`jsonapi-kit/atomic`, `hono-jsonapi/atomic`, ADR 0010, ADR 0013)
 
 Types (`types.ts`):
 
@@ -739,36 +762,52 @@ Types (`types.ts`):
 - `ResolvedResourceObject<TAttributes> = { type; id; lid; attributes; relationships: Record<string, ResourceLinkage>; meta }`:
   the operation's `data` with every `lid` reference replaced by the id the earlier operation
   produced.
-- `OperationContext<TTransaction, E> = { c, tx, index, pointer, meta }`.
-- `ResourceHandlers<TResource, TTransaction, E> = { resource; create?; update?; remove?; relationships? }`
+- `OperationContext<TTransaction, TContext = unknown> = { ctx, tx, index, pointer, meta }`: `ctx` is
+  what the host handed the processor for this request (Hono's `Context` under `hono-jsonapi`).
+- `ResourceHandlers<TResource, TTransaction, TContext> = { resource; create?; update?; remove?; relationships? }`
   where `create({ data })` and `update({ id, data })` return a row (the result's `data`) or
   `undefined` (an empty result), `remove({ id })` returns nothing, and `relationships[name]` is
   `{ update?, add?, remove? }` over linkage. Handlers MAY be synchronous (`MaybePromise`).
 - `AnyResourceHandlers` is the erased form the processor stores; its handler members are declared
   through method signatures so typed handlers are assignable (bivariant parameters).
-- `AtomicOptions<TTransaction, E> = { resources; transaction(c, run); resolveHref?; maxOperations? }`.
+- `AtomicOptions<TTransaction, TContext> = { resources; transaction(ctx, run); resolveHref?; maxOperations? }`.
   `transaction` MUST call `run` once and MUST roll back whatever `run` did when it rejects.
+- `OperationsOutcome = { results, document }` and `OperationsProcessor<TContext>` (11.1);
+  `OperationsResultDocument` is the `atomic:results` document.
 
-### 11.1 `atomicOperations(options)` (`handler.ts`)
+### 11.1 `operationsProcessor(options)` (`process.ts`), `assertOperationsContentType` (`content-type.ts`), and `atomicOperations(options)` (`hono-jsonapi/atomic`, `handler.ts`)
 
-A Hono `Handler` for the operations endpoint. Listing a resource type twice throws `TypeError` at
-setup. Per request, in order:
+The core processes; the host (an HTTP adapter) does what needs the request and the response.
+`operationsProcessor(options)` returns
+`OperationsProcessor<TContext> = (body, ctx) => Promise<OperationsOutcome>`; listing a resource type
+twice throws `TypeError` at setup. Per call, in order:
+
+1. `parseOperationsDocument(body, { maxOperations, resolveHref })` (11.2), `maxOperations`
+   defaulting to 10.
+2. `options.transaction(ctx, run)`; `run` executes every operation in document order (11.4) with one
+   `Lids` registry (11.3) and `OperationContext = { ctx, tx, index, pointer, meta }`. A
+   `JsonApiError` from an operation whose objects lack a `source` gets `source.pointer` set to the
+   operation's pointer (extension: errors SHOULD point at the operation); any error aborts `run`, so
+   the transaction rolls back, and escapes the processor as it is.
+3. The outcome is `{ results, document }`: `results` holds one result per operation, in order;
+   `document` is `{ jsonapi: { version: '1.1', ext: [extension] }, 'atomic:results': results }` when
+   at least one result carries `data`, and `undefined` when none does (extension: "MUST include the
+   `atomic:results` array"; `204 No Content` allowed "if all results are empty").
+
+`assertOperationsContentType(value)` throws a 415 unless `value` parses as the JSON:API media type
+with the extension in `ext` (extension: the request "MUST ... specify the extension in the `ext`
+media type parameter"). Other parameters are the negotiation layer's concern (3.3).
+
+`atomicOperations(options)` in `hono-jsonapi/atomic` is a Hono `Handler` built on the two; `ctx` is
+Hono's `Context<E>` (`AtomicOptions<TTransaction, Context<E>>`). Per request, in order:
 
 1. A method other than `POST` is 405 with `Allow: POST` (extension: "MUST be sent via POST").
-2. The request `Content-Type` MUST declare the extension (`ext` includes
-   `https://jsonapi.org/ext/atomic`); otherwise 415.
-3. `readDocument` (10.3), then `parseOperationsDocument` (11.2) with `maxOperations` (default 10)
-   and `resolveHref`.
-4. `options.transaction(c, run)`; `run` executes every operation in document order (11.4) with one
-   `Lids` registry (11.3). A `JsonApiError` from an operation whose objects lack a `source` gets
-   `source.pointer` set to the operation's pointer (extension: errors SHOULD point at the
-   operation); any error aborts `run`, so the transaction rolls back.
-5. When every result lacks `data`: `204 No Content`. Otherwise `200` with
-   `{ jsonapi: { version: '1.1', ext: [extension] }, 'atomic:results': results }` through `respond`,
-   which puts the extension on `Content-Type` (extension: "MUST include the `atomic:results` array";
-   `204` allowed when no operation returns data).
+2. `assertOperationsContentType(c.req.header('content-type'))`.
+3. `readDocument` (10.3), then the processor with `c` as `ctx`.
+4. No document: `204 No Content`. Otherwise `200` with the document through `respond`, which puts
+   the extension on `Content-Type`.
 
-A `JsonApiError` thrown anywhere in 1 to 5 is rendered by the handler itself; other errors propagate
+A `JsonApiError` thrown anywhere in 1 to 4 is rendered by the handler itself; other errors propagate
 to `app.onError` after the rollback.
 
 ### 11.2 Document and targets (`parse-document.ts`, `parse-target.ts`)
@@ -811,27 +850,40 @@ identifiers, keeping `meta`.
 Results carry `data` only when a handler returned a row (extension: results for `remove` and
 relationship operations MUST NOT contain `data`).
 
-Tests: `parse-document.test.ts`, `lids.test.ts`, `handler.test.ts` (the extension's examples, lid
-flow, 204, rollback, pointers), `handler-semantics.test.ts` (every rule above), and
-`handler-coverage.test.ts`; `atomic.e2e.test.ts` over HTTP.
+Tests: `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts` (the
+extension's examples, lid flow, the empty outcome, the host context, rollback, pointers),
+`process-semantics.test.ts` (every rule above), and `process-coverage.test.ts` in the core;
+`atomic/handler.test.ts` in `hono-jsonapi` (405, 415, malformed JSON, 200 with the extension on
+`Content-Type`, 204, rendering and propagation after the rollback); `atomic.e2e.test.ts` over HTTP.
 
 ---
 
 ## 12. Packaging
 
-- ESM only; `type: module`; `exports` maps `.` and `./atomic` to `dist/*.js` with declarations next
-  to them, plus `./package.json`. tsdown rewrites `exports` from its entry map on every build; CI
-  fails on a diff.
-- `sideEffects: false`; `files` is `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`.
-- `engines.node >= 22.12.0`; `peerDependencies.hono >= 4.12.34`.
+Two packages under `packages/`, both ESM only with `type: module`, `sideEffects: false`, `files` of
+`dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, and
+`publishConfig.provenance` (ADR 0013).
+
+- `jsonapi-kit`: no `dependencies`, no `peerDependencies`. `hono-jsonapi`:
+  `dependencies.jsonapi-kit` (`workspace:^`, a caret range when published) and
+  `peerDependencies.hono >= 4.12.34`.
+- Each `exports` map has `.`, `./atomic`, and `./package.json`, with declarations next to the
+  `dist/*.js` files. tsdown rewrites both maps from its entry map on every build
+  (`exports.devExports: 'source'`): the in-repo map resolves each subpath to `./dist/*.js` by
+  default and to `./src/**/index.ts` under the `source` condition, which only
+  `packages/hono-jsonapi/tsconfig.json` (`customConditions`) and its Vitest project
+  (`ssr.resolve.conditions`) enable; `publishConfig.exports` holds the dist-only map that
+  `pnpm publish` and `pnpm pack` apply. CI fails on a diff of either `package.json`.
 - Built with `platform: 'neutral'`, `target: es2023`, source maps, declarations from
-  `isolatedDeclarations` (ADR 0004). `publint --strict` and `attw --profile esm-only` run on every
-  build.
-- Published with npm provenance through trusted publishing (`release.yml`).
+  `isolatedDeclarations` (ADR 0004); `hono-jsonapi`'s build leaves `jsonapi-kit` and `hono`
+  external. `publint --strict` and `attw --profile esm-only` run on every build and in `check:pkg`.
+- Versions are independent; Changesets patch-bumps `hono-jsonapi` when its `jsonapi-kit` range
+  moves. Both are published with npm provenance through trusted publishing (`release.yml`), one
+  trusted publisher per package.
 
 ---
 
-## 13. Constants (`src/internal/constants.ts`)
+## 13. Constants (`packages/jsonapi-kit/src/internal/constants.ts`)
 
 | Name                           | Value                                                         | Exported |
 | ------------------------------ | ------------------------------------------------------------- | -------- |
@@ -854,45 +906,48 @@ flow, 204, rollback, pointers), `handler-semantics.test.ts` (every rule above), 
 
 ## 14. Test plan
 
-Vitest with `typecheck` enabled for `*.test-d.ts`; V8 coverage thresholds of 90% for statements,
-branches, functions, and lines over `src/` (the root barrel excluded). Every test names the clause
-or server choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks
-of the package's own modules.
+One Vitest run over two projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled for
+its `*.test-d.ts`; `hono-jsonapi`'s project resolves `jsonapi-kit` from source (section 12). V8
+coverage thresholds of 90% for statements, branches, functions, and lines over `packages/*/src/`
+combined (the `index.ts` barrels excluded). Every test names the clause or server choice it pins.
+Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of the packages' own
+modules.
 
-| Area        | Files                                                                                                                     | What is pinned                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Internal    | `object.test.ts`, `pointer.test.ts`                                                                                       | prototype-safe reads, RFC 6901 escaping                                                                        |
-| Media types | `parse.test.ts`, `json-api.test.ts`                                                                                       | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                          |
-| Negotiation | `negotiate.test.ts`                                                                                                       | each rule of 3.3                                                                                               |
-| Errors      | `json-api-error.test.ts`, `status.test.ts`                                                                                | status derivation, catalog closure, factories, registered codes only                                           |
-| Documents   | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                        | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance |
-| Resources   | `define-resource.test.ts`, `define-resource.test-d.ts`                                                                    | every definition-time rejection, inference                                                                     |
-| Query       | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                         | dispatch, aggregation, each family, the filter grammar                                                         |
-| Pagination  | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                    | link rebuilding, meta members, the profile's error objects                                                     |
-| Requests    | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`            | pointers for every structural error, 403/409/422 cases, lids                                                   |
-| Hono        | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, error rendering                   |
-| Atomic      | `parse-document.test.ts`, `lids.test.ts`, `handler.test.ts`, `handler-semantics.test.ts`, `handler-coverage.test.ts`      | the extension's examples and every processing rule                                                             |
+| Area                  | Files                                                                                                                                               | What is pinned                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal              | `object.test.ts`, `pointer.test.ts`                                                                                                                 | prototype-safe reads, RFC 6901 escaping                                                                                                              |
+| Media types           | `parse.test.ts`, `json-api.test.ts`                                                                                                                 | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                |
+| Negotiation           | `negotiate.test.ts`                                                                                                                                 | each rule of 3.3                                                                                                                                     |
+| Errors                | `json-api-error.test.ts`, `status.test.ts`                                                                                                          | status derivation, catalog closure, factories, registered codes only                                                                                 |
+| Documents             | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                  | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                       |
+| Resources             | `define-resource.test.ts`, `define-resource.test-d.ts`                                                                                              | every definition-time rejection, inference                                                                                                           |
+| Query                 | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                   | dispatch, aggregation, each family, the filter grammar                                                                                               |
+| Pagination            | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                              | link rebuilding, meta members, the profile's error objects                                                                                           |
+| Requests              | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                                      | pointers for every structural error, 403/409/422 cases, lids                                                                                         |
+| Hono (`hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, error rendering, the operations endpoint's 405, 415, 204, and rendering |
+| Atomic                | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `process-coverage.test.ts`        | the extension's examples, the host context, and every processing rule                                                                                |
 
 ### 14.1 End-to-end suite (`e2e/`)
 
-A private workspace package that depends on `hono-jsonapi` through `workspace:*`, so imports resolve
-through the published `exports` map into `dist/` and `tsc` checks the emitted declarations.
-`e2e/support/` holds a blog API (people, articles, tags; a keyset pagination engine over an
-in-memory store; a snapshot transaction) built only from the package; each file starts it on
-`@hono/node-server` and asserts over `fetch`.
+A private workspace package that depends on `jsonapi-kit` and `hono-jsonapi` through `workspace:*`,
+so imports resolve through the published `exports` maps into each `dist/` (never the `source`
+condition) and `tsc` checks the emitted declarations. `e2e/support/` holds a blog API (people,
+articles, tags; a keyset pagination engine over an in-memory store; a snapshot transaction) built
+only from the packages: `store.ts` and `resources.ts` import `jsonapi-kit`, the routes and handlers
+`hono-jsonapi`. Each file starts it on `@hono/node-server` and asserts over `fetch`.
 
-| File                          | Covers                                                                                             |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `package-surface.e2e.test.ts` | the exact export list of both subpaths                                                             |
-| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500 |
-| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors   |
-| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, update, relationship endpoints, delete |
-| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers               |
-| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, 415 and 400 for bad requests            |
+| File                          | Covers                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts` | the exact export lists of all four subpaths, and that `hono-jsonapi` re-exports the core's own bindings |
+| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500      |
+| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors        |
+| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, update, relationship endpoints, delete      |
+| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                    |
+| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, 415 and 400 for bad requests                 |
 
 ### 14.2 Runtime smoke test (`e2e/smoke/`)
 
-`app.ts` is the same blog API; `checks.ts` holds runtime-neutral assertions over every feature area;
-`run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers module and `workerd.ts`
-bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's workerd.
-`pnpm test:runtimes` runs all three; CI runs them on every push.
+`app.ts` is the same blog API, so both packages load in each runtime; `checks.ts` holds
+runtime-neutral assertions over every feature area; `run.ts` drives it in-process on Bun and Deno;
+`worker.ts` is the Workers module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`)
+and runs it in Miniflare's workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.

@@ -15,8 +15,8 @@ Security Advisory; reporters are credited unless they ask not to be.
 
 ## Scope
 
-hono-jsonapi parses untrusted request documents and query strings and renders responses. Reports we
-care about most:
+jsonapi-kit and hono-jsonapi parse untrusted request documents and query strings and render
+responses. Reports we care about most:
 
 - prototype pollution through member names, query parameter names, or `lid` values taken from a
   request

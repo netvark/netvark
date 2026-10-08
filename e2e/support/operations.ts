@@ -1,6 +1,7 @@
 /**
  * The atomic operations endpoint of the blog: typed handlers per resource
- * and a snapshot transaction that rolls the store back on failure.
+ * and a snapshot transaction that rolls the store back on failure. Under
+ * `hono-jsonapi` the handler context is the Hono `Context`.
  */
 import type { Context } from 'hono';
 
@@ -23,7 +24,11 @@ function article(tx: Store, id: string): ArticleRow {
   return row;
 }
 
-const articles: ResourceHandlers<typeof Articles, Store, JsonApiEnv> = {
+const articles: ResourceHandlers<
+  typeof Articles,
+  Store,
+  Context<JsonApiEnv>
+> = {
   resource: Articles,
   create: ({ data }, { tx }) => {
     const row: ArticleRow = {
@@ -70,7 +75,7 @@ const articles: ResourceHandlers<typeof Articles, Store, JsonApiEnv> = {
   },
 };
 
-const people: ResourceHandlers<typeof People, Store, JsonApiEnv> = {
+const people: ResourceHandlers<typeof People, Store, Context<JsonApiEnv>> = {
   resource: People,
   create: ({ data }, { tx }) => {
     const row: PersonRow = {
@@ -83,10 +88,12 @@ const people: ResourceHandlers<typeof People, Store, JsonApiEnv> = {
   },
 };
 
-export function atomicOptions(store: Store): AtomicOptions<Store, JsonApiEnv> {
+export function atomicOptions(
+  store: Store,
+): AtomicOptions<Store, Context<JsonApiEnv>> {
   return {
     resources: [articles, people],
-    transaction: async (_c: Context<JsonApiEnv>, run) => {
+    transaction: async (_ctx, run) => {
       const snapshot = store.snapshot();
       try {
         return await run(store);

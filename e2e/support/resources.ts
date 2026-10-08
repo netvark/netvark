@@ -3,13 +3,13 @@
  * handlers. Module-level so `typeof Articles` types the validators and
  * handlers everywhere.
  */
-import type { AnyResource } from 'hono-jsonapi';
+import type { AnyResource } from 'jsonapi-kit';
 
 import type { ArticleRow, PersonRow, TagRow } from './store.ts';
 
 import { z } from 'zod';
 
-import { defineResource } from 'hono-jsonapi';
+import { defineResource } from 'jsonapi-kit';
 
 export const BASE_URL = 'https://blog.example';
 

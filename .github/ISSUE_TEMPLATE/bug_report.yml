@@ -5,8 +5,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: hono-jsonapi version
-      placeholder: 1.0.0
+      label: Package and version
+      placeholder: jsonapi-kit 1.0.0, or hono-jsonapi 1.0.0
     validations:
       required: true
   - type: input
@@ -20,8 +20,9 @@ body:
     id: hono
     attributes:
       label: Hono version
+      description: When the report concerns hono-jsonapi.
     validations:
-      required: true
+      required: false
   - type: textarea
     id: repro
     attributes:

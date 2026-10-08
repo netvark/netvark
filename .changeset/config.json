@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "ali-issa/hono-jsonapi" }
+    { "repo": "ali-issa/jsonapi-kit" }
   ],
   "commit": false,
   "fixed": [],
