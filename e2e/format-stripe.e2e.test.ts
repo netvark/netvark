@@ -208,7 +208,7 @@ describe('stripe() validation bodies', () => {
       });
       expect(
         schemaErrors(
-          ban.format.validationSchema(
+          ban.format.errorsSchema(
             ban.catalog.VALIDATION_FAILED,
             SCHEMA_CONTEXT,
           ),

@@ -1,4 +1,4 @@
-# Contributing to hono-ban
+# Contributing to ban-kit and hono-ban
 
 Thanks for helping. This document covers setup, the quality gates, and how changes are released.
 Design intent lives in `docs/DESIGN.md`, the normative contract in `docs/SPEC.md`, and decisions in
@@ -13,8 +13,8 @@ Design intent lives in `docs/DESIGN.md`, the normative contract in `docs/SPEC.md
 ## Setup
 
 ```bash
-git clone https://github.com/ali-issa/hono-ban.git
-cd hono-ban
+git clone https://github.com/ali-issa/ban-kit.git
+cd ban-kit
 pnpm install
 ```
 
@@ -24,32 +24,47 @@ the package checks (`publint`, `attw`) read `dist/`.
 
 ## Scripts
 
-| Script                     | What it does                                                    |
-| -------------------------- | --------------------------------------------------------------- |
-| `pnpm check`               | Runs every `check:*` script below, in order                     |
-| `pnpm check:format`        | `oxfmt --check`                                                 |
-| `pnpm check:lint`          | `oxlint` with type-aware rules                                  |
-| `pnpm check:types`         | `tsc --noEmit`                                                  |
-| `pnpm check:deps`          | `knip`: unused files, exports, dependencies                     |
-| `pnpm check:pkg`           | `publint` and `arethetypeswrong` against the built package      |
-| `pnpm test`                | Vitest, including type tests in `*.test-d.ts`                   |
-| `pnpm test:coverage`       | Vitest with V8 coverage; thresholds are enforced                |
-| `pnpm test:e2e`            | Build, then type-check and run `e2e/` against the built package |
-| `pnpm test:runtimes`       | Build, then run the smoke test on Bun, Deno, and workerd        |
-| `pnpm build`               | tsdown: ESM, declarations, updates `exports` in `package.json`  |
-| `pnpm format` / `lint:fix` | Apply formatting / autofixable lint fixes                       |
+| Script                     | What it does                                                     |
+| -------------------------- | ---------------------------------------------------------------- |
+| `pnpm check`               | Runs every `check:*` script below, in order                      |
+| `pnpm check:format`        | `oxfmt --check`                                                  |
+| `pnpm check:lint`          | `oxlint` with type-aware rules                                   |
+| `pnpm check:types`         | `tsc --noEmit` at the root and in each package                   |
+| `pnpm check:deps`          | `knip`: unused files, exports, dependencies                      |
+| `pnpm check:pkg`           | `publint` and `arethetypeswrong` against both built packages     |
+| `pnpm test`                | Vitest over both packages, including type tests in `*.test-d.ts` |
+| `pnpm test:coverage`       | Vitest with V8 coverage; thresholds are enforced                 |
+| `pnpm test:e2e`            | Build, then type-check and run `e2e/` against the built packages |
+| `pnpm test:runtimes`       | Build, then run the smoke test on Bun, Deno, and workerd         |
+| `pnpm build`               | tsdown in each package: ESM, declarations, updates its `exports` |
+| `pnpm format` / `lint:fix` | Apply formatting / autofixable lint fixes                        |
 
 CI runs the same commands. A pull request must be green on all of them.
+
+## Layout
+
+- `packages/ban-kit` is the framework-free core and `packages/hono-ban` the Hono adapter (ADR 0016).
+  Behavior lives in the core; the adapter owns only what needs a Hono type (`create-ban.ts`,
+  `http-exception.ts`) and one-line re-exports of each core subpath. A change to a format, hook, or
+  the handler is a core change, even when the motivating bug was seen through Hono.
+- `hono-ban` imports `ban-kit` by package name. In the repository the `source` export condition
+  resolves that to the core's `src/` (see `packages/hono-ban/tsconfig.json` and its
+  `vitest.config.ts`), so no build is needed for tests and type checks; the published package
+  resolves to `dist/`.
+- Tests that need Hono or its middleware (`@hono/*` validators, `OpenAPIHono`) live in
+  `packages/hono-ban/src`; the core's tests feed the hooks validator results directly and drive the
+  handler through `test-support/handler-dispatch.ts`.
 
 ## Conventions
 
 - **Tests are colocated.** `foo.ts` has `foo.test.ts` next to it, and `foo.test-d.ts` when the types
   are part of the contract. New behavior ships with tests; bug fixes ship with a failing test first.
 - **End-to-end tests live in `e2e/`.** That directory is a private pnpm workspace package that
-  depends on `hono-ban` through `workspace:*`, so its imports resolve through the published
-  `exports` map into `dist/` and its `tsc` run checks the emitted declarations. Each `*.e2e.test.ts`
-  file starts a real Hono app on `@hono/node-server` and asserts over `fetch`. Never import from
-  `src/` there. Run one file with `pnpm --filter hono-ban-e2e exec vitest run <name>` after
+  depends on `ban-kit` and `hono-ban` through `workspace:*`, so its imports resolve through the
+  published `exports` maps into each `dist/` and its `tsc` run checks the emitted declarations. Each
+  `*.e2e.test.ts` file starts a real Hono app on `@hono/node-server` and asserts over `fetch`
+  (`core-handler` serves a plain `fetch` function instead, to prove the core alone). Never import
+  from `src/` there. Run one file with `pnpm --filter ban-kit-e2e exec vitest run <name>` after
   `pnpm build`.
 - **Runtime smoke tests live in `e2e/smoke/`.** One app imports every subpath; `run.ts` drives it
   in-process on Bun and Deno and `workerd.ts` bundles it with tsdown and runs it in Miniflare's
@@ -72,13 +87,16 @@ CI runs the same commands. A pull request must be green on all of them.
 
 ## Adding a format or adapter
 
-The four extension points are wire formats (`src/formats/<name>/index.ts`, exported as
-`hono-ban/formats/<name>`), validator hooks (`src/validation/<name>.ts`, exported as
-`hono-ban/<name>`), observability sources (`src/observability/<name>.ts`, exported as
-`hono-ban/<name>`), and database error mappers (`src/<database>/index.ts`, exported as
-`hono-ban/<database>`; `hono-ban/postgresql` is the one so far). Formats are namespaced because
-several ship and a consumer picks one; hooks, sources, and mappers are top-level because a consumer
-picks the one matching a library already installed.
+The extension points live in `packages/ban-kit/src`: wire formats (`formats/<name>/index.ts`,
+exported as `ban-kit/formats/<name>`), validator hooks (`validation/<name>.ts`, exported as
+`ban-kit/<name>`), observability sources (`observability/<name>.ts`, exported as `ban-kit/<name>`),
+and database error mappers (`<database>/index.ts`, exported as `ban-kit/<database>`;
+`ban-kit/postgresql` is the one so far). Each subpath is mirrored by a one-line re-export in
+`packages/hono-ban/src` so it is also `hono-ban/<subpath>`. Formats are namespaced because several
+ship and a consumer picks one; hooks, sources, and mappers are top-level because a consumer picks
+the one matching a library already installed. A fifth kind, a host adapter, is its own package next
+to `hono-ban`: it depends on `ban-kit`, installs an `adopt` hook for the host's exceptions, and maps
+the host's request to `ErrorRequest` (ADR 0016, ADR 0018).
 
 **What is accepted in-tree.** Open a discussion first (the issue templates link to it) so the scope
 question is settled before code exists.
@@ -90,7 +108,7 @@ question is settled before code exists.
   the one deliberate exception to both. A shape that exists in one organization belongs in that
   organization as a `defineFormat()` call, which the README shows.
 - A validator hook must target a validator with its own `@hono/*` middleware that Standard Schema
-  does not already cover. `hono-ban/standard-schema` serves every Standard Schema library (ArkType,
+  does not already cover. `ban-kit/standard-schema` serves every Standard Schema library (ArkType,
   Effect Schema, Zod 4, Valibot), so a dedicated hook for one of them needs a reason the shared hook
   cannot meet.
 - An observability module supplies a request id or trace id source for `HandlerOptions`. Sinks
@@ -103,10 +121,11 @@ question is settled before code exists.
 
 **Constraints every contribution inherits.**
 
-- `hono` stays the only peer dependency. Type the third-party objects you read structurally (`*Like`
-  interfaces) and never import the library at runtime or in types (ADR 0009). The real library is a
-  devDependency in both `package.json` and `e2e/package.json`; pnpm refuses versions younger than a
-  day (`minimumReleaseAge`). A database mapper's real driver is an `e2e/` devDependency (PGlite runs
+- `ban-kit` has no dependencies and no peer dependencies, and `hono` stays `hono-ban`'s only peer.
+  Type the third-party objects you read structurally (`*Like` interfaces) and never import the
+  library at runtime or in types (ADR 0009). The real library is a devDependency of the package
+  whose tests need it and of `e2e/package.json`; pnpm refuses versions younger than a day
+  (`minimumReleaseAge`). A database mapper's real driver is an `e2e/` devDependency (PGlite runs
   Postgres in-process and `@electric-sql/pglite-socket` serves it to real drivers over the wire
   protocol), and a driver whose error type spells its fields differently is a root devDependency for
   a type-level test only. The README's database-errors table and the matrix in ADR 0015 say how each
@@ -122,23 +141,25 @@ question is settled before code exists.
 
 1. Source file in the location above, with a `@packageDocumentation` header naming the SPEC section
    it implements and `@ref` links to the specification or upstream source.
-2. Entry in `tsdown.config.ts` (the key becomes the subpath). Run `pnpm build` and commit the
-   regenerated `exports` in `package.json`; CI fails on a diff. knip reads the tsdown entries, so
-   `knip.jsonc` needs no change.
-3. Unit tests beside the file. Formats also run `assertFormatConformance()` from `src/testing` with
-   the Ajv compiler in `src/test-support/ajv.ts`; hooks add a case to `validation/hooks.test-d.ts`
-   proving assignability to the real middleware's hook type; mappers add a `*.test-d.ts` proving
-   assignability to `BanOptions['map']` for bans with and without custom catalogs and to the real
-   driver's error type.
+2. Entries in both `tsdown.config.ts` files (the key becomes the subpath): the core's points at the
+   source, `hono-ban`'s at a new one-line re-export file. Run `pnpm build` and commit the
+   regenerated `exports` in both `package.json` files; CI fails on a diff. knip reads the tsdown
+   entries, so `knip.jsonc` needs no change.
+3. Unit tests beside the file. Formats also run `assertFormatConformance()` from `testing/` with the
+   Ajv compiler in `test-support/ajv.ts` and must pass its mixed-items cases; hooks add a case to
+   `packages/hono-ban/src/hooks.test-d.ts` proving assignability to the real middleware's hook type
+   and a route to `validators.test.ts` there; mappers add a `*.test-d.ts` proving assignability to
+   `BanOptions['map']` for bans with and without custom catalogs and to the real driver's error
+   type.
 4. `e2e/package-surface.e2e.test.ts`: the exact export list of the new subpath. An e2e file named
    `<area>-<subject>.e2e.test.ts` driving the subpath over real HTTP.
 5. `e2e/smoke/app.ts` imports the subpath and `e2e/smoke/checks.ts` exercises it; the smoke test
    must pass on Bun, Deno, and workerd (`pnpm test:runtimes`).
 6. Docs in the same PR: `docs/SPEC.md` sections 1 (subpath table and source layout), 12 (entry
    list), 14 and 14.1 (test rows), plus the section for the new module (6.x, 7.x, 8.x, or 10.x);
-   `docs/DESIGN.md` section 4.4, 4.5, 4.7, or 4.6, and 4.10; the README Modules table and any
-   sentence that enumerates the formats or hooks; `package.json` `keywords` when a new library name
-   applies.
+   `docs/DESIGN.md` section 4.4, 4.5, 4.7, or 4.6, and 4.10; the Modules table in both package
+   READMEs and any sentence that enumerates the formats or hooks; `package.json` `keywords` when a
+   new library name applies.
 7. An ADR: a new subpath is a public API change, and a new format is a wire format.
 8. A changeset: an additive subpath or option is `minor`; anything that changes an existing wire
    shape, schema, or exported type is `major`.
@@ -149,18 +170,19 @@ question is settled before code exists.
   `fix(handler): preserve HTTPException headers`. Types: `feat`, `fix`, `refactor`, `perf`, `test`,
   `docs`, `chore`, `build`, `ci`.
 - Keep pull requests focused. Describe the why in the body; link the issue.
-- Every user-visible change needs a changeset (next section). CI fails without one on `src/`
-  changes.
+- Every user-visible change needs a changeset (next section), naming the package it changes. CI
+  fails without one on `packages/*/src` changes.
 
 ## Changesets and releases
 
 Releases are automated with [Changesets](https://github.com/changesets/changesets).
 
-1. In your branch run `pnpm changeset` and pick `patch`, `minor`, or `major`. Write the entry for
-   users, not for maintainers: what changed and what they have to do.
+1. In your branch run `pnpm changeset`, pick the package (a core change is a `ban-kit` entry;
+   `hono-ban` is bumped automatically to depend on it), and pick `patch`, `minor`, or `major`. Write
+   the entry for users, not for maintainers: what changed and what they have to do.
 2. Commit the generated file under `.changeset/`.
 3. When your PR merges, the release workflow opens or updates a "Version Packages" PR that bumps
-   `package.json` and `CHANGELOG.md`.
+   each affected package's `package.json` and `CHANGELOG.md`.
 4. Merging that PR publishes to npm through trusted publishing (OIDC, with provenance) and creates a
    GitHub release.
 

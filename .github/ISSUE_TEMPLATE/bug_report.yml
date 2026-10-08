@@ -5,8 +5,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: hono-ban version
-      placeholder: 1.0.0
+      label: Package and version
+      placeholder: ban-kit 1.0.0, or hono-ban 2.0.0
     validations:
       required: true
   - type: input
@@ -21,7 +21,7 @@ body:
     attributes:
       label: Hono version
     validations:
-      required: true
+      required: false
   - type: textarea
     id: repro
     attributes:

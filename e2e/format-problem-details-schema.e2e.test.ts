@@ -25,7 +25,7 @@ const SCHEMA_CTX = {
   dialect: 'draft-2020-12',
 } as const;
 /** SPEC 7.4: three rendered cases plus two validation bodies (two issues, none) per location. */
-const CASES_PER_DEFINITION = 3 + 6 * 2;
+const CASES_PER_DEFINITION = 3 + 6 * 3;
 /** A compiler whose validator rejects every body, to observe failure handling. */
 const rejectAll = (): SchemaValidator => () => ['rejected'];
 
@@ -53,7 +53,7 @@ describe('published schemas (SPEC 7.1.4)', () => {
   });
 
   it('requires errors in the validation schema and closes each entry', () => {
-    const schema = ban.format.validationSchema(
+    const schema = ban.format.errorsSchema(
       ban.catalog.VALIDATION_FAILED,
       SCHEMA_CTX,
     );
@@ -64,7 +64,7 @@ describe('published schemas (SPEC 7.1.4)', () => {
       type: 'array',
       items: {
         type: 'object',
-        required: ['location', 'detail'],
+        required: ['detail'],
         properties: {
           location: {
             type: 'string',

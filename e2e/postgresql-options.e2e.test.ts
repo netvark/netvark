@@ -222,7 +222,7 @@ describe('issue mapping rendered by JSON:API', () => {
     });
     const definition = ban.catalog['VALIDATION_FAILED'];
     const validate = compileWithAjv(
-      ban.format.validationSchema(definition, {
+      ban.format.errorsSchema(definition, {
         dialect: 'draft-2020-12',
         docsBaseUrl: undefined,
       }),

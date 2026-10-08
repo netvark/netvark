@@ -1,4 +1,4 @@
-# hono-ban: instructions for coding agents
+# ban-kit and hono-ban: instructions for coding agents
 
 This file is read by AI coding agents working in this repository. Humans: see `CONTRIBUTING.md`.
 
@@ -21,28 +21,37 @@ This file is read by AI coding agents working in this repository. Humans: see `C
 - Tests are colocated (`x.test.ts`, `x.test-d.ts`) and cover behavior, not implementation. Coverage
   thresholds are enforced; do not lower them.
 - The error handler never throws and never reveals server internals by default. Any change to
-  `src/handler/` must keep the single-invocation and constant-500-detail tests green.
-- No `process.env` at module scope, no Node-only APIs in `src/` (web standards only), no enums or
-  parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis.
+  `packages/ban-kit/src/handler/` must keep the single-invocation and constant-500-detail tests
+  green.
+- `packages/ban-kit` imports nothing from Hono, not even types; anything that needs a Hono type
+  belongs in `packages/hono-ban`, which imports `ban-kit` by package name (resolved to the core's
+  `src/` in-repo through the `source` export condition).
+- No `process.env` at module scope, no Node-only APIs in either `src/` (web standards only), no
+  enums or parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis.
 - Commit subjects use conventional commits. Every user-visible change needs a changeset in
-  `.changeset/` (`pnpm changeset`).
+  `.changeset/` (`pnpm changeset`) naming the package it changes.
 - Never mention AI assistance in commits, changesets, or docs.
 
 ## Repository map
 
-- `src/core/` error class, definitions catalog, factories, `createBan`
-- `src/formats/` wire formats (RFC 9457, JSON:API, plain, Google API, Stripe) and `defineFormat`
-- `src/headers/` `bearerChallenge()`, the RFC 6750 `WWW-Authenticate` builder
-- `src/handler/` the `onError` handler and error mapping
-- `src/validation/` validation-issue normalization and validator hooks
-- `src/openapi/` response schema helpers
-- `src/observability/` the OpenTelemetry trace id adapter
-- `src/postgresql/` the Postgres SQLSTATE mapper (`hono-ban/postgresql`)
-- `src/testing/` consumer test helpers and format conformance
-- `src/internal/` helpers that are never exported
-- `src/test-support/` helpers for the repository's own tests (Ajv compiler); not published
-- `e2e/` end-to-end suite: a private workspace package that consumes the built `hono-ban` through
-  `workspace:*` and drives it over real HTTP with `@hono/node-server`; never imports from `src/`.
-  `e2e/smoke/` is the runtime smoke test (Bun, Deno, workerd)
+- `packages/ban-kit/src/core/` error class, error items, status codes, definitions catalog,
+  factories, `createBan`
+- `packages/ban-kit/src/formats/` wire formats (RFC 9457, JSON:API, plain, Google API, Stripe) and
+  `defineFormat`
+- `packages/ban-kit/src/headers/` `bearerChallenge()`, the RFC 6750 `WWW-Authenticate` builder
+- `packages/ban-kit/src/handler/` the framework-free handler, `fromRequest`, and error mapping
+- `packages/ban-kit/src/validation/` validation-issue normalization and validator hooks
+- `packages/ban-kit/src/openapi/` response schema helpers
+- `packages/ban-kit/src/observability/` the OpenTelemetry trace id adapter
+- `packages/ban-kit/src/postgresql/` the Postgres SQLSTATE mapper (`ban-kit/postgresql`)
+- `packages/ban-kit/src/testing/` consumer test helpers and format conformance
+- `packages/ban-kit/src/internal/` helpers that are never exported
+- `packages/ban-kit/src/test-support/` helpers for the repository's own tests (Ajv compiler, handler
+  dispatch); not published
+- `packages/hono-ban/src/` the Hono adapter: `createBan` with `onError`, `HTTPException` adoption,
+  one-line re-exports of every core subpath, and the tests that need Hono or its middleware
+- `e2e/` end-to-end suite: a private workspace package that consumes the built `ban-kit` and
+  `hono-ban` through `workspace:*` and drives them over real HTTP with `@hono/node-server`; never
+  imports from `src/`. `e2e/smoke/` is the runtime smoke test (Bun, Deno, workerd)
 - `docs/DESIGN.md` what we are building and why; `docs/SPEC.md` the normative contract; `docs/adr/`
   decisions

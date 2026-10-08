@@ -1,9 +1,10 @@
-# hono-ban 1.0: implementation specification
+# ban-kit 1.0 and hono-ban 2.0: implementation specification
 
-- Status: normative for the 1.0 line; `docs/DESIGN.md` explains the why
+- Status: normative for the ban-kit 1.x and hono-ban 2.x lines; `docs/DESIGN.md` explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
-source file that implements it and the tests that prove it. When this document and the code
+source file that implements it and the tests that prove it. File references are relative to
+`packages/ban-kit/src/` unless they start with `packages/`. When this document and the code
 disagree, fix one of them in the same pull request.
 
 Contents
@@ -12,8 +13,8 @@ Contents
 2. Core types
 3. Built-in catalog
 4. `BanError`
-5. Factories, `error`, `custom`, `assert`, `from`
-6. The `onError` handler
+5. Factories, `error`, `custom`, `fromStatus`, `assert`, `from`, `adopt`
+6. The handler, and `onError` for Hono
 7. Formats
 8. Validation
 9. OpenAPI
@@ -27,46 +28,60 @@ Contents
 
 ## 1. Public surface and module map
 
-`hono` is the only peer dependency. Every integration module types the third-party objects it
-receives structurally (ADR 0009), so installing `hono-ban` never pulls in or requires Zod, Valibot,
-`@standard-schema/spec`, `@hono/*` validators, `@opentelemetry/api`, a Postgres driver, or Ajv.
+Two packages ship from this repository (ADR 0016):
 
-| Subpath                            | Exports                                                                                                                                                                                                                                                                                                                       |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hono-ban`                         | `createBan`, `assert`, `defineFormat`, `problemDetails`, `bearerChallenge`, `BanError`, `isBanError`, `BUILTIN_CATALOG`, `FACTORY_NAMES`, `parseTraceparent`, `pointerFromPath`, `nameFromPath`, `locationFromTarget`, and every type in sections 2, 3.2, 4, 7, 8                                                             |
-| `hono-ban/formats/problem-details` | `problemDetails(options?)`, `PROBLEM_DETAILS_CONTENT_TYPE`, `ProblemDetailsOptions`, `ProblemDetailsBody`                                                                                                                                                                                                                     |
-| `hono-ban/formats/json-api`        | `jsonApi(options?)`, `JSON_API_CONTENT_TYPE`, `JsonApiOptions`, `JsonApiBody`, `JsonApiErrorObject`, `JsonApiLinks`, `JsonApiSource`                                                                                                                                                                                          |
-| `hono-ban/formats/google-api`      | `googleApi(options)`, `GOOGLE_API_CONTENT_TYPE`, `GoogleApiOptions`, `GoogleApiBody`, `GoogleApiStatus`, `GoogleApiDetail`, `GoogleApiErrorInfo`, `GoogleApiBadRequest`, `GoogleApiFieldViolation`, `GoogleApiRetryInfo`, `GoogleApiRequestInfo`, `GoogleApiDebugInfo`, `GoogleApiHelp`, `GoogleApiHelpLink`, `GoogleRpcCode` |
-| `hono-ban/formats/stripe`          | `stripe(options?)`, `STRIPE_CONTENT_TYPE`, `StripeOptions`, `StripeBody`, `StripeErrorObject`, `StripeErrorType`                                                                                                                                                                                                              |
-| `hono-ban/formats/plain`           | `plain()`, `PLAIN_CONTENT_TYPE`, `PlainBody`                                                                                                                                                                                                                                                                                  |
-| `hono-ban/zod`                     | `hook(ban)`, `defaultHook(ban)`, `fromZodError(ban, error, location, options?)`, `toIssues(error)`, `ZodIssueLike`, `ZodErrorLike`, `ZodHookResult`                                                                                                                                                                           |
-| `hono-ban/valibot`                 | `hook(ban)`, `fromValibotIssues(ban, issues, location, options?)`, `toIssues(issues)`, `ValibotIssueLike`, `ValibotPathItemLike`, `ValibotHookResult`                                                                                                                                                                         |
-| `hono-ban/standard-schema`         | `hook(ban)`, `fromIssues(ban, issues, location, options?)`, `toIssues(issues)`, `StandardHookResult`                                                                                                                                                                                                                          |
-| `hono-ban/openapi`                 | `errorSchema`, `errorResponse`, `errorResponses`, `validationSchema`, `validationResponse`, `SchemaSource`, `OpenApiOptions`, `ResponseObject`, `MediaTypeObject`, `ErrorRef`                                                                                                                                                 |
-| `hono-ban/otel`                    | `traceIdFromOtel(source)`, `OtelSource`, `OtelTraceLike`, `OtelSpanLike`, `OtelSpanContextLike`                                                                                                                                                                                                                               |
-| `hono-ban/postgresql`              | `postgresMapper(options?)`, `findPostgresError(value)`, `readPostgresFields(error)`, `PostgresMapOptions`, `PostgresMapping`, `PostgresIssue`, `PostgresIssueMapping`, `PostgresConstraintMapping`, `PostgresMapper`, `CatalogWith`, `PostgresErrorLike`, `PostgresErrorFields`                                               |
-| `hono-ban/testing`                 | `renderError`, `expectBanError`, `assertFormatConformance`, `ExpectedError`, `ConformanceOptions`, `SchemaValidator`                                                                                                                                                                                                          |
+- `ban-kit` is the framework-free core: the catalog, `BanError`, the formats, the handler, and the
+  validation, OpenAPI, observability, Postgres, and testing modules. It has no dependencies and no
+  peer dependencies. Every integration types the third-party objects it receives structurally (ADR
+  0009), so installing `ban-kit` never pulls in or requires Hono, Zod, Valibot,
+  `@standard-schema/spec`, `@hono/*` validators, `@opentelemetry/api`, a Postgres driver, or Ajv.
+- `hono-ban` is the Hono adapter. It depends on `ban-kit`, peers on `hono`, re-exports every
+  `ban-kit` subpath under its own name, and replaces `createBan` with one whose instances also carry
+  `onError` for `app.onError()` and adopt Hono's `HTTPException` (6.11).
+
+| Subpath                           | Exports                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ban-kit`                         | `createBan`, `assert`, `defineFormat`, `problemDetails`, `bearerChallenge`, `fromRequest`, `isErrorStatus`, `reasonPhrase`, `resolveDefinition`, `BanError`, `isBanError`, `BUILTIN_CATALOG`, `FACTORY_NAMES`, `parseTraceparent`, `pointerFromPath`, `nameFromPath`, `locationFromTarget`, and every type in sections 2, 3.2, 4, 6, 7, 8 |
+| `ban-kit/formats/problem-details` | `problemDetails(options?)`, `PROBLEM_DETAILS_CONTENT_TYPE`, `ProblemDetailsOptions`, `ProblemDetailsBody`                                                                                                                                                                                                                                 |
+| `ban-kit/formats/json-api`        | `jsonApi(options?)`, `responseStatus(errors)`, `JSON_API_CONTENT_TYPE`, `JsonApiOptions`, `JsonApiDocumentMembers`, `JsonApiBody`, `JsonApiErrorObject`, `JsonApiLinks`, `JsonApiSource`                                                                                                                                                  |
+| `ban-kit/formats/google-api`      | `googleApi(options)`, `GOOGLE_API_CONTENT_TYPE`, `GoogleApiOptions`, `GoogleApiBody`, `GoogleApiStatus`, `GoogleApiDetail`, `GoogleApiErrorInfo`, `GoogleApiBadRequest`, `GoogleApiFieldViolation`, `GoogleApiRetryInfo`, `GoogleApiRequestInfo`, `GoogleApiDebugInfo`, `GoogleApiHelp`, `GoogleApiHelpLink`, `GoogleRpcCode`             |
+| `ban-kit/formats/stripe`          | `stripe(options?)`, `STRIPE_CONTENT_TYPE`, `StripeOptions`, `StripeBody`, `StripeErrorObject`, `StripeErrorType`                                                                                                                                                                                                                          |
+| `ban-kit/formats/plain`           | `plain()`, `PLAIN_CONTENT_TYPE`, `PlainBody`                                                                                                                                                                                                                                                                                              |
+| `ban-kit/zod`                     | `hook(ban)`, `defaultHook(ban)`, `fromZodError(ban, error, location, options?)`, `toIssues(error)`, `ZodIssueLike`, `ZodErrorLike`, `ZodHookResult`                                                                                                                                                                                       |
+| `ban-kit/valibot`                 | `hook(ban)`, `fromValibotIssues(ban, issues, location, options?)`, `toIssues(issues)`, `ValibotIssueLike`, `ValibotPathItemLike`, `ValibotHookResult`                                                                                                                                                                                     |
+| `ban-kit/standard-schema`         | `hook(ban)`, `fromIssues(ban, issues, location, options?)`, `toIssues(issues)`, `StandardHookResult`                                                                                                                                                                                                                                      |
+| `ban-kit/openapi`                 | `errorSchema`, `errorResponse`, `errorResponses`, `validationSchema`, `validationResponse`, `SchemaSource`, `OpenApiOptions`, `ResponseObject`, `MediaTypeObject`, `ErrorRef`                                                                                                                                                             |
+| `ban-kit/otel`                    | `traceIdFromOtel(source)`, `OtelSource`, `OtelTraceLike`, `OtelSpanLike`, `OtelSpanContextLike`                                                                                                                                                                                                                                           |
+| `ban-kit/postgresql`              | `postgresMapper(options?)`, `findPostgresError(value)`, `readPostgresFields(error)`, `PostgresMapOptions`, `PostgresMapping`, `PostgresIssue`, `PostgresIssueMapping`, `PostgresConstraintMapping`, `PostgresMapper`, `CatalogWith`, `PostgresErrorLike`, `PostgresErrorFields`                                                           |
+| `ban-kit/testing`                 | `renderError`, `expectBanError`, `assertFormatConformance`, `ExpectedError`, `ConformanceOptions`, `SchemaValidator`                                                                                                                                                                                                                      |
+| `hono-ban`                        | everything `ban-kit` exports, with `createBan`, `Ban`, `BanInstance`, `HandlerOptions`, `NoReserved`, and `ReservedKey` replaced by the Hono-aware versions (2.2), plus `fromHttpException` and `HonoMembers`                                                                                                                             |
+| `hono-ban/<subpath>`              | the same module object as `ban-kit/<subpath>`, for each subpath above                                                                                                                                                                                                                                                                     |
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
-`*.test-d.ts` (the validator hooks share `validation/hooks.test-d.ts`). Type-only and data-only
-modules (`types.ts`, `context.ts`, `internal.ts`, `report.ts`, `resolve.ts`, `hook.ts`,
-`schema-helpers.ts`) are covered through their consumers; coverage thresholds apply to all of
-`src/`. Imports form a DAG (`import/no-cycle` is enforced, type-only imports included).
+`*.test-d.ts`. Type-only and data-only modules (`types.ts`, `context.ts`, `internal.ts`,
+`report.ts`, `resolve.ts`, `hook.ts`, `schema-helpers.ts`) are covered through their consumers;
+coverage thresholds apply to both packages' `src/`. Imports form a DAG (`import/no-cycle` is
+enforced, type-only imports included). `packages/hono-ban/src` imports `ban-kit` by package name; in
+the repository the `source` export condition resolves it to `packages/ban-kit/src` for tests and
+type checks, and the published build resolves it to `ban-kit`'s `dist/`.
 
 ```
-src/
+packages/ban-kit/src/
   index.ts                     root entry
   internal/
     constants.ts               section 13
     id.ts                      generateErrorId(): crypto.randomUUID()
     json.ts                    safeStringify(), isPlainRecord()
     sanitize-meta.ts           sanitizeMeta() (ADR 0007)
+    member-name.ts             assertMemberName() for format option names
     standard-schema-types.ts   vendored Standard Schema and Standard JSON Schema interfaces
   core/
+    status.ts                  ErrorStatusCode, isErrorStatus() (2.1)
     catalog.ts                 BUILTIN_CATALOG, FACTORY_NAMES, SECONDARY_KEYS (section 3)
     definition.ts              ErrorDefinition, ResolvedDefinition, resolveDefinition(), indexByStatus(), reasonPhrase()
     ban-error.ts               BanError, BanErrorOptions, BanErrorInit, RenderedError, Renderer (section 4)
-    types.ts                   Factory, Catalog, BanOptions, BanInstance, Ban, HandlerOptions, ErrorReport, ... (section 2)
+    error-item.ts              ErrorItem, itemFromIssue(), itemsFromIssues() (4.1)
+    types.ts                   Factory, Catalog, BanOptions, BanInstance, Ban, HandlerOptions, BanHandler, ErrorRequest, ErrorReport, ... (section 2)
     internal.ts                BanCore: what modules share without importing the public Ban
     factories.ts               parseFactoryArgs(), createFactory() (5.1, 5.2)
     assert.ts                  assert() (5.4)
@@ -78,11 +93,13 @@ src/
     types.ts                   ErrorFormat
     schema-helpers.ts          constant(value, dialect)
     extension-members.ts       flattenMeta() (7.1.2, ADR 0008)
-    validation-entries.ts      ValidationEntry, toValidationEntries(), readLocation(), VALIDATION_ENTRIES_SCHEMA
+    error-entries.ts           ErrorEntry, toErrorEntries(), readLocation(), ERROR_ENTRIES_SCHEMA (7.1.3)
     define-format.ts           defineFormat() (7.5)
     problem-details/index.ts   7.1
     json-api/
       index.ts                 jsonApi(), JsonApiOptions, JsonApiBody (7.2)
+      error-object.ts          error objects, sources, and meta per item (7.2.1, 7.2.2)
+      response-status.ts       responseStatus() (7.2.4)
       schema.ts                bodySchema() (7.2.3)
     plain/index.ts             7.3
     google-api/
@@ -94,7 +111,8 @@ src/
   headers/
     bearer-challenge.ts        bearerChallenge(), BearerChallengeOptions (3.2)
   handler/
-    on-error.ts                createOnError(): the pipeline (6.2), fallback (6.4)
+    handler.ts                 createHandler(): the pipeline (6.2), fallback (6.4)
+    request.ts                 fromRequest(): ErrorRequest from a fetch Request (section 6)
     headers.ts                 mergeHeaders() (6.9), assertHeaderName(), assertHeadersInit(), lastResortHeaders() (6.4)
     resolve.ts                 resolveThrown() (6.3)
     request-id.ts              readRequestId() (6.5)
@@ -117,21 +135,29 @@ src/
     index.ts                   postgresMapper() (6.10)
   testing/index.ts             section 11
   test-support/ajv.ts          compileWithAjv() for the repository's own conformance tests; not published
-  test-support/postgresql-*.ts   driver-shaped fixtures and a dispatch helper for the postgres tests; not published
+  test-support/handler-dispatch.ts   fakeRequest() and dispatch() for the handler and postgres tests; not published
+  test-support/postgresql-fixtures.ts   driver-shaped fixtures; not published
+
+packages/hono-ban/src/
+  index.ts                     export * from 'ban-kit', then the Hono-aware createBan and types (2.2)
+  create-ban.ts                createBan(): wraps the core with the HTTPException adopter and adds onError (6.11)
+  http-exception.ts            fromHttpException(), passthroughResponse(), MALFORMED_JSON_MESSAGE (6.11)
+  formats/<name>.ts, <name>.ts one-line re-exports of each ban-kit subpath
+  hooks.test-d.ts              validator hook types against the @hono/* middleware (8.4)
+  validators.test.ts           zValidator, vValidator, sValidator, and OpenAPIHono through onError (8.4)
+  openapi.test.ts              the generated @hono/zod-openapi document (section 9)
 ```
 
 ## 2. Core types
 
-All in `src/core/types.ts`, `src/core/ban-error.ts`, `src/core/definition.ts`, and
-`src/formats/context.ts`; re-exported from `src/index.ts`. Every optional property is declared
-`?: T | undefined` because the package compiles with `exactOptionalPropertyTypes`.
+All in `core/types.ts`, `core/ban-error.ts`, `core/definition.ts`, `core/status.ts`, and
+`formats/context.ts`; re-exported from `index.ts`. Every optional property is declared
+`?: T | undefined` because the package compiles with `exactOptionalPropertyTypes`. Nothing here
+imports a framework: `ErrorStatusCode` (2.1) is the library's own.
 
 ```ts
-import type { Context, Env, ErrorHandler } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
-
 export interface ErrorDefinition {
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly title?: string | undefined; // default: IANA reason phrase, else 'Error'
   readonly code?: string | undefined; // default: the catalog key
   readonly type?: string | undefined; // explicit URI reference only (RFC 9457 3.1.1); formats derive `${base}/${code}` otherwise (ADR 0010)
@@ -140,7 +166,7 @@ export interface ErrorDefinition {
 
 export interface ResolvedDefinition {
   readonly key: string;
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly title: string;
   readonly code: string;
   readonly type: string | undefined; // never derived here; see 7.1.1 and 7.2.1
@@ -155,6 +181,7 @@ export interface BanErrorOptions {
   readonly headers?: HeadersInit | undefined;
   readonly cause?: unknown;
   readonly id?: string | undefined;
+  readonly errors?: ReadonlyArray<ErrorItem> | undefined; // 4.1: one entry per reported problem
 }
 
 export interface Factory {
@@ -171,6 +198,10 @@ export type ErrorMapper<TErrors extends Catalog> = (
   error: unknown,
   ban: Ban<TErrors>,
 ) => BanError | undefined;
+export type ErrorAdopter<TErrors extends Catalog> = (
+  value: unknown,
+  ban: Ban<TErrors>,
+) => BanError | undefined; // 5.7
 
 export interface BanOptions<TErrors extends Catalog> {
   readonly format?: ErrorFormat | undefined; // default problemDetails()
@@ -178,23 +209,25 @@ export interface BanOptions<TErrors extends Catalog> {
   readonly docsBaseUrl?: string | undefined;
   readonly validationKey?: NoInfer<ErrorKey<TErrors>> | undefined; // default 'VALIDATION_FAILED'
   readonly map?: NoInfer<ErrorMapper<TErrors>> | undefined;
+  readonly adopt?: NoInfer<ErrorAdopter<TErrors>> | undefined;
   readonly id?: (() => string) | undefined; // default crypto.randomUUID()
 }
 
 export interface CustomErrorInit extends BanErrorOptions {
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly code?: string | undefined; // default 'CUSTOM'; free because custom errors have no schema
   readonly title?: string | undefined; // default: IANA reason phrase, else 'Error'
 }
 
 export interface ValidationOptions {
   readonly location: IssueLocation;
-  readonly detail?: string | undefined;
+  readonly detail?: string | undefined; // default VALIDATION_DETAIL (8.2)
   readonly meta?: Readonly<Record<string, unknown>> | undefined;
+  readonly cause?: unknown;
 }
 
 export interface RenderedError {
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly headers: Headers; // includes Content-Type for the format
   readonly body: unknown;
 }
@@ -209,12 +242,15 @@ export interface BanInstance<TErrors extends Catalog> {
   readonly validationKey: ErrorKey<TErrors>;
   readonly error: (key: ErrorKey<TErrors>, options?: BanErrorOptions) => BanError;
   readonly custom: (init: CustomErrorInit) => BanError;
+  readonly fromStatus: (status: ErrorStatusCode, options?: BanErrorOptions) => BanError; // 5.6
   readonly validation: (
     issues: ReadonlyArray<ValidationIssue>,
     options: ValidationOptions,
   ) => BanError;
   readonly from: (value: unknown) => BanError;
-  readonly onError: <E extends Env = Env>(options?: HandlerOptions<E, TErrors>) => ErrorHandler<E>;
+  readonly handler: <TContext = void>(
+    options?: HandlerOptions<TContext, TErrors>,
+  ) => BanHandler<TContext>; // section 6
   readonly render: Renderer;
 }
 
@@ -222,8 +258,8 @@ export type Ban<TErrors extends Catalog> = BuiltinFactories &
   CustomFactories<TErrors> &
   BanInstance<TErrors>;
 export type ReservedKey = keyof BanInstance<Catalog> | FactoryName;
-export type NoReserved<T extends Catalog> = {
-  readonly [K in keyof T]: K extends ReservedKey ? never : T[K];
+export type NoReserved<T extends Catalog, TReserved extends string = ReservedKey> = {
+  readonly [K in keyof T]: K extends TReserved ? never : T[K];
 };
 
 export function createBan<const TErrors extends Catalog = EmptyCatalog>(
@@ -243,12 +279,60 @@ Rules and rationale:
   or a built-in factory name, and throws `TypeError` at runtime for the same condition.
 - **Overriding a built-in.** A custom key equal to a built-in key replaces that definition; the
   camelCase factory keeps working and uses the replacement.
-- Hono's `ContentfulStatusCode` covers official statuses only; a non-standard status such as 499
-  needs a cast on the caller's side.
+- `ErrorStatusCode` (2.1) names the registered 4xx and 5xx statuses; a non-standard status such as
+  499 needs a cast on the caller's side, and `isErrorStatus()` is the runtime check.
+
+### 2.1 Status codes (`core/status.ts`)
+
+```ts
+export type ClientErrorStatusCode = 400 | 401 | ... | 418 | 421 | ... | 426 | 428 | 429 | 431 | 451;
+export type ServerErrorStatusCode = 500 | 501 | ... | 508 | 510 | 511;
+export type ErrorStatusCode = ClientErrorStatusCode | ServerErrorStatusCode;
+export function isErrorStatus(value: unknown): value is ErrorStatusCode;
+```
+
+The unions list the IANA-registered members of the 4xx and 5xx classes, the only statuses an error
+can carry (`BanErrorInit.status`, `ErrorDefinition.status`, `CustomErrorInit.status`,
+`ErrorReport.status`). `isErrorStatus` accepts any integer from 400 to 599: RFC 9110 defines the
+classes so that an unregistered code is treated as the `x00` of its class, which is what a
+non-standard 499 relies on. 1xx, 2xx, and 3xx are rejected at the type level and at runtime. @ref
+https://www.rfc-editor.org/rfc/rfc9110#section-15 @ref
+https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+
+### 2.2 `hono-ban` types (`packages/hono-ban/src/create-ban.ts`)
+
+```ts
+import type { Context, Env, ErrorHandler } from 'hono';
+
+export type HandlerOptions<
+  E extends Env = Env,
+  TErrors extends Catalog = Catalog,
+> = CoreHandlerOptions<Context<E>, TErrors>; // the core's, with the Hono Context as the callback context
+export interface HonoMembers<TErrors extends Catalog> {
+  readonly onError: <E extends Env = Env>(options?: HandlerOptions<E, TErrors>) => ErrorHandler<E>;
+}
+export type BanInstance<TErrors extends Catalog> = CoreBanInstance<TErrors> & HonoMembers<TErrors>;
+export type Ban<TErrors extends Catalog> = CoreBan<TErrors> & HonoMembers<TErrors>;
+export type ReservedKey = CoreReservedKey | 'onError';
+export type NoReserved<T extends Catalog> = CoreNoReserved<T> &
+  ('onError' extends keyof T ? never : unknown);
+
+export function createBan<const TErrors extends Catalog = EmptyCatalog>(
+  options?: BanOptions<TErrors> & { readonly errors?: NoReserved<TErrors> | undefined },
+): Ban<TErrors>;
+export function fromHttpException<TErrors extends Catalog>(
+  value: unknown,
+  ban: Ban<TErrors>,
+): BanError | undefined;
+```
+
+`hono-ban`'s `createBan` calls the core's with `adopt` set to `fromHttpException` followed by the
+caller's own `adopt`, rejects the catalog key `onError` (type level and `TypeError`), and returns
+the core instance with `onError` assigned (6.11). Everything else on the instance is the core's.
 
 ## 3. Built-in catalog
 
-`src/core/catalog.ts` exports `BUILTIN_CATALOG` (`as const`, `{ status, title }` per key),
+`core/catalog.ts` exports `BUILTIN_CATALOG` (`as const`, `{ status, title }` per key),
 `FACTORY_NAMES` (camelCase name to key; aliases point at the same key), and `SECONDARY_KEYS`. Titles
 are the IANA reason phrases; RFC 9110 names are used for 413 and 422, and the names they replaced
 are kept as factory aliases: `payloadTooLarge` (RFC 7231 section 6.5.11) and `unprocessableEntity`
@@ -317,8 +401,8 @@ Rules:
 
 The library fills in `Content-Type`, the error id header, and `Cache-Control` (6.9). Some statuses
 also require a header only the application can write; the factories accept it through `headers`
-(`ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } })`) and `ban.from()` keeps it from an
-`HTTPException` (5.5). The library never fabricates these values.
+(`ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } })`) and `hono-ban`'s adopter keeps it from
+an `HTTPException` (6.11). The library never fabricates these values.
 
 | Status   | Header                          | Strength | Source                                                 |
 | -------- | ------------------------------- | -------- | ------------------------------------------------------ |
@@ -331,8 +415,8 @@ also require a header only the application can write; the factories accept it th
 | 503, 3xx | `Retry-After`                   | MAY      | https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3  |
 
 For bearer tokens the 401 challenge follows RFC 6750 section 3 (`Bearer realm=..., error=...`), and
-RFC 9728 section 5.1 adds `resource_metadata`; `hono/bearer-auth` produces the former and `from()`
-preserves it. `bearerChallenge()` (3.2) builds the value. @ref
+RFC 9728 section 5.1 adds `resource_metadata`; `hono/bearer-auth` produces the former and
+`hono-ban`'s `onError` preserves it (6.11). `bearerChallenge()` (3.2) builds the value. @ref
 https://www.rfc-editor.org/rfc/rfc6750#section-3 @ref
 https://www.rfc-editor.org/rfc/rfc9728#section-5.1
 
@@ -364,20 +448,20 @@ https://www.rfc-editor.org/rfc/rfc9110#section-5.6.4
 
 ## 4. `BanError`
 
-File: `src/core/ban-error.ts`.
+File: `core/ban-error.ts`.
 
 ```ts
 export interface BanErrorInit extends BanErrorOptions {
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly code: string;
   readonly title: string;
   readonly definition?: ResolvedDefinition | undefined;
-  readonly issues?: ReadonlyArray<ValidationIssue> | undefined;
   readonly render?: Renderer | undefined; // injected by factories
 }
 
-export class BanError extends HTTPException {
+export class BanError extends Error {
   override readonly name: string = 'BanError';
+  readonly status: ErrorStatusCode;
   readonly id: string;
   readonly code: string;
   readonly title: string;
@@ -387,25 +471,61 @@ export class BanError extends HTTPException {
   readonly meta: Readonly<Record<string, unknown>>;
   readonly headers: Headers;
   readonly definition: ResolvedDefinition | undefined;
-  readonly issues: ReadonlyArray<ValidationIssue> | undefined;
+  readonly errors: ReadonlyArray<ErrorItem> | undefined;
   constructor(init: BanErrorInit);
   toInit(): BanErrorInit; // rebuild an equivalent error (body cap uses it)
-  override getResponse(): Response;
+  getResponse(): Response;
 }
 export function isBanError(value: unknown): value is BanError;
 ```
 
-- `super(status, { message: detail ?? title, cause })`; `res` is never passed.
+- `BanError` extends `Error` and nothing else (ADR 0018): the core knows no framework, and
+  `instanceof HTTPException` was the one thing a Hono app lost. `hono-ban` restores the behavior
+  that mattered, Hono middleware's `HTTPException` reaching the catalog, through `adopt` (6.11).
+  Without `app.onError(ban.onError())`, Hono answers a thrown `BanError` with its default 500.
+- `super(detail ?? title, { cause })`, so ordinary logging of the error reads well.
 - `id` is `init.id ?? generateErrorId()`; `meta` is stored as given (sanitized at render time);
-  `headers` is `new Headers(init.headers)`.
+  `headers` is `new Headers(init.headers)`; `errors` is stored as given.
 - `getResponse()` uses the injected renderer when present (status, headers including `Content-Type`,
   `safeStringify(body)`); otherwise it returns `{ status, code, title, detail, id }` as
   `application/json` with the error's headers. Neither branch adds the handler's `Cache-Control`
-  default or the error id header (6.9); those belong to `ban.onError()`.
+  default or the error id header (6.9); those belong to `ban.handler()`.
 - No `process`, `Error.captureStackTrace`, or other non-web globals.
-- @ref https://hono.dev/docs/api/exception
 
-## 5. Factories, `error`, `custom`, `assert`, `from`
+### 4.1 Error items (`core/error-item.ts`, ADR 0017)
+
+```ts
+export interface ErrorItem {
+  readonly status?: ErrorStatusCode | undefined;
+  readonly code?: string | undefined;
+  readonly title?: string | undefined;
+  readonly type?: string | undefined;
+  readonly detail: string;
+  readonly location?: IssueLocation | undefined;
+  readonly path?: ReadonlyArray<string | number> | undefined;
+  readonly reason?: string | undefined; // the validator's own code (`invalid_type`)
+  readonly expected?: string | undefined;
+  readonly received?: string | undefined;
+  readonly meta?: Readonly<Record<string, unknown>> | undefined;
+}
+export function itemFromIssue(issue: ValidationIssue, location: IssueLocation): ErrorItem;
+export function itemsFromIssues(
+  issues: ReadonlyArray<ValidationIssue>,
+  location: IssueLocation,
+): Array<ErrorItem>;
+```
+
+An error reports one problem by default; `errors` is the list of several, each an `ErrorItem`, the
+shape every list-bearing wire format shares: JSON:API's error objects, Problem Details' and plain's
+`errors` entries, Google's `BadRequest.fieldViolations`, Stripe's `param`. Only `detail` is
+required. `status`, `code`, `title`, and `type` give an item its own identity where the format
+allows it (7.2.4); `location`, `path`, `reason`, `expected`, and `received` describe a rejected
+input; `meta` is per-item metadata. Every factory accepts `errors` (`ban.badRequest({ errors })`);
+`ban.validation()` (8.2) is the shorthand that builds the list from validator issues:
+`itemFromIssue` keeps `message` as `detail`, `code` as `reason`, and copies `path`, `expected`, and
+`received` when defined.
+
+## 5. Factories, `error`, `custom`, `fromStatus`, `assert`, `from`, `adopt`
 
 ### 5.1 Factory call forms (`factories.ts`)
 
@@ -453,47 +573,68 @@ and `boolean | null` narrows to `true`.
 ### 5.5 `ban.from(value)` (`from.ts`)
 
 1. `BanError` is returned unchanged.
-2. `HTTPException`: `status = value.status`; if `status === 400` and
-   `message === 'Malformed JSON in request body'` (Hono's validator, exact match) the entry is
-   `MALFORMED_JSON`, else the primary entry for the status; if no entry exists (non-standard status)
-   the result is `custom({ status, title: 'Error' })`. `detail` is the message unless empty; the
-   body of `value.res` is discarded and every header is copied except those describing that body
-   (`BODY_HEADERS`, section 13: `Content-Type`, `Content-Length`, `Content-Encoding`,
-   `Content-Location`, `Content-Range`, `Transfer-Encoding`), because a kept `Content-Length`
-   truncates the rendered body on the wire and a kept `Content-Encoding` makes clients decompress
-   plain text; `cause = value`. `Content-Range` is kept when `status === 416`: there it states the
-   selected representation's complete length (`bytes */N`), not the body's range, and RFC 9110 says
-   a 416 SHOULD carry it. @ref https://github.com/honojs/hono/blob/main/src/validator/validator.ts
-   @ref https://www.rfc-editor.org/rfc/rfc9110#section-8.3 @ref
-   https://www.rfc-editor.org/rfc/rfc9110#section-14.4 @ref
-   https://www.rfc-editor.org/rfc/rfc9110#section-15.5.17
+2. The instance's `adopt` hook (5.7) runs; a `BanError` result is returned. A hook that throws or
+   returns something else is treated as declining.
 3. Anything else becomes `INTERNAL_SERVER_ERROR` with `detail = UNEXPECTED_DETAIL` and
    `cause = value`.
 
-`from` never throws. `from.test.ts` covers each branch, including `WWW-Authenticate` surviving from
-`hono/bearer-auth`, a proxied response losing its framing and coding headers, and a 416 keeping
-`Content-Range`.
+`from` never throws. `from.test.ts` covers each branch, including a throwing hook.
 
-## 6. The `onError` handler
+### 5.6 `ban.fromStatus(status, options?)`
 
-File: `src/handler/on-error.ts`. `ban.onError(options?)` returns a Hono `ErrorHandler<E>`.
+The primary catalog entry for `status` (the one `indexByStatus` holds, so a custom entry sharing a
+built-in status does not replace the built-in; override the key instead, section 2) built with
+`options`; when no entry has that status, `custom({ ...options, status })`. The building block for
+adopters that receive a status from somewhere else, such as `fromHttpException` (6.11).
+
+### 5.7 `adopt` (`createBan({ adopt })`)
+
+`adopt(value, ban)` recognizes thrown values that already describe an HTTP outcome and returns the
+`BanError` for them, or `undefined`. It runs inside `from()` (5.5) and ahead of `map` in the handler
+(6.3), and what it returns counts as handled: an adopted value is a deliberate error, not an
+unexpected one. `map` remains the place for domain errors that are not HTTP-shaped. Adapters install
+their own adopter and run the caller's after it (`hono-ban`, 6.11); the core ships none.
+
+## 6. The handler, and `onError` for Hono
+
+File: `handler/handler.ts`. `ban.handler(options?)` returns a `BanHandler<TContext>`: a function
+from the thrown value, the request facts, and a caller-chosen context to a `Response`. It is
+framework-free; `hono-ban` wraps it as `ban.onError()` (6.11), and any other host passes
+`fromRequest(request)` from a fetch handler, a router's error hook, or a test.
 
 ```ts
-export interface HandlerOptions<E extends Env = Env, TErrors extends Catalog = Catalog> {
+export interface ErrorRequest {
+  readonly method: string;
+  readonly path: string; // the URL path without the query
+  header(name: string): string | undefined; // case-insensitive
+}
+export function fromRequest(request: Request): ErrorRequest; // handler/request.ts
+
+export type BanHandler<TContext = void> = (
+  thrown: unknown,
+  request: ErrorRequest,
+  ctx: TContext,
+) => Promise<Response>;
+
+export interface HandlerOptions<TContext = void, TErrors extends Catalog = Catalog> {
   readonly includeStack?: boolean | undefined; // default false
   readonly requestIdHeader?: string | false | undefined; // default 'X-Request-Id'
-  readonly requestId?: ((c: Context<E>) => string | undefined) | undefined; // replaces the header lookup
-  readonly traceId?: ((c: Context<E>) => string | undefined) | undefined; // replaces traceparent parsing
-  readonly onReport?: ((report: ErrorReport, c: Context<E>) => void | Promise<void>) | undefined;
+  readonly requestId?: ((ctx: TContext) => string | undefined) | undefined; // replaces the header lookup
+  readonly traceId?: ((ctx: TContext) => string | undefined) | undefined; // replaces traceparent parsing
+  readonly onReport?: ((report: ErrorReport, ctx: TContext) => void | Promise<void>) | undefined;
   readonly headers?: HeadersInit | undefined;
   readonly errorIdHeader?: string | false | undefined; // default 'X-Error-Id'
   readonly maxBodyBytes?: number | undefined; // default 65536
-  readonly transform?: ((body: unknown, error: BanError, c: Context<E>) => unknown) | undefined;
+  readonly transform?: ((body: unknown, error: BanError, ctx: TContext) => unknown) | undefined;
   readonly map?: ErrorMapper<TErrors> | undefined; // overrides the instance map
 }
 ```
 
-`ban.onError()` itself throws `TypeError` when `requestIdHeader` or `errorIdHeader` is not a valid
+`TContext` defaults to `void`, so `handle(thrown, request)` is a complete call when the callbacks
+need nothing from the host; `ban.handler<MyContext>()` makes the third argument required and types
+it for every callback. The callbacks receive the context unchanged.
+
+`ban.handler()` itself throws `TypeError` when `requestIdHeader` or `errorIdHeader` is not a valid
 HTTP field name or when `headers` holds a name or value the `Headers` constructor rejects
 (`headers.ts`). `Headers` throws the same `TypeError` from `set()` and from its constructor; checked
 once at construction, the mistake fails at startup instead of inside the header merge (6.9) that
@@ -503,49 +644,50 @@ https://fetch.spec.whatwg.org/#concept-headers-fill
 
 ### 6.1 Guarantees
 
-- Resolves to a `Response` for every `Error` Hono hands it; never throws or rejects.
+- Resolves to a `Response` for every value, `Error` or not; never throws or rejects.
 - Calls `onReport` exactly once per invocation and swallows anything `onReport` throws.
 - Hono itself only routes `Error` instances to `onError`; a thrown string or plain object is
-  rethrown by Hono before the handler runs (`handleError` in `hono-base.ts`). `ban.from()` still
-  handles such values for callers who convert them by hand.
+  rethrown by Hono before `hono-ban`'s handler runs (`handleError` in `hono-base.ts`). Hosts that
+  call `ban.handler()` themselves can pass anything.
 
 ### 6.2 Algorithm
 
 ```
-(thrown, c):
+(thrown, request, ctx):
   try {
-    requestId = options.requestId ? options.requestId(c) : readRequestId(c.req.header(requestIdHeader))  // 6.5
-    trace     = options.traceId ? { traceId: options.traceId(c) } : parseTraceparent(c.req.header('traceparent'))  // 6.6
-    { error, handled } = resolveThrown(thrown, ban, from, map)                                          // 6.3
-    renderOptions = { requestId, traceId, instance: c.req.path, method: c.req.method, includeStack }
+    requestId = options.requestId ? options.requestId(ctx) : readRequestId(request.header(requestIdHeader))  // 6.5
+    trace     = options.traceId ? { traceId: options.traceId(ctx) } : parseTraceparent(request.header('traceparent'))  // 6.6
+    { error, handled } = resolveThrown(thrown, ban, core, map)                                          // 6.3
+    renderOptions = { requestId, traceId, instance: request.path, method: request.method, includeStack }
     rendered = render(error, renderOptions)                                                             // 6.7
-    apply = (body) => transform ? transform(body, error, c) : body
+    apply = (body) => transform ? transform(body, error, ctx) : body
     text = capBody(apply(rendered.body), error, renderOptions, render, maxBodyBytes, apply)             // 6.8
     headers = mergeHeaders(options.headers, rendered.headers, errorIdHeader, error.id)                   // 6.9
-    await report(onReport, buildReport({...}), c)                                                       // 10.1
+    await report(onReport, buildReport({...}), ctx)                                                     // 10.1
     return new Response(text, { status: error.status, headers })
   } catch (failure) {
-    return fallback(failure, thrown, c)                                                                 // 6.4
+    return fallback(failure, thrown, request, ctx)                                                      // 6.4
   }
 ```
 
 `transform` runs before the size cap and again on the minimal body when the cap re-renders (6.8).
-`onReport` is awaited; fire-and-forget work belongs in `c.executionCtx.waitUntil()` inside the
-callback.
+`onReport` is awaited; fire-and-forget work belongs in the host's own mechanism inside the callback
+(`c.executionCtx.waitUntil()` on Hono, where `ctx` is the `Context`).
 
 `transform` is also the localization point. RFC 9457 allows `title` to change between occurrences
 only for localization (section 3.1.3), and the catalog fixes `title` (ADR 0011), so a localized body
-is produced by `transform` from `c.req.header('accept-language')`, and the application states the
+is produced by `transform` from the request's `Accept-Language`, and the application states the
 language with `Content-Language` through `options.headers` or the error's headers; the library never
 sets `Content-Language`. @ref https://www.rfc-editor.org/rfc/rfc9457#section-3.1.3 @ref
 https://www.rfc-editor.org/rfc/rfc9110#section-8.5
 
 ### 6.3 `resolveThrown` (`resolve.ts`)
 
-`BanError` or `HTTPException` go through `from` with `handled: true`. Otherwise `map`, when set,
-runs: a `BanError` result is used with `handled: true`; `undefined` falls through; any other value
-throws `TypeError` (a handler failure). Without a mapping the value goes through `from` with
-`handled: false`. A `map` that throws propagates to 6.4.
+A `BanError` is used as is with `handled: true`. Otherwise the `adopt` hook (5.7) runs: a `BanError`
+result is used with `handled: true`; `undefined` falls through; any other value throws `TypeError`
+(a handler failure), and so does a hook that throws. Then `map`, when set, runs under the same
+rules. Without a mapping the value becomes the constant `INTERNAL_SERVER_ERROR` with
+`cause = thrown` and `handled: false`.
 
 ### 6.4 `fallback`
 
@@ -561,7 +703,7 @@ throws `TypeError` (a handler failure). Without a mapping the value goes through
 Then report once with `handled: false` and `handlerFailure` set. Tests: a throwing format, a
 throwing `map`, a `map` returning a non-`BanError`, a throwing `onReport` (the resolved status is
 kept, not turned into 500), a `headers` getter that throws after construction (tier 3 keeps the id
-in the header), header options rejected at construction.
+in the header), header options rejected at construction, a throwing or ill-typed `adopt` hook.
 
 ### 6.5 Request id (`request-id.ts`)
 
@@ -584,23 +726,24 @@ https://www.w3.org/TR/trace-context/#traceparent-header
    else the error's own.
 3. `ctx.instance = error.instance ?? options.instance` (an explicit instance on the error wins over
    the request path).
-4. `body = error.issues ? format.renderValidation(error, issues, ctx) : format.render(error, ctx)`.
+4. `body = error.errors ? format.renderErrors(error, error.errors, ctx) : format.render(error, ctx)`;
+   an empty list still goes through `renderErrors`.
 5. Returns `{ status, headers: error.headers plus Content-Type: format.contentType, body }`.
 
 ### 6.8 Body cap (`body-cap.ts`)
 
 Serialize with `safeStringify` (bigint becomes a string; a cycle throws and becomes a handler
 failure). If the UTF-8 length exceeds `maxBodyBytes`, rebuild the error from `toInit()` with
-`meta: {}`, no issues, and `detail` cut to 1024 characters, render again with `truncated: true` and
-`includeStack: false`, run the handler's `transform` on that body too (so a redaction applied to the
-first body cannot reappear), and return it.
+`meta: {}`, no `errors`, and `detail` cut to 1024 characters, render again with `truncated: true`
+and `includeStack: false`, run the handler's `transform` on that body too (so a redaction applied to
+the first body cannot reappear), and return it.
 
-The cap bounds the members a request can inflate: `meta`, validation issues, `detail`, and the
+The cap bounds the members a request can inflate: `meta`, the `errors` list, `detail`, and the
 stack. The members left in the minimal body (`type`, `status`, `title`, `code`, `id`, `instance`,
 the request id, the trace id) come from the catalog, the id generator, the request line, and the
 128-character request id pattern, so they are bounded by the operator, and the minimal body is
 returned as is even when a very small `maxBodyBytes` sits below their size. Tests: an oversized
-`meta` and an oversized issue list are dropped, the detail is cut, a stack is dropped, and a
+`meta` and an oversized `errors` list are dropped, the detail is cut, a stack is dropped, and a
 redacting `transform` still applies.
 
 ### 6.9 Header merge order
@@ -624,9 +767,9 @@ owns only the configured error id header name: renaming or disabling it does not
 `X-Error-Id`, so a header of that name supplied through `options.headers` or on the error passes
 through unchanged.
 
-### 6.10 Postgres mapper (`hono-ban/postgresql`, ADR 0015)
+### 6.10 Postgres mapper (`ban-kit/postgresql`, ADR 0015)
 
-`postgresMapper(options?)` returns a `map` for `createBan` or `ban.onError` that turns a Postgres
+`postgresMapper(options?)` returns a `map` for `createBan` or `ban.handler` that turns a Postgres
 driver error into a catalog entry by SQLSTATE with constant client-facing text. Files:
 `postgresql/error.ts` (recognition), `postgresql/sqlstate.ts` (the built-in table),
 `postgresql/options.ts` (option types and construction checks), `postgresql/index.ts` (the mapper).
@@ -735,6 +878,49 @@ https://www.rfc-editor.org/rfc/rfc9110#section-15.6.4 @ref
 https://www.postgresql.org/docs/current/transaction-iso.html @ref
 https://github.com/pgbouncer/pgbouncer/blob/master/src/proto.c
 
+### 6.11 `onError` for Hono (`packages/hono-ban/src`)
+
+`ban.onError(options?)` on a `hono-ban` instance returns a Hono `ErrorHandler<E>`:
+
+```
+handle = core.handler<Context<E>>(options)
+(thrown, c) => passthroughResponse(thrown) ?? handle(thrown, { method: c.req.method, path: c.req.path, header: (n) => c.req.header(n) }, c)
+```
+
+The Hono `Context` is the handler context, so `requestId`, `traceId`, `transform`, and `onReport`
+receive `c`, typed by `ban.onError<E>()`. Everything in 6.1 to 6.10 applies unchanged; this section
+adds what Hono needs.
+
+`fromHttpException(value, ban)` is the adopter `createBan` installs (5.7), ahead of the caller's own
+`adopt`. For an `HTTPException` whose `status` passes `isErrorStatus`: if `status === 400` and
+`message === MALFORMED_JSON_MESSAGE` (Hono's validator, exact match) the entry is `MALFORMED_JSON`,
+else `ban.fromStatus(status)` (5.6). `detail` is the message unless empty; the body of `value.res`
+is discarded and every header is copied except those describing that body (`BODY_HEADERS`:
+`Content-Type`, `Content-Length`, `Content-Encoding`, `Content-Location`, `Content-Range`,
+`Transfer-Encoding`), because a kept `Content-Length` truncates the rendered body on the wire and a
+kept `Content-Encoding` makes clients decompress plain text; `cause = value`. `Content-Range` is
+kept when `status === 416`: there it states the selected representation's complete length
+(`bytes */N`), not the body's range, and RFC 9110 says a 416 SHOULD carry it. Anything else,
+including an `HTTPException` outside the error classes, is declined. @ref
+https://github.com/honojs/hono/blob/main/src/validator/validator.ts @ref
+https://www.rfc-editor.org/rfc/rfc9110#section-8.3 @ref
+https://www.rfc-editor.org/rfc/rfc9110#section-14.4 @ref
+https://www.rfc-editor.org/rfc/rfc9110#section-15.5.17
+
+`passthroughResponse(thrown)`: an `HTTPException` outside the 4xx and 5xx classes is not an error
+but a short-circuit (a redirect thrown from middleware). Hono's default handler answers it with
+`getResponse()`, and so does `onError`, without rendering or reporting; `getResponse()` failing
+yields `undefined` and the value falls into the pipeline as an unexpected error. Hono 1.x's
+`BanError extends HTTPException` had the inverse problem, a 302 rendered as an error body. @ref
+https://github.com/honojs/hono/blob/main/src/hono-base.ts
+
+`MALFORMED_JSON_MESSAGE` (`'Malformed JSON in request body'`) and `BODY_HEADERS` live in
+`packages/hono-ban/src/http-exception.ts`; the core has no use for them. Tests: `create-ban.test.ts`
+drives a Hono app (bearer-auth 401 keeping `WWW-Authenticate`, the built-in validator's JSON
+failure, body headers dropped and `Content-Range` kept, a thrown 302 passed through, the context
+reaching every callback, request id and traceparent headers, the reserved key `onError`);
+`http-exception.test.ts` covers both functions directly.
+
 ## 7. Formats
 
 ```ts
@@ -761,15 +947,15 @@ export interface ErrorFormat<TBody = unknown> {
   readonly name: string;
   readonly contentType: string;
   render(error: BanError, ctx: RenderContext): TBody;
-  renderValidation(
-    error: BanError,
-    issues: ReadonlyArray<ValidationIssue>,
-    ctx: RenderContext,
-  ): TBody;
+  renderErrors(error: BanError, errors: ReadonlyArray<ErrorItem>, ctx: RenderContext): TBody;
   schema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
-  validationSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
+  errorsSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
 }
 ```
+
+`render` and `schema` describe an error that reports one problem; `renderErrors` and `errorsSchema`
+describe one carrying a list (4.1), `ban.validation()` included. A format decides how items appear
+(entries, separate objects, field violations) and whether per-item identity is honored (7.2.4).
 
 Constant members are spelled with `constant(value, dialect)` (`schema-helpers.ts`): `{ const }` for
 JSON Schema 2020-12 and OpenAPI 3.1, `{ enum: [value] }` for OpenAPI 3.0, which predates `const`.
@@ -821,10 +1007,11 @@ dropped. @ref https://www.rfc-editor.org/rfc/rfc9457#section-3.2 @ref
 https://www.rfc-editor.org/rfc/rfc9457#section-4 (extension member naming, the paragraph after the
 definition requirements)
 
-#### 7.1.3 `renderValidation`
+#### 7.1.3 `renderErrors`
 
-Same body with `detail` defaulting to `'Request validation failed'`, the `location` extension member
-(from `meta.location`, see 8.2), and `errors`:
+Same body with the `location` extension member when `meta.location` is set (8.2) and `errors`, one
+entry per item. `detail` is the error's own; `ban.validation()` supplies
+`'Request validation failed'` when the caller gives none:
 
 ```json
 "errors": [
@@ -833,9 +1020,12 @@ Same body with `detail` defaulting to `'Request validation failed'`, the `locati
 ]
 ```
 
-Entries (`ValidationEntry` in `validation-entries.ts`) carry `location`, `detail`, optional `code`,
-`expected`, `received`, plus `pointer` for `body` and `form` or `name` (first path segment) for
-`query`, `param`, `header`, `cookie`.
+Entries (`ErrorEntry` in `error-entries.ts`, built by `toErrorEntries(errors, fallback)`) carry
+`detail`, optional `location` (the item's, else the error's `meta.location`), optional `code` (the
+item's `reason`), `expected`, `received`, plus `pointer` for `body`, `form`, and items with a path
+but no location, or `name` (first path segment) for `query`, `param`, `header`, `cookie`. An item
+without a path has neither. The item's own `status`, `code`, `title`, `type`, and `meta` are not
+rendered: Problem Details describes one problem per document (ADR 0017).
 
 #### 7.1.4 `schema`
 
@@ -857,8 +1047,8 @@ Entries (`ValidationEntry` in `validation-entries.ts`) carry `location`, `detail
 }
 ```
 
-Optional members appear only when the matching option is on. `validationSchema` adds `errors` (array
-of the entry schema) and requires it.
+Optional members appear only when the matching option is on. `errorsSchema` adds `errors` (array of
+the entry schema, `ERROR_ENTRIES_SCHEMA`, each entry requiring only `detail`) and requires it.
 
 ### 7.2 JSON:API (`formats/json-api`)
 
@@ -868,6 +1058,8 @@ export interface JsonApiOptions {
   readonly aboutLink?: ((error: BanError, ctx: RenderContext) => string | undefined) | undefined;
   readonly includeId?: boolean | undefined; // default true
   readonly traceIdMetaKey?: string | false | undefined; // default 'traceId'
+  readonly mixedEntries?: boolean | undefined; // default false (7.2.4)
+  readonly document?: JsonApiDocumentMembers | undefined; // top-level jsonapi, links, meta (7.2.5)
 }
 ```
 
@@ -888,15 +1080,17 @@ https://jsonapi.org/format/#document-member-names
 `detail`, `meta` (`ctx.meta` plus `[traceIdMetaKey]` and `stack`; omitted when empty). @ref
 https://jsonapi.org/format/#error-objects
 
-#### 7.2.2 `renderValidation`
+#### 7.2.2 `renderErrors` (`error-object.ts`)
 
-One error object per issue sharing `id`, `status`, `code`, and `title`, with
-`detail = issue.message`, `source` = `{ pointer }` for `body` and `form`, `{ parameter }` for
-`query`, `{ header }` for `header`, omitted for `param` and `cookie` (JSON:API defines no member for
-them), and `meta` = shared meta plus `location`, `name` (param and cookie only), `code`, `expected`,
-`received`. An empty issue list renders one error object with
-`detail = error.detail ?? 'Request validation failed'`, no `source`, and `meta` = shared meta plus
-`location`, because `errors` must hold at least one object (7.2.3). @ref
+One error object per item sharing `id` and, by default, the error's `status`, `code`, and `title`
+(7.2.4), with `detail = item.detail`, `links.type` from `item.type` else as in 7.2.1, `source` =
+`{ pointer }` for `body`, `form`, and a path with no location, `{ parameter }` for `query`,
+`{ header }` for `header`, omitted for `param` and `cookie` (JSON:API defines no member for them)
+and for items without a path, and `meta` = shared meta, then the item's own `meta` (sanitized), then
+`location` (the item's, else `meta.location` of the error), `name` (param and cookie only), `code`
+(the item's `reason`), `expected`, `received`. An empty list renders the error itself as the one
+object (7.2.1 with `meta.location`), because `errors` must hold at least one object (7.2.3);
+`ban.validation([])` therefore shows `'Request validation failed'` as that object's `detail`. @ref
 https://jsonapi.org/format/#errors-processing
 
 #### 7.2.3 `schema` (`schema.ts`)
@@ -904,14 +1098,38 @@ https://jsonapi.org/format/#errors-processing
 Closed body `{ errors: [ErrorObject, ...] }`; error objects require `status`, `code`, `title`,
 constrain them to the definition's values (`status` as a string), type `links` (`type` and `about`
 as `format: uri-reference`, the class JSON:API assigns to link strings), `source`, and `meta`, and
-are closed too. @ref https://jsonapi.org/format/#document-links @ref
+are closed too. `errorsSchema` is the same document unless `mixedEntries` is on (7.2.4); both admit
+the configured `document` members (7.2.5). @ref https://jsonapi.org/format/#document-links @ref
 https://www.rfc-editor.org/rfc/rfc3986#section-4.1
+
+#### 7.2.4 `mixedEntries` and `responseStatus` (`response-status.ts`)
+
+JSON:API lets one document report problems from different sources, each error object with its own
+`status`, `code`, and `title`. By default the format ignores an item's identity members and renders
+the error's, so every object matches the pinned schema (ADR 0011). With `mixedEntries: true`,
+`renderErrors` uses `item.status`, `item.code`, and `item.title` when present (the derived
+`links.type` then follows the item's code; an item with no code keeps the error's `type`), and
+`errorsSchema` types `status` as a string matching `^[45][0-9]{2}$`, and `code` and `title` as
+strings, instead of pinning them. `schema` stays pinned either way: only lists may mix.
+
+`responseStatus(errors)` returns the HTTP status for a mixed list the way the specification asks,
+"the most generally applicable HTTP error code": the one status every item shares, else 400 when
+every status is a client error, else 500; items without a status are skipped and `undefined` is
+returned when none has one. Callers combine it with `ban.fromStatus()` (5.6). @ref
+https://jsonapi.org/format/#errors-processing
+
+#### 7.2.5 `document`
+
+`document: { jsonapi?, links?, meta? }` adds those top-level members verbatim to every document the
+format renders, in the order `jsonapi`, `errors`, `links`, `meta`; `schema` and `errorsSchema` admit
+each configured member as an object. They are static per format instance (a version object, a
+service link), not per error. @ref https://jsonapi.org/format/#document-top-level
 
 ### 7.3 Plain (`formats/plain`)
 
 `contentType = 'application/json'`. Body order: `status`, `code`, `title`, `detail`, `id`,
-`instance`, `traceId`, `meta` (nested, omitted when empty), `stack`, `errors` (validation only,
-Problem Details entry shape). Schema is closed.
+`instance`, `traceId`, `meta` (nested, omitted when empty), `stack`, `errors` (`renderErrors` only;
+Problem Details entry shape, 7.1.3). Schema is closed.
 
 ### 7.4 Conformance (`testing`)
 
@@ -920,11 +1138,15 @@ assertFormatConformance(format, catalog, { compile, docsBaseUrl? })
 ```
 
 `compile(schema)` returns a validator `(body) => problems[]`; the repository uses Ajv 2020 with
-`ajv-formats` (`src/test-support/ajv.ts`). For every definition it renders a minimal error, one with
+`ajv-formats` (`test-support/ajv.ts`). For every definition it renders a minimal error, one with
 `detail`, colliding and short `meta` keys, nested meta, and headers, one with a stack, and per
-location a validation error with two issues and one with none (`ban.validation([])` is legal, and a
-schema that demands at least one entry must still be met), then validates each body against `schema`
-or `validationSchema` (dialect `draft-2020-12`). Failures are collected into one `AggregateError`.
+location three lists: two validator items, none (`ban.validation([])` is legal, and a schema that
+demands at least one entry must still be met), and two mixed items carrying their own `status`,
+`code`, `title`, `type`, and `meta`, one with a path and no location (a format may render or ignore
+those members, and its `errorsSchema` must accept the result either way). Each body is validated
+against `schema` or `errorsSchema` (dialect `draft-2020-12`); the labels are `minimal`, `meta`,
+`stack`, `errors/<location>`, `errors-empty/<location>`, `errors-mixed/<location>`, 21 cases per
+definition. Failures are collected into one `AggregateError`.
 
 ### 7.5 `defineFormat` (`define-format.ts`)
 
@@ -935,11 +1157,11 @@ export function defineFormat<TSchema extends StandardJsonSchema>(
 ): ErrorFormat<InferStandardOutput<TSchema>>;
 ```
 
-`FormatSpec` is `ErrorFormat` with `renderValidation` (defaults to `render`) and `validationSchema`
+`FormatSpec` is `ErrorFormat` with `renderErrors` (defaults to `render`) and `errorsSchema`
 (defaults to `schema`) optional. `StandardFormatSpec` takes a Standard JSON Schema object;
 `schema()` calls `spec.schema['~standard'].jsonSchema.output({ target: ctx.dialect })` and the body
 type is the schema's output type. The Standard Schema interfaces are vendored in
-`src/internal/standard-schema-types.ts`. @ref https://standardschema.dev/json-schema
+`internal/standard-schema-types.ts`. @ref https://standardschema.dev/json-schema
 
 ### 7.6 Google API (`formats/google-api`, ADR 0014)
 
@@ -979,20 +1201,19 @@ of the Postgres mapper therefore render `UNAVAILABLE`; a 409 entry through its `
 `ABORTED` (6.10). @ref https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
 @ref https://github.com/googleapis/gax-nodejs/blob/main/gax/src/status.ts
 
-#### 7.6.2 `render` and `renderValidation` (`details.ts`)
+#### 7.6.2 `render` and `renderErrors` (`details.ts`)
 
-`error` members in order: `code` (number), `message` (`detail`, else `title`; for validation
-`detail`, else `'Request validation failed'`), `status`, `details`. Payloads in order, each type at
-most once as AIP-193 requires:
+`error` members in order: `code` (number), `message` (`detail`, else `title`), `status`, `details`.
+Payloads in order, each type at most once as AIP-193 requires:
 
-| Payload       | When                                              | Members                                                                                                                                                                                                                                                                                                                    |
-| ------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ErrorInfo`   | always                                            | `reason` = catalog `code`; `domain` = the option; `metadata` = `ctx.meta` with every value a string (strings verbatim, bigint decimal, everything else JSON; `undefined`, functions, and symbols dropped) and every key outside `METADATA_KEY_PATTERN` dropped, plus `[traceIdMetadataKey]` when known, omitted when empty |
-| `BadRequest`  | validation with at least one issue                | `fieldViolations`, one per issue: `field` = the path in proto JSON path syntax (`items[0].sku`; omitted for an empty path), `description` = the message, `reason` = the issue code upper-cased when present; proto3 JSON omits an empty repeated field, so no issues means no `BadRequest`                                 |
-| `RetryInfo`   | the error's `Retry-After` header is delay-seconds | `retryDelay` = `${seconds}s`; the HTTP-date form needs the current time and formats are pure, so it is not converted                                                                                                                                                                                                       |
-| `RequestInfo` | `includeRequestInfo`                              | `requestId` = the error id (10.2 coherence)                                                                                                                                                                                                                                                                                |
-| `DebugInfo`   | `ctx.stack` defined                               | `stackEntries` = the stack split on newlines                                                                                                                                                                                                                                                                               |
-| `Help`        | a documentation URL exists and is absolute        | one link `{ description: 'Documentation for ${code} errors', url }` with `url` = `error.type`, else `${helpLinkBaseUrl ?? ctx.docsBaseUrl}/${code}`; AIP-193 requires an absolute URL with a scheme, so a relative one yields no `Help`                                                                                    |
+| Payload       | When                                              | Members                                                                                                                                                                                                                                                                                                                     |
+| ------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ErrorInfo`   | always                                            | `reason` = catalog `code`; `domain` = the option; `metadata` = `ctx.meta` with every value a string (strings verbatim, bigint decimal, everything else JSON; `undefined`, functions, and symbols dropped) and every key outside `METADATA_KEY_PATTERN` dropped, plus `[traceIdMetadataKey]` when known, omitted when empty  |
+| `BadRequest`  | `renderErrors` with at least one item             | `fieldViolations`, one per item: `field` = the path in proto JSON path syntax (`items[0].sku`; omitted for an empty or missing path), `description` = `detail`, `reason` = the item's `reason` upper-cased, else its own `code` as given; proto3 JSON omits an empty repeated field, so an empty list means no `BadRequest` |
+| `RetryInfo`   | the error's `Retry-After` header is delay-seconds | `retryDelay` = `${seconds}s`; the HTTP-date form needs the current time and formats are pure, so it is not converted                                                                                                                                                                                                        |
+| `RequestInfo` | `includeRequestInfo`                              | `requestId` = the error id (10.2 coherence)                                                                                                                                                                                                                                                                                 |
+| `DebugInfo`   | `ctx.stack` defined                               | `stackEntries` = the stack split on newlines                                                                                                                                                                                                                                                                                |
+| `Help`        | a documentation URL exists and is absolute        | one link `{ description: 'Documentation for ${code} errors', url }` with `url` = `error.type`, else `${helpLinkBaseUrl ?? ctx.docsBaseUrl}/${code}`; AIP-193 requires an absolute URL with a scheme, so a relative one yields no `Help`                                                                                     |
 
 Validation `meta.location` (8.2) reaches `ErrorInfo.metadata.location`. `LocalizedMessage` is not
 emitted (the handler `transform` is the localization point, 6.2); `QuotaFailure`,
@@ -1043,17 +1264,17 @@ payments (`advice_code`, `charge`, `decline_code`, `network_advice_code`, `netwo
 emitted. @ref https://docs.stripe.com/api/errors @ref
 https://github.com/stripe/openapi/blob/master/openapi/spec3.json (`components.schemas.api_errors`)
 
-#### 7.7.1 `render` and `renderValidation`
+#### 7.7.1 `render` and `renderErrors`
 
 - `code`: the catalog `code` lower-cased (`NOT_FOUND` becomes `not_found`), Stripe's spelling; a
   lower snake code declared in the catalog is unchanged.
 - `doc_url`: `error.type`, else `${docUrlBaseUrl ?? ctx.docsBaseUrl}/${code}` with the code as
   spelled in the catalog (the same URL every format derives, ADR 0010); omitted when neither exists.
-- `message`: `detail`, else `title`. Validation: the first issue's message, else `detail`, else
-  `'Request validation failed'`.
-- `param`: validation only, the first issue's path in Stripe's bracket notation (`items[0][sku]`,
-  `page`), the `deepObject` form encoding of its requests; omitted for an empty path. Stripe reports
-  one problem per response, so the remaining issues are dropped. @ref
+- `message`: `detail`, else `title`. With a list: the first item's `detail`, else the error's
+  `detail`, else `title`.
+- `param`: lists only, the first item's path in Stripe's bracket notation (`items[0][sku]`, `page`),
+  the `deepObject` form encoding of its requests; omitted for an empty or missing path. Stripe
+  reports one problem per response, so the remaining items are dropped. @ref
   https://spec.openapis.org/oas/v3.0.3#style-values
 - `request_log_url`: `requestLogUrl(error, ctx)` when the option is set and returns a string.
 - `type`: `types[code]`, else by status the way Stripe's SDKs classify errors: 402 `card_error`, any
@@ -1068,7 +1289,7 @@ builds one from `error.id`).
 
 Closed: `error` requires `code`, `message`, `type`; `code` (lower-cased) and `type` are
 `constant()`; `doc_url` and `request_log_url` are `format: uri-reference`, the latter present only
-when `requestLogUrl` is set; `param` appears only in `validationSchema`.
+when `requestLogUrl` is set; `param` appears only in `errorsSchema`.
 
 ## 8. Validation
 
@@ -1088,10 +1309,14 @@ export interface ValidationIssue {
 
 ### 8.2 `ban.validation(issues, { location, detail?, meta?, cause? })`
 
-Builds the `validationKey` entry (default `VALIDATION_FAILED`, 422) with `issues` attached,
+Builds the `validationKey` entry (default `VALIDATION_FAILED`, 422) with
+`errors = itemsFromIssues(issues, location)` (4.1), `detail = options.detail ?? VALIDATION_DETAIL`,
 `meta.location = location`, and `cause` when given (the caught validator or driver failure, for
-`ErrorReport.error.cause`; never rendered); formats read the location back with
-`readLocation(ctx.meta)`.
+`ErrorReport.error.cause`; never rendered). Formats read the location back with
+`readLocation(ctx.meta)` for items that carry none. It is sugar over
+`ban.error(validationKey, { errors })`: every factory accepts `errors`, and a list that did not come
+from a validator (a batch of domain checks, a JSON:API document with several problems) is built
+directly.
 
 ### 8.3 Pointers and names
 
@@ -1105,32 +1330,33 @@ Every Hono validator calls its hook as `hook(result & { target }, c)` and contin
 returns nothing. `createHook(ban, extract)` returns `(result) => void` that does nothing on
 `success` and otherwise throws
 `ban.validation(extract(result), { location: locationFromTarget(target) })` (`json` maps to `body`).
-The result types are structural supersets of what the validators pass, so `hooks.test-d.ts` proves
-assignability to `@hono/zod-validator`, `@hono/zod-openapi` (`defaultHook`),
-`@hono/valibot-validator`, and `@hono/standard-validator` hook types without those packages being
-dependencies. @ref
+The result types are structural supersets of what the validators pass, so the hooks live in the core
+without a Hono import; `packages/hono-ban/src/hooks.test-d.ts` proves assignability to
+`@hono/zod-validator`, `@hono/zod-openapi` (`defaultHook`), `@hono/valibot-validator`, and
+`@hono/standard-validator` hook types, and `validators.test.ts` there runs each middleware through
+`onError`. The core's own tests feed the hooks validator results directly. @ref
 https://github.com/honojs/middleware/blob/main/packages/zod-validator/src/index.ts @ref
 https://github.com/honojs/middleware/blob/main/packages/zod-openapi/src/index.ts @ref
 https://github.com/honojs/middleware/blob/main/packages/valibot-validator/src/index.ts @ref
 https://github.com/honojs/middleware/blob/main/packages/standard-validator/src/index.ts
 
-### 8.5 Zod (`hono-ban/zod`)
+### 8.5 Zod (`ban-kit/zod`)
 
 Reads `error.issues[]` with `path` (PropertyKey[]), `message`, `code`, and scalar `expected` and
 `received` when present, so Zod 3.25+ and Zod 4 both work (`zod.test.ts` covers both). @ref
 https://zod.dev/error-formatting
 
-### 8.6 Valibot (`hono-ban/valibot`)
+### 8.6 Valibot (`ban-kit/valibot`)
 
 Reads `issues[]` with `type` (as `code`), `message`, `expected` (omitted when `null`), `received`,
 and `path[].key` (non-scalar keys render as `?`). @ref https://valibot.dev/api/BaseIssue/
 
-### 8.7 Standard Schema (`hono-ban/standard-schema`)
+### 8.7 Standard Schema (`ban-kit/standard-schema`)
 
 Reads `issues[]` with `message` and `path` (raw keys or `{ key }` segments). The spec defines no
 code, expected, or received. @ref https://standardschema.dev
 
-## 9. OpenAPI (`hono-ban/openapi`)
+## 9. OpenAPI (`ban-kit/openapi`)
 
 ```ts
 export interface OpenApiOptions {
@@ -1144,7 +1370,7 @@ export function errorResponses(
   refs: ReadonlyArray<string | number>,
   options?,
 ): Record<string, ResponseObject>;
-export function validationSchema(ban, options?): JsonSchema;
+export function validationSchema(ban, options?): JsonSchema; // format.errorsSchema for validationKey
 export function validationResponse(ban, options?): ResponseObject;
 ```
 
@@ -1160,8 +1386,8 @@ export function validationResponse(ban, options?): ResponseObject;
   https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.1.2
 - `@hono/zod-openapi` accepts raw schema objects in `content[*].schema`
   (`ZodMediaTypeObject.schema: ZodType | SchemaObject | ReferenceObject`), so the objects drop
-  straight into `createRoute({ responses })`. `openapi/index.test.ts` generates an OpenAPI 3.1
-  document and asserts the emitted schemas deep-equal `errorSchema()`. Pass
+  straight into `createRoute({ responses })`. `packages/hono-ban/src/openapi.test.ts` generates an
+  OpenAPI 3.1 document and asserts the emitted schemas deep-equal `errorSchema()`. Pass
   `{ dialect: 'openapi-3.0' }` for 3.0 documents. @ref
   https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registry.ts
 - `OpenAPIHono.doc()` always generates a 3.0.x document (it uses `OpenApiGeneratorV3` whatever the
@@ -1176,7 +1402,7 @@ export function validationResponse(ban, options?): ResponseObject;
 ```ts
 export interface ErrorReport {
   readonly id: string;
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly code: string;
   readonly error: BanError;
   readonly cause: unknown; // the thrown value, or error.cause when the BanError itself was thrown
@@ -1188,19 +1414,20 @@ export interface ErrorReport {
 
 ### 10.2 Coherence
 
-The same `id` appears in the body, in the error id header, and in the report (`on-error.test.ts`).
+The same `id` appears in the body, in the error id header, and in the report (`handler.test.ts`).
 Stripe is the exception (7.7): its shape has no member for the id, which travels in the header and
 the report only.
 
-### 10.3 `hono-ban/otel`
+### 10.3 `ban-kit/otel`
 
 `traceIdFromOtel(source)` accepts the `trace` API or the whole `@opentelemetry/api` namespace
 (structurally: `getActiveSpan()` returning a span with `spanContext().traceId`) and returns a
 zero-argument function that yields the active span's trace id when it is 32 lowercase hex characters
-and not all zeros. Usage: `ban.onError({ traceId: traceIdFromOtel(trace) })`. @ref
+and not all zeros. Usage: `ban.handler({ traceId: traceIdFromOtel(trace) })` or, on Hono,
+`ban.onError({ traceId: traceIdFromOtel(trace) })`. @ref
 https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_api.SpanContext.html
 
-## 11. Testing utilities (`hono-ban/testing`)
+## 11. Testing utilities (`ban-kit/testing`)
 
 - `renderError(ban, error, options?)`: `ban.render`.
 - `expectBanError(value, expected?)`: asserts `value is BanError`, comparing `status`, `code`,
@@ -1209,97 +1436,112 @@ https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_api.
 
 ## 12. Packaging
 
-`tsdown.config.ts` entries (keys become `exports` subpaths; `exports: true` rewrites `package.json`
-and CI diffs it):
+Each package has its own `tsdown.config.ts`; entry keys become `exports` subpaths, and
+`exports: { devExports: 'source' }` rewrites `package.json` with a `source` condition pointing at
+`src/` next to the `default` condition pointing at `dist/` (`publishConfig.exports` strips the
+`source` condition from what npm sees). CI diffs both `package.json` files after a build.
 
 ```
 index, formats/problem-details, formats/json-api, formats/plain, formats/google-api, formats/stripe,
-zod, valibot, standard-schema, openapi, otel, postgres, testing
+zod, valibot, standard-schema, openapi, otel, postgresql, testing
 ```
 
-`peerDependencies` is `{ "hono": ">=4.12.34" }` and there are no `dependencies`. Validators,
-`@hono/*` packages, `@opentelemetry/api`, `postgres` (postgres.js, for one type-level test), Ajv,
-and `ajv-formats` are devDependencies used only by tests; `@electric-sql/pglite`,
-`@electric-sql/pglite-socket`, `drizzle-orm`, `pg`, and `postgres` are devDependencies of `e2e/`
-only. `sideEffects: false`. publint and attw run as part of the build.
+`ban-kit` has no `dependencies` and no `peerDependencies`. `hono-ban` has
+`dependencies: { "ban-kit": "workspace:^" }` (a caret range on the published version) and
+`peerDependencies: { "hono": ">=4.12.34" }`. Validators, `@hono/*` packages, `@opentelemetry/api`,
+`postgres` (postgres.js, for one type-level test), Ajv, and `ajv-formats` are devDependencies used
+only by tests; `@electric-sql/pglite`, `@electric-sql/pglite-socket`, `drizzle-orm`, `pg`, and
+`postgres` are devDependencies of `e2e/` only. Both packages set `sideEffects: false`. publint and
+attw run as part of each build.
 
-The repository is a pnpm workspace with two packages: the root (published) and `e2e/` (private,
-`hono-ban-e2e`). `e2e/` depends on `hono-ban` through `workspace:*`, so its imports resolve through
-the `exports` map above into `dist/`, and its own `tsconfig.json` checks the emitted declarations.
-`pnpm test:e2e` builds first, then type-checks and runs it. `e2e/smoke/` holds the runtime smoke
-test and its Bun, Deno, and workerd entry points (14.2); `pnpm test:runtimes` builds and runs the
-three. Section 14 lists the suites.
+The repository is a pnpm workspace with four packages: the private root (`ban-kit-monorepo`),
+`packages/ban-kit`, `packages/hono-ban`, and `e2e/` (private, `ban-kit-e2e`). `e2e/` depends on both
+published packages through `workspace:*`, so its imports resolve through the `exports` map above
+into each `dist/`, and its own `tsconfig.json` checks the emitted declarations. `pnpm test:e2e`
+builds first, then type-checks and runs it. `e2e/smoke/` holds the runtime smoke test and its Bun,
+Deno, and workerd entry points (14.2); `pnpm test:runtimes` builds and runs the three. Section 14
+lists the suites. Changesets version the two packages independently;
+`updateInternalDependencies: patch` bumps `hono-ban` whenever `ban-kit` releases.
 
-## 13. Constants (`src/internal/constants.ts`)
+## 13. Constants (`internal/constants.ts`)
 
-| Name                        | Value                                                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `UNEXPECTED_DETAIL`         | `'An unexpected error occurred'`                                                                                         |
-| `VALIDATION_DETAIL`         | `'Request validation failed'`                                                                                            |
-| `MALFORMED_JSON_MESSAGE`    | `'Malformed JSON in request body'`                                                                                       |
-| `DEFAULT_REQUEST_ID_HEADER` | `'X-Request-Id'`                                                                                                         |
-| `DEFAULT_ERROR_ID_HEADER`   | `'X-Error-Id'`                                                                                                           |
-| `DEFAULT_CACHE_CONTROL`     | `'no-store'`                                                                                                             |
-| `DEFAULT_MAX_BODY_BYTES`    | `65536`                                                                                                                  |
-| `TRUNCATED_DETAIL_LENGTH`   | `1024`                                                                                                                   |
-| `REQUEST_ID_PATTERN`        | `/^[A-Za-z0-9._-]{1,128}$/u`                                                                                             |
-| `TRACEPARENT_PATTERN`       | `/^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})/u`                                                          |
-| `TRACEPARENT_LENGTH`        | `55`                                                                                                                     |
-| `EXTENSION_NAME_PATTERN`    | `/^[A-Za-z][A-Za-z0-9_]{2,}$/u`                                                                                          |
-| `PROTO_KEYS`                | `Set { '__proto__', 'constructor', 'prototype' }`                                                                        |
-| `BODY_HEADERS`              | `Set { 'content-type', 'content-length', 'content-encoding', 'content-location', 'content-range', 'transfer-encoding' }` |
+| Name                        | Value                                                           |
+| --------------------------- | --------------------------------------------------------------- |
+| `UNEXPECTED_DETAIL`         | `'An unexpected error occurred'`                                |
+| `VALIDATION_DETAIL`         | `'Request validation failed'`                                   |
+| `DEFAULT_REQUEST_ID_HEADER` | `'X-Request-Id'`                                                |
+| `DEFAULT_ERROR_ID_HEADER`   | `'X-Error-Id'`                                                  |
+| `DEFAULT_CACHE_CONTROL`     | `'no-store'`                                                    |
+| `DEFAULT_MAX_BODY_BYTES`    | `65536`                                                         |
+| `TRUNCATED_DETAIL_LENGTH`   | `1024`                                                          |
+| `REQUEST_ID_PATTERN`        | `/^[A-Za-z0-9._-]{1,128}$/u`                                    |
+| `TRACEPARENT_PATTERN`       | `/^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})/u` |
+| `TRACEPARENT_LENGTH`        | `55`                                                            |
+| `EXTENSION_NAME_PATTERN`    | `/^[A-Za-z][A-Za-z0-9_]{2,}$/u`                                 |
+| `PROTO_KEYS`                | `Set { '__proto__', 'constructor', 'prototype' }`               |
+
+`MALFORMED_JSON_MESSAGE` (`'Malformed JSON in request body'`) and `BODY_HEADERS` (`content-type`,
+`content-length`, `content-encoding`, `content-location`, `content-range`, `transfer-encoding`)
+belong to `hono-ban` (`packages/hono-ban/src/http-exception.ts`, 6.11); `MALFORMED_JSON_MESSAGE` is
+exported from the `hono-ban` root.
 
 ## 14. Test plan
 
-Coverage thresholds (90 percent) are enforced by Vitest.
+Coverage thresholds (90 percent) are enforced by Vitest across both packages. Rows name
+`packages/ban-kit/src` modules unless prefixed.
 
-| Module               | Tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/catalog`       | IANA completeness, title equality, alias targets, factory coverage, type mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `core/definition`    | defaults, derived `type`, explicit values, unknown status title                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `core/ban-error`     | HTTPException interop, message fallback, id, headers/meta/cause, `getResponse` both branches, `toInit`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `core/factories`     | call forms, detail precedence, `TypeError`, `type`/`instance`/`id` options, `code` and `title` rejected at the type level, aliases, purity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `core/assert`        | throws for `null`, `undefined`, `false`; passes `0`, `''`; producer laziness; narrowing types                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `core/from`          | passthrough, status mapping, `MALFORMED_JSON` exact match, `res` headers kept and body headers dropped, `Content-Range` kept on 416, custom and non-standard statuses, unknown values                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `core/create-ban`    | every built-in factory, custom factories, overriding a built-in, reserved keys (runtime and types), `validationKey`, format and id generator, `custom`, `render`, typed `onError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `core/render`        | meta sanitization, stack rules, explicit instance, validation branch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `headers/*`          | `bearerChallenge` attribute order, empty-realm fallback, scope string and list, realm quoted-pairs, `TypeError` per grammar, round trip through `Headers` and a factory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `handler/*`          | request id validation, traceparent grammar, body cap (transform re-applied, stack dropped), single-handler and middleware apps, bearer-auth headers, Hono validator JSON failure, constant 500, map precedence and failures, format failure fallback, header-merge failure (tier 3), header options rejected at construction, `onReport` failure, transform, header merge including `Set-Cookie`, `Cache-Control` default and overrides, error id header options, request id options, traceparent into body and report, trace override, Hono rethrowing non-Errors                                                                                                                                                                     |
-| `formats/*`          | extension flattening and precedence, Problem Details members and toggles, `traceIdMember` rejected, validation entries, plain shape, JSON:API objects and sources, `traceIdMetaKey` rejected, empty issue list, closed schemas, OpenAPI 3.0 `enum`, `defineFormat` both forms and types, Google API `status` resolution, metadata stringification and key filtering, `traceIdMetadataKey` rejected, empty issue list without `BadRequest`, `propertyNames` per dialect, field paths, `RetryInfo`, absolute-only `Help`, closed detail schemas, Stripe member order, `type` classification, first-issue `param`, Ajv conformance for all five formats                                                                                   |
-| `validation/*`       | pointer escaping, symbols, target mapping, `ban.validation` with and without `cause`, Zod 4 and Zod 3 issues, `zValidator` and `OpenAPIHono` hooks, Valibot issues and `vValidator`, Standard Schema issues and `sValidator`, hook type assignability                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `openapi`            | key and status resolution, descriptions, `RangeError`s, dialect, `anyOf` grouping and identical-schema collapse, content type, validation response, generated OpenAPI 3.1 document                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `postgresql/*`       | recognition of the node-postgres, postgres.js (with and without field V), Bun (`errno`), and copied-field shapes; Node errno, Prisma, and connection-error shapes rejected; `cause`, `original`, `nativeError` traversal with the depth cap and cycles; field normalization in both spellings; every table row and exclusion; constraint, column, code, class, and table precedence member by member; issue mappings with the driver error as `cause`; own-property lookups for constraints and inherited `codes` entries ignored; `retryAfter` placement and the safe-integer bound; construction errors; unknown key as a handler failure; driver stack under `includeStack`; postgres.js error type and mapper assignability matrix |
-| `observability/otel` | fake and real trace APIs, invalid ids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `testing`            | `expectBanError` messages, `renderError`, `assertFormatConformance` on a broken format                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Module                    | Tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/catalog`            | IANA completeness, title equality, alias targets, factory coverage, type mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `core/status`             | class-based acceptance, other classes and non-integers rejected, `ErrorStatusCode` excludes 2xx and 3xx (types)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `core/definition`         | defaults, derived `type`, explicit values, unknown status title                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `core/ban-error`          | extends `Error` only, message fallback, id, headers/meta/cause/errors, `getResponse` both branches, `toInit` round trip, status union (types)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `core/error-item`         | issue to item mapping with and without optional members                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `core/factories`          | call forms, detail precedence, `TypeError`, `type`/`instance`/`id` options, `code` and `title` rejected at the type level, aliases, purity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `core/assert`             | throws for `null`, `undefined`, `false`; passes `0`, `''`; producer laziness; narrowing types                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `core/from`               | passthrough, the `adopt` hook (recognized, declined, throwing), unknown values as the constant 500                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `core/create-ban`         | every built-in factory, custom factories, overriding a built-in, reserved keys (runtime and types), `validationKey`, format and id generator, `custom`, `fromStatus` (primary entry, custom entry, `CUSTOM`), `render`, typed `handler` context and `adopt`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `core/render`             | meta sanitization, stack rules, explicit instance, `renderErrors` branch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `headers/*`               | `bearerChallenge` attribute order, empty-realm fallback, scope string and list, realm quoted-pairs, `TypeError` per grammar, round trip through `Headers` and a factory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `handler/*`               | request id validation, traceparent grammar, body cap (transform re-applied, stack dropped), `fakeRequest` dispatch and `fromRequest`, non-Error values, the context reaching every callback, constant 500, `adopt` before `map`, map precedence and failures, format failure fallback, header-merge failure (tier 3), header options rejected at construction, `onReport` failure, transform, header merge including `Set-Cookie`, `Cache-Control` default and overrides, error id header options, request id options, traceparent into body and report, trace override, Hono rethrowing non-Errors                                                                                                                                                                                                                 |
+| `formats/*`               | extension flattening and precedence, Problem Details members and toggles, `traceIdMember` rejected, error entries with and without a fallback location, plain shape, JSON:API objects and sources, per-item identity ignored by default, `mixedEntries` rendering and loosened schema, `document` members, `responseStatus`, `traceIdMetaKey` rejected, empty and mixed lists, closed schemas, OpenAPI 3.0 `enum`, `defineFormat` both forms and types, Google API `status` resolution, metadata stringification and key filtering, `traceIdMetadataKey` rejected, empty issue list without `BadRequest`, `propertyNames` per dialect, field paths, `RetryInfo`, absolute-only `Help`, closed detail schemas, Stripe member order, `type` classification, first-issue `param`, Ajv conformance for all five formats |
+| `validation/*`            | pointer escaping, symbols, target mapping, `ban.validation` with and without `cause`, the default `detail`, the `errors` items, Zod 4 and Zod 3 issues, Valibot issues, Standard Schema issues, every hook fed real validator results for each target and declining on success                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `openapi`                 | key and status resolution, descriptions, `RangeError`s, dialect, `anyOf` grouping and identical-schema collapse, content type, validation response from `errorsSchema`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `postgresql/*`            | recognition of the node-postgres, postgres.js (with and without field V), Bun (`errno`), and copied-field shapes; Node errno, Prisma, and connection-error shapes rejected; `cause`, `original`, `nativeError` traversal with the depth cap and cycles; field normalization in both spellings; every table row and exclusion; constraint, column, code, class, and table precedence member by member; issue mappings with the driver error as `cause`; own-property lookups for constraints and inherited `codes` entries ignored; `retryAfter` placement and the safe-integer bound; construction errors; unknown key as a handler failure; driver stack under `includeStack`; postgres.js error type and mapper assignability matrix                                                                              |
+| `observability/otel`      | fake and real trace APIs, invalid ids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `testing`                 | `expectBanError` messages, `renderError`, `assertFormatConformance` on a broken format (21 cases per definition, 3 when only `schema` is broken)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `packages/hono-ban/src/*` | `onError` over a Hono app: `HTTPException` by status and message, bearer-auth, the built-in validator's JSON failure, body headers dropped and `Content-Range` kept on 416, a thrown 302 passed through, non-Error throws rethrown by Hono, the `Context` in every callback, request id and traceparent headers, reserved key `onError`, `from()` adopting `HTTPException` ahead of the user hook; `fromHttpException` and `passthroughResponse` directly; `zValidator`, `vValidator`, `sValidator`, and `OpenAPIHono` through `onError`; hook type assignability; the generated OpenAPI 3.1 document; typed `onError<E>`                                                                                                                                                                                           |
 
 ### 14.1 End-to-end suite (`e2e/`)
 
-The `e2e/` workspace package (section 12) consumes the built package and runs every file against a
-real `@hono/node-server` HTTP server on an ephemeral port (`e2e/support/server.ts`). Bodies are read
-with `fetch` and, wherever the package publishes a schema, validated with Ajv
-(`e2e/support/ajv.ts`). `pnpm test:e2e` runs it; CI runs it on Node 22 and 24.
+The `e2e/` workspace package (section 12) consumes both built packages and runs every file against a
+real `@hono/node-server` HTTP server on an ephemeral port (`e2e/support/server.ts`). Files import
+`hono-ban` unless they prove the core alone. Bodies are read with `fetch` and, wherever the package
+publishes a schema, validated with Ajv (`e2e/support/ajv.ts`). `pnpm test:e2e` runs it; CI runs it
+on Node 22 and 24.
 
-| File(s)                                                             | Proves                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package-surface`                                                   | every subpath in section 1 resolves through `exports` and exports exactly the listed values; first HTTP round trip                                                                                                                                                                                                                                                                                                                                                   |
-| `catalog-builtins`, `catalog-custom`                                | every `FACTORY_NAMES` entry over HTTP (status, title, code, `about:blank`, `X-Error-Id`), aliases, call forms, custom entries and overrides, `custom()`, `assert()` narrowing, reserved-key and `validationKey` constructor errors                                                                                                                                                                                                                                   |
-| `handler-identity-ids`, `-reports`, `-correlation`                  | id coherence across body, header, report; `errorIdHeader`; header merge matrix including `Set-Cookie` and the `Cache-Control` default and override; deterministic ids; 20 concurrent requests; `ErrorReport` shape and `handled`; `includeStack` rules; request id and traceparent tables; `traceId` override                                                                                                                                                        |
-| `handler-not-found`                                                 | `app.notFound` throwing `ban.notFound()` reaches `onError` on both Hono dispatch paths (no handler matched; one middleware matched) with body, header, and report; matched routes untouched                                                                                                                                                                                                                                                                          |
-| `handler-resolution-from`, `-headers`, `-pipeline`, `-body`         | `from()` branches (plain `Error`, `HTTPException`, bearer-auth, malformed JSON, unknown status); an adopted response losing `Content-Length` and `Content-Encoding` but keeping `Retry-After`, a 416 keeping `Content-Range`, and a `bearerChallenge` value arriving verbatim; instance and handler `map` precedence; tier-1 and tier-2 fallback with headers; `transform` before and after the cap; `maxBodyBytes`; `onReport` once and swallowed; non-Error throws |
-| `format-problem-details-members`, `-extensions`, `-schema`          | member order, `type` derivation for four instance shapes, toggles, ADR 0008 flattening and reserved names, proto keys, bigint, validation bodies for all locations, schema equality and Ajv conformance                                                                                                                                                                                                                                                              |
-| `format-json-api`, `format-json-api-validation`                     | exact media type, error object members, `links`, nested `meta`, `traceIdMetaKey`, per-issue `source` for every location, RFC 6901 pointers, Ajv conformance                                                                                                                                                                                                                                                                                                          |
-| `format-custom-oauth`                                               | the README's OAuth 2.0 token endpoint `defineFormat` example (RFC 6749 5.2): `error`, `error_description`, `error_uri` from `code`, `detail`, `type`; `invalid_client` with the app's challenge; `bearerChallenge` pairing; conformance in both dialects                                                                                                                                                                                                             |
-| `format-google-api`, `-validation`, `-options`                      | AIP-193 member order, `status` derivation for built-in and custom codes, `ErrorInfo.metadata` strings and trace id, `RetryInfo` from `Retry-After`, `DebugInfo` under `includeStack`, absolute-only `Help`, `BadRequest` per location and issue, `validationSchema` versus `schema`, every option over HTTP, Ajv conformance, 3.0 `enum`                                                                                                                             |
-| `format-validation-empty-issues`                                    | `ban.validation([])` over HTTP for all five formats validates against `validationSchema`                                                                                                                                                                                                                                                                                                                                                                             |
-| `format-stripe`                                                     | exact serialized text in alphabetical order, `type` by status and per-code override, an unknown `Error` as `api_error` with the constant detail, first-issue `param` per location, `request_log_url`, closed schemas, Ajv conformance                                                                                                                                                                                                                                |
-| `format-plain-custom-plain`, `-define`, `-testing`                  | `plain()` body and schema, `defineFormat` hand-written and Standard JSON Schema (Zod 4) forms over HTTP, `renderError`, `expectBanError`, `assertFormatConformance` failures                                                                                                                                                                                                                                                                                         |
-| `validation-zod`, `validation-zod-direct`, `validation-zod-openapi` | `zValidator` hook for every target, pointer escaping, typed passthrough, `validationKey`, `fromZodError`, `toIssues`, `OpenAPIHono` `defaultHook` parity                                                                                                                                                                                                                                                                                                             |
-| `validation-valibot-standard-valibot`, `-standard-schema`           | `vValidator` and `sValidator` hooks (Zod and Valibot schemas), `expected`/`received` mapping, direct converters, `ban.validation()`, JSON:API `source` for Valibot issues                                                                                                                                                                                                                                                                                            |
-| `openapi-document`, `openapi-responses`                             | served 3.1 (`doc31`) and 3.0 (`doc`) documents, `const` versus `enum`, `anyOf` grouping, real error bodies validated against the served schemas, `RangeError`s                                                                                                                                                                                                                                                                                                       |
-| `postgresql-pglite`, `postgresql-pglite-options`                    | PGlite (PostgreSQL 18) raising every table row it can and the fallthrough codes over HTTP, directly and through Drizzle (wrapper on the report, driver error on the error); `constraints`, `columns`, and `codes`; `includeStack` rendering the driver stack and not the ORM wrapper's; no server text in any body                                                                                                                                                   |
-| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`; `severity_local`, `constraint_name`/`table_name`/`column_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`                                          |
-| `postgresql-options`                                                | hand-built errors in the node-postgres, Neon, postgres.js (with and without field V), Bun, and Sequelize shapes; Prisma and Node errno shapes left unhandled; `retryAfter` on 503 only; an issue mapping rendered by JSON:API with `source.pointer` and validated against `validationSchema`                                                                                                                                                                         |
-| `otel-correlation`, `otel-sources`                                  | real `NodeTracerProvider` spans: body and report trace id equal the exported span, option wins over `traceparent`, no span outside the middleware, `{ trace }` form, invalid span contexts ignored, JSON:API `meta.traceId`                                                                                                                                                                                                                                          |
+| File(s)                                                             | Proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-surface`                                                   | every subpath in section 1 resolves through `exports` and exports exactly the listed values for both packages; `hono-ban` subpaths are the `ban-kit` module objects; first HTTP round trip                                                                                                                                                                                                                                                                              |
+| `core-handler`                                                      | `ban-kit` alone: `ban.handler()` with a typed context and `fromRequest` behind a plain `fetch` function served by `@hono/node-server`; instance, trace id, request id from the context, error headers, `adopt`, and the constant 500                                                                                                                                                                                                                                    |
+| `catalog-builtins`, `catalog-custom`                                | every `FACTORY_NAMES` entry over HTTP (status, title, code, `about:blank`, `X-Error-Id`), aliases, call forms, custom entries and overrides, `custom()`, `assert()` narrowing, reserved-key and `validationKey` constructor errors                                                                                                                                                                                                                                      |
+| `handler-identity-ids`, `-reports`, `-correlation`                  | id coherence across body, header, report; `errorIdHeader`; header merge matrix including `Set-Cookie` and the `Cache-Control` default and override; deterministic ids; 20 concurrent requests; `ErrorReport` shape and `handled`; `includeStack` rules; request id and traceparent tables; `traceId` override                                                                                                                                                           |
+| `handler-not-found`                                                 | `app.notFound` throwing `ban.notFound()` reaches `onError` on both Hono dispatch paths (no handler matched; one middleware matched) with body, header, and report; matched routes untouched                                                                                                                                                                                                                                                                             |
+| `handler-resolution-from`, `-headers`, `-pipeline`, `-body`         | `onError` resolution (plain `Error`, `HTTPException`, bearer-auth, malformed JSON, unknown status); an adopted response losing `Content-Length` and `Content-Encoding` but keeping `Retry-After`, a 416 keeping `Content-Range`, and a `bearerChallenge` value arriving verbatim; instance and handler `map` precedence; tier-1 and tier-2 fallback with headers; `transform` before and after the cap; `maxBodyBytes`; `onReport` once and swallowed; non-Error throws |
+| `format-problem-details-members`, `-extensions`, `-schema`          | member order, `type` derivation for four instance shapes, toggles, ADR 0008 flattening and reserved names, proto keys, bigint, validation bodies for all locations, schema equality and Ajv conformance                                                                                                                                                                                                                                                                 |
+| `format-json-api`, `format-json-api-validation`                     | exact media type, error object members, `links`, nested `meta`, `traceIdMetaKey`, per-issue `source` for every location, RFC 6901 pointers, Ajv conformance                                                                                                                                                                                                                                                                                                             |
+| `format-custom-oauth`                                               | the README's OAuth 2.0 token endpoint `defineFormat` example (RFC 6749 5.2): `error`, `error_description`, `error_uri` from `code`, `detail`, `type`; `invalid_client` with the app's challenge; `bearerChallenge` pairing; conformance in both dialects                                                                                                                                                                                                                |
+| `format-google-api`, `-validation`, `-options`                      | AIP-193 member order, `status` derivation for built-in and custom codes, `ErrorInfo.metadata` strings and trace id, `RetryInfo` from `Retry-After`, `DebugInfo` under `includeStack`, absolute-only `Help`, `BadRequest` per location and item, `errorsSchema` versus `schema`, every option over HTTP, Ajv conformance, 3.0 `enum`                                                                                                                                     |
+| `format-validation-empty-issues`                                    | `ban.validation([])` over HTTP for all five formats validates against `errorsSchema`                                                                                                                                                                                                                                                                                                                                                                                    |
+| `format-stripe`                                                     | exact serialized text in alphabetical order, `type` by status and per-code override, an unknown `Error` as `api_error` with the constant detail, first-issue `param` per location, `request_log_url`, closed schemas, Ajv conformance                                                                                                                                                                                                                                   |
+| `format-plain-custom-plain`, `-define`, `-testing`                  | `plain()` body and schema, `defineFormat` hand-written and Standard JSON Schema (Zod 4) forms over HTTP, `renderError`, `expectBanError`, `assertFormatConformance` failures                                                                                                                                                                                                                                                                                            |
+| `validation-zod`, `validation-zod-direct`, `validation-zod-openapi` | `zValidator` hook for every target, pointer escaping, typed passthrough, `validationKey`, `fromZodError`, `toIssues`, `OpenAPIHono` `defaultHook` parity                                                                                                                                                                                                                                                                                                                |
+| `validation-valibot-standard-valibot`, `-standard-schema`           | `vValidator` and `sValidator` hooks (Zod and Valibot schemas), `expected`/`received` mapping, direct converters, `ban.validation()`, JSON:API `source` for Valibot issues                                                                                                                                                                                                                                                                                               |
+| `openapi-document`, `openapi-responses`                             | served 3.1 (`doc31`) and 3.0 (`doc`) documents, `const` versus `enum`, `anyOf` grouping, real error bodies validated against the served schemas, `RangeError`s                                                                                                                                                                                                                                                                                                          |
+| `postgresql-pglite`, `postgresql-pglite-options`                    | PGlite (PostgreSQL 18) raising every table row it can and the fallthrough codes over HTTP, directly and through Drizzle (wrapper on the report, driver error on the error); `constraints`, `columns`, and `codes`; `includeStack` rendering the driver stack and not the ORM wrapper's; no server text in any body                                                                                                                                                      |
+| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`; `severity_local`, `constraint_name`/`table_name`/`column_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`                                             |
+| `postgresql-options`                                                | hand-built errors in the node-postgres, Neon, postgres.js (with and without field V), Bun, and Sequelize shapes; Prisma and Node errno shapes left unhandled; `retryAfter` on 503 only; an issue mapping rendered by JSON:API with `source.pointer` and validated against `errorsSchema`                                                                                                                                                                                |
+| `otel-correlation`, `otel-sources`                                  | real `NodeTracerProvider` spans: body and report trace id equal the exported span, option wins over `traceparent`, no span outside the middleware, `{ trace }` form, invalid span contexts ignored, JSON:API `meta.traceId`                                                                                                                                                                                                                                             |
 
 ### 14.2 Runtime smoke test (`e2e/smoke/`)
 
@@ -1309,16 +1551,17 @@ through an explicit `problemDetails()`, `ban.validation` through the Zod, Valibo
 Schema hooks, `HTTPException` from `hono/bearer-auth`, an unknown `Error`, JSON:API, plain, Google
 API, and Stripe sub-apps, the OpenAPI helpers, `renderError` from `hono-ban/testing`, a
 `bearerChallenge` header, the OpenTelemetry adapter, a unique violation through `postgresMapper` in
-the node-postgres and Bun shapes). `app.ts` imports no database driver: the workerd bundle inlines
-every import of it, so the Postgres routes throw driver-shaped fixtures. `checks.ts` asserts the
-responses through a runtime-neutral `dispatch` function, checks `Cache-Control: no-store` and a
-matching `X-Error-Id` on every Problem Details response, and `report()` throws on any failure, so
-the process exits non-zero. A new subpath is not covered until `app.ts` imports it and `checks.ts`
-exercises it. Entry points:
+the node-postgres and Bun shapes, and a route answered by a `ban-kit` instance's own `handler` with
+`fromRequest`, so the core package is loaded by every runtime too). `app.ts` imports no database
+driver: the workerd bundle inlines every import of it, so the Postgres routes throw driver-shaped
+fixtures. `checks.ts` asserts the responses through a runtime-neutral `dispatch` function, checks
+`Cache-Control: no-store` and a matching `X-Error-Id` on every Problem Details response, and
+`report()` throws on any failure, so the process exits non-zero. A new subpath is not covered until
+`app.ts` imports it and `checks.ts` exercises it. Entry points:
 
 | Script                  | Runtime                                                                                                                                      |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `smoke:bun` (`run.ts`)  | Bun runs `run.ts`, which drives `app.request()` in-process; `hono-ban` resolves through `node_modules` like on Node                          |
+| `smoke:bun` (`run.ts`)  | Bun runs `run.ts`, which drives `app.request()` in-process; both packages resolve through `node_modules` like on Node                        |
 | `smoke:deno` (`run.ts`) | Deno 2 runs the same file with `--allow-read --allow-env`; a `package.json` puts it in manual `node_modules` mode, so pnpm's install is used |
 | `smoke:workerd`         | Node bundles `worker.ts` with tsdown (`platform: 'neutral'`) and runs the checks against Miniflare's workerd through `dispatchFetch`         |
 

@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/ali-issa/hono-ban/security/advisories/new
+    url: https://github.com/ali-issa/ban-kit/security/advisories/new
     about: Report privately. Do not open a public issue.
   - name: Question or idea
-    url: https://github.com/ali-issa/hono-ban/discussions
+    url: https://github.com/ali-issa/ban-kit/discussions
     about: Ask in Discussions before opening a feature request.

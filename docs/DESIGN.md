@@ -1,6 +1,7 @@
-# hono-ban 1.0: design
+# ban-kit and hono-ban: design
 
-This document describes what hono-ban 1.0 is, the API it exposes, and how it is built.
+This document describes what ban-kit 1.0 and hono-ban 2.0 are, the API they expose, and how they are
+built.
 
 Architecture decisions referenced as ADR-NNNN live in `docs/adr/`. The normative, field-by-field
 specification that implementers work from is `docs/SPEC.md`; this document explains the intent
@@ -8,29 +9,35 @@ behind it. When the two disagree, fix one in the same PR.
 
 ## 1. Purpose
 
-hono-ban is the error layer for Hono applications. It gives an application:
+ban-kit is an HTTP error layer for any JavaScript runtime that speaks the fetch standard; hono-ban
+is the same layer wired into Hono (ADR-0016). Together they give an application:
 
 1. one way to create HTTP errors, with a typed catalog that the application extends;
-2. one `onError` handler that turns anything thrown into a well-formed response, safely;
+2. one handler that turns anything thrown into a well-formed response, safely, with `app.onError()`
+   on Hono or a `fetch` handler's `catch` anywhere else;
 3. one pluggable wire format, so the same application code can emit RFC 9457 Problem Details,
    JSON:API error objects, or a custom shape;
 4. validation, OpenAPI, and observability integrations that all derive from the same catalog and
    format, so documentation, responses, and logs cannot disagree.
 
-It is a library for teams who treat their error responses as an API contract.
+It is a library for teams who treat their error responses as an API contract. ban-kit started life
+as hono-ban 1.x; the core was extracted so that a library of its own, a non-Hono service, or a test
+can build and render the same errors, and so that other adapters can be thin.
 
 ### Who it is for
 
 - API teams on Hono who want a standard error body without hand-rolling RFC 9457 or JSON:API in
   every project.
+- Libraries and services that render HTTP errors outside Hono and want the same catalog, formats,
+  and handler without a framework dependency.
 - Teams whose clients consume JSON:API and who have had no Hono-native option.
 - Teams who need domain errors (`OrderNotFound`, `PlanLimitReached`) translated into HTTP at the
   edge, once, with the same id in the response and in the logs.
 
 ### Non-goals
 
-- Replacing your logger or tracer. hono-ban emits one `ErrorReport` per error and stops there.
-- Forwarding database or driver text to clients. `hono-ban/postgresql` maps Postgres errors to
+- Replacing your logger or tracer. The handler emits one `ErrorReport` per error and stops there.
+- Forwarding database or driver text to clients. `ban-kit/postgresql` maps Postgres errors to
   catalog entries with constant messages (ADR-0015); other drivers go through `map` the same way,
   and no driver's `message`, `detail`, or `hint` is ever forwarded (ADR-0007).
 - Content negotiation between formats per request. One format per `createBan` instance. If demand
@@ -48,10 +55,14 @@ It is a library for teams who treat their error responses as an API contract.
 7. **Typed catalog, no strings at call sites.** Custom errors are keys with inference, not
    `problem({ status, title })` literals repeated across handlers.
 8. **One id per error occurrence**, present in the body, the `X-Error-Id` header, and the report.
-9. **Small core, optional integrations.** `hono` is the only peer dependency. The Zod, Valibot,
-   Standard Schema, OpenAPI, and OpenTelemetry integrations are subpath exports that type the
-   third-party objects they receive structurally and never import those packages (ADR-0009).
-10. **Every non-obvious decision cites its source** with `@ref` in code and an ADR in docs.
+9. **Small core, optional integrations.** ban-kit has no dependencies and no peer dependencies;
+   hono-ban adds `hono` as its only peer (ADR-0016). The Zod, Valibot, Standard Schema, OpenAPI, and
+   OpenTelemetry integrations are subpath exports that type the third-party objects they receive
+   structurally and never import those packages (ADR-0009).
+10. **Errors are plain values; adapters adopt.** `BanError` extends `Error` and nothing else. An
+    adapter recognizes its framework's own exceptions through the `adopt` hook instead of the core
+    inheriting from them (ADR-0018).
+11. **Every non-obvious decision cites its source** with `@ref` in code and an ADR in docs.
 
 ## 3. The API by example
 
@@ -74,6 +85,28 @@ app.get('/orders/:id', async (c) => {
 ```
 
 Default format is RFC 9457 Problem Details (section 4.4 explains the choice).
+
+Without Hono, the same instance comes from `ban-kit` and the handler is called directly:
+
+```ts
+import { createBan, fromRequest } from 'ban-kit';
+
+const ban = createBan();
+const handle = ban.handler();
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    try {
+      return await route(request);
+    } catch (thrown) {
+      return handle(thrown, fromRequest(request));
+    }
+  },
+};
+```
+
+`hono-ban`'s `createBan` is the core's plus `onError`, which feeds the Hono context's request facts
+to that same handler (section 4.5).
 
 ### 3.2 Options bag
 
@@ -154,18 +187,22 @@ const ban = createBan({
 
 `map` is a single ordered function, not a class registry, so `instanceof` chains, discriminant
 checks, and third-party error shapes all work the same way, and subclasses match their parent.
-Postgres errors have a ready-made one: `postgresMapper()` from `hono-ban/postgresql` is such a
-`map`, keyed on SQLSTATE, with constant client text and per-constraint overrides (section 4.5,
-ADR-0015).
+Postgres errors have a ready-made one: `postgresMapper()` from `ban-kit/postgresql` is such a `map`,
+keyed on SQLSTATE, with constant client text and per-constraint overrides (section 4.5, ADR-0015).
+
+`adopt` is the sibling hook for values that already describe an HTTP outcome, such as a framework's
+own exception class. It runs before `map`, inside `ban.from()` too, and what it returns counts as
+handled rather than unexpected. `hono-ban` installs one for `HTTPException`; an application adds its
+own for, say, a fetch wrapper's error that carries an upstream status.
 
 ### 3.6 Formats
 
 ```ts
-import { googleApi } from 'hono-ban/formats/google-api';
-import { jsonApi } from 'hono-ban/formats/json-api';
-import { problemDetails } from 'hono-ban/formats/problem-details';
-import { plain } from 'hono-ban/formats/plain';
-import { stripe } from 'hono-ban/formats/stripe';
+import { googleApi } from 'ban-kit/formats/google-api';
+import { jsonApi } from 'ban-kit/formats/json-api';
+import { problemDetails } from 'ban-kit/formats/problem-details';
+import { plain } from 'ban-kit/formats/plain';
+import { stripe } from 'ban-kit/formats/stripe';
 
 createBan({ format: jsonApi() });
 createBan({ format: problemDetails({ typeBaseUrl: 'https://api.example.com/problems' }) });
@@ -177,7 +214,7 @@ createBan({ format: plain() }); // { status, code, title, detail, id, meta }
 A custom format with a schema:
 
 ```ts
-import { defineFormat } from 'hono-ban';
+import { defineFormat } from 'ban-kit';
 import { z } from 'zod';
 
 const legacy = defineFormat({
@@ -224,12 +261,14 @@ All three normalize issues into `ValidationIssue[]` and **throw**
 `ban.validation(issues, { location })`. Throwing rather than returning a `Response` from the hook
 sends validation errors through the same `onError` pipeline as everything else, so they get the
 error id, the `X-Error-Id` header, the report, and the trace id like any other error (section 4.7).
+The hooks are exported from `ban-kit/zod`, `ban-kit/valibot`, and `ban-kit/standard-schema` as well
+as under `hono-ban/*`; they take a result object and need nothing from Hono.
 
 ### 3.8 OpenAPI
 
 ```ts
 import { createRoute } from '@hono/zod-openapi';
-import { errorResponse, errorResponses } from 'hono-ban/openapi';
+import { errorResponse, errorResponses } from 'ban-kit/openapi';
 
 createRoute({
   method: 'post',
@@ -284,7 +323,7 @@ carry `WWW-Authenticate`, a 405 `Allow`, a 407 `Proxy-Authenticate`. They travel
 the one with a grammar worth enforcing has a builder (ADR-0013).
 
 ```ts
-import { bearerChallenge } from 'hono-ban';
+import { bearerChallenge } from 'ban-kit';
 
 throw ban.unauthorized({
   headers: {
@@ -309,7 +348,7 @@ https://www.rfc-editor.org/rfc/rfc9728#section-5.1
 
 ```ts
 interface ErrorDefinition {
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   /** Defaults to the RFC 9110 reason phrase for `status`. */
   readonly title?: string;
   /** Machine-readable code. Defaults to the catalog key. */
@@ -335,14 +374,19 @@ custom key that equals a built-in key overrides its definition (for example to c
 
 ### 4.2 BanError
 
-`BanError extends HTTPException` (implemented in `src/core/ban-error.ts`). Extending Hono's own
-exception means every piece of Hono middleware that already special-cases `HTTPException` keeps
-working, and `err.getResponse()` renders in the configured format because the error carries a
-reference to its `Ban` instance. @ref https://hono.dev/docs/api/exception
+`BanError extends Error` (implemented in `packages/ban-kit/src/core/ban-error.ts`). hono-ban 1.x
+extended Hono's `HTTPException`; the core cannot, and the two things that inheritance bought are
+covered another way (ADR-0018): Hono middleware that throws `HTTPException` is adopted into the
+catalog by `hono-ban` (section 4.5), and `err.getResponse()` still renders in the configured format
+because the error carries a reference to its renderer. What was lost on purpose: a `BanError` that
+escapes without `app.onError(ban.onError())` is answered by Hono's default 500 rather than by its
+own body, which is the same as any other error and is covered by the quick start.
 
 Fields: `status`, `code`, `title`, `detail`, `meta`, `headers`, `id`, `cause`, `definition`,
-`instance` (request path when rendered). `message` is `detail ?? title` so ordinary logging of the
-error reads well.
+`errors` (the list of items, section 4.7), `instance` (request path when rendered). `message` is
+`detail ?? title` so ordinary logging of the error reads well. `status` is typed as
+`ErrorStatusCode`, the library's own union of the registered 4xx and 5xx statuses, so the core does
+not borrow a framework's status type and a 2xx or 3xx error is a type error.
 
 ### 4.3 Factories
 
@@ -359,9 +403,11 @@ Factories are pure: they allocate a `BanError` and return it. No I/O, no side ef
 `ban.error(key, options)` is the generic form for dynamic keys.
 `ban.custom({ status, title, code?, ...options })` builds a one-off error that is not in the
 catalog, for prototypes and for statuses an application uses exactly once; it is excluded from
-`errorResponses()` because it has no definition to document. `ban.from(unknown)` converts any thrown
-value: `BanError` passes through, `HTTPException` maps by status with headers preserved, anything
-else becomes the `INTERNAL_SERVER_ERROR` entry with the value as `cause`.
+`errorResponses()` because it has no definition to document. `ban.fromStatus(status, options)` picks
+the primary entry for a status, or a custom error when none exists, the building block for adopters
+that receive a status from elsewhere. `ban.from(unknown)` converts any thrown value: `BanError`
+passes through, the `adopt` hook gets the next say, anything else becomes the
+`INTERNAL_SERVER_ERROR` entry with the value as `cause`.
 
 ### 4.4 Formats
 
@@ -370,13 +416,9 @@ interface ErrorFormat<TBody = unknown> {
   readonly name: string;
   readonly contentType: string;
   render(error: BanError, ctx: RenderContext): TBody;
-  renderValidation(
-    error: BanError,
-    issues: ReadonlyArray<ValidationIssue>,
-    ctx: RenderContext,
-  ): TBody;
+  renderErrors(error: BanError, errors: ReadonlyArray<ErrorItem>, ctx: RenderContext): TBody;
   schema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
-  validationSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
+  errorsSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
 }
 
 interface RenderContext {
@@ -392,20 +434,22 @@ interface RenderContext {
 }
 ```
 
-All four methods are required on `ErrorFormat`; `defineFormat` (SPEC 7.5) fills in
-`renderValidation` and `validationSchema` from `render` and `schema` when a hand-written format
-omits them. A format sees only what the context carries: it cannot set response headers, which stay
-with the error (`BanError.headers`) and the handler (`HandlerOptions.headers`).
+All four methods are required on `ErrorFormat`; `defineFormat` (SPEC 7.5) fills in `renderErrors`
+and `errorsSchema` from `render` and `schema` when a hand-written format omits them. `renderErrors`
+is the list path: an error carrying `errors` (section 4.7) renders through it, with every built-in
+format deciding how items appear in its own shape. A format sees only what the context carries: it
+cannot set response headers, which stay with the error (`BanError.headers`) and the handler
+(`HandlerOptions.headers`).
 
 Built-in formats:
 
-| Format             | Content type               | Notes                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `problemDetails()` | `application/problem+json` | RFC 9457 members plus `id`, `code`, and `meta` flattened as extension members; standard members win on collision. See ADR-0008 and SPEC 7.1. `type` is `about:blank` unless a type URI is derived. Validation issues render as an `errors` array of `{ pointer \| parameter \| header, detail, code }`.                                                                               |
-| `jsonApi()`        | `application/vnd.api+json` | `{ errors: [ErrorObject] }` with `id`, `status` (string), `code`, `title`, `detail`, `links.type`, `links.about`, `source`, `meta`. Validation issues become one error object each with `source.pointer` (RFC 6901 escaped) or `source.parameter` or `source.header`.                                                                                                                 |
-| `googleApi()`      | `application/json`         | AIP-193: `{ error: { code, message, status, details } }` with `code` the HTTP status, `status` the `google.rpc.Code` name (from the catalog code, the `rpcCodes` option, or the HTTP status through the gax table), and `details` holding `ErrorInfo` (always), `BadRequest` (validation), `RetryInfo`, `RequestInfo` (the error id), `DebugInfo`, `Help`. See ADR-0014 and SPEC 7.6. |
-| `stripe()`         | `application/json`         | Stripe's `api_errors` shape: `{ error: { code, doc_url, message, param, request_log_url, type } }` in alphabetical order, `type` classified by status like Stripe's SDKs or per code. No member for `meta`, the trace id, or the id. See ADR-0014 and SPEC 7.7.                                                                                                                       |
-| `plain()`          | `application/json`         | `{ status, code, title, detail, id, meta, errors? }`. For teams migrating from ad hoc bodies.                                                                                                                                                                                                                                                                                         |
+| Format             | Content type               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `problemDetails()` | `application/problem+json` | RFC 9457 members plus `id`, `code`, and `meta` flattened as extension members; standard members win on collision. See ADR-0008 and SPEC 7.1. `type` is `about:blank` unless a type URI is derived. Error items render as an `errors` array of `{ location, pointer \| name, detail, code, expected, received }`.                                                                                                      |
+| `jsonApi()`        | `application/vnd.api+json` | `{ errors: [ErrorObject] }` with `id`, `status` (string), `code`, `title`, `detail`, `links.type`, `links.about`, `source`, `meta`. Error items become one error object each with `source.pointer` (RFC 6901 escaped) or `source.parameter` or `source.header`; `mixedEntries` lets items carry their own status, code, and title, and `responseStatus()` picks the document's status the way the specification asks. |
+| `googleApi()`      | `application/json`         | AIP-193: `{ error: { code, message, status, details } }` with `code` the HTTP status, `status` the `google.rpc.Code` name (from the catalog code, the `rpcCodes` option, or the HTTP status through the gax table), and `details` holding `ErrorInfo` (always), `BadRequest` (validation), `RetryInfo`, `RequestInfo` (the error id), `DebugInfo`, `Help`. See ADR-0014 and SPEC 7.6.                                 |
+| `stripe()`         | `application/json`         | Stripe's `api_errors` shape: `{ error: { code, doc_url, message, param, request_log_url, type } }` in alphabetical order, `type` classified by status like Stripe's SDKs or per code. No member for `meta`, the trace id, or the id. See ADR-0014 and SPEC 7.7.                                                                                                                                                       |
+| `plain()`          | `application/json`         | `{ status, code, title, detail, id, meta, errors? }`. For teams migrating from ad hoc bodies.                                                                                                                                                                                                                                                                                                                         |
 
 @ref https://www.rfc-editor.org/rfc/rfc9457 @ref https://jsonapi.org/format/#error-objects @ref
 https://jsonapi.org/format/#content-negotiation-servers @ref
@@ -423,13 +467,20 @@ literals with a conformance test (ADR-0003). @ref https://standardschema.dev
 
 ### 4.5 Handler
 
-`ban.onError(options)` returns a Hono `ErrorHandler`. The pipeline for a thrown value `err`:
+`ban.handler(options)` returns `(thrown, request, ctx) => Promise<Response>`: the thrown value, the
+request facts (`method`, `path`, and a case-insensitive `header()`, which `fromRequest(request)`
+reads from a fetch `Request`), and a context of the caller's choosing that every callback receives.
+`hono-ban`'s `ban.onError(options)` wraps it as a Hono `ErrorHandler` with the `Context` as that
+context, so `requestId`, `traceId`, `transform`, and `onReport` see `c` exactly as in 1.x. The
+pipeline for a thrown value `err`:
 
 1. `BanError` → use as is.
-2. `HTTPException` → `ban.from(err)`: catalog entry by status, `detail = err.message`, headers from
-   `err.res` preserved. Hono's own validator throws
+2. `adopt` → if the instance's hook returns a `BanError`, use it as a handled error. `hono-ban`
+   installs `fromHttpException`: catalog entry by status, `detail = err.message`, headers from
+   `err.res` preserved minus those describing its body. Hono's own validator throws
    `HTTPException(400, 'Malformed JSON in request body')`; it is matched by status and exact
-   message, never by substring.
+   message, never by substring. An `HTTPException` outside the error classes (a thrown redirect) is
+   answered with its own response before the pipeline starts.
 3. `options.map ?? createBan({ map })` → if it returns a `BanError`, use it.
 4. Anything else → `INTERNAL_SERVER_ERROR` with the constant detail and `cause = err`.
 
@@ -440,26 +491,28 @@ format, cap the body size, build the report, call `onReport` inside a try/catch,
 the failure attached to the report as `handlerFailure`.
 
 ```ts
-interface HandlerOptions {
+interface HandlerOptions<TContext = void> {
   includeStack?: boolean; // default false
   requestIdHeader?: string | false; // default 'X-Request-Id'; validated, never fabricated
-  requestId?: (c: Context) => string | undefined; // overrides the header lookup
-  traceId?: (c: Context) => string | undefined; // default: W3C traceparent
-  onReport?: (report: ErrorReport, c: Context) => void | Promise<void>;
+  requestId?: (ctx: TContext) => string | undefined; // overrides the header lookup
+  traceId?: (ctx: TContext) => string | undefined; // default: W3C traceparent
+  onReport?: (report: ErrorReport, ctx: TContext) => void | Promise<void>;
   headers?: HeadersInit; // added to every error response
   errorIdHeader?: string | false; // default 'X-Error-Id'
   maxBodyBytes?: number; // default 65536
-  transform?: (body: unknown, error: BanError, c: Context) => unknown; // localization etc.
+  transform?: (body: unknown, error: BanError, ctx: TContext) => unknown; // localization etc.
   map?: BanOptions['map']; // overrides the instance-level map
 }
 ```
+
+On Hono `TContext` is `Context<E>`; elsewhere it is whatever the host passes, or nothing.
 
 @ref https://www.w3.org/TR/trace-context/#traceparent-header
 
 The step-by-step algorithm, the fallback path, header merge order, and every edge case are in SPEC
 section 6.
 
-`hono-ban/postgresql` supplies a `map` for Postgres driver errors. `postgresMapper(options)`
+`ban-kit/postgresql` supplies a `map` for Postgres driver errors. `postgresMapper(options)`
 recognizes the error by its SQLSTATE and severity, directly or through an ORM wrapper's `cause`, and
 returns a catalog entry with constant text (409 for conflicts, 422 for rejected values, 503 for
 transient conditions) or `undefined` for codes it has no row for, so those stay unhandled 500s.
@@ -472,7 +525,7 @@ reasoning.
 ```ts
 interface ErrorReport {
   readonly id: string;
-  readonly status: ContentfulStatusCode;
+  readonly status: ErrorStatusCode;
   readonly code: string;
   readonly error: BanError; // what was rendered
   readonly cause: unknown; // what was thrown, when different
@@ -507,27 +560,34 @@ type IssueLocation = 'body' | 'form' | 'query' | 'param' | 'header' | 'cookie';
 ```
 
 `ban.validation(issues, { location })` creates a `BanError` for the `VALIDATION_FAILED` entry (422;
-`createBan({ validationKey })` selects another entry) with issues attached; the format renders them.
-Hooks throw this error so it reaches `onError` and gets an id, header, report, and trace id. The
-location is always stated by the caller (the validator hook knows which target it validated), never
-inferred from key names. JSON pointers escape `~` and `/` per RFC 6901; symbol path segments are
-stringified.
+`createBan({ validationKey })` selects another entry) with one `ErrorItem` per issue in `errors` and
+`'Request validation failed'` as the default `detail`; the format renders the items. Hooks throw
+this error so it reaches the handler and gets an id, header, report, and trace id. The location is
+always stated by the caller (the validator hook knows which target it validated), never inferred
+from key names. JSON pointers escape `~` and `/` per RFC 6901; symbol path segments are stringified.
 
-Subpath exports:
+`errors` is not reserved for validation (ADR-0017). Every factory accepts it, and an item is the
+unit every list-bearing format shares: `detail`, an optional `location` and `path`, the validator's
+own `reason`, `expected`, and `received`, per-item `meta`, and an optional identity (`status`,
+`code`, `title`, `type`) for formats that let one document combine several problems, which JSON:API
+does under `mixedEntries`. A batch of domain checks or a JSON:API document with three unrelated
+problems builds the list directly: `ban.badRequest({ errors })`.
 
-- `hono-ban/zod`: `defaultHook(ban)` for `OpenAPIHono`, `hook(ban)` for `zValidator`, and
+Subpath exports (each also available as `hono-ban/<name>`):
+
+- `ban-kit/zod`: `defaultHook(ban)` for `OpenAPIHono`, `hook(ban)` for `zValidator`, and
   `fromZodError(ban, error, location)`. Zod 3.25+ and 4.
-- `hono-ban/valibot`: `hook(ban)` for `@hono/valibot-validator` and
+- `ban-kit/valibot`: `hook(ban)` for `@hono/valibot-validator` and
   `fromValibotIssues(ban, issues, location)`, keeping Valibot's `type`, `expected`, and `received`
   on each issue.
-- `hono-ban/standard-schema`: `hook(ban)` for `@hono/standard-validator` and
+- `ban-kit/standard-schema`: `hook(ban)` for `@hono/standard-validator` and
   `fromIssues(ban, issues, location)`. Covers ArkType, Effect Schema, and any other Standard Schema
   library through one interface (path and message only, which is all the spec carries). @ref
   https://standardschema.dev
 
 ### 4.8 OpenAPI
 
-`hono-ban/openapi` exports `errorResponse(ban, statusOrKey, opts?)`, `errorResponses(ban, list)`,
+`ban-kit/openapi` exports `errorResponse(ban, statusOrKey, opts?)`, `errorResponses(ban, list)`,
 `errorSchema(ban, statusOrKey)`, `validationResponse(ban)`, and `validationSchema(ban)`. Schemas are
 JSON Schema 2020-12 objects, which OpenAPI 3.1 accepts directly; pass `{ dialect: 'openapi-3.0' }`
 to get `enum` instead of `const` for 3.0 documents. `@hono/zod-openapi` accepts raw schema objects
@@ -538,7 +598,7 @@ https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registr
 
 A conformance test in the repository renders every catalog entry in every built-in format and
 validates the body against `format.schema(entry)`.
-`assertFormatConformance(format, catalog, { compile })` is exported from `hono-ban/testing` for
+`assertFormatConformance(format, catalog, { compile })` is exported from `ban-kit/testing` for
 custom formats; `compile` turns a JSON Schema into a validator so the package does not depend on Ajv
 (ADR-0009).
 
@@ -552,54 +612,69 @@ several error statuses are heuristically cacheable.
 
 ### 4.10 Runtime and packaging
 
+- Two packages, versioned independently (ADR-0016): `ban-kit` (the core) and `hono-ban` (the Hono
+  adapter, depending on `ban-kit` with a caret range).
 - ESM only, `platform: 'neutral'`, `engines.node >= 22.12`, `sideEffects: false` (ADR-0006).
-- One peer: `hono >= 4.12.34` (upstream security floor). No optional peers: the integrations are
-  typed structurally, so `zod`, `valibot`, `@hono/*` validators, `@standard-schema/spec`, and
-  `@opentelemetry/api`, and the Postgres drivers are devDependencies of this repository only
-  (ADR-0009).
-- No runtime dependencies. Ids come from `crypto.randomUUID()`.
-- Subpath exports: `.`, `./formats/json-api`, `./formats/problem-details`, `./formats/plain`,
-  `./formats/google-api`, `./formats/stripe`, `./zod`, `./valibot`, `./standard-schema`,
-  `./openapi`, `./otel`, `./postgresql`, `./testing`.
+- `ban-kit` has no dependencies and no peers. `hono-ban` has one peer, `hono >= 4.12.34` (upstream
+  security floor). No optional peers anywhere: the integrations are typed structurally, so `zod`,
+  `valibot`, `@hono/*` validators, `@standard-schema/spec`, `@opentelemetry/api`, and the Postgres
+  drivers are devDependencies of this repository only (ADR-0009).
+- Ids come from `crypto.randomUUID()`.
+- Subpath exports, identical in both packages: `.`, `./formats/json-api`,
+  `./formats/problem-details`, `./formats/plain`, `./formats/google-api`, `./formats/stripe`,
+  `./zod`, `./valibot`, `./standard-schema`, `./openapi`, `./otel`, `./postgresql`, `./testing`. A
+  `hono-ban` subpath is a one-line re-export of the `ban-kit` one; only the root differs.
 
 ## 5. Package layout
 
 The authoritative file map, with the SPEC section each file implements, is SPEC section 1. In
 outline:
 
-- `src/core/` `BanError`, catalog data, definitions, factories, `createBan`, `assert`, `from`
-- `src/formats/` `ErrorFormat` types, `defineFormat`, extension-member flattening, the five built-in
-  formats
-- `src/headers/` the `WWW-Authenticate` Bearer challenge builder
-- `src/handler/` the `onError` pipeline, request id and traceparent parsing, body cap, report
-- `src/validation/` `ValidationIssue`, pointer helpers, the Zod, Valibot, and Standard Schema hooks
-- `src/openapi/` response schema helpers
-- `src/observability/` the OpenTelemetry trace id adapter
-- `src/postgresql/` the Postgres SQLSTATE mapper
-- `src/testing/` consumer-facing test helpers and format conformance
-- `src/internal/` helpers that are never exported
+Under `packages/ban-kit/src/`:
+
+- `core/` `BanError`, `ErrorItem`, status codes, catalog data, definitions, factories, `createBan`,
+  `assert`, `from`
+- `formats/` `ErrorFormat` types, `defineFormat`, extension-member flattening, error entries, the
+  five built-in formats
+- `headers/` the `WWW-Authenticate` Bearer challenge builder
+- `handler/` the handler pipeline, `fromRequest`, request id and traceparent parsing, body cap,
+  report
+- `validation/` `ValidationIssue`, pointer helpers, the Zod, Valibot, and Standard Schema hooks
+- `openapi/` response schema helpers
+- `observability/` the OpenTelemetry trace id adapter
+- `postgresql/` the Postgres SQLSTATE mapper
+- `testing/` consumer-facing test helpers and format conformance
+- `internal/` helpers that are never exported
+
+Under `packages/hono-ban/src/`: `create-ban.ts` (the wrapping `createBan` and `onError`),
+`http-exception.ts` (`HTTPException` adoption and passthrough), the re-export files for each
+subpath, and the tests that need Hono or its middleware (validator hooks through `onError`, the
+generated OpenAPI document, hook type assignability).
 
 Every module with behavior has `*.test.ts` beside it; types that are part of the contract have
 `*.test-d.ts`. The per-module test list is SPEC section 14.
 
 ## 6. Comparison
 
-| Capability           | hono-ban 1.0                                                                   | hono-problem-details                                              | @hapi/boom         |
+| Capability           | ban-kit 1.0 / hono-ban 2.0                                                     | hono-problem-details                                              | @hapi/boom         |
 | -------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------ |
 | Formats              | RFC 9457, JSON:API, Google API (AIP-193), Stripe, plain, custom (schema-typed) | RFC 9457                                                          | flat               |
 | Catalog              | built-in plus typed custom keys as factories                                   | user registry, `create(key)`                                      | built-in factories |
 | Options per error    | detail, code, title, meta, headers, cause, id                                  | detail, instance, type, extensions                                | data, headers      |
 | Domain error mapping | `map(error, ban)`                                                              | `mapError`                                                        | `boomify`          |
-| Validation           | Zod, Valibot, Standard Schema; format renders; flows through `onError`         | Zod, Valibot, Standard Schema; hook returns the response directly | none               |
+| Validation           | Zod, Valibot, Standard Schema; format renders; flows through the handler       | Zod, Valibot, Standard Schema; hook returns the response directly | none               |
 | OpenAPI              | derived from format schema; zod-openapi and JSON Schema                        | zod-openapi and JSON Schema                                       | none               |
 | Observability        | `ErrorReport` with shared id, request id, trace id                             | `traceId` extension via OTel                                      | none               |
 | Handler safety       | never throws, once per error, constant 500 detail                              | never throws, constant 500 detail                                 | n/a                |
 | Runtime              | web standards only                                                             | web standards only                                                | Node               |
+| Framework            | none in the core; Hono through `hono-ban`                                      | Hono                                                              | none               |
 
-hono-ban 1.0 does not depend on or wrap hono-problem-details.
+Neither package depends on or wraps hono-problem-details.
 
 ## 7. Roadmap
 
 Everything described in this document has shipped and is covered by the unit, end-to-end, and
-runtime smoke suites (SPEC section 14). Nothing is scheduled; additive proposals start as a
-discussion (`CONTRIBUTING.md`).
+runtime smoke suites (SPEC section 14). Adapters for other hosts (a `fetch`-native router, a Node
+`http` server) are the expected additions: each is a package that depends on `ban-kit`, installs an
+`adopt` hook for the host's own exceptions, and maps the host's request to `ErrorRequest`, the way
+`hono-ban` does. Additive proposals start as a discussion (`CONTRIBUTING.md`).

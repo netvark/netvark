@@ -13,6 +13,7 @@ import { sValidator } from '@hono/standard-validator';
 import { vValidator } from '@hono/valibot-validator';
 import { zValidator } from '@hono/zod-validator';
 import { trace } from '@opentelemetry/api';
+import { createBan as createCoreBan, fromRequest } from 'ban-kit';
 import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 import * as v from 'valibot';
@@ -53,6 +54,9 @@ const googleApiBan = createBan({
   docsBaseUrl: DOCS_BASE_URL,
 });
 const stripeBan = createBan({ format: stripe(), docsBaseUrl: DOCS_BASE_URL });
+// The framework-free core answering a request on its own (SPEC 6).
+const core = createCoreBan({ format: plain() });
+const coreHandle = core.handler();
 
 /** Reports by error id, read back through `GET /reports/:id`. */
 const reports = new Map<string, ErrorReport>();
@@ -155,6 +159,9 @@ app.get('/openapi', (c) =>
     ...errorResponses(ban, [404, 'ORDER_CONFLICT']),
     422: validationResponse(ban),
   }),
+);
+app.get('/core/missing', async (c) =>
+  coreHandle(core.notFound('Order 42 does not exist'), fromRequest(c.req.raw)),
 );
 app.get('/rendered', () => {
   // What a consumer's unit test does: render without a request.

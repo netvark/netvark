@@ -26,6 +26,6 @@ body:
     attributes:
       label: Area
       options:
-        [core, formats, handler, validation, openapi, observability, docs]
+        [core, formats, handler, validation, openapi, observability, hono, docs]
     validations:
       required: true

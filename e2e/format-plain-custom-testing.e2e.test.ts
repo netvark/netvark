@@ -117,11 +117,11 @@ describe('hono-ban/testing helpers used by a consumer', () => {
   });
 
   it('accepts a minimal defineFormat that relies on the SPEC 7.5 defaults', () => {
-    // Only `render` and `schema`: validation errors reuse both.
+    // Only `render` and `schema`: errors with a list reuse both.
     const mini = defineFormat({
       name: 'mini',
       contentType: 'application/json',
-      render: (error) => ({ code: error.code, issues: error.issues?.length }),
+      render: (error) => ({ code: error.code, issues: error.errors?.length }),
       schema: (definition) => ({
         type: 'object',
         required: ['code'],
@@ -143,7 +143,7 @@ describe('hono-ban/testing helpers used by a consumer', () => {
     });
     const definition = miniBan.catalog.VALIDATION_FAILED;
     const ctx = { docsBaseUrl: undefined, dialect: 'draft-2020-12' } as const;
-    expect(mini.validationSchema(definition, ctx)).toEqual(
+    expect(mini.errorsSchema(definition, ctx)).toEqual(
       mini.schema(definition, ctx),
     );
     expect(() => {
@@ -178,24 +178,27 @@ describe('hono-ban/testing helpers used by a consumer', () => {
     }
     expect(caught).toBeInstanceOf(AggregateError);
     const aggregate = caught as AggregateError;
-    // SPEC 7.4: three render cases plus two validation cases (two issues,
-    // none) for each of the six locations: 15 per definition.
-    expect(aggregate.message).toBe('broken failed 30 conformance check(s)');
+    // SPEC 7.4: three render cases plus three list cases (two items, none,
+    // mixed entries) for each of the six locations: 21 per definition.
+    expect(aggregate.message).toBe('broken failed 42 conformance check(s)');
     const messages = aggregate.errors.map((entry) => (entry as Error).message);
     expect(
       messages.filter((m) => m.startsWith('broken NOT_FOUND ')),
-    ).toHaveLength(15);
+    ).toHaveLength(21);
     expect(
       messages.filter((m) => m.startsWith('broken CONFLICT ')),
-    ).toHaveLength(15);
+    ).toHaveLength(21);
     expect(messages[0]).toBe(
       "broken NOT_FOUND minimal: / must have required property 'status'",
     );
     expect(messages).toContainEqual(
-      expect.stringMatching(/^broken CONFLICT validation\/cookie: /u),
+      expect.stringMatching(/^broken CONFLICT errors\/cookie: /u),
     );
     expect(messages).toContainEqual(
-      expect.stringMatching(/^broken CONFLICT validation-empty\/cookie: /u),
+      expect.stringMatching(/^broken CONFLICT errors-empty\/cookie: /u),
+    );
+    expect(messages).toContainEqual(
+      expect.stringMatching(/^broken CONFLICT errors-mixed\/cookie: /u),
     );
   });
 });

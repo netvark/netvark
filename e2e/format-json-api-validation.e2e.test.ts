@@ -9,7 +9,7 @@
  * `parameter` for query, `header` for header, none for param and cookie),
  * the `meta.location`, `meta.name`, `code`, `expected`, and `received`
  * members, the shared `id`, `status`, `code`, and `title`, the string `'422'`
- * status, and that every document validates against `validationSchema`. It
+ * status, and that every document validates against `errorsSchema`. It
  * also runs `assertFormatConformance` from `hono-ban/testing` over the whole
  * catalog with Ajv. Non-validation documents live in
  * `format-json-api.e2e.test.ts`.
@@ -235,12 +235,9 @@ describe('jsonApi() validation documents', () => {
     },
   );
 
-  it('serves documents that validate against validationSchema for every location', async () => {
+  it('serves documents that validate against errorsSchema for every location', async () => {
     const validate = compileWithAjv(
-      ban.format.validationSchema(
-        ban.catalog.VALIDATION_FAILED,
-        SCHEMA_CONTEXT,
-      ),
+      ban.format.errorsSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CONTEXT),
     );
     for (const location of LOCATIONS) {
       const body = await readBody(await request(`/validate/${location}`));
@@ -253,7 +250,7 @@ describe('jsonApi() validation documents', () => {
     ).not.toEqual([]);
     expect(
       schemaErrors(
-        ban.format.validationSchema(ban.catalog.NOT_FOUND, SCHEMA_CONTEXT),
+        ban.format.errorsSchema(ban.catalog.NOT_FOUND, SCHEMA_CONTEXT),
         body,
       ),
     ).not.toEqual([]);

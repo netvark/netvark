@@ -1,8 +1,8 @@
 {
-  "name": "hono-ban-e2e",
+  "name": "ban-kit-e2e",
   "version": "0.0.0",
   "private": true,
-  "description": "End-to-end tests: a consumer of the built hono-ban package, exercised over real HTTP.",
+  "description": "End-to-end tests: a consumer of the built ban-kit and hono-ban packages, exercised over real HTTP.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -26,6 +26,7 @@
     "@types/pg": "8.23.1",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "ban-kit": "workspace:*",
     "drizzle-orm": "0.45.2",
     "hono": "4.13.7",
     "hono-ban": "workspace:*",

@@ -1,12 +1,18 @@
-import { Hono } from 'hono';
-import { afterAll, describe, expect, it } from 'vitest';
-
 /**
  * Package surface. Every subpath in SPEC section 1 must resolve through the
  * published `exports` map at runtime and export what the SPEC lists. The
  * imports below are value imports on purpose: a missing dist file or a wrong
  * `exports` entry fails here before any feature test runs.
  */
+import * as kit from 'ban-kit';
+import * as kitJsonApi from 'ban-kit/formats/json-api';
+import * as kitProblemDetails from 'ban-kit/formats/problem-details';
+import * as kitOpenapi from 'ban-kit/openapi';
+import * as kitTesting from 'ban-kit/testing';
+import * as kitZod from 'ban-kit/zod';
+import { Hono } from 'hono';
+import { afterAll, describe, expect, it } from 'vitest';
+
 import * as root from 'hono-ban';
 import * as googleApi from 'hono-ban/formats/google-api';
 import * as jsonApi from 'hono-ban/formats/json-api';
@@ -32,25 +38,37 @@ function sorted(list: Array<string>): Array<string> {
   return list.toSorted();
 }
 
+const CORE_ROOT = [
+  'BUILTIN_CATALOG',
+  'BanError',
+  'FACTORY_NAMES',
+  'assert',
+  'bearerChallenge',
+  'createBan',
+  'defineFormat',
+  'fromRequest',
+  'isBanError',
+  'isErrorStatus',
+  'locationFromTarget',
+  'nameFromPath',
+  'parseTraceparent',
+  'pointerFromPath',
+  'problemDetails',
+  'reasonPhrase',
+  'resolveDefinition',
+];
+
 describe('package surface', () => {
-  it('root exports the SPEC section 1 values', () => {
-    expect(names(root)).toEqual(
-      sorted([
-        'BUILTIN_CATALOG',
-        'BanError',
-        'FACTORY_NAMES',
-        'assert',
-        'bearerChallenge',
-        'createBan',
-        'defineFormat',
-        'isBanError',
-        'locationFromTarget',
-        'nameFromPath',
-        'parseTraceparent',
-        'pointerFromPath',
-        'problemDetails',
-      ]),
-    );
+  it('ban-kit root exports the SPEC section 1 values', () => {
+    expect(names(kit)).toEqual(sorted(CORE_ROOT));
+  });
+
+  it('hono-ban root re-exports the core and adds the Hono members', () => {
+    expect(names(root)).toEqual(sorted([...CORE_ROOT, 'fromHttpException']));
+    expect(root.BanError).toBe(kit.BanError);
+    expect(root.createBan).not.toBe(kit.createBan);
+    expect('onError' in kit.createBan()).toBe(false);
+    expect(typeof root.createBan().onError).toBe('function');
   });
 
   it('format subpaths export their factory and content type', () => {
@@ -58,7 +76,7 @@ describe('package surface', () => {
       sorted(['PROBLEM_DETAILS_CONTENT_TYPE', 'problemDetails']),
     );
     expect(names(jsonApi)).toEqual(
-      sorted(['JSON_API_CONTENT_TYPE', 'jsonApi']),
+      sorted(['JSON_API_CONTENT_TYPE', 'jsonApi', 'responseStatus']),
     );
     expect(names(plain)).toEqual(sorted(['PLAIN_CONTENT_TYPE', 'plain']));
     expect(names(googleApi)).toEqual(
@@ -105,7 +123,14 @@ describe('package surface', () => {
     );
   });
 
-  it('root problemDetails is the same module as the subpath', () => {
+  it('hono-ban subpaths are the ban-kit modules', () => {
+    expect(problemDetails.problemDetails).toBe(
+      kitProblemDetails.problemDetails,
+    );
+    expect(jsonApi.jsonApi).toBe(kitJsonApi.jsonApi);
+    expect(openapi.errorSchema).toBe(kitOpenapi.errorSchema);
+    expect(testing.expectBanError).toBe(kitTesting.expectBanError);
+    expect(zod.hook).toBe(kitZod.hook);
     expect(root.problemDetails).toBe(problemDetails.problemDetails);
   });
 });

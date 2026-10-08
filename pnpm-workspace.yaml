@@ -4,11 +4,13 @@
 # @ref https://pnpm.io/supply-chain-security
 # @ref https://pnpm.io/workspaces
 
-# The root is the published package. `e2e/` is a private consumer package
-# that installs the built `hono-ban` through `workspace:*`, so its imports
-# resolve through the published `exports` map into `dist/`.
+# `packages/*` are the published packages: `ban-kit` (the framework-free
+# core) and `hono-ban` (the Hono adapter, which depends on the core through
+# `workspace:^`). `e2e/` is a private consumer package that installs both
+# through `workspace:*`, so its imports resolve through the published
+# `exports` maps into `dist/`.
 packages:
-  - .
+  - packages/*
   - e2e
 
 # Do not install versions published less than a day ago; most compromised

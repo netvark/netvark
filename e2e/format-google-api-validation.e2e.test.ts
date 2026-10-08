@@ -8,7 +8,7 @@
  * (`items[0].sku`), `description` from the issue message, `reason` from the
  * issue code in UPPER_SNAKE_CASE, and the location in `ErrorInfo.metadata`.
  * The suite also proves every validation body validates against
- * `validationSchema` and not against `schema`, and runs
+ * `errorsSchema` and not against `schema`, and runs
  * `assertFormatConformance` over the whole catalog in both dialects' shapes.
  * @ref https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto (BadRequest)
  * @ref https://google.aip.dev/193#status-details
@@ -151,12 +151,9 @@ describe('googleApi() validation bodies', () => {
     expect(body.error.message).toBe('Request validation failed');
   });
 
-  it('validates against validationSchema for every location and never against schema', async () => {
+  it('validates against errorsSchema for every location and never against schema', async () => {
     const validation = compileWithAjv(
-      ban.format.validationSchema(
-        ban.catalog.VALIDATION_FAILED,
-        SCHEMA_CONTEXT,
-      ),
+      ban.format.errorsSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CONTEXT),
     );
     const plain = ban.format.schema(
       ban.catalog.VALIDATION_FAILED,

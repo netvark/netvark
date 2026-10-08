@@ -183,7 +183,7 @@ describe('plain() over HTTP', () => {
       });
       expect(
         schemaErrors(
-          plain().validationSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CTX),
+          plain().errorsSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CTX),
           body,
         ),
       ).toEqual([]);

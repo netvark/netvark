@@ -263,6 +263,15 @@ const CHECKS: Readonly<Record<string, Check>> = {
     const required = list(member(schemaOf('422'), 'required'), '422 required');
     check(required.includes('errors'), '422 requires errors');
   },
+  'ban-kit handler without Hono': async (dispatch) => {
+    const res = await dispatch('/core/missing');
+    equal(res.status, 404, 'status');
+    equal(res.headers.get('content-type'), 'application/json', 'content-type');
+    const body = await json(res);
+    equal(body['code'], 'NOT_FOUND', 'code');
+    equal(body['detail'], 'Order 42 does not exist', 'detail');
+    equal(res.headers.get('x-error-id'), body['id'], 'X-Error-Id');
+  },
   'renderError from hono-ban/testing': async (dispatch) => {
     const res = await dispatch('/rendered');
     equal(res.status, 410, 'status');
@@ -295,13 +304,13 @@ export async function runChecks(dispatch: Dispatch): Promise<SmokeResult> {
 export function report(result: SmokeResult): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
-    console.log(`hono-ban smoke: ${total} checks passed on ${result.runtime}`);
+    console.log(`ban-kit smoke: ${total} checks passed on ${result.runtime}`);
     return;
   }
   for (const failure of result.failures) {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `hono-ban smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `ban-kit smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

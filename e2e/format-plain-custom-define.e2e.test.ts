@@ -21,7 +21,7 @@ import { startServer } from './support/server';
 /**
  * `defineFormat` in both SPEC 7.5 forms, served through `createBan({ format })`
  * over real HTTP. The hand-written form proves a custom content type, body,
- * validation body and explicit `validationSchema`; the Standard JSON Schema
+ * list body and explicit `errorsSchema`; the Standard JSON Schema
  * form is built from a Zod 4 object whose `~standard.jsonSchema` converter
  * produces the schema real bodies are checked against. Both pass SPEC 7.4.
  */
@@ -99,15 +99,15 @@ const acme = defineFormat({
   name: 'acme',
   contentType: ACME_CONTENT_TYPE,
   render: renderAcme,
-  renderValidation: (error, issues, ctx): AcmeBody => ({
+  renderErrors: (error, errors, ctx): AcmeBody => ({
     ...renderAcme(error, ctx),
-    issues: issues.map((issue) => ({
-      at: issue.path.join('.'),
-      reason: issue.message,
+    issues: errors.map((item) => ({
+      at: (item.path ?? []).join('.'),
+      reason: item.detail,
     })),
   }),
   schema: acmeSchema,
-  validationSchema: (definition, ctx) => ({
+  errorsSchema: (definition, ctx) => ({
     ...acmeSchema(definition, ctx),
     required: ['status', 'code', 'message', 'id', 'issues'],
   }),
@@ -141,12 +141,12 @@ const std = defineFormat({
   contentType: STD_CONTENT_TYPE,
   schema: StdBody,
   render: renderStd,
-  renderValidation: (error, issues, ctx) => ({
+  renderErrors: (error, errors, ctx) => ({
     ...renderStd(error, ctx),
     // @ref https://www.rfc-editor.org/rfc/rfc6901#section-3
-    issues: issues.map((issue) => ({
-      path: pointerFromPath(issue.path),
-      message: issue.message,
+    issues: errors.map((item) => ({
+      path: pointerFromPath(item.path ?? []),
+      message: item.detail,
     })),
   }),
 });
@@ -193,7 +193,7 @@ describe('defineFormat (hand-written) over HTTP', () => {
     expect(Object.keys(bare)).toEqual(['status', 'code', 'message', 'id']);
   });
 
-  it('routes validation errors through renderValidation', async () => {
+  it('routes validation errors through renderErrors', async () => {
     const res = await server.fetch('/invalid');
     const body = (await res.json()) as Record<string, unknown>;
     expect(res.status).toBe(422);
@@ -201,14 +201,11 @@ describe('defineFormat (hand-written) over HTTP', () => {
     expect(body).toEqual({
       status: 422,
       code: 'VALIDATION_FAILED',
-      message: 'Validation Failed',
+      message: 'Request validation failed',
       id: expect.any(String),
       issues: [{ at: 'items.0.sku', reason: 'Required' }],
     });
-    const schema = acme.validationSchema(
-      ban.catalog.VALIDATION_FAILED,
-      DRAFT_2020,
-    );
+    const schema = acme.errorsSchema(ban.catalog.VALIDATION_FAILED, DRAFT_2020);
     expect(schema).toHaveProperty('required', [
       'status',
       'code',
@@ -252,7 +249,7 @@ describe('defineFormat (Standard JSON Schema from Zod) over HTTP', () => {
     const definition = ban.catalog.NOT_FOUND;
     const expected = StdBody['~standard'].jsonSchema.output({ target });
     expect(std.schema(definition, ctx)).toEqual(expected);
-    expect(std.validationSchema(definition, ctx)).toEqual(expected);
+    expect(std.errorsSchema(definition, ctx)).toEqual(expected);
   });
 
   it('serves a body the derived schema and the Zod schema both accept', async () => {
@@ -285,7 +282,7 @@ describe('defineFormat (Standard JSON Schema from Zod) over HTTP', () => {
     });
     expect(
       schemaErrors(
-        std.validationSchema(ban.catalog.VALIDATION_FAILED, DRAFT_2020),
+        std.errorsSchema(ban.catalog.VALIDATION_FAILED, DRAFT_2020),
         body,
       ),
     ).toEqual([]);

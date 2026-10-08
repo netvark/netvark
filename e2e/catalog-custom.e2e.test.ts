@@ -1,4 +1,4 @@
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { ErrorStatusCode } from 'hono-ban';
 
 import type { RunningServer } from './support/server';
 
@@ -69,16 +69,16 @@ describe('custom catalog, ban.error and ban.custom (SPEC 2, 5.3)', () => {
   app.get('/custom/standard', () => {
     throw ban.custom({ status: 410, detail: 'Removed' });
   });
-  // ContentfulStatusCode covers official statuses only; 499 needs the cast (SPEC 2).
+  // ErrorStatusCode names registered statuses only; 499 needs the cast (SPEC 2.1).
   app.get('/custom/499', () => {
     throw ban.custom({
-      status: 499 as ContentfulStatusCode,
+      status: 499 as ErrorStatusCode,
       title: 'Client Closed Request',
       code: 'CLIENT_CLOSED',
     });
   });
   app.get('/custom/499-defaults', () => {
-    throw ban.custom({ status: 499 as ContentfulStatusCode });
+    throw ban.custom({ status: 499 as ErrorStatusCode });
   });
   let server: RunningServer;
 

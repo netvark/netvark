@@ -2,7 +2,8 @@
 
 ## Supported versions
 
-Only the latest minor release of the current major line receives security fixes.
+Only the latest minor release of the current major line of each package (`ban-kit`, `hono-ban`)
+receives security fixes.
 
 ## Reporting a vulnerability
 
@@ -15,7 +16,7 @@ Security Advisory; reporters are credited unless they ask not to be.
 
 ## Scope
 
-hono-ban renders error responses. Reports we care about most:
+ban-kit and hono-ban render error responses. Reports we care about most:
 
 - server internals (stack traces, database detail, file paths) reaching a client response by default
 - prototype pollution through user-supplied `meta` or extension members

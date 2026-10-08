@@ -18,7 +18,7 @@ import { startServer } from './support/server';
 /**
  * `ban.validation([], { location })` over HTTP for every built-in format
  * (SPEC 7.2.2, 7.6.2, 7.4). An empty issue list is legal, and each body
- * must still validate against the format's own `validationSchema`: JSON:API
+ * must still validate against the format's own `errorsSchema`: JSON:API
  * renders one summary error object because `errors` needs at least one,
  * Google API omits `BadRequest` because proto3 JSON has no empty repeated
  * field, and the others render an empty `errors` array or no `param`.
@@ -55,11 +55,11 @@ describe.each(FORMATS)('$name renders an empty issue list', ({ format }) => {
     await server?.close();
   });
   const validate = compileWithAjv(
-    format.validationSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CONTEXT),
+    format.errorsSchema(ban.catalog.VALIDATION_FAILED, SCHEMA_CONTEXT),
   );
 
   it.each(LOCATIONS)(
-    'as a 422 that matches validationSchema (%s)',
+    'as a 422 that matches errorsSchema (%s)',
     async (location) => {
       if (server === undefined) {
         throw new Error('server not started');
