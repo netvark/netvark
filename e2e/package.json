@@ -1,0 +1,26 @@
+{
+  "name": "hono-jsonapi-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end tests: a consumer of the built hono-jsonapi package, exercised over real HTTP.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "smoke:bun": "bun run smoke/run.ts",
+    "smoke:deno": "deno run --allow-read --allow-env smoke/run.ts",
+    "smoke:workerd": "node --experimental-strip-types smoke/workerd.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@hono/node-server": "2.1.1",
+    "@types/node": "26.4.1",
+    "hono": "4.13.7",
+    "hono-jsonapi": "workspace:*",
+    "miniflare": "4.20260730.0",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.0",
+    "zod": "4.5.4"
+  }
+}
