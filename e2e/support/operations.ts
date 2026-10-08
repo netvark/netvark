@@ -1,0 +1,99 @@
+/**
+ * The atomic operations endpoint of the blog: typed handlers per resource
+ * and a snapshot transaction that rolls the store back on failure.
+ */
+import type { Context } from 'hono';
+
+import type { JsonApiEnv } from 'hono-jsonapi';
+import type { AtomicOptions, ResourceHandlers } from 'hono-jsonapi/atomic';
+
+import type { ArticleRow, PersonRow, Store } from './store.ts';
+
+import { JsonApiError, toManyLinkage, toOneLinkage } from 'hono-jsonapi';
+
+import { Articles, People } from './resources.ts';
+
+const TIMESTAMP = '2026-02-01T00:00:00Z';
+
+function article(tx: Store, id: string): ArticleRow {
+  const row = tx.articles.get(id);
+  if (row === undefined) {
+    throw JsonApiError.notFound(`Article ${id} does not exist`);
+  }
+  return row;
+}
+
+const articles: ResourceHandlers<typeof Articles, Store, JsonApiEnv> = {
+  resource: Articles,
+  create: ({ data }, { tx }) => {
+    const row: ArticleRow = {
+      id: tx.id(),
+      title: data.attributes.title,
+      body: data.attributes.body,
+      createdAt: TIMESTAMP,
+      authorId: toOneLinkage(data.relationships['author'])?.id ?? null,
+      tagIds: (toManyLinkage(data.relationships['tags']) ?? []).map(
+        (tag) => tag.id,
+      ),
+    };
+    tx.articles.set(row.id, row);
+    return row;
+  },
+  update: ({ id, data }, { tx }) => {
+    const current = article(tx, id);
+    const row = { ...current, title: data.attributes.title ?? current.title };
+    tx.articles.set(id, row);
+    return row;
+  },
+  remove: ({ id }, { tx }) => {
+    article(tx, id);
+    tx.articles.delete(id);
+  },
+  relationships: {
+    author: {
+      update: ({ id, data }, { tx }) => {
+        tx.articles.set(id, {
+          ...article(tx, id),
+          authorId: toOneLinkage(data)?.id ?? null,
+        });
+      },
+    },
+    tags: {
+      add: ({ id, data }, { tx }) => {
+        const row = article(tx, id);
+        tx.articles.set(id, {
+          ...row,
+          tagIds: [...new Set([...row.tagIds, ...data.map((tag) => tag.id)])],
+        });
+      },
+    },
+  },
+};
+
+const people: ResourceHandlers<typeof People, Store, JsonApiEnv> = {
+  resource: People,
+  create: ({ data }, { tx }) => {
+    const row: PersonRow = {
+      id: tx.id(),
+      name: data.attributes.name,
+      twitter: data.attributes.twitter,
+    };
+    tx.people.set(row.id, row);
+    return { ...row, articleIds: [] };
+  },
+};
+
+export function atomicOptions(store: Store): AtomicOptions<Store, JsonApiEnv> {
+  return {
+    resources: [articles, people],
+    transaction: async (_c: Context<JsonApiEnv>, run) => {
+      const snapshot = store.snapshot();
+      try {
+        return await run(store);
+      } catch (error) {
+        store.restore(snapshot);
+        throw error;
+      }
+    },
+  };
+}

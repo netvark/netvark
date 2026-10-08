@@ -1,0 +1,97 @@
+/**
+ * The resource definitions of the blog, shared by the routes and the atomic
+ * handlers. Module-level so `typeof Articles` types the validators and
+ * handlers everywhere.
+ */
+import type { AnyResource } from 'hono-jsonapi';
+
+import type { ArticleRow, PersonRow, TagRow } from './store.ts';
+
+import { z } from 'zod';
+
+import { defineResource } from 'hono-jsonapi';
+
+export const BASE_URL = 'https://blog.example';
+
+/** A person with the ids of their articles, resolved by the caller. */
+export interface PersonView extends PersonRow {
+  readonly articleIds: ReadonlyArray<string>;
+}
+
+const CreateArticle = z.object({
+  title: z.string().min(1),
+  body: z.string().default(''),
+});
+/** Not `CreateArticle.partial()`: a default would overwrite the stored body. */
+const UpdateArticle = z.object({
+  title: z.string().min(1).optional(),
+  body: z.string().optional(),
+});
+
+export const People = defineResource({
+  type: 'people',
+  attributes: ['name', 'twitter'],
+  relationships: {
+    articles: {
+      type: 'articles',
+      cardinality: 'many',
+      resource: (): AnyResource => Articles,
+    },
+  },
+  serialize: (row: PersonView) => ({
+    id: row.id,
+    attributes: { name: row.name, twitter: row.twitter },
+    relationships: { articles: row.articleIds },
+  }),
+  links: { self: (id) => `${BASE_URL}/people/${id}` },
+  validate: {
+    create: z.object({
+      name: z.string().min(1),
+      twitter: z.string().nullable().default(null),
+    }),
+  },
+});
+
+export const Tags = defineResource({
+  type: 'tags',
+  attributes: ['name'],
+  serialize: (row: TagRow) => ({ id: row.id, attributes: { name: row.name } }),
+  links: { self: (id) => `${BASE_URL}/tags/${id}` },
+});
+
+export const Articles = defineResource({
+  type: 'articles',
+  attributes: ['title', 'body', 'createdAt'],
+  relationships: {
+    author: {
+      type: 'people',
+      cardinality: 'one',
+      resource: (): AnyResource => People,
+    },
+    tags: {
+      type: 'tags',
+      cardinality: 'many',
+      resource: (): AnyResource => Tags,
+    },
+  },
+  serialize: (row: ArticleRow) => ({
+    id: row.id,
+    attributes: { title: row.title, body: row.body, createdAt: row.createdAt },
+    relationships: { author: row.authorId, tags: row.tagIds },
+  }),
+  links: {
+    self: (id) => `${BASE_URL}/articles/${id}`,
+    relationship: (id, name) => ({
+      self: `${BASE_URL}/articles/${id}/relationships/${name}`,
+      related: `${BASE_URL}/articles/${id}/${name}`,
+    }),
+  },
+  query: {
+    sort: ['title', 'createdAt'],
+    filter: { title: ['eq', 'like'], author: ['eq'] },
+    include: ['author', 'author.articles', 'tags'],
+    page: { default: 2, max: 4 },
+    search: 'filter[q]',
+  },
+  validate: { create: CreateArticle, update: UpdateArticle },
+});
