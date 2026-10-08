@@ -1,0 +1,898 @@
+# hono-jsonapi: implementation specification
+
+- Status: normative for the 0.x line; `docs/DESIGN.md` explains the why
+
+The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
+source file that implements it and the tests that prove it. When this document and the code
+disagree, fix one of them in the same pull request. Clause references are to
+[JSON:API 1.1](https://jsonapi.org/format/1.1/) unless a profile, extension, or RFC is named.
+
+Contents
+
+1. Public surface and module map
+2. Documents
+3. Media types and negotiation
+4. Errors
+5. Resource definitions
+6. Query parsing
+7. Document building
+8. Cursor pagination
+9. Request documents
+10. Hono integration
+11. Atomic operations
+12. Packaging
+13. Constants
+14. Test plan
+
+---
+
+## 1. Public surface and module map
+
+`hono` is the only peer dependency. Validators are consumed through Standard Schema V1, whose
+interfaces are vendored in `src/internal/standard-schema-types.ts` (ADR 0002), so installing
+`hono-jsonapi` never pulls in Zod, Valibot, ArkType, or Ajv.
+
+| Subpath               | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hono-jsonapi`        | Values: `defineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `JsonApiError`, `isJsonApiError`, `errorObject`, `errorDocument`, `responseStatus`, `ERROR_CATALOG`, `ERROR_CODES`, `isErrorStatusCode`, `reasonPhrase`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`, `toJsonApiError`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9, 10 |
+| `hono-jsonapi/atomic` | `atomicOperations`, `parseOperationsDocument`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+`e2e/package-surface.e2e.test.ts` asserts the exact value export list of both subpaths against the
+built package.
+
+Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
+`*.test-d.ts`. Type-only modules (`types.ts` files, `standard-schema-types.ts`) and modules reached
+only through their consumers (`input.ts`, `registry.ts`, `identifiers.ts`, `resource-members.ts`,
+`format.ts`, `linkage.ts`, `query-capabilities.ts`, the atomic executors) are covered through those
+consumers; coverage thresholds apply to all of `src/`. Imports form a DAG (`import/no-cycle` is
+enforced, type-only imports included).
+
+```
+src/
+  index.ts                       root entry
+  internal/
+    constants.ts                 section 13
+    object.ts                    isRecord(), ownMember(), hasOwnMember(), ownKeys(), compact(): prototype-safe reads
+    pointer.ts                   pointer(), escapePointerToken(): RFC 6901
+    standard-schema-types.ts     vendored Standard Schema V1 interfaces
+  media-type/
+    parse.ts                     parseMediaType(), parseAccept() (3.1)
+    format.ts                    formatMediaType(), quoteParameterValue() (3.1)
+    json-api.ts                  isJsonApiMediaType(), jsonApiParameters(), formatJsonApiMediaType() (3.2)
+  negotiate/negotiate.ts         negotiate() (3.3)
+  errors/
+    status.ts                    ErrorStatusCode, isErrorStatusCode(), reasonPhrase() (4.3)
+    catalog.ts                   ERROR_CATALOG, ERROR_CODES (4.1)
+    json-api-error.ts            JsonApiError, errorObject(), errorDocument(), responseStatus(), isJsonApiError() (4.2)
+  document/
+    types.ts                     section 2
+    member-name.ts               2.1
+    serialize.ts                 serializeResource(), applyFields(), identify() (7.1)
+    build.ts                     resourceDocument(), collectionDocument(), relationship documents, include(), jsonApiObject() (7.2)
+    linkage.ts                   assertFullLinkage() (7.3)
+  resource/
+    types.ts                     section 5
+    define-resource.ts           defineResource(), relatedResource() (5.1)
+    query-capabilities.ts        query capability resolution (5.2)
+  query/
+    types.ts                     ParsedQuery and friends (6.1)
+    input.ts                     toPairs(), groupByName() (6.1)
+    parameter-name.ts            parseParameterName() (6.2)
+    registry.ts                  registryOf(), resolveIncludePath() (6.3)
+    parse-families.ts            include, fields, sort, page (6.4 to 6.7)
+    parse-filter.ts              filter (6.8)
+    parse-query.ts               parseQuery() (6)
+  pagination/
+    paginated.ts                 paginatedDocument() (8.1)
+    links.ts                     paginationLinks(), pageMeta(), itemCursorMeta() (8.2, 8.3)
+    errors.ts                    the profile's error objects (8.4)
+  request/
+    types.ts                     RequestDocument, RequestResourceObject, ParseResourceOptions (9.2)
+    identifiers.ts               parseIdentifier(), parseLinkage() (9.1)
+    resource-members.ts          identity, attribute names, relationships of a request resource object (9.2)
+    resource-document.ts         parseResourceObject(), parseCreateDocument(), parseUpdateDocument(), primaryData() (9.2)
+    relationship-document.ts     parseToOneRelationshipDocument(), parseToManyRelationshipDocument() (9.3)
+    cardinality.ts               toOneLinkage(), toManyLinkage() (9.4)
+  hono/
+    types.ts                     JsonApiEnv, JsonApiContext (10.1)
+    middleware.ts                jsonApi() (10.1)
+    respond.ts                   respond(), respondError(), isJsonApiResponse(), varyAccept() (10.2)
+    body.ts                      readDocument() (10.3)
+    validators.ts                queryValidator(), bodyValidator(), relationshipValidator() (10.4)
+    handlers.ts                  errorHandler(), notFoundHandler(), toJsonApiError() (10.5)
+  atomic/
+    index.ts                     subpath entry
+    types.ts                     section 11
+    handler.ts                   atomicOperations() (11.1)
+    parse-document.ts            parseOperationsDocument() (11.2)
+    parse-target.ts              ref and href (11.2)
+    parse-support.ts             ParseDocumentOptions, unknownMembers()
+    lids.ts                      Lids (11.3)
+    execute.ts                   executeOperation() (11.4)
+    execute-resource.ts          create(), update(), remove() (11.4)
+    execute-relationship.ts      relationship() (11.4)
+    execute-support.ts           shared lookups and checks (11.4)
+    test-fixtures.ts             the store and app the atomic tests share; not published
+  test-support/
+    jsonapi-schema-1-0.ts        the official JSON:API 1.0 JSON Schema, vendored; not published
+    conformance.ts               schemaErrors(): Ajv over the schema with the 1.1 deltas; not published
+```
+
+---
+
+## 2. Documents (`document/types.ts`)
+
+Types mirror the specification's document structure (`#document-structure`). All members are
+`readonly`; optional members are `?: T | undefined` so a builder can pass `undefined` and
+`compact()` removes it before serialization.
+
+- `Meta = Readonly<Record<string, unknown>>`; `Link = string | LinkObject | null`;
+  `LinkObject { href; rel?; describedby?; title?; type?; hreflang?: string | ReadonlyArray<string>; meta? }`;
+  `Links = Readonly<Record<string, Link>>` (`#document-links`).
+- `ResourceIdentifier { type; id; meta? }`; `LocalResourceIdentifier { type; lid; meta? }`;
+  `AnyResourceIdentifier` is their union (`#document-resource-identifier-objects`).
+- `ResourceLinkage = null | ResourceIdentifier | ReadonlyArray<ResourceIdentifier>`;
+  `ToOneLinkage = ResourceIdentifier | null`; `ToManyLinkage = ReadonlyArray<ResourceIdentifier>`
+  (`#document-resource-object-linkage`).
+- `Relationship { links?; data?; meta? }`; `Relationships`; `Attributes`;
+  `ResourceObject { type; id; attributes?; relationships?; links?; meta? }` with `id: string` always
+  present: the package builds server-side resource objects only (`#document-resource-objects`).
+- `JsonApiObject { version?; ext?; profile?; meta? }` (`#document-jsonapi-object`).
+- `ErrorSource { pointer?; parameter?; header? }`, `ErrorLinks { about?; type? }`,
+  `ErrorObject { id?; links?; status?: string; code?; title?; detail?; source?; meta? }`
+  (`#error-objects`). `status` is a string on the wire.
+- `DocumentBase { jsonapi?; links?; meta? }`;
+  `DataDocument<TData> extends DocumentBase { data: TData; included? }`; `ErrorDocument { errors }`;
+  `MetaDocument { meta }`; `ExtensionDocument { [member: \`${string}:${string}\`]: unknown
+  }` for documents whose primary member is an extension member (`atomic:results`); `Document =
+  DataDocument | ErrorDocument | MetaDocument |
+  ExtensionDocument`; `PrimaryData`, `ResourceDocument`, `CollectionDocument`, `ToOneRelationshipDocument`, `ToManyRelationshipDocument`are the`DataDocument` instantiations (`#document-top-level`).
+
+### 2.1 Member names (`member-name.ts`)
+
+- `isMemberName(name)`: at least one character; first and last characters are `A-Z`, `a-z`, `0-9`,
+  or U+0080 and above; inside, additionally `-`, `_`, and U+0020 SPACE
+  (`#document-member-names-allowed-characters`). Prototype keys (`__proto__`, `constructor`,
+  `prototype`) are excluded by `assertMemberName` and by every parser that turns a name into a key.
+- `isMemberPath(path)`: one or more member names joined by `.` (`#fetching-includes`,
+  `#fetching-sorting`).
+- `isAtMember(name)`: starts with `@`. @-Members are ignored by every processing rule in this
+  package: a request parser skips them, never reports them (`#document-member-names-at-members`).
+- `isExtensionMemberName(name)`: `namespace:name` where the namespace matches `[A-Za-z0-9]+` and the
+  rest is a member name (`#extension-members`).
+- `assertMemberName(what, name)` throws `TypeError` naming `what` for an invalid or prototype name.
+
+Tests: `member-name.test.ts` covers the grammar edge characters, @-Members, extension names, and
+prototype keys.
+
+---
+
+## 3. Media types and negotiation
+
+### 3.1 RFC 9110 parsing and serialization (`media-type/parse.ts`, `format.ts`)
+
+- `parseMediaType(value): MediaType | undefined`: `type/subtype` then `*( OWS ";" OWS parameter )`.
+  Type, subtype, and parameter names are lowercased (case-insensitive per RFC 9110 8.3.1 and 5.6.6);
+  parameter values keep their case, with quoted-strings unquoted and quoted-pairs resolved (5.6.4).
+  Anything that is not a valid media type returns `undefined`; nothing throws.
+- `parseAccept(value): ReadonlyArray<MediaRange>`: a comma-separated list of media ranges, each with
+  `weight` from `q` (12.4.2; default 1; `q` is not reported as a parameter). Malformed elements are
+  skipped so one bad element cannot hide the rest.
+- `formatMediaType`, `formatParameterValue` (token as is, otherwise quoted-string),
+  `quoteParameterValue` (throws `TypeError` for a value no quoted-string can carry).
+
+Tests: `parse.test.ts` (grammar, case, quoting, weights, malformed input), `json-api.test.ts`.
+
+### 3.2 The JSON:API media type (`media-type/json-api.ts`)
+
+- `isJsonApiMediaType(mediaType)`: `application/vnd.api+json`, parameters aside.
+- `jsonApiParameters(mediaType): { ext, profile, other }`: `ext` and `profile` values are split on
+  U+0020 SPACE, deduplicated, order kept; `other` lists the names of every other parameter
+  (`#media-type-parameter-rules`).
+- `formatJsonApiMediaType({ ext?, profile? })`: the media type followed by `ext` and `profile`
+  parameters only when their lists are non-empty; values are always quoted-strings so one URI and
+  several serialize the same way (`#media-type-parameter-rules`, the HTTP quoting note).
+
+### 3.3 Negotiation (`negotiate/negotiate.ts`)
+
+`negotiate({ contentType, accept }, { extensions?, profiles? })` applies
+`#content-negotiation-servers` in order and returns `{ ok: true, request, extensions, profiles }` or
+`{ ok: false, error }` where `error` is a 415 or 406 `JsonApiError`.
+
+Content-Type:
+
+1. Absent or unparseable: the request declares no body (`request.jsonApi === false`).
+2. Not JSON:API: `request.mediaType` is kept, `jsonApi` is `false`. Whether such a body is
+   acceptable is the endpoint's call (`readDocument` rejects it, section 10.3).
+3. JSON:API with any parameter other than `ext` and `profile`: 415 (`source.header` is
+   `Content-Type`).
+4. JSON:API with an `ext` URI not in `extensions`: 415.
+5. Otherwise `request = { mediaType, jsonApi: true, extensions, profiles }` as sent.
+
+Accept:
+
+1. Absent, or no JSON:API instance with `q > 0`: no extensions or profiles are required.
+2. Every JSON:API instance carries a parameter other than `ext` and `profile`: 406 (`source.header`
+   is `Accept`).
+3. Every remaining instance requires an extension not in `extensions`: 406.
+4. Otherwise the instance with the highest weight wins; among equal weights the one with the most
+   extensions, then the first in field order. `extensions` are that instance's `ext` URIs;
+   `profiles` are its `profile` URIs filtered to `profiles` (unrecognized profiles MUST be ignored,
+   `#profile-rules`).
+
+`q=0` instances are "not acceptable" by RFC 9110 12.4.2 and are not JSON:API instances for rule 2.
+
+Tests: `negotiate.test.ts` names each rule.
+
+---
+
+## 4. Errors
+
+### 4.1 Catalog (`errors/catalog.ts`)
+
+`ERROR_CATALOG` is closed: `ErrorCode` is the union of its keys, `ERROR_CODES` lists them in catalog
+order, and every `code` the package emits is one of them. Each entry fixes `status` and `title`;
+`detail` and `source` vary per occurrence (`#error-objects`: `title` SHOULD NOT change from
+occurrence to occurrence).
+
+| Code                                | Status | Title                             |
+| ----------------------------------- | ------ | --------------------------------- |
+| `INVALID_QUERY_PARAMETER`           | 400    | Invalid Query Parameter           |
+| `UNKNOWN_QUERY_PARAMETER`           | 400    | Unknown Query Parameter           |
+| `INVALID_DOCUMENT`                  | 400    | Invalid Document                  |
+| `MALFORMED_JSON`                    | 400    | Malformed JSON                    |
+| `UNSUPPORTED_SORT`                  | 400    | Unsupported Sort                  |
+| `MAX_PAGE_SIZE_EXCEEDED`            | 400    | Max Page Size Exceeded            |
+| `RANGE_PAGINATION_NOT_SUPPORTED`    | 400    | Range Pagination Not Supported    |
+| `FORBIDDEN`                         | 403    | Forbidden                         |
+| `CLIENT_GENERATED_ID_NOT_SUPPORTED` | 403    | Client-Generated ID Not Supported |
+| `NOT_FOUND`                         | 404    | Not Found                         |
+| `NOT_ACCEPTABLE`                    | 406    | Not Acceptable                    |
+| `CONFLICT`                          | 409    | Conflict                          |
+| `UNSUPPORTED_MEDIA_TYPE`            | 415    | Unsupported Media Type            |
+| `VALIDATION_FAILED`                 | 422    | Validation Failed                 |
+| `INTERNAL_SERVER_ERROR`             | 500    | Internal Server Error             |
+
+### 4.2 `JsonApiError` (`errors/json-api-error.ts`)
+
+- `new JsonApiError(errors, { status?, cause? })`: `errors` is one error object or a non-empty array
+  (empty: `TypeError`). `status` defaults to `responseStatus(errors)`; an explicit status MUST be a
+  registered 4xx or 5xx code (`TypeError` otherwise; ADR 0009). `message` is
+  `"<status> <codes>[: <first detail>]"` for logs. `cause` is passed to `Error`.
+- `responseStatus(errors)`: the common status when every object agrees; 400 when they differ and all
+  are 4xx; otherwise 500. An object whose `status` is not a registered 4xx or 5xx code contributes
+  nothing; no statuses at all is 500 (`#errors-processing`: "the most generally applicable HTTP
+  error code").
+- `error.document(base?)`: `{ jsonapi?, links?, meta?, errors }`.
+- `errorObject(code, { id?, detail?, source?, links?, meta? })`: `status` as a string and `title`
+  from the catalog; `undefined` members omitted. `errorDocument(errors, base?)` for callers without
+  an error instance.
+- Factories (all return `JsonApiError`): `of(code, init?)`, `invalidParameter(parameter, detail)`,
+  `unknownParameter(parameter, detail?)`, `invalidDocument(pointer, detail)`, `malformedJson()`,
+  `forbidden(detail, source?)`, `clientGeneratedIdNotSupported(pointer = '/data/id')`,
+  `notFound(detail?, source?)`, `notAcceptable(detail)` (`source.header: 'Accept'`),
+  `conflict(detail, source?)`, `unsupportedMediaType(detail)` (`source.header: 'Content-Type'`),
+  `validationFailed(issues)` (422, one object per `{ pointer, detail }`; empty: `TypeError`),
+  `internal(cause?)` (a constant 500: `detail` is "An unexpected error occurred").
+- `isJsonApiError(value)`: `instanceof`, or structurally an `Error` named `JsonApiError` with an
+  `errors` array and a numeric `status`, so an error from a second installed copy still renders.
+
+### 4.3 Status codes (`errors/status.ts`)
+
+`ErrorStatusCode` is Hono's `ClientErrorStatusCode | ServerErrorStatusCode`. `isErrorStatusCode(n)`
+is true for the registered 4xx and 5xx codes; `reasonPhrase(status)` gives the RFC 9110 / IANA
+phrase (`413 Content Too Large`, `422 Unprocessable Content`, `418 I'm a teapot`).
+
+Tests: `json-api-error.test.ts` (status derivation table, factories, structural narrowing),
+`status.test.ts` (every code round-trips; 499 and 299 are rejected).
+
+---
+
+## 5. Resource definitions (`resource/types.ts`)
+
+`ResourceDefinition<TType, TAttribute, TRelationship, TRow, TSort, TFilter, TCreate, TUpdate>`:
+
+| Member          | Meaning                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`          | The resource type; a member name                                                                                                       |
+| `attributes`    | Declared attribute names                                                                                                               |
+| `relationships` | By name: `{ type, cardinality: 'one' \| 'many', resource?: () => AnyResource }`                                                        |
+| `fields`        | `ReadonlySet` of attribute and relationship names                                                                                      |
+| `serialize`     | `(row: TRow) => { id; attributes?; relationships?; links?; meta? }`; attributes and relationships are restricted to the declared names |
+| `links`         | `{ self?: (id) => string; relationship?: (id, name) => { self?; related? } }`                                                          |
+| `query`         | Resolved capabilities (5.2)                                                                                                            |
+| `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate> }`                                             |
+| `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                        |
+
+`serialize` may return relationships as an id, `null`, an array of ids, an identifier object, an
+array of identifier objects, or `{ data?, links?, meta? }`. `AnyResource` erases every parameter;
+`RowOf`, `RelationshipNameOf`, `CreateAttributesOf`, `UpdateAttributesOf` recover them.
+`CreateAttributesOf` is `Attributes` when the definition has no create validator.
+
+`RelationshipLinks` is an object type (not an interface) so a built value is assignable to `Links`.
+
+### 5.1 `defineResource(init)` (`define-resource.ts`, ADR 0012)
+
+Validates once and throws `TypeError` naming the option for: a `type` that is not a member name; an
+attribute or relationship name that is not a member name, is `type` or `id` (fields share a
+namespace with them, `#document-resource-object-fields`), or is declared twice or in both lists; a
+relationship whose `type` is not a member name or whose `cardinality` is not `one` or `many`; a
+`serialize` that is not a function; a validator that is not a Standard Schema V1 object (`~standard`
+read with `in`, since zod 4, Valibot, and ArkType expose it as a prototype getter; `version` 1 and a
+`validate` function). Fills `links`, `query`, `validate`, and `clientIds` with defaults. The literal
+types of `type`, the field names, and the sort and filter names are inferred (`const` type
+parameters) and `NoInfer` keeps names flowing from the declarations into `serialize`, never the
+other way.
+
+`relatedResource(resource, name)` follows a relationship to its definition and throws when the
+relationship is undeclared, declares no `resource`, or the definition's `type` differs from the
+relationship's.
+
+Tests: `define-resource.test.ts` (every rejection), `define-resource.test-d.ts` (inference and the
+`serialize` field restriction).
+
+### 5.2 Query capabilities (`query-capabilities.ts`)
+
+`query` resolves to `{ sort, filter, include, fields, page, search, custom }`:
+
+- `sort`: declared names, each a member path; default none.
+- `filter`: by field (a member path), the operators it accepts, each non-empty; `or` and the search
+  member are reserved; default none.
+- `include`: declared relationship paths; default none. Each path is validated against the
+  definitions it traverses when the registry is first built (6.3).
+- `fields`: whether `fields[type]` is accepted; default `true`.
+- `page`: `false` or absent rejects every `page` parameter. Otherwise `{ default, max, range }` with
+  `max` default 100, `default` default `min(20, max)`, both positive integers, `default <= max`,
+  `range` default `false`. The profile has no implicit maximum; this package chooses 100 so an
+  endpoint never returns an unbounded page by omission (ADR 0008).
+- `search`: `filter[<member>]`, or a custom base name; default none.
+- `custom`: implementation-specific base names. A custom name MUST be a member name containing at
+  least one character outside `a-z` (`#query-parameters-custom`); the same rule applies to a custom
+  search name.
+
+---
+
+## 6. Query parsing (`query/parse-query.ts`)
+
+`parseQuery(resource, input): ParsedQuery<TSort, TFilter>` parses every parameter against the
+definition and throws one 400 `JsonApiError` listing every problem, each with `source.parameter` set
+to the parameter name as sent. Nothing is dropped silently: a parameter the endpoint does not know
+how to process is `UNKNOWN_QUERY_PARAMETER` (`#query-parameters`: "MUST return 400 Bad Request").
+
+Dispatch per parameter name (6.2 gives the grammar; `member` is the first bracket member):
+
+| Name                                             | Rule                      |
+| ------------------------------------------------ | ------------------------- |
+| `include`                                        | 6.4                       |
+| `fields[type]`                                   | 6.5                       |
+| `sort`                                           | 6.6                       |
+| `page[member]`                                   | 6.7                       |
+| `filter[...]` naming the search member           | the search value          |
+| `filter[...]`                                    | 6.8                       |
+| the custom search base name, no members          | the search value          |
+| a declared custom base name, any members         | `custom[name] = value`    |
+| anything else, including a name 6.2 cannot parse | `UNKNOWN_QUERY_PARAMETER` |
+
+`include`, `fields[type]`, `sort`, `page[member]`, and the search parameter MAY appear once; a
+repeated occurrence is `INVALID_QUERY_PARAMETER` ("specified more than once"), since a second value
+has no defined meaning. A repeated custom parameter is kept as an array of its values.
+
+### 6.1 Input and result (`input.ts`, `types.ts`)
+
+`QueryInput` is a query string (with or without `?`), a `URLSearchParams`, or a record of string or
+string-array values (the shape of `c.req.queries()`). A string is parsed with `URLSearchParams`, the
+`application/x-www-form-urlencoded` parser the specification names
+(`#appendix-query-details-parsing`); the record form expands arrays to repeated pairs. Order is
+preserved.
+
+`ParsedQuery`:
+
+| Member    | Value                                                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `include` | `undefined` when absent; `[]` for `include=` (which still requires `included` in the response); otherwise segment arrays, deduplicated |
+| `fields`  | by type: the field names, deduplicated; an empty array means no fields; absent types get all fields                                    |
+| `sort`    | `{ field, direction }` in order; `direction` is `desc` for a `-` prefix                                                                |
+| `filter`  | `{ conditions, anyOf }` (6.8)                                                                                                          |
+| `page`    | `undefined` when the definition does not paginate; otherwise `{ size, after, before, sizeRequested, range }` (6.7)                     |
+| `search`  | the search value, or `undefined`                                                                                                       |
+| `custom`  | declared custom parameters by full name, as sent                                                                                       |
+| `params`  | a `URLSearchParams` of every pair as sent, for links that must reproduce them                                                          |
+
+### 6.2 Parameter names (`parameter-name.ts`)
+
+`parseParameterName(name)` splits `base`, `base[]`, `base[member]`, `base[a.b]`, and nested groups
+into `{ base, members }`, or returns `undefined` when the base is neither a member name nor an
+extension member name, brackets are unbalanced or nested inside a group, or a member is neither
+empty, a member name, nor a member path (`#query-parameters-families`). Brackets arrive decoded
+(`%5B`) or bare; both are the same name (`#appendix-query-details-square-brackets`).
+
+### 6.3 Registry (`registry.ts`)
+
+`registryOf(resource)` builds once per definition (memoized in a `WeakMap`): the trie of declared
+include paths, each segment resolved through `relatedResource`, and the map of every type reachable
+that way, including the primary type. Two different definitions declaring the same type throw.
+`resolveIncludePath(registry, segments)` returns the definition at the end of a declared path or a
+declared prefix of one.
+
+### 6.4 `include` (`parse-families.ts`)
+
+A comma-separated list of relationship paths (`#fetching-includes`); an empty value is an empty
+list. Duplicates are dropped. A path that is not a member path, or that the registry does not
+resolve, is `INVALID_QUERY_PARAMETER` on `include` ("MUST respond with 400 Bad Request").
+
+### 6.5 `fields[type]`
+
+Rejected as unknown when the definition sets `fields: false`. The type MUST be one the registry
+knows (the primary type or one reachable through declared include paths); each name MUST be a field
+of that type; otherwise `INVALID_QUERY_PARAMETER` on `fields[type]`. An empty value is an empty
+fieldset (`#fetching-sparse-fieldsets`: "an empty value indicates that no fields should be
+returned"). Duplicates are dropped.
+
+### 6.6 `sort`
+
+A comma-separated list of declared sort names, each optionally prefixed with `-` for descending
+(`#fetching-sorting`). An undeclared name is the profile's `UNSUPPORTED_SORT` error (8.4), chosen
+over the generic 400 because it carries a `type` link clients can key on; a repeated name is
+`INVALID_QUERY_PARAMETER`.
+
+### 6.7 `page[member]`
+
+When the definition does not paginate, every `page` parameter is unknown. Otherwise the members are
+those of the Cursor Pagination profile: `size`, `after`, `before`; any other member is unknown.
+
+- `page[size]` MUST match `^[0-9]+$` and be positive (profile: "MUST match `^[0-9]+$`"); a value
+  above `max` is `MAX_PAGE_SIZE_EXCEEDED` with `meta.page.maxSize` (8.4).
+- `page[after]` and `page[before]` MUST be non-empty; their content is opaque here and decoded by
+  the application's pagination engine (which throws `invalidCursor`, 8.4).
+- Both cursors together is a range request; on a definition without `range` it is
+  `RANGE_PAGINATION_NOT_SUPPORTED` (8.4).
+- The used size is `page[size]` when sent, else `default`, or `max` on a range request (profile:
+  "the max page size SHOULD be used" on range requests). `sizeRequested` says whether the client
+  sent `page[size]`.
+
+### 6.8 `filter` (`parse-filter.ts`, ADR 0007)
+
+The grammar is the package's choice; JSON:API reserves the family and leaves the strategy open
+(`#fetching-filtering`).
+
+| Parameter                    | Meaning                                                   |
+| ---------------------------- | --------------------------------------------------------- |
+| `filter[field]=v`            | condition `{ field, operator: 'eq', value }`              |
+| `filter[field][op]=v`        | condition with a declared operator                        |
+| `filter[or][n][field]=v`     | `eq` condition in disjunction group `n` (`n` is `[0-9]+`) |
+| `filter[or][n][field][op]=v` | condition in group `n`                                    |
+
+`conditions` all hold; within a group any condition may hold; every group holds. Groups are returned
+in ascending index order. An undeclared field or operator is `INVALID_QUERY_PARAMETER` on the
+parameter; `filter`, `filter[]`, more than four members, or an `or` without a numeric index and a
+field is `UNKNOWN_QUERY_PARAMETER`. A repeated parameter yields an array `value`.
+
+Tests: `parse-query.test.ts` (dispatch, aggregation, single-occurrence rule, custom and search
+parameters), `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`.
+
+---
+
+## 7. Document building
+
+### 7.1 Serialization (`document/serialize.ts`)
+
+`serializeResource(resource, row)` returns a complete resource object in member order `type`, `id`,
+`attributes`, `relationships`, `links`, `meta`:
+
+- `id` MUST be a string; anything else throws `TypeError`
+  (`#document-resource-object-identification`).
+- `attributes` keeps only declared names with a defined value; the member is omitted when empty.
+- Each relationship becomes a relationship object: linkage from the shorthand (ids become
+  identifiers of the declared type; identifier objects pass through), plus `links.self` and
+  `links.related` from `links.relationship` when they are defined. The declared cardinality is
+  enforced: an array for to-one or a non-array for to-many throws. An undeclared relationship name
+  throws; a relationship object with none of `links`, `data`, `meta` throws
+  (`#document-resource-object-relationships`). A `null` to-one and an empty to-many stay as
+  `data: null` and `data: []`.
+- `links.self` from `links.self(id)`; `meta` as returned.
+
+`applyFields(resource, fields)` keeps only the named attributes and relationships; an empty list
+drops both members; `type`, `id`, `links`, `meta` are not fields and stay
+(`#fetching-sparse-fieldsets`). `identify(resource, row)` returns `{ type, id }`.
+
+### 7.2 Builders (`document/build.ts`)
+
+All take `DocumentOptions = DocumentBase & { query?, included? }`.
+
+- `jsonApiObject(init?)`: `{ version: '1.1', ...init }`, `undefined` members removed.
+- `resourceDocument(resource, row | null, options?)`,
+  `collectionDocument(resource, rows, options?)`: serialize, apply `query.fields[resource.type]`,
+  build `included` (below), and emit `jsonapi`, `links`, `meta`, `data`, `included` in that order.
+- `toOneRelationshipDocument(resource, row | null, base?)`,
+  `toManyRelationshipDocument(resource, rows, base?)`: `data` is identifiers only
+  (`#fetching-relationships-responses-200`).
+- `include(resource, rows)` pairs rows with their definition for `options.included`; the row type is
+  checked against the definition at the call.
+
+`included`:
+
+1. Absent when `options.included` and `query.include` are both `undefined`.
+2. Each included row is serialized completely and deduplicated by type and id, first wins; a
+   resource present in the primary data is never repeated (`#document-compound-documents`: "MUST NOT
+   include more than one resource object for each type and id pair").
+3. Full linkage is asserted over the complete objects (7.3); a violation throws `TypeError`.
+4. `query.fields[type]` is applied per included type.
+5. The member is omitted when nothing remains and the client sent no `include`; it is `[]` when the
+   client sent `include` (even `include=`) and nothing qualifies (`#fetching-includes`).
+
+### 7.3 Full linkage (`document/linkage.ts`)
+
+`assertFullLinkage(primary, included, requested?)` walks from every primary resource along
+relationship `data` and throws for an included resource the walk never reaches. With `requested`
+(the parsed include paths) the walk is confined to those paths, so an included resource the client
+did not ask for is reported too. Linkage is checked over the complete objects, before sparse
+fieldsets: the specification's one exception is linkage a fieldset removed from the output
+(`#document-compound-documents`).
+
+Tests: `serialize.test.ts`, `build.test.ts`, and `conformance.test.ts`, which validates every
+builder's output against the JSON:API JSON Schema (ADR 0011).
+
+---
+
+## 8. Cursor pagination (`pagination/`)
+
+The profile is `http://jsonapi.org/profiles/ethanresnick/cursor-pagination/` exactly as its page
+states it, `http` and trailing slash included (ADR 0008).
+
+### 8.1 `paginatedDocument(resource, page, options)` (`paginated.ts`)
+
+`page = { rows, next, prev, last?, first?, total?, estimatedTotal?, rangeTruncated?, cursor? }`;
+`options = DocumentOptions & { url, relative? }`. Builds `collectionDocument` with:
+
+- `jsonapi.profile`: any profiles passed, then the cursor profile once;
+- `links`: any links passed, overridden by `paginationLinks(url, page)` (8.2);
+- `meta`: any meta passed, with `pageMeta(page)` merged in (8.3);
+- each item's `meta.page.cursor` from `cursor(row)` when `cursor` is given, keeping other `meta` and
+  `meta.page` members of the item.
+
+### 8.2 Links (`links.ts`)
+
+`paginationLinks(url, { next, prev, last?, first? }, { relative? })` derives every link from the
+request URL so each parameter the client sent survives (`#document-top-level`: `self` is "the link
+that generated the current response document"; profile: links "MUST" reproduce the query).
+
+- The query is re-serialized once through `URLSearchParams`, so square brackets a client left bare
+  come out percent-encoded, which the serialization rules prescribe
+  (`#appendix-query-details-square-brackets`).
+- `self`: the URL as is. `first`: without `page[after]` and `page[before]`; omitted for
+  `first: false`. `prev`: `page[before]=prev` without `page[after]`, or `null`. `next`:
+  `page[after]=next` without `page[before]`, or `null`. `last`: `page[before]=last` or `null`, only
+  when `last` is given. `prev` and `next` are always present (profile: "MUST be present").
+- `relative: true` renders path and query only.
+
+### 8.3 Meta (`links.ts`)
+
+`pageMeta({ total?, estimatedTotal?, rangeTruncated? })` emits only the members the profile
+recognizes under `meta.page`: `total`, `estimatedTotal: { bestGuess }`, and `rangeTruncated: true`
+only when true (the profile defines it as a flag to add). `itemCursorMeta(cursor)` is
+`{ page: { cursor } }`.
+
+### 8.4 Errors (`errors.ts`)
+
+Each is a 400 error object with `source.parameter` and, where the profile defines one, a `type` link
+under `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/`:
+
+| Builder                                    | Code                             | `type` link suffix               | Extra                                 |
+| ------------------------------------------ | -------------------------------- | -------------------------------- | ------------------------------------- |
+| `unsupportedSortError(field)`              | `UNSUPPORTED_SORT`               | `unsupported-sort`               | `source.parameter: 'sort'`            |
+| `maxPageSizeExceededError(requested, max)` | `MAX_PAGE_SIZE_EXCEEDED`         | `max-size-exceeded`              | `meta.page.maxSize`                   |
+| `rangePaginationNotSupportedError()`       | `RANGE_PAGINATION_NOT_SUPPORTED` | `range-pagination-not-supported` | `source.parameter: 'page[before]'`    |
+| `invalidCursorError(parameter, detail?)`   | `INVALID_QUERY_PARAMETER`        | none                             | for a cursor the engine cannot decode |
+
+`unsupportedSort(field)` and `invalidCursor(parameter, detail?)` wrap them in a `JsonApiError` for
+throwing from an engine. The `type` link is a string, since the profile says "has a `type` link of"
+and a link may be a string (`#document-links-link`).
+
+Tests: `links.test.ts`, `paginated.test.ts`, `errors.test.ts`; `pagination.e2e.test.ts` walks pages
+over HTTP.
+
+---
+
+## 9. Request documents (`request/`)
+
+Every parser accumulates error objects, each with `source.pointer` (RFC 6901, `~` and `/` escaped in
+names), and throws one `JsonApiError` whose status follows 4.2.
+
+### 9.1 Identifiers and linkage (`identifiers.ts`)
+
+- `parseIdentifier(value, pointer, { lids?, type? }, errors)`: an object with a string `type` (400
+  at `pointer/type` otherwise); `type` MUST equal `options.type` when given (409 `CONFLICT` at
+  `pointer/type`); `meta`, when present, MUST be an object; a string `id`, or a string `lid` when
+  `lids` is true; otherwise 400 (`#document-resource-identifier-objects`).
+- `parseLinkage(value, pointer, cardinality, options, errors)`: to-one accepts `null` or one
+  identifier; to-many accepts an array (possibly empty), each item parsed at `pointer/<index>`. The
+  result type is `ResourceLinkage` without `lids` and `RequestLinkage` (identifiers that may carry
+  `lid`) with it.
+
+### 9.2 Resource documents (`resource-document.ts`, `resource-members.ts`)
+
+`parseResourceObject(resource, value, { operation, id?, lids?, pointer? })` parses the resource
+object at `pointer` (default `/data`):
+
+1. `value` MUST be an object (400).
+2. Members other than `type`, `id`, `lid`, `attributes`, `relationships`, `links`, `meta` are 400 at
+   their pointer; @-Members are skipped. `links` is ignored (clients MAY send it); `meta` MUST be an
+   object when present.
+3. `type` MUST be a string and MUST equal the definition's type (409 `CONFLICT` at `pointer/type`,
+   `#crud-creating-responses-409`, `#crud-updating-responses-409`).
+4. `id`, when present, MUST be a string. On `create`, an `id` is `CLIENT_GENERATED_ID_NOT_SUPPORTED`
+   (403) unless the definition sets `clientIds` (`#crud-creating-client-ids`). On `update`, `id`
+   MUST be present (400) and MUST equal `options.id` when given (409).
+5. `lid` is a 400 unless `lids` is true; with `lids`, an update MAY identify the resource by `lid`
+   instead of `id`.
+6. `attributes`, when present, MUST be an object; each name MUST be a declared attribute (400 at
+   `pointer/attributes/<name>`); @-Members are skipped.
+7. `relationships`, when present, MUST be an object; each name MUST be a declared relationship and
+   each value a relationship object with a `data` member (400); `data` is parsed with 9.1 for the
+   declared cardinality and type, `lids` passed through (`#crud-updating-resource-relationships`).
+8. With no structural errors, the attributes (an empty object when absent) are validated by the
+   definition's `create` or `update` Standard Schema; each issue becomes a `VALIDATION_FAILED` (422)
+   object whose pointer is `pointer/attributes` plus the issue path. Without a validator the
+   attributes pass through.
+
+Returns
+`ParsedResourceObject<TAttributes, TLinkage> = { type, id, lid, attributes, relationships, meta }`
+with `relationships` keyed by the names the document carried.
+
+`parseCreateDocument(resource, body, options?)` and
+`parseUpdateDocument(resource, body, id, options?)` take `primaryData(body)` (400 unless `body` is
+an object with a `data` member) and type `attributes` as `CreateAttributesOf` / `UpdateAttributesOf`
+and `relationships` as `ResourceLinkage`, or `RequestLinkage` when `options.lids` is `true`.
+
+`RequestResourceObject` and `RequestDocument` type a request as a client sends it.
+
+### 9.3 Relationship documents (`relationship-document.ts`)
+
+`parseToOneRelationshipDocument(body, { type })` returns an identifier of `type` or `null`;
+`parseToManyRelationshipDocument(body, { type })` returns an array of identifiers of `type`,
+possibly empty. The body MUST have `data` (400 at `""`); a wrong shape is 400 at `/data`; a wrong
+type is 409 at `/data/type` or `/data/<index>/type` (`#crud-updating-to-one-relationships`,
+`#crud-updating-to-many-relationships`).
+
+### 9.4 Cardinality helpers (`cardinality.ts`)
+
+`toOneLinkage(linkage)` and `toManyLinkage(linkage)` narrow a `ResourceLinkage | undefined` by the
+cardinality the caller knows, passing `undefined` through for a relationship the document did not
+carry. A mismatch is a programming error and throws `TypeError`.
+
+Tests: `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`,
+`cardinality.test.ts`.
+
+---
+
+## 10. Hono integration (`hono/`)
+
+### 10.1 `jsonApi(options?)` and types (`middleware.ts`, `types.ts`)
+
+`jsonApi({ extensions?, profiles? })` runs 3.3 over the request headers. A failure is answered
+immediately as an error document with `Vary: Accept`. On success the result is stored as the
+`jsonApi` context variable (`JsonApiContext = { request, extensions, profiles }`, typed through
+`JsonApiEnv`), downstream runs, and when the response is a JSON:API response `Vary: Accept` is added
+without duplicating an existing `Accept` or `*` (`#content-negotiation-servers`: servers that
+support `ext` or `profile` SHOULD send `Vary: Accept`; RFC 9110 12.5.5).
+
+### 10.2 `respond` (`respond.ts`, ADR 0005)
+
+- `respond(c, document)` (200) and `respond(c, document, status, headers?)`: `c.json` with
+  `Content-Type` from
+  `formatJsonApiMediaType({ ext: document.jsonapi?.ext, profile: document.jsonapi?.profile })`, so
+  the header and the body cannot disagree (`#content-negotiation-servers`: the response MUST specify
+  the extensions and profiles applied). A 201 gets `Location` from the resource's `links.self`
+  (string or link object `href`) unless `headers` carries one (`#crud-creating-responses-201`:
+  `Location` MUST match `links.self` when both are present). A caller header whose name matches a
+  fixed one case-insensitively is dropped: Hono applies header records in key order, and a lowercase
+  `content-type` would otherwise win. The return type is `JsonApiResponse<TDocument, TStatus>` for
+  Hono's RPC inference.
+- `respondError(c, error, base?, headers?)`: `error.document(base)` with `error.status` and the bare
+  media type: no extension or profile applies to an error document.
+- `isJsonApiResponse(response)`, `varyAccept(current)`.
+
+### 10.3 `readDocument(c)` (`body.ts`)
+
+415 unless the request `Content-Type` parses as the JSON:API media type (`#content-negotiation-all`:
+clients MUST send documents with it); 400 `MALFORMED_JSON` when the body is not JSON. Media type
+parameters were already checked by `jsonApi()`.
+
+### 10.4 Validators (`validators.ts`)
+
+Each is a `MiddlewareHandler` in the shape of Hono's `validator`, stores its result for
+`c.req.valid()`, and answers a `JsonApiError` itself through `respondError`, so a rejected request
+is rendered as JSON:API whether or not `errorHandler()` is installed. Other errors propagate.
+
+| Validator                                                  | Target  | Stored value                                                                                                                                                                         |
+| ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `queryValidator(resource)`                                 | `query` | `ParsedQuery<TSort, TFilter>` from `parseQuery(resource, <query string of c.req.url>)`                                                                                               |
+| `bodyValidator(resource, { operation: 'create' })`         | `json`  | `ParsedResourceObject<CreateAttributesOf<TResource>>`                                                                                                                                |
+| `bodyValidator(resource, { operation: 'update', param? })` | `json`  | `ParsedResourceObject<UpdateAttributesOf<TResource>>`; `data.id` MUST equal the `:id` route parameter (`param`, default `id`); a route without it throws `TypeError` at request time |
+| `relationshipValidator(resource, name, 'one')`             | `json`  | `ResourceIdentifier \| null`                                                                                                                                                         |
+| `relationshipValidator(resource, name, 'many')`            | `json`  | `ReadonlyArray<ResourceIdentifier>`                                                                                                                                                  |
+
+`relationshipValidator` throws `TypeError` at setup for an undeclared relationship or a cardinality
+that disagrees with the definition; `name` is typed as `RelationshipNameOf<TResource>`.
+
+### 10.5 Handlers (`handlers.ts`, ADR 0006)
+
+- `toJsonApiError(error)`: a `JsonApiError` as is; an `HTTPException` with a registered 4xx or 5xx
+  status as `{ status, title: reasonPhrase(status), detail: message }` with the exception as
+  `cause`; anything else `JsonApiError.internal(error)`.
+- `errorHandler({ report?, document?, headers? })` for `app.onError`: awaits `report(error, c)`
+  (anything it throws is ignored), then `respondError(c, toJsonApiError(error), document, headers)`.
+- `notFoundHandler({ document?, headers? })` for `app.notFound`: a 404 `NOT_FOUND` document with
+  detail "No resource exists at the requested URL".
+
+Tests: `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`,
+`validators.test-d.ts`, `handlers.test.ts`.
+
+---
+
+## 11. Atomic operations (`atomic/`, ADR 0010)
+
+Types (`types.ts`):
+
+- `OperationCode = 'add' | 'update' | 'remove'`;
+  `OperationTarget = { type; id?; lid?; relationship? }`.
+- `ResolvedResourceObject<TAttributes> = { type; id; lid; attributes; relationships: Record<string, ResourceLinkage>; meta }`:
+  the operation's `data` with every `lid` reference replaced by the id the earlier operation
+  produced.
+- `OperationContext<TTransaction, E> = { c, tx, index, pointer, meta }`.
+- `ResourceHandlers<TResource, TTransaction, E> = { resource; create?; update?; remove?; relationships? }`
+  where `create({ data })` and `update({ id, data })` return a row (the result's `data`) or
+  `undefined` (an empty result), `remove({ id })` returns nothing, and `relationships[name]` is
+  `{ update?, add?, remove? }` over linkage. Handlers MAY be synchronous (`MaybePromise`).
+- `AnyResourceHandlers` is the erased form the processor stores; its handler members are declared
+  through method signatures so typed handlers are assignable (bivariant parameters).
+- `AtomicOptions<TTransaction, E> = { resources; transaction(c, run); resolveHref?; maxOperations? }`.
+  `transaction` MUST call `run` once and MUST roll back whatever `run` did when it rejects.
+
+### 11.1 `atomicOperations(options)` (`handler.ts`)
+
+A Hono `Handler` for the operations endpoint. Listing a resource type twice throws `TypeError` at
+setup. Per request, in order:
+
+1. A method other than `POST` is 405 with `Allow: POST` (extension: "MUST be sent via POST").
+2. The request `Content-Type` MUST declare the extension (`ext` includes
+   `https://jsonapi.org/ext/atomic`); otherwise 415.
+3. `readDocument` (10.3), then `parseOperationsDocument` (11.2) with `maxOperations` (default 10)
+   and `resolveHref`.
+4. `options.transaction(c, run)`; `run` executes every operation in document order (11.4) with one
+   `Lids` registry (11.3). A `JsonApiError` from an operation whose objects lack a `source` gets
+   `source.pointer` set to the operation's pointer (extension: errors SHOULD point at the
+   operation); any error aborts `run`, so the transaction rolls back.
+5. When every result lacks `data`: `204 No Content`. Otherwise `200` with
+   `{ jsonapi: { version: '1.1', ext: [extension] }, 'atomic:results': results }` through `respond`,
+   which puts the extension on `Content-Type` (extension: "MUST include the `atomic:results` array";
+   `204` allowed when no operation returns data).
+
+A `JsonApiError` thrown anywhere in 1 to 5 is rendered by the handler itself; other errors propagate
+to `app.onError` after the rollback.
+
+### 11.2 Document and targets (`parse-document.ts`, `parse-target.ts`)
+
+`parseOperationsDocument(body, { maxOperations, resolveHref? })` throws one 400 listing every
+problem, each pointing into the request:
+
+- The document MUST be an object whose top-level members are among `atomic:operations`, `jsonapi`,
+  `links`, `meta`, and @-Members.
+- `atomic:operations` MUST be a non-empty array with at most `maxOperations` entries.
+- Each operation (`/atomic:operations/<i>`) MUST be an object with members among `op`, `ref`,
+  `href`, `data`, `meta`; `op` MUST be `add`, `update`, or `remove`; `meta` MUST be an object when
+  present.
+- An operation MAY carry `ref` or `href`, not both. `ref` MUST be an object with a string `type`,
+  exactly one of string `id` and string `lid`, an optional string `relationship`, and no other
+  members. `href` is accepted only when `resolveHref` is given and returns a target; otherwise 400
+  at `/atomic:operations/<i>/href`.
+
+The result is `RawOperation = { index, pointer, op, target, hasData, data, meta }` in order, with
+`data` untouched: it is parsed against the targeted definition during execution.
+
+### 11.3 Local identities (`lids.ts`)
+
+`Lids` maps `(type, lid)` to the id an earlier `add` produced. `define` rejects a repeated `lid` for
+a type (400); `resolve` rejects a `lid` no earlier operation created (400, at the pointer of the
+reference). `identifier`, `identifiers`, and `linkage` replace `lid` identifiers with `id`
+identifiers, keeping `meta`.
+
+### 11.4 Execution (`execute*.ts`)
+
+`executeOperation` classifies by `op` and target:
+
+| Operation                        | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add`, no relationship target    | The target, when given, MAY only name a collection (no `id` or `lid`). The type comes from the target or from `data.type`. Unknown type: 404 at `.../ref/type` or `.../data/type`. No `create` handler: 403. `data` is parsed with 9.2 (`create`, `lids` on, pointer `.../data`), `lid` references resolved, the handler called, the returned row serialized as the result's `data`. A `data.lid` is defined from the result's id or the client-generated id; a handler that returns nothing for an operation with a `lid` is a `TypeError`. |
+| `update`, no relationship target | Type from the target or `data.type`; 404 and 403 as above. The id is the target's (`lid` resolved), else `data.id`, else `data.lid` resolved; a `data.lid` that disagrees with the target's `lid` is 409 at `.../data/lid`. `data` is parsed as an `update` with that id.                                                                                                                                                                                                                                                                    |
+| `remove`, no relationship target | A target is required (400). 404 and 403 as above. `remove({ id })`; the result is empty.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| any `op` with `ref.relationship` | The relationship MUST be declared (400 at `.../ref/relationship`). `add` and `remove` apply only to to-many relationships (400 at `.../op` for to-one). `data` is required and parsed as linkage of the declared cardinality and type with `lids` on (`add` and `remove`: always an array). No handler for the `op`: 403. The result is empty.                                                                                                                                                                                               |
+
+Results carry `data` only when a handler returned a row (extension: results for `remove` and
+relationship operations MUST NOT contain `data`).
+
+Tests: `parse-document.test.ts`, `lids.test.ts`, `handler.test.ts` (the extension's examples, lid
+flow, 204, rollback, pointers), `handler-semantics.test.ts` (every rule above), and
+`handler-coverage.test.ts`; `atomic.e2e.test.ts` over HTTP.
+
+---
+
+## 12. Packaging
+
+- ESM only; `type: module`; `exports` maps `.` and `./atomic` to `dist/*.js` with declarations next
+  to them, plus `./package.json`. tsdown rewrites `exports` from its entry map on every build; CI
+  fails on a diff.
+- `sideEffects: false`; `files` is `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`.
+- `engines.node >= 22.12.0`; `peerDependencies.hono >= 4.12.34`.
+- Built with `platform: 'neutral'`, `target: es2023`, source maps, declarations from
+  `isolatedDeclarations` (ADR 0004). `publint --strict` and `attw --profile esm-only` run on every
+  build.
+- Published with npm provenance through trusted publishing (`release.yml`).
+
+---
+
+## 13. Constants (`src/internal/constants.ts`)
+
+| Name                           | Value                                                         | Exported |
+| ------------------------------ | ------------------------------------------------------------- | -------- |
+| `JSON_API_MEDIA_TYPE`          | `application/vnd.api+json`                                    | yes      |
+| `JSON_API_VERSION`             | `1.1`                                                         | yes      |
+| `ATOMIC_OPERATIONS_EXTENSION`  | `https://jsonapi.org/ext/atomic`                              | yes      |
+| `CURSOR_PAGINATION_PROFILE`    | `http://jsonapi.org/profiles/ethanresnick/cursor-pagination/` | yes      |
+| `CURSOR_PAGINATION_ERROR_BASE` | `https://jsonapi.org/profiles/ethanresnick/cursor-pagination` | no       |
+| `MEMBER_NAME_PATTERN`          | section 2.1                                                   | no       |
+| `EXTENSION_NAMESPACE_PATTERN`  | `^[A-Za-z0-9]+$`                                              | no       |
+| `PAGE_SIZE_PATTERN`            | `^[0-9]+$`                                                    | no       |
+| `PROTO_KEYS`                   | `__proto__`, `constructor`, `prototype`                       | no       |
+| `RESERVED_QUERY_FAMILIES`      | `include`, `fields`, `sort`, `page`, `filter`                 | no       |
+| `CURSOR_PAGE_MEMBERS`          | `size`, `after`, `before`                                     | no       |
+| `DEFAULT_PAGE_SIZE`            | 20                                                            | no       |
+| `DEFAULT_MAX_PAGE_SIZE`        | 100                                                           | no       |
+| `DEFAULT_MAX_OPERATIONS`       | 10                                                            | no       |
+
+---
+
+## 14. Test plan
+
+Vitest with `typecheck` enabled for `*.test-d.ts`; V8 coverage thresholds of 90% for statements,
+branches, functions, and lines over `src/` (the root barrel excluded). Every test names the clause
+or server choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks
+of the package's own modules.
+
+| Area        | Files                                                                                                                     | What is pinned                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Internal    | `object.test.ts`, `pointer.test.ts`                                                                                       | prototype-safe reads, RFC 6901 escaping                                                                        |
+| Media types | `parse.test.ts`, `json-api.test.ts`                                                                                       | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                          |
+| Negotiation | `negotiate.test.ts`                                                                                                       | each rule of 3.3                                                                                               |
+| Errors      | `json-api-error.test.ts`, `status.test.ts`                                                                                | status derivation, catalog closure, factories, registered codes only                                           |
+| Documents   | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                        | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance |
+| Resources   | `define-resource.test.ts`, `define-resource.test-d.ts`                                                                    | every definition-time rejection, inference                                                                     |
+| Query       | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                         | dispatch, aggregation, each family, the filter grammar                                                         |
+| Pagination  | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                    | link rebuilding, meta members, the profile's error objects                                                     |
+| Requests    | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`            | pointers for every structural error, 403/409/422 cases, lids                                                   |
+| Hono        | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, error rendering                   |
+| Atomic      | `parse-document.test.ts`, `lids.test.ts`, `handler.test.ts`, `handler-semantics.test.ts`, `handler-coverage.test.ts`      | the extension's examples and every processing rule                                                             |
+
+### 14.1 End-to-end suite (`e2e/`)
+
+A private workspace package that depends on `hono-jsonapi` through `workspace:*`, so imports resolve
+through the published `exports` map into `dist/` and `tsc` checks the emitted declarations.
+`e2e/support/` holds a blog API (people, articles, tags; a keyset pagination engine over an
+in-memory store; a snapshot transaction) built only from the package; each file starts it on
+`@hono/node-server` and asserts over `fetch`.
+
+| File                          | Covers                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts` | the exact export list of both subpaths                                                             |
+| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500 |
+| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors   |
+| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, update, relationship endpoints, delete |
+| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers               |
+| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, 415 and 400 for bad requests            |
+
+### 14.2 Runtime smoke test (`e2e/smoke/`)
+
+`app.ts` is the same blog API; `checks.ts` holds runtime-neutral assertions over every feature area;
+`run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers module and `workerd.ts`
+bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's workerd.
+`pnpm test:runtimes` runs all three; CI runs them on every push.
