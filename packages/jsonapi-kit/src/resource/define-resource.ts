@@ -18,6 +18,7 @@ import type {
 
 import { assertMemberName } from '../document/member-name';
 import { isRecord, ownEntry } from '../internal/object';
+import { resolveLinks } from './links';
 import { assertUnique, resolveQueryCapabilities } from './query-capabilities';
 
 /** Names no field may take: fields share a namespace with these members. */
@@ -161,7 +162,7 @@ export function defineResource(
     relationships,
     fields: new Set([...attributes, ...relationshipNames]),
     serialize: init.serialize,
-    links: init.links ?? {},
+    links: resolveLinks(init.links ?? {}, init.type),
     query: resolveQueryCapabilities(init.query, relationshipNames),
     validate,
     clientIds: init.clientIds ?? false,

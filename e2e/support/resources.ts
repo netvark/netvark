@@ -9,9 +9,12 @@ import type { ArticleRow, PersonRow, TagRow } from './store.ts';
 
 import { z } from 'zod';
 
-import { defineResource } from 'jsonapi-kit';
+import { createDefineResource } from 'jsonapi-kit';
 
 export const BASE_URL = 'https://blog.example';
+
+/** Every definition derives its links from the blog's origin (SPEC 5.1). */
+const defineResource = createDefineResource({ links: { base: BASE_URL } });
 
 /** A person with the ids of their articles, resolved by the caller. */
 export interface PersonView extends PersonRow {
@@ -43,7 +46,6 @@ export const People = defineResource({
     attributes: { name: row.name, twitter: row.twitter },
     relationships: { articles: row.articleIds },
   }),
-  links: { self: (id) => `${BASE_URL}/people/${id}` },
   validate: {
     create: z.object({
       name: z.string().min(1),
@@ -56,7 +58,6 @@ export const Tags = defineResource({
   type: 'tags',
   attributes: ['name'],
   serialize: (row: TagRow) => ({ id: row.id, attributes: { name: row.name } }),
-  links: { self: (id) => `${BASE_URL}/tags/${id}` },
 });
 
 export const Articles = defineResource({
@@ -79,13 +80,6 @@ export const Articles = defineResource({
     attributes: { title: row.title, body: row.body, createdAt: row.createdAt },
     relationships: { author: row.authorId, tags: row.tagIds },
   }),
-  links: {
-    self: (id) => `${BASE_URL}/articles/${id}`,
-    relationship: (id, name) => ({
-      self: `${BASE_URL}/articles/${id}/relationships/${name}`,
-      related: `${BASE_URL}/articles/${id}/${name}`,
-    }),
-  },
   query: {
     sort: ['title', 'createdAt'],
     filter: { title: ['eq', 'like'], author: ['eq'] },

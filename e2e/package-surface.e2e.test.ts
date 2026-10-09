@@ -32,6 +32,7 @@ const CORE = [
   'assertFullLinkage',
   'assertMemberName',
   'collectionDocument',
+  'createDefineResource',
   'defineResource',
   'errorDocument',
   'errorItem',

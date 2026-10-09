@@ -109,7 +109,7 @@ const Articles = defineResource({
     attributes: { title: row.title, body: row.body },
     relationships: { author: row.authorId },
   }),
-  links: { self: (id) => `${BASE}/articles/${id}` },
+  links: { base: '/api/v1' },
   query: { sort: ['title'], filter: { title: ['eq', 'like'] }, include: ['author'], page: {} },
   validate: { create: CreateArticle, update: UpdateArticle },
 });
@@ -120,6 +120,13 @@ names are inferred and carried on the result, so `serialize` cannot return an un
 `c.req.valid('query').sort[0].field` is `'title'`, and
 `relationshipValidator(Articles, 'editor', 'one')` is a type error. `resource` is a thunk so
 definitions can reference each other.
+
+`links: { base }` derives `self` (`/api/v1/articles/1`) and every relationship's `self` and
+`related` links (`/api/v1/articles/1/relationships/author`, `/api/v1/articles/1/author`) by the URL
+design the specification recommends; a builder written out wins over the derived one, and no `base`
+means no links. An application states the base once with
+`createDefineResource({ links: { base: '/api/v1' } })` and defines every resource with the result
+(ADR-0015).
 
 ### 3.3 Queries
 
@@ -307,3 +314,4 @@ a cited clause with a test.
 | 0012 | Definitions are validated at definition time, never at request time                              |
 | 0013 | Two packages: the framework-neutral core `jsonapi-kit` and the Hono adapter `hono-jsonapi`       |
 | 0014 | Errors are ban-kit errors; the adapter renders through hono-ban; everything throws               |
+| 0015 | Resource links by convention: opt-in `base`, a configured definer, no implicit defaults          |

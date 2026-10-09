@@ -12,6 +12,7 @@ import type {
   ResourceIdentifier,
 } from '../document/types';
 import type { StandardSchema } from '../internal/standard-schema-types';
+import type { ResourceLinks, ResourceLinksInit } from './links';
 
 export type Cardinality = 'one' | 'many';
 
@@ -78,26 +79,6 @@ export interface SerializedResource<
   readonly relationships?: SerializedRelationships<TRelationship>;
   readonly links?: Links | undefined;
   readonly meta?: Meta | undefined;
-}
-
-/**
- * `links.self` and `links.related` of a relationship. An object type, not an
- * interface, so it is assignable to `Links` (an interface has no implicit
- * index signature) and the builder's result can feed a relationship
- * document's `links`.
- */
-export type RelationshipLinks = {
-  readonly self?: string;
-  readonly related?: string;
-};
-
-export interface ResourceLinks {
-  /** The resource's `links.self`. */
-  readonly self?: ((id: string) => string) | undefined;
-  /** `links.self` and `links.related` of each relationship object. */
-  readonly relationship?:
-    | ((id: string, name: string) => RelationshipLinks)
-    | undefined;
 }
 
 export interface PageCapabilitiesInit {
@@ -187,7 +168,7 @@ export interface ResourceDefinitionInit<
   readonly serialize: (
     row: TRow,
   ) => SerializedResource<NoInfer<TAttribute>, NoInfer<TRelationship>>;
-  readonly links?: ResourceLinks | undefined;
+  readonly links?: ResourceLinksInit | undefined;
   readonly query?: QueryCapabilitiesInit<TSort, TFilter> | undefined;
   readonly validate?: ResourceValidators<TCreate, TUpdate> | undefined;
   /** Accept client-generated ids on create; default false (403). */

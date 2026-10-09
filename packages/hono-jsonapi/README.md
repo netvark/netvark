@@ -50,7 +50,7 @@ const Articles = defineResource({
     id: row.id,
     attributes: { title: row.title, body: row.body },
   }),
-  links: { self: (id) => `https://api.example.com/articles/${id}` },
+  links: { base: 'https://api.example.com' },
 });
 
 const app = new Hono<JsonApiEnv>();
@@ -95,6 +95,9 @@ a `TypeError` at startup rather than a 400 at request time.
 ```ts
 import { z } from 'zod';
 
+// resources/define.ts: the one place the application states its link base.
+export const defineResource = createDefineResource({ links: { base: '/api/v1' } });
+
 const People = defineResource({
   type: 'people',
   attributes: ['name', 'twitter'],
@@ -102,7 +105,6 @@ const People = defineResource({
     id: row.id,
     attributes: { name: row.name, twitter: row.twitter },
   }),
-  links: { self: (id) => `${BASE}/people/${id}` },
 });
 
 const Articles = defineResource({
@@ -117,13 +119,6 @@ const Articles = defineResource({
     attributes: { title: row.title, body: row.body, createdAt: row.createdAt },
     relationships: { author: row.authorId, tags: row.tagIds },
   }),
-  links: {
-    self: (id) => `${BASE}/articles/${id}`,
-    relationship: (id, name) => ({
-      self: `${BASE}/articles/${id}/relationships/${name}`,
-      related: `${BASE}/articles/${id}/${name}`,
-    }),
-  },
   query: {
     sort: ['title', 'createdAt'],
     filter: { title: ['eq', 'like'], author: ['eq'] },
@@ -140,6 +135,44 @@ const Articles = defineResource({
 `serialize` returns ids for relationships and the package builds the identifier objects with the
 declared type; identifier objects pass through for polymorphic relationships. The attribute and
 relationship names it may return are the declared ones: a typo is a type error.
+
+### Links
+
+`links: { base }` derives every link from the type by the URL design the
+[specification recommends](https://jsonapi.org/recommendations/#urls): `self` is
+`/api/v1/articles/1`, and each relationship gets `self: /api/v1/articles/1/relationships/author` and
+`related: /api/v1/articles/1/author`. Ids and names are percent-encoded. `respond` takes the 201
+`Location` from `self`. A link is a URI-reference, so a root-relative base is valid and stays
+correct behind any host or proxy; use an absolute base only when clients are on another origin.
+
+Best practices:
+
+- **State the base once.** Export a configured definer from one module and define every resource
+  with it. The raw `defineResource` from the package derives nothing, so a file that imports it by
+  mistake silently ships a resource without links; ban that import where the configured one exists:
+
+  ```jsonc
+  // .oxlintrc.json or an ESLint config
+  "no-restricted-imports": ["error", { "paths": [{ "name": "jsonapi-kit", "importNames": ["defineResource"], "message": "Import defineResource from resources/define.ts" }] }]
+  ```
+
+- **Override only what deviates.** A builder written out wins over the derived one and the rest
+  stays derived; a definition's `base` replaces the default's:
+
+  ```ts
+  const Users = defineResource({
+    type: 'users',
+    // People live under /accounts; relationship links keep the convention.
+    links: { self: (id) => `/api/v1/accounts/${id}` },
+    ...
+  });
+  ```
+
+- **Links are promises.** A derived `related` link names `/api/v1/articles/1/author`; serve that
+  route, or override `relationship` to return only `self`.
+- **No base, no links.** The convention is opt-in. A definition without `base` and without builders
+  emits no `links` at all, which the specification allows, and then the 201 carries no `Location`
+  unless the handler sets one.
 
 ### Fetch: include, sparse fieldsets, sort, filter
 

@@ -46,7 +46,7 @@ const Articles = defineResource({
     id: row.id,
     attributes: { title: row.title, body: row.body },
   }),
-  links: { self: (id) => `https://api.example.com/articles/${id}` },
+  links: { base: 'https://api.example.com' },
 });
 
 const app = new Hono<JsonApiEnv>();
@@ -141,7 +141,8 @@ listing every parameter the endpoint does not support, because the definition de
 
 - **One definition per resource type.** `defineResource` fixes the type, attribute and relationship
   names, links, what the query may ask for, and the Standard Schema validators for writes. Parsers,
-  builders, and validators all read from it; a mistake in it is a `TypeError` at startup.
+  builders, and validators all read from it; a mistake in it is a `TypeError` at startup. Links
+  derive from a `base` by the recommended URL design, stated once for every resource.
 - **Documents the specification accepts.** Sparse fieldsets, compound documents with full linkage
   and no orphans, string ids, and pagination links that reproduce the client's query.
 - **Parsers that reject what the specification rejects.** Every problem reported at once, located by

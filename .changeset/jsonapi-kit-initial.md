@@ -5,7 +5,9 @@
 First release: JSON:API 1.1 for any JavaScript runtime, framework-free.
 
 - `defineResource` declares a resource's type, fields, relationships, links, query capabilities, and
-  Standard Schema validators once; every parser and builder reads from it.
+  Standard Schema validators once; every parser and builder reads from it. `links: { base }` derives
+  `self` and the relationship links by the recommended URL design, and `createDefineResource` states
+  such defaults once for every definition.
 - `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`,
   `toManyRelationshipDocument`, and `include` build documents with sparse fieldsets applied and full
   linkage enforced.

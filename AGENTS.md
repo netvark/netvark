@@ -57,7 +57,8 @@ re-exports it), and `e2e/` (private). Root configs (`vitest.config.ts` with `tes
   and `errorItem`; every error is a ban-kit `BanError`
 - `document/` document and resource object types, member name rules, resource serialization,
   document builders, full linkage
-- `resource/` `defineResource`: the definition everything else reads from
+- `resource/` `defineResource`: the definition everything else reads from; `links.ts` derives links
+  from `links.base`; `createDefineResource` configures defaults once
 - `query/` `parseQuery`: `include`, `fields`, `sort`, `page`, `filter`, search, custom
 - `pagination/` the Cursor Pagination profile: links, meta, errors, `paginatedDocument`
 - `request/` request documents: identifiers, resource objects, relationship documents

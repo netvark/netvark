@@ -111,6 +111,13 @@ export type {
   RequestDocument,
   RequestResourceObject,
 } from './request/types';
+export type { DefineResource } from './resource/create-define-resource';
+export type {
+  RelationshipLinks,
+  ResourceDefaults,
+  ResourceLinks,
+  ResourceLinksInit,
+} from './resource/links';
 export type {
   AnyResource,
   Cardinality,
@@ -122,11 +129,9 @@ export type {
   QueryCapabilitiesInit,
   RelationshipDefinition,
   RelationshipInit,
-  RelationshipLinks,
   RelationshipNameOf,
   ResourceDefinition,
   ResourceDefinitionInit,
-  ResourceLinks,
   ResourceValidators,
   RowOf,
   SearchParameter,
@@ -203,4 +208,5 @@ export {
   parseUpdateDocument,
   primaryData,
 } from './request/resource-document';
+export { createDefineResource } from './resource/create-define-resource';
 export { defineResource, relatedResource } from './resource/define-resource';
