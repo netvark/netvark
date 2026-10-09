@@ -105,6 +105,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  ban-kit: file:../hono-ban/.pack/ban-kit-1.0.0.tgz
+  hono-ban: file:../hono-ban/.pack/hono-ban-2.0.0.tgz
+
 importers:
 
   .:
@@ -163,6 +167,9 @@ importers:
       hono:
         specifier: 4.13.7
         version: 4.13.7
+      hono-ban:
+        specifier: file:../../hono-ban/.pack/hono-ban-2.0.0.tgz
+        version: file:../hono-ban/.pack/hono-ban-2.0.0.tgz(hono@4.13.7)
       hono-jsonapi:
         specifier: workspace:*
         version: link:../packages/hono-jsonapi
@@ -187,6 +194,9 @@ importers:
 
   packages/hono-jsonapi:
     dependencies:
+      hono-ban:
+        specifier: file:../../../hono-ban/.pack/hono-ban-2.0.0.tgz
+        version: file:../hono-ban/.pack/hono-ban-2.0.0.tgz(hono@4.13.7)
       jsonapi-kit:
         specifier: workspace:^
         version: link:../jsonapi-kit
@@ -199,6 +209,10 @@ importers:
         version: 4.5.4
 
   packages/jsonapi-kit:
+    dependencies:
+      ban-kit:
+        specifier: file:../../../hono-ban/.pack/ban-kit-1.0.0.tgz
+        version: file:../hono-ban/.pack/ban-kit-1.0.0.tgz
     devDependencies:
       ajv:
         specifier: 8.20.0
@@ -1575,6 +1589,11 @@ packages:
   ast-v8-to-istanbul@1.0.7:
     resolution: {integrity: sha512-kFL68AG6ajd8fg248zwM9GQrUWEp79gsmjum34OEXjs4yHuUMZfYKwOLW9GMmB4oNvVrj+EAGxsP7ye2UR9UlA==}
 
+  ban-kit@file:../hono-ban/.pack/ban-kit-1.0.0.tgz:
+    resolution: {integrity: sha512-9JkS1lxT6XCCvRxPGNhKx/LMmA5qYoXl+60rs88OinO6e80ax+fuMFBhZjWOjQeXOR2Jl09Arm0F4VcegmOumA==, tarball: file:../hono-ban/.pack/ban-kit-1.0.0.tgz}
+    version: 1.0.0
+    engines: {node: '>=22.12.0'}
+
   cac@7.0.0:
     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
     engines: {node: '>=20.19.0'}
@@ -1732,6 +1751,13 @@ packages:
 
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
+
+  hono-ban@file:../hono-ban/.pack/hono-ban-2.0.0.tgz:
+    resolution: {integrity: sha512-qN/nUo53y/qOxdbFWc/4gw1bTtTXun/kAwYQlt08ycx0/I/JU+MI0Q4IlAfZX55qy1bl1ZpImg+RdVcczAy/pg==, tarball: file:../hono-ban/.pack/hono-ban-2.0.0.tgz}
+    version: 2.0.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      hono: '>=4.12.34'
 
   hono@4.13.7:
     resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
@@ -3296,6 +3322,8 @@ snapshots:
       estree-walker: 3.0.3
       js-tokens: 10.0.0
 
+  ban-kit@file:../hono-ban/.pack/ban-kit-1.0.0.tgz: {}
+
   cac@7.0.0: {}
 
   chai@6.3.0: {}
@@ -3417,6 +3445,11 @@ snapshots:
   has-flag@4.0.0: {}
 
   highlight.js@10.7.3: {}
+
+  hono-ban@file:../hono-ban/.pack/hono-ban-2.0.0.tgz(hono@4.13.7):
+    dependencies:
+      ban-kit: file:../hono-ban/.pack/ban-kit-1.0.0.tgz
+      hono: 4.13.7
 
   hono@4.13.7: {}
 

@@ -13,8 +13,9 @@ import type {
 } from '../document/types';
 import type { RequestLinkage } from '../request/identifiers';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { compact } from '../internal/object';
+import { invalidDocument } from '../request/identifiers';
 
 function key(type: string, lid: string): string {
   return `${type}\u0000${lid}`;
@@ -32,9 +33,11 @@ export class Lids {
   /** Records the id a created resource received; a repeated `lid` is a 400. */
   public define(type: string, lid: string, id: string, pointer: string): void {
     if (this.ids.has(key(type, lid))) {
-      throw JsonApiError.invalidDocument(
-        pointer,
-        `lid "${lid}" is already used for another "${type}" in this document`,
+      throw jsonApiError(
+        invalidDocument(
+          pointer,
+          `lid "${lid}" is already used for another "${type}" in this document`,
+        ),
       );
     }
     this.ids.set(key(type, lid), id);
@@ -44,9 +47,11 @@ export class Lids {
   public resolve(type: string, lid: string, pointer: string): string {
     const id = this.ids.get(key(type, lid));
     if (id === undefined) {
-      throw JsonApiError.invalidDocument(
-        pointer,
-        `lid "${lid}" does not refer to a "${type}" created by an earlier operation`,
+      throw jsonApiError(
+        invalidDocument(
+          pointer,
+          `lid "${lid}" does not refer to a "${type}" created by an earlier operation`,
+        ),
       );
     }
     return id;

@@ -1,6 +1,8 @@
 # ADR 0013: Two packages: a framework-neutral core (`jsonapi-kit`) and the Hono adapter (`hono-jsonapi`)
 
-- Status: accepted
+- Status: accepted; the dependency statements amended by ADR-0014 (`jsonapi-kit` depends on
+  `ban-kit`, `hono-jsonapi` also has `hono-ban` as a peer dependency, and `ErrorStatusCode` is
+  ban-kit's)
 - Date: 2026-10-08
 
 ## Context

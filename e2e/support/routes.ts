@@ -11,10 +11,10 @@ import type { PersonView } from './resources.ts';
 import type { ArticleRow, PersonRow, Store } from './store.ts';
 
 import {
-  JsonApiError,
   bodyValidator,
   collectionDocument,
   include,
+  jsonApiError,
   paginatedDocument,
   queryValidator,
   relationshipValidator,
@@ -44,7 +44,9 @@ export function registerRoutes(app: Hono<JsonApiEnv>, store: Store): void {
   function article(id: string): ArticleRow {
     const row = store.articles.get(id);
     if (row === undefined) {
-      throw JsonApiError.notFound(`Article ${id} does not exist`);
+      throw jsonApiError('NOT_FOUND', {
+        detail: `Article ${id} does not exist`,
+      });
     }
     return row;
   }
@@ -234,7 +236,7 @@ export function registerRoutes(app: Hono<JsonApiEnv>, store: Store): void {
   app.get('/people/:id', (c) => {
     const row = store.people.get(c.req.param('id'));
     if (row === undefined) {
-      throw JsonApiError.notFound();
+      throw jsonApiError('NOT_FOUND');
     }
     return respond(c, resourceDocument(People, view(row)));
   });

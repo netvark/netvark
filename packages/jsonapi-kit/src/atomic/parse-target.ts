@@ -4,7 +4,8 @@
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @packageDocumentation
  */
-import type { ErrorObject } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
 import type { ParseDocumentOptions } from './parse-support';
 import type { OperationTarget } from './types';
 
@@ -23,7 +24,7 @@ const REF_MEMBERS: ReadonlySet<string> = new Set([
 function parseRef(
   value: unknown,
   pointer: string,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): OperationTarget | undefined {
   if (!isRecord(value)) {
     errors.push(invalidDocument(pointer, 'ref must be an object'));
@@ -74,7 +75,7 @@ function parseHref(
   value: unknown,
   pointer: string,
   options: ParseDocumentOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): OperationTarget | undefined {
   if (typeof value !== 'string') {
     errors.push(invalidDocument(pointer, 'href must be a string'));
@@ -102,7 +103,7 @@ export function parseTarget(
   operation: Record<string, unknown>,
   pointer: string,
   options: ParseDocumentOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): OperationTarget | undefined {
   const hasRef = hasOwnMember(operation, 'ref');
   const hasHref = hasOwnMember(operation, 'href');

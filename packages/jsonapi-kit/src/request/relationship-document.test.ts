@@ -1,21 +1,26 @@
+import type { BanError } from 'ban-kit';
+
+import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import {
   parseToManyRelationshipDocument,
   parseToOneRelationshipDocument,
 } from './relationship-document';
 
-function thrown(run: () => unknown): JsonApiError {
+function thrown(run: () => unknown): BanError & {
+  readonly objects: ReturnType<typeof errorObjects>;
+} {
   try {
     run();
   } catch (error) {
-    if (error instanceof JsonApiError) {
-      return error;
+    if (isBanError(error)) {
+      return Object.assign(error, { objects: errorObjects(error) });
     }
     throw error;
   }
-  throw new Error('expected a JsonApiError');
+  throw new Error('expected a BanError');
 }
 
 describe('parseToOneRelationshipDocument', () => {
@@ -35,7 +40,7 @@ describe('parseToOneRelationshipDocument', () => {
     expect(
       thrown(() =>
         parseToOneRelationshipDocument({ data: [] }, { type: 'people' }),
-      ).errors[0],
+      ).objects[0],
     ).toMatchObject({
       status: '400',
       source: { pointer: '/data' },
@@ -47,18 +52,18 @@ describe('parseToOneRelationshipDocument', () => {
       ),
     );
     expect(wrong.status).toBe(409);
-    expect(wrong.errors[0]?.source?.pointer).toBe('/data/type');
+    expect(wrong.objects[0]?.source?.pointer).toBe('/data/type');
     expect(
       thrown(() =>
         parseToOneRelationshipDocument(
           { data: { type: 'people', lid: 'x' } },
           { type: 'people' },
         ),
-      ).errors[0]?.detail,
+      ).objects[0]?.detail,
     ).toBe('A resource identifier object must have a string id');
     expect(
       thrown(() => parseToOneRelationshipDocument({}, { type: 'people' }))
-        .errors[0]?.source,
+        .objects[0]?.source,
     ).toEqual({
       pointer: '',
     });
@@ -73,7 +78,7 @@ describe('parseToOneRelationshipDocument: identifier members', () => {
           { data: { type: 'people', id: '1', meta: 'x' } },
           { type: 'people' },
         ),
-      ).errors[0]?.source,
+      ).objects[0]?.source,
     ).toEqual({ pointer: '/data/meta' });
     expect(
       parseToOneRelationshipDocument(
@@ -109,7 +114,7 @@ describe('parseToManyRelationshipDocument', () => {
     expect(
       thrown(() =>
         parseToManyRelationshipDocument({ data: null }, { type: 'tags' }),
-      ).errors[0]?.detail,
+      ).objects[0]?.detail,
     ).toBe(
       'A to-many relationship takes an array of resource identifier objects',
     );
@@ -126,7 +131,7 @@ describe('parseToManyRelationshipDocument', () => {
         { type: 'tags' },
       ),
     );
-    expect(bad.errors.map((error) => error.source?.pointer)).toEqual([
+    expect(bad.objects.map((error) => error.source?.pointer)).toEqual([
       '/data/1',
       '/data/2',
       '/data/3/id',

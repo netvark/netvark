@@ -53,7 +53,8 @@ re-exports it), and `e2e/` (private). Root configs (`vitest.config.ts` with `tes
 - `media-type/` RFC 9110 media type and `Accept` parsing and serialization, the JSON:API media type
   and its `ext` and `profile` parameters
 - `negotiate/` the server content negotiation rules as a pure function
-- `errors/` `JsonApiError`, the closed error catalog, the registered status code table
+- `errors/` the catalog fragment over ban-kit's built-ins, the `jsonApiBan` instance, `jsonApiError`
+  and `errorItem`; every error is a ban-kit `BanError`
 - `document/` document and resource object types, member name rules, resource serialization,
   document builders, full linkage
 - `resource/` `defineResource`: the definition everything else reads from

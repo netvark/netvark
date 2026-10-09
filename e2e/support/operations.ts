@@ -10,7 +10,7 @@ import type { AtomicOptions, ResourceHandlers } from 'hono-jsonapi/atomic';
 
 import type { ArticleRow, PersonRow, Store } from './store.ts';
 
-import { JsonApiError, toManyLinkage, toOneLinkage } from 'hono-jsonapi';
+import { jsonApiError, toManyLinkage, toOneLinkage } from 'hono-jsonapi';
 
 import { Articles, People } from './resources.ts';
 
@@ -19,7 +19,9 @@ const TIMESTAMP = '2026-02-01T00:00:00Z';
 function article(tx: Store, id: string): ArticleRow {
   const row = tx.articles.get(id);
   if (row === undefined) {
-    throw JsonApiError.notFound(`Article ${id} does not exist`);
+    throw jsonApiError('NOT_FOUND', {
+      detail: `Article ${id} does not exist`,
+    });
   }
   return row;
 }

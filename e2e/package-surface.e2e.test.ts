@@ -4,6 +4,7 @@
  * lists. Value imports on purpose: a missing dist file or a wrong `exports`
  * entry fails here before any feature test runs.
  */
+import { BanError } from 'hono-ban';
 import { describe, expect, it } from 'vitest';
 
 import * as hono from 'hono-jsonapi';
@@ -18,12 +19,12 @@ function names(module: object): Array<string> {
 /** SPEC section 1: the core's values. */
 const CORE = [
   'ATOMIC_OPERATIONS_EXTENSION',
+  'BanError',
   'CURSOR_PAGINATION_PROFILE',
   'ERROR_CATALOG',
   'ERROR_CODES',
   'JSON_API_MEDIA_TYPE',
   'JSON_API_VERSION',
-  'JsonApiError',
   'MAX_SIZE_EXCEEDED_TYPE',
   'RANGE_PAGINATION_NOT_SUPPORTED_TYPE',
   'UNSUPPORTED_SORT_TYPE',
@@ -33,20 +34,22 @@ const CORE = [
   'collectionDocument',
   'defineResource',
   'errorDocument',
-  'errorObject',
+  'errorItem',
+  'errorObjects',
   'formatJsonApiMediaType',
   'identify',
   'include',
   'invalidCursor',
   'invalidCursorError',
   'isAtMember',
-  'isErrorStatusCode',
+  'isBanError',
   'isExtensionMemberName',
-  'isJsonApiError',
   'isJsonApiMediaType',
   'isMemberName',
   'isMemberPath',
   'itemCursorMeta',
+  'jsonApiBan',
+  'jsonApiError',
   'jsonApiObject',
   'jsonApiParameters',
   'maxPageSizeExceededError',
@@ -66,10 +69,8 @@ const CORE = [
   'parseUpdateDocument',
   'primaryData',
   'rangePaginationNotSupportedError',
-  'reasonPhrase',
   'relatedResource',
   'resourceDocument',
-  'responseStatus',
   'serializeResource',
   'toManyLinkage',
   'toOneLinkage',
@@ -98,7 +99,6 @@ const HONO = [
   'relationshipValidator',
   'respond',
   'respondError',
-  'toJsonApiError',
   'varyAccept',
 ];
 
@@ -123,9 +123,11 @@ describe('jsonapi-kit surface', () => {
 describe('hono-jsonapi surface', () => {
   it('the root re-exports the core, the same bindings, and adds the Hono integration', () => {
     expect(names(hono)).toEqual([...CORE, ...HONO].toSorted());
-    // One copy of the core in the graph: a JsonApiError thrown through either
-    // package is the same class, and instanceof holds across them.
-    expect(hono.JsonApiError).toBe(kit.JsonApiError);
+    // One copy of the core in the graph, and one copy of ban-kit under it:
+    // an error thrown through any of the packages is the same class, so
+    // instanceof holds across them.
+    expect(hono.BanError).toBe(kit.BanError);
+    expect(kit.BanError).toBe(BanError);
     expect(hono.defineResource).toBe(kit.defineResource);
   });
 

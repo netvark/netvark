@@ -14,7 +14,9 @@ First release: JSON:API 1.1 for any JavaScript runtime, framework-free.
 - `paginatedDocument` and `paginationLinks` implement the Cursor Pagination profile.
 - `parseCreateDocument`, `parseUpdateDocument`, and the relationship document parsers check request
   documents against the definition with RFC 6901 pointers on every error.
-- `negotiate` applies the server content negotiation rules (415, 406) over two header values;
-  `JsonApiError` carries error objects with a closed catalog of codes and registered statuses.
+- `negotiate` applies the server content negotiation rules (415, 406) over two header values.
+- Errors are [ban-kit](https://github.com/ali-issa/ban-kit) errors: `jsonApiError` builds one from a
+  closed catalog (`ERROR_CATALOG` over ban-kit's built-ins), `errorItem` one object of a list, and
+  `errorDocument` the document; an application spreads the catalog into its own `createBan`.
 - `jsonapi-kit/atomic` implements the Atomic Operations extension as `operationsProcessor`, with a
   caller-owned transaction, local ids across operations, and a host-supplied context for handlers.

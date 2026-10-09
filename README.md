@@ -2,10 +2,10 @@
 
 [JSON:API 1.1](https://jsonapi.org/format/1.1/) for JavaScript, as two packages:
 
-| Package                                 | What it is                                                                                                                                                                                                                                                                                                                                                                                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`jsonapi-kit`](packages/jsonapi-kit)   | The framework-free core: resource definitions, document building, typed query parsing, request document validation, content negotiation, the [Cursor Pagination](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/) profile, and the [Atomic Operations](https://jsonapi.org/ext/atomic/) extension. Functions over plain values; runs on Node, Bun, Deno, and Cloudflare Workers with no dependencies. |
-| [`hono-jsonapi`](packages/hono-jsonapi) | The [Hono](https://hono.dev) adapter: content negotiation middleware, validators typed for `c.req.valid()`, response helpers, error handlers, and the operations endpoint as a handler. Re-exports the core in full, so a Hono application imports from one package.                                                                                                                                               |
+| Package                                 | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`jsonapi-kit`](packages/jsonapi-kit)   | The framework-free core: resource definitions, document building, typed query parsing, request document validation, content negotiation, the [Cursor Pagination](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/) profile, and the [Atomic Operations](https://jsonapi.org/ext/atomic/) extension. Functions over plain values; runs on Node, Bun, Deno, and Cloudflare Workers; errors are [ban-kit](https://github.com/ali-issa/ban-kit) errors, its one dependency. |
+| [`hono-jsonapi`](packages/hono-jsonapi) | The [Hono](https://hono.dev) adapter: content negotiation middleware, validators typed for `c.req.valid()`, response helpers, error handlers on [hono-ban](https://github.com/ali-issa/ban-kit), and the operations endpoint as a handler. Re-exports the core in full, so a Hono application imports from one package.                                                                                                                                                             |
 
 Declare a resource once; everything else reads from the definition. Every rule is a cited clause of
 the specification; where the specification leaves a choice to the server, the choice is written down
@@ -14,8 +14,8 @@ in [`docs/SPEC.md`](docs/SPEC.md).
 ## Install
 
 ```bash
-pnpm add hono-jsonapi hono   # Hono applications (pulls in jsonapi-kit)
-pnpm add jsonapi-kit         # anything else: a fetch handler, another framework, a client
+pnpm add hono-jsonapi hono hono-ban   # Hono applications (pulls in jsonapi-kit and ban-kit)
+pnpm add jsonapi-kit                  # anything else: a fetch handler, another framework, a client
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
@@ -29,10 +29,10 @@ without importing any of them.
 import { Hono } from 'hono';
 import type { JsonApiEnv } from 'hono-jsonapi';
 import {
-  JsonApiError,
   defineResource,
   errorHandler,
   jsonApi,
+  jsonApiError,
   notFoundHandler,
   queryValidator,
   resourceDocument,
@@ -57,7 +57,7 @@ app.notFound(notFoundHandler());
 app.get('/articles/:id', queryValidator(Articles), async (c) => {
   const row = await articles.find(c.req.param('id'));
   if (row === undefined) {
-    throw JsonApiError.notFound(`Article ${c.req.param('id')} does not exist`);
+    throw jsonApiError('NOT_FOUND', { detail: `Article ${c.req.param('id')} does not exist` });
   }
   return respond(c, resourceDocument(Articles, row, { query: c.req.valid('query') }));
 });
@@ -71,9 +71,10 @@ parses, checks, and builds; you send the document it hands back.
 ```ts
 import {
   JSON_API_MEDIA_TYPE,
-  JsonApiError,
+  errorDocument,
   formatJsonApiMediaType,
-  isJsonApiError,
+  isBanError,
+  jsonApiError,
   negotiate,
   parseQuery,
   resourceDocument,
@@ -93,7 +94,7 @@ export default {
       accept: request.headers.get('Accept') ?? undefined,
     });
     if (!negotiation.ok) {
-      return send(negotiation.error.document(), negotiation.error.status);
+      return send(errorDocument(negotiation.error), negotiation.error.status);
     }
     try {
       const url = new URL(request.url);
@@ -101,13 +102,13 @@ export default {
       const query = parseQuery(Articles, url.search.slice(1));
       const row = await articles.find(id);
       if (row === undefined) {
-        throw JsonApiError.notFound(`Article ${id} does not exist`);
+        throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
       }
       const document = resourceDocument(Articles, row, { query });
       return send(document, 200, formatJsonApiMediaType({ profile: document.jsonapi?.profile }));
     } catch (error) {
-      if (isJsonApiError(error)) {
-        return send(error.document(), error.status);
+      if (isBanError(error)) {
+        return send(errorDocument(error), error.status);
       }
       throw error;
     }
@@ -148,6 +149,10 @@ listing every parameter the endpoint does not support, because the definition de
 - **Content negotiation, cursor pagination, atomic operations**, each implemented from its text.
 - **Hostile input handled.** Member names, parameter names, and `lid` values never become prototype
   keys; server internals never reach a response.
+- **One error model.** Every error is a [ban-kit](https://github.com/ali-issa/ban-kit) error from a
+  closed catalog, and the Hono handler is hono-ban's: an error id in the header and the body, a
+  report hook, and one handler for this library's errors, the application's own catalog, and any
+  other library on ban-kit.
 
 The package READMEs walk through each area: [`jsonapi-kit`](packages/jsonapi-kit/README.md) for the
 core API, [`hono-jsonapi`](packages/hono-jsonapi/README.md) for the Hono routes, validators,

@@ -33,18 +33,20 @@ Two packages, one repository (ADR 0013). `jsonapi-kit` is the framework-free cor
 function over plain values (strings, parsed JSON, `URL`s) and none imports a web framework or a
 runtime API beyond web standards. `hono-jsonapi` is the Hono adapter: it depends on `jsonapi-kit`,
 re-exports all of it (one import for a Hono application), and adds the middleware, validators,
-response helpers, error handlers, and the operations endpoint (sections 10 and 11.1). `jsonapi-kit`
-has no dependencies and no peer dependencies; `hono` is `hono-jsonapi`'s only peer dependency (ADR
-0002). Validators are consumed through Standard Schema V1, whose interfaces are vendored in
+response helpers, error handlers, and the operations endpoint (sections 10 and 11.1). Errors are
+[ban-kit](https://github.com/ali-issa/ban-kit) errors (ADR 0014): `jsonapi-kit` depends on `ban-kit`
+and on nothing else; `hono-jsonapi` has two peer dependencies, `hono` and `hono-ban`, ban-kit's Hono
+adapter, through which its error handler renders (ADR 0002). Validators are consumed through
+Standard Schema V1, whose interfaces are vendored in
 `packages/jsonapi-kit/src/internal/standard-schema-types.ts`, so installing either package never
 pulls in Zod, Valibot, ArkType, or Ajv.
 
-| Subpath               | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jsonapi-kit`         | Values: `defineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `JsonApiError`, `isJsonApiError`, `errorObject`, `errorDocument`, `responseStatus`, `ERROR_CATALOG`, `ERROR_CODES`, `isErrorStatusCode`, `reasonPhrase`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9 |
-| `jsonapi-kit/atomic`  | `operationsProcessor`, `assertOperationsContentType`, `parseOperationsDocument`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `hono-jsonapi`        | Everything of `jsonapi-kit` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`, `toJsonApiError`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `hono-jsonapi/atomic` | Everything of `jsonapi-kit/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Subpath               | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jsonapi-kit`         | Values: `defineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `BanError`, `isBanError`, `jsonApiBan`, `jsonApiError`, `errorItem`, `errorObjects`, `errorDocument`, `ERROR_CATALOG`, `ERROR_CODES`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9, with `Ban`, `BanError`, `ErrorItem`, and `ErrorStatusCode` re-exported from `ban-kit` |
+| `jsonapi-kit/atomic`  | `operationsProcessor`, `assertOperationsContentType`, `parseOperationsDocument`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `hono-jsonapi`        | Everything of `jsonapi-kit` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `hono-jsonapi/atomic` | Everything of `jsonapi-kit/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 `e2e/package-surface.e2e.test.ts` asserts the exact value export list of all four subpaths against
 the built packages, and that the adapter's re-exports are the core's own bindings.
@@ -63,7 +65,7 @@ packages/jsonapi-kit/src/
   internal/
     constants.ts                 section 13
     object.ts                    isRecord(), ownMember(), hasOwnMember(), ownEntry(), ownKeys(), compact(): prototype-safe reads
-    pointer.ts                   pointer(), escapePointerToken(): RFC 6901
+    pointer.ts                   pointer(), escapePointerToken(), pathFromPointer(): RFC 6901
     standard-schema-types.ts     vendored Standard Schema V1 interfaces
   media-type/
     parse.ts                     parseMediaType(), parseAccept() (3.1)
@@ -71,9 +73,8 @@ packages/jsonapi-kit/src/
     json-api.ts                  isJsonApiMediaType(), jsonApiParameters(), formatJsonApiMediaType() (3.2)
   negotiate/negotiate.ts         negotiate() (3.3)
   errors/
-    status.ts                    ErrorStatusCode, isErrorStatusCode(), reasonPhrase() (4.3)
     catalog.ts                   ERROR_CATALOG, ERROR_CODES (4.1)
-    json-api-error.ts            JsonApiError, errorObject(), errorDocument(), responseStatus(), isJsonApiError() (4.2)
+    json-api-error.ts            jsonApiBan, jsonApiError(), errorItem(), errorObjects(), errorDocument() (4.2)
   document/
     types.ts                     section 2
     member-name.ts               2.1
@@ -129,7 +130,7 @@ packages/hono-jsonapi/src/
   respond.ts                     respond(), respondError(), isJsonApiResponse(), varyAccept() (10.2)
   body.ts                        readDocument() (10.3)
   validators.ts                  queryValidator(), bodyValidator(), relationshipValidator() (10.4)
-  handlers.ts                    errorHandler(), notFoundHandler(), toJsonApiError() (10.5)
+  handlers.ts                    errorHandler(), notFoundHandler() (10.5)
   atomic/
     index.ts                     subpath entry: re-exports jsonapi-kit/atomic, adds atomicOperations
     handler.ts                   atomicOperations() (11.1)
@@ -214,7 +215,8 @@ Tests: `parse.test.ts` (grammar, case, quoting, weights, malformed input), `json
 
 `negotiate({ contentType, accept }, { extensions?, profiles? })` applies
 `#content-negotiation-servers` in order and returns `{ ok: true, request, extensions, profiles }` or
-`{ ok: false, error }` where `error` is a 415 or 406 `JsonApiError`.
+`{ ok: false, error }` where `error` is a 415 or 406 `BanError` (4.2) carrying `Vary: Accept` in its
+headers.
 
 Content-Type:
 
@@ -247,63 +249,83 @@ Tests: `negotiate.test.ts` names each rule.
 
 ### 4.1 Catalog (`errors/catalog.ts`)
 
-`ERROR_CATALOG` is closed: `ErrorCode` is the union of its keys, `ERROR_CODES` lists them in catalog
-order, and every `code` the package emits is one of them. Each entry fixes `status` and `title`;
-`detail` and `source` vary per occurrence (`#error-objects`: `title` SHOULD NOT change from
-occurrence to occurrence).
+Every error the package emits is a ban-kit `BanError` (ADR 0014) carrying one of `ERROR_CODES`.
+`ERROR_CATALOG` holds the entries ban-kit's built-in catalog does not have, in ban-kit's
+`ErrorDefinition` shape (`JsonApiCatalog = Record<JsonApiCatalogKey, ErrorDefinition>`), so an
+application spreads them into its own `createBan({ errors })` next to its own entries; the other
+codes are ban-kit built-ins with the same `status` and `title`. `ErrorCode` is the union of all
+sixteen, `ERROR_CODES` lists them in status order, and each fixes `status` and `title`; `detail` and
+`source` vary per occurrence (`#error-objects`: `title` SHOULD NOT change from occurrence to
+occurrence). The three profile entries carry the profile's error `type` URI (8.4).
 
-| Code                                | Status | Title                             |
-| ----------------------------------- | ------ | --------------------------------- |
-| `INVALID_QUERY_PARAMETER`           | 400    | Invalid Query Parameter           |
-| `UNKNOWN_QUERY_PARAMETER`           | 400    | Unknown Query Parameter           |
-| `INVALID_DOCUMENT`                  | 400    | Invalid Document                  |
-| `MALFORMED_JSON`                    | 400    | Malformed JSON                    |
-| `UNSUPPORTED_SORT`                  | 400    | Unsupported Sort                  |
-| `MAX_PAGE_SIZE_EXCEEDED`            | 400    | Max Page Size Exceeded            |
-| `RANGE_PAGINATION_NOT_SUPPORTED`    | 400    | Range Pagination Not Supported    |
-| `FORBIDDEN`                         | 403    | Forbidden                         |
-| `CLIENT_GENERATED_ID_NOT_SUPPORTED` | 403    | Client-Generated ID Not Supported |
-| `NOT_FOUND`                         | 404    | Not Found                         |
-| `NOT_ACCEPTABLE`                    | 406    | Not Acceptable                    |
-| `CONFLICT`                          | 409    | Conflict                          |
-| `UNSUPPORTED_MEDIA_TYPE`            | 415    | Unsupported Media Type            |
-| `VALIDATION_FAILED`                 | 422    | Validation Failed                 |
-| `INTERNAL_SERVER_ERROR`             | 500    | Internal Server Error             |
+| Code                                | Status | Title                             | Defined by   |
+| ----------------------------------- | ------ | --------------------------------- | ------------ |
+| `INVALID_QUERY_PARAMETER`           | 400    | Invalid Query Parameter           | this package |
+| `UNKNOWN_QUERY_PARAMETER`           | 400    | Unknown Query Parameter           | this package |
+| `INVALID_DOCUMENT`                  | 400    | Invalid Document                  | this package |
+| `MALFORMED_JSON`                    | 400    | Malformed JSON                    | ban-kit      |
+| `UNSUPPORTED_SORT`                  | 400    | Unsupported Sort                  | this package |
+| `MAX_PAGE_SIZE_EXCEEDED`            | 400    | Max Page Size Exceeded            | this package |
+| `RANGE_PAGINATION_NOT_SUPPORTED`    | 400    | Range Pagination Not Supported    | this package |
+| `FORBIDDEN`                         | 403    | Forbidden                         | ban-kit      |
+| `CLIENT_GENERATED_ID_NOT_SUPPORTED` | 403    | Client-Generated ID Not Supported | this package |
+| `NOT_FOUND`                         | 404    | Not Found                         | ban-kit      |
+| `METHOD_NOT_ALLOWED`                | 405    | Method Not Allowed                | ban-kit      |
+| `NOT_ACCEPTABLE`                    | 406    | Not Acceptable                    | ban-kit      |
+| `CONFLICT`                          | 409    | Conflict                          | ban-kit      |
+| `UNSUPPORTED_MEDIA_TYPE`            | 415    | Unsupported Media Type            | ban-kit      |
+| `VALIDATION_FAILED`                 | 422    | Validation Failed                 | ban-kit      |
+| `INTERNAL_SERVER_ERROR`             | 500    | Internal Server Error             | ban-kit      |
 
-### 4.2 `JsonApiError` (`errors/json-api-error.ts`)
+### 4.2 Errors on ban-kit (`errors/json-api-error.ts`)
 
-- `new JsonApiError(errors, { status?, cause? })`: `errors` is one error object or a non-empty array
-  (empty: `TypeError`). `status` defaults to `responseStatus(errors)`; an explicit status MUST be a
-  registered 4xx or 5xx code (`TypeError` otherwise; ADR 0009). `message` is
-  `"<status> <codes>[: <first detail>]"` for logs. `cause` is passed to `Error`.
-- `responseStatus(errors)`: the common status when every object agrees; 400 when they differ and all
-  are 4xx; otherwise 500. An object whose `status` is not a registered 4xx or 5xx code contributes
-  nothing; no statuses at all is 500 (`#errors-processing`: "the most generally applicable HTTP
-  error code").
-- `error.document(base?)`: `{ jsonapi?, links?, meta?, errors }`.
-- `errorObject(code, { id?, detail?, source?, links?, meta? })`: `status` as a string and `title`
-  from the catalog; `undefined` members omitted. `errorDocument(errors, base?)` for callers without
-  an error instance.
-- Factories (all return `JsonApiError`): `of(code, init?)`, `invalidParameter(parameter, detail)`,
-  `unknownParameter(parameter, detail?)`, `invalidDocument(pointer, detail)`, `malformedJson()`,
-  `forbidden(detail, source?)`, `clientGeneratedIdNotSupported(pointer = '/data/id')`,
-  `notFound(detail?, source?)`, `notAcceptable(detail)` (`source.header: 'Accept'`),
-  `conflict(detail, source?)`, `unsupportedMediaType(detail)` (`source.header: 'Content-Type'`),
-  `validationFailed(issues)` (422, one object per `{ pointer, detail }`; empty: `TypeError`),
-  `internal(cause?)` (a constant 500: `detail` is "An unexpected error occurred").
-- `isJsonApiError(value)`: `instanceof`, or structurally an `Error` named `JsonApiError` with an
-  `errors` array and a numeric `status`, so an error from a second installed copy still renders.
+`jsonApiBan` is the ban-kit instance behind every error the package builds:
+`createBan({ errors: ERROR_CATALOG, format: jsonApi({ mixedEntries: true }) })`. Its catalog is
+`ERROR_CATALOG` over ban-kit's built-ins (`JsonApiErrorCode = ErrorKey<JsonApiCatalog>`), and its
+format is ban-kit's JSON:API format with `mixedEntries` on, so one document can combine entries
+(ban-kit SPEC 7.2.4). Any ban-kit instance renders any `BanError`, so an application with entries of
+its own builds its own instance with `ERROR_CATALOG` spread into `errors` and renders this package's
+errors the same way; `e2e/custom-catalog.e2e.test.ts` drives that over HTTP.
 
-### 4.3 Status codes (`errors/status.ts`)
+An error object is an `ErrorItem` on `error.errors`:
 
-`ErrorStatusCode` is `ClientErrorStatusCode | ServerErrorStatusCode`, the package's own literal
-unions of the registered codes (the same membership as Hono's unions, so `hono-jsonapi` hands a
-status to `c.json` without assertions). `isErrorStatusCode(n)` is true for the registered 4xx and
-5xx codes; `reasonPhrase(status)` gives the RFC 9110 / IANA phrase (`413 Content Too Large`,
-`422 Unprocessable Content`, `418 I'm a teapot`).
+- `errorItem(code, { detail, source?, meta? })`: the entry's `status`, `code`, `title`, and `type`
+  (when it declares one), then the occurrence's `detail`, address, and `meta`. The address is the
+  `source` as ban-kit locates it: `pointer` is a path with no location (`pathFromPointer`, RFC 6901
+  unescaping), `parameter` is a one-segment path in `query`, `header` one in `header`; one item
+  addresses one part of the request, with that precedence when several are given. The format renders
+  them back as `source.pointer`, `source.parameter`, and `source.header` (ban-kit SPEC 7.2.2); a
+  parameter or header item also carries `meta.location`.
+- `jsonApiError(code, { detail?, source?, meta?, cause?, headers? })`: one error object from the
+  catalog. With no `source` and no `meta` it is
+  `jsonApiBan.error(code, { detail, cause, headers })`; otherwise the error carries one item, and a
+  `source` or `meta` without a `detail` is a `TypeError`.
+- `jsonApiError(items, { cause?, headers? })`: one error over one item or a non-empty list (empty:
+  `TypeError`). When every item carries the same catalog code the error is that entry; otherwise it
+  is the primary entry for the response status, `responseStatus(items)` from
+  `ban-kit/formats/json-api` (the common status; 400 when the items differ and are all 4xx; else
+  500; 500 when no item has a status) through `jsonApiBan.fromStatus` (`#errors-processing`: "the
+  most generally applicable HTTP error code"). A single item's `detail` becomes the error's, so logs
+  and the other formats show it.
+- `headers` are the error's own (`error.headers`): `Allow` on a 405, `Vary: Accept` on a 415 or 406.
+  Every handler and `respondError` send them.
+- `errorObjects(error)`: the error objects the JSON:API format renders for any `BanError`, in
+  document order: one per item, or one for the error itself when it has no list, each with the
+  error's `id`. `errorDocument(error, base?)` is `{ jsonapi?, links?, meta?, errors }` for callers
+  that build a response by hand; handlers (10.5) render through ban-kit instead.
+- `BanError` and `isBanError` are re-exported from `ban-kit` so a consumer narrows a caught error
+  without a second import. `error.status` is the response status, `error.getResponse()` a bare
+  rendering, `error.cause` the underlying failure.
 
-Tests: `json-api-error.test.ts` (status derivation table, factories, structural narrowing),
-`status.test.ts` (every code round-trips; 499 and 299 are rejected).
+### 4.3 Status codes
+
+`ErrorStatusCode` is ban-kit's union of the registered 4xx and 5xx codes, re-exported; an
+unregistered status is a `TypeError` in ban-kit at construction (ADR 0009). The adapter hands
+`error.status` to `c.json` without assertions.
+
+Tests: `json-api-error.test.ts` (catalog closure and spreading into `createBan`, item mapping and
+precedence, both call forms, status derivation for mixed lists), `error-document.test.ts` (document
+order, a foreign ban-kit validation error, `getResponse` with the error's headers).
 
 ---
 
@@ -374,9 +396,9 @@ Tests: `define-resource.test.ts` (every rejection), `define-resource.test-d.ts` 
 ## 6. Query parsing (`query/parse-query.ts`)
 
 `parseQuery(resource, input): ParsedQuery<TSort, TFilter>` parses every parameter against the
-definition and throws one 400 `JsonApiError` listing every problem, each with `source.parameter` set
-to the parameter name as sent. Nothing is dropped silently: a parameter the endpoint does not know
-how to process is `UNKNOWN_QUERY_PARAMETER` (`#query-parameters`: "MUST return 400 Bad Request").
+definition and throws one 400 `BanError` listing every problem, each with `source.parameter` set to
+the parameter name as sent. Nothing is dropped silently: a parameter the endpoint does not know how
+to process is `UNKNOWN_QUERY_PARAMETER` (`#query-parameters`: "MUST return 400 Bad Request").
 
 Dispatch per parameter name (6.2 gives the grammar; `member` is the first bracket member):
 
@@ -593,8 +615,10 @@ only when true (the profile defines it as a flag to add). `itemCursorMeta(cursor
 
 ### 8.4 Errors (`errors.ts`)
 
-Each is a 400 error object with `source.parameter` and, where the profile defines one, a `type` link
-under `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/`:
+Each is a 400 `ErrorItem` (4.2) with `source.parameter` and, where the profile defines one, a `type`
+link under `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/`, the catalog entry's
+`type` (4.1), exported as `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, and
+`RANGE_PAGINATION_NOT_SUPPORTED_TYPE`:
 
 | Builder                                    | Code                             | `type` link suffix               | Extra                                 |
 | ------------------------------------------ | -------------------------------- | -------------------------------- | ------------------------------------- |
@@ -603,7 +627,7 @@ under `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/`:
 | `rangePaginationNotSupportedError()`       | `RANGE_PAGINATION_NOT_SUPPORTED` | `range-pagination-not-supported` | `source.parameter: 'page[before]'`    |
 | `invalidCursorError(parameter, detail?)`   | `INVALID_QUERY_PARAMETER`        | none                             | for a cursor the engine cannot decode |
 
-`unsupportedSort(field)` and `invalidCursor(parameter, detail?)` wrap them in a `JsonApiError` for
+`unsupportedSort(field)` and `invalidCursor(parameter, detail?)` wrap them in a `BanError` for
 throwing from an engine. The `type` link is a string, since the profile says "has a `type` link of"
 and a link may be a string (`#document-links-link`).
 
@@ -614,8 +638,8 @@ over HTTP.
 
 ## 9. Request documents (`request/`)
 
-Every parser accumulates error objects, each with `source.pointer` (RFC 6901, `~` and `/` escaped in
-names), and throws one `JsonApiError` whose status follows 4.2.
+Every parser accumulates error items, each with `source.pointer` (RFC 6901, `~` and `/` escaped in
+names), and throws one `BanError` whose status follows 4.2.
 
 ### 9.1 Identifiers and linkage (`identifiers.ts`)
 
@@ -687,17 +711,18 @@ Tests: `resource-document.test.ts`, `resource-update.test.ts`, `relationship-doc
 ## 10. Hono integration (`hono-jsonapi`, `packages/hono-jsonapi/src/`)
 
 `hono-jsonapi` depends on `jsonapi-kit`, re-exports everything of both its subpaths (`export *`, so
-the bindings are the core's own), and adds the functions of this section and 11.1. `hono` is its
-only peer dependency.
+the bindings are the core's own), and adds the functions of this section and 11.1. Its peer
+dependencies are `hono` and `hono-ban` (ADR 0014).
 
 ### 10.1 `jsonApi(options?)` and types (`middleware.ts`, `types.ts`)
 
-`jsonApi({ extensions?, profiles? })` runs 3.3 over the request headers. A failure is answered
-immediately as an error document with `Vary: Accept`. On success the result is stored as the
-`jsonApi` context variable (`JsonApiContext = { request, extensions, profiles }`, typed through
-`JsonApiEnv`), downstream runs, and when the response is a JSON:API response `Vary: Accept` is added
-without duplicating an existing `Accept` or `*` (`#content-negotiation-servers`: servers that
-support `ext` or `profile` SHOULD send `Vary: Accept`; RFC 9110 12.5.5).
+`jsonApi({ extensions?, profiles? })` runs 3.3 over the request headers. A failure is thrown: its
+415 or 406 carries `Vary: Accept` in the error's headers, and `app.onError` renders it (10.5). On
+success the result is stored as the `jsonApi` context variable
+(`JsonApiContext = { request, extensions, profiles }`, typed through `JsonApiEnv`), downstream runs,
+and when the response is a JSON:API response `Vary: Accept` is added without duplicating an existing
+`Accept` or `*` (`#content-negotiation-servers`: servers that support `ext` or `profile` SHOULD send
+`Vary: Accept`; RFC 9110 12.5.5).
 
 ### 10.2 `respond` (`respond.ts`, ADR 0005)
 
@@ -711,8 +736,10 @@ support `ext` or `profile` SHOULD send `Vary: Accept`; RFC 9110 12.5.5).
   fixed one case-insensitively is dropped: Hono applies header records in key order, and a lowercase
   `content-type` would otherwise win. The return type is `JsonApiResponse<TDocument, TStatus>` for
   Hono's RPC inference.
-- `respondError(c, error, base?, headers?)`: `error.document(base)` with `error.status` and the bare
-  media type: no extension or profile applies to an error document.
+- `respondError(c, error, base?, headers?)`: `errorDocument(error, base)` with `error.status`, the
+  error's own headers (`Allow`, `Vary`), which win over `headers`, and the bare media type: no
+  extension or profile applies to an error document. A bare rendering: no error id header, no
+  report; `errorHandler` does those for errors that are thrown.
 - `isJsonApiResponse(response)`, `varyAccept(current)`.
 
 ### 10.3 `readDocument(c)` (`body.ts`)
@@ -723,9 +750,11 @@ parameters were already checked by `jsonApi()`.
 
 ### 10.4 Validators (`validators.ts`)
 
-Each is a `MiddlewareHandler` in the shape of Hono's `validator`, stores its result for
-`c.req.valid()`, and answers a `JsonApiError` itself through `respondError`, so a rejected request
-is rendered as JSON:API whether or not `errorHandler()` is installed. Other errors propagate.
+Each is a `MiddlewareHandler` in the shape of Hono's `validator` and stores its result for
+`c.req.valid()`. A rejected request throws the parser's `BanError` for `app.onError` to render
+(10.5); Hono's default error handler answers a thrown `BanError` through its `getResponse()`, so the
+rejection is a JSON:API document even on an app without `errorHandler()`, without the handler's id
+header and report.
 
 | Validator                                                  | Target  | Stored value                                                                                                                                                                         |
 | ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -738,15 +767,30 @@ is rendered as JSON:API whether or not `errorHandler()` is installed. Other erro
 `relationshipValidator` throws `TypeError` at setup for an undeclared relationship or a cardinality
 that disagrees with the definition; `name` is typed as `RelationshipNameOf<TResource>`.
 
-### 10.5 Handlers (`handlers.ts`, ADR 0006)
+### 10.5 Handlers (`handlers.ts`, ADR 0014)
 
-- `toJsonApiError(error)`: a `JsonApiError` as is; an `HTTPException` with a registered 4xx or 5xx
-  status as `{ status, title: reasonPhrase(status), detail: message }` with the exception as
-  `cause`; anything else `JsonApiError.internal(error)`.
-- `errorHandler({ report?, document?, headers? })` for `app.onError`: awaits `report(error, c)`
-  (anything it throws is ignored), then `respondError(c, toJsonApiError(error), document, headers)`.
+- `errorHandler(options?)` for `app.onError` is a hono-ban handler:
+  `createBan({ errors: ERROR_CATALOG, format: jsonApi({ ...format, mixedEntries: true, document }) }).onError(handlerOptions)`,
+  where `document` and `format` are this package's options and the rest (`ErrorHandlerOptions<E>`
+  extends hono-ban's `HandlerOptions<E, JsonApiCatalog>`) are hono-ban's: `onReport(report, c)`
+  (called exactly once, anything it throws is swallowed), `headers` (error headers and
+  `Content-Type` win), `map` (receives the handler's instance, whose catalog is `ERROR_CATALOG` over
+  the built-ins), `includeStack`, `transform`, `requestIdHeader`, `requestId`, `traceId`,
+  `errorIdHeader`, `maxBodyBytes` (ban-kit SPEC 6 and 6.11). `document` adds top-level `jsonapi`,
+  `links`, and `meta` members to every error document; `format` is the JSON:API format's own options
+  (`typeLinkBaseUrl`, `aboutLink`, `includeId`, `traceIdMetaKey`), `mixedEntries` being always on
+  since this package's errors combine entries.
+- What it renders: a `BanError` as is (this package's, the application's own instance's, or any
+  other library's on ban-kit); Hono's `HTTPException` with a 4xx or 5xx status adopted by status
+  (ban-kit's primary entry for that status, `detail` from the message unless empty, its response
+  headers kept except the body-describing ones, the exception as `cause`); an `HTTPException`
+  outside those classes passed through as its own `getResponse()` (a thrown redirect); anything else
+  as a constant 500 whose `detail` is "An unexpected error occurred", the thrown value on `cause`
+  for the report. Every response carries `Content-Type: application/vnd.api+json`,
+  `Cache-Control: no-store` unless `headers` sets one, the error id in `X-Error-Id` and in each
+  error object's `id`, and `meta.traceId` when the request carried a W3C `traceparent`.
 - `notFoundHandler({ document?, headers? })` for `app.notFound`: a 404 `NOT_FOUND` document with
-  detail "No resource exists at the requested URL".
+  detail "No resource exists at the requested URL" through `respondError`.
 
 Tests: `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`,
 `validators.test-d.ts`, `handlers.test.ts`.
@@ -785,10 +829,12 @@ twice throws `TypeError` at setup. Per call, in order:
 1. `parseOperationsDocument(body, { maxOperations, resolveHref })` (11.2), `maxOperations`
    defaulting to 10.
 2. `options.transaction(ctx, run)`; `run` executes every operation in document order (11.4) with one
-   `Lids` registry (11.3) and `OperationContext = { ctx, tx, index, pointer, meta }`. A
-   `JsonApiError` from an operation whose objects lack a `source` gets `source.pointer` set to the
-   operation's pointer (extension: errors SHOULD point at the operation); any error aborts `run`, so
-   the transaction rolls back, and escapes the processor as it is.
+   `Lids` registry (11.3) and `OperationContext = { ctx, tx, index, pointer, meta }`. A `BanError`
+   from an operation is rebuilt with the operation's pointer as the path of every item without one
+   (an error without items becomes one item with the error's `message` as `detail`), so each error
+   object gets `source.pointer` set to the operation's pointer (extension: errors SHOULD point at
+   the operation); any error aborts `run`, so the transaction rolls back, and escapes the processor
+   as it is.
 3. The outcome is `{ results, document }`: `results` holds one result per operation, in order;
    `document` is `{ jsonapi: { version: '1.1', ext: [extension] }, 'atomic:results': results }` when
    at least one result carries `data`, and `undefined` when none does (extension: "MUST include the
@@ -807,8 +853,8 @@ Hono's `Context<E>` (`AtomicOptions<TTransaction, Context<E>>`). Per request, in
 4. No document: `204 No Content`. Otherwise `200` with the document through `respond`, which puts
    the extension on `Content-Type`.
 
-A `JsonApiError` thrown anywhere in 1 to 4 is rendered by the handler itself; other errors propagate
-to `app.onError` after the rollback.
+Every failure in 1 to 4 is thrown for `app.onError` to render (10.5): the 405 carries `Allow: POST`
+in the error's headers; a handler's error propagates after the rollback.
 
 ### 11.2 Document and targets (`parse-document.ts`, `parse-target.ts`)
 
@@ -864,9 +910,10 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
 `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, and
 `publishConfig.provenance` (ADR 0013).
 
-- `jsonapi-kit`: no `dependencies`, no `peerDependencies`. `hono-jsonapi`:
+- `jsonapi-kit`: `dependencies.ban-kit` (a caret range), no `peerDependencies`. `hono-jsonapi`:
   `dependencies.jsonapi-kit` (`workspace:^`, a caret range when published) and
-  `peerDependencies.hono >= 4.12.34`.
+  `peerDependencies.hono >= 4.12.34` and `hono-ban >= 2.0.0` (ADR 0014); one copy of `ban-kit` and
+  of `hono` in the graph is what keeps `instanceof` true across the packages.
 - Each `exports` map has `.`, `./atomic`, and `./package.json`, with declarations next to the
   `dist/*.js` files. tsdown rewrites both maps from its entry map on every build
   (`exports.devExports: 'source'`): the in-repo map resolves each subpath to `./dist/*.js` by
@@ -875,8 +922,9 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
   (`ssr.resolve.conditions`) enable; `publishConfig.exports` holds the dist-only map that
   `pnpm publish` and `pnpm pack` apply. CI fails on a diff of either `package.json`.
 - Built with `platform: 'neutral'`, `target: es2023`, source maps, declarations from
-  `isolatedDeclarations` (ADR 0004); `hono-jsonapi`'s build leaves `jsonapi-kit` and `hono`
-  external. `publint --strict` and `attw --profile esm-only` run on every build and in `check:pkg`.
+  `isolatedDeclarations` (ADR 0004); `jsonapi-kit`'s build leaves `ban-kit` external and
+  `hono-jsonapi`'s leaves `jsonapi-kit`, `hono`, and `hono-ban` external. `publint --strict` and
+  `attw --profile esm-only` run on every build and in `check:pkg`.
 - Versions are independent; Changesets patch-bumps `hono-jsonapi` when its `jsonapi-kit` range
   moves. Both are published with npm provenance through trusted publishing (`release.yml`), one
   trusted publisher per package.
@@ -885,22 +933,24 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
 
 ## 13. Constants (`packages/jsonapi-kit/src/internal/constants.ts`)
 
-| Name                           | Value                                                         | Exported |
-| ------------------------------ | ------------------------------------------------------------- | -------- |
-| `JSON_API_MEDIA_TYPE`          | `application/vnd.api+json`                                    | yes      |
-| `JSON_API_VERSION`             | `1.1`                                                         | yes      |
-| `ATOMIC_OPERATIONS_EXTENSION`  | `https://jsonapi.org/ext/atomic`                              | yes      |
-| `CURSOR_PAGINATION_PROFILE`    | `http://jsonapi.org/profiles/ethanresnick/cursor-pagination/` | yes      |
-| `CURSOR_PAGINATION_ERROR_BASE` | `https://jsonapi.org/profiles/ethanresnick/cursor-pagination` | no       |
-| `MEMBER_NAME_PATTERN`          | section 2.1                                                   | no       |
-| `EXTENSION_NAMESPACE_PATTERN`  | `^[A-Za-z0-9]+$`                                              | no       |
-| `PAGE_SIZE_PATTERN`            | `^[0-9]+$`                                                    | no       |
-| `PROTO_KEYS`                   | `__proto__`, `constructor`, `prototype`                       | no       |
-| `RESERVED_QUERY_FAMILIES`      | `include`, `fields`, `sort`, `page`, `filter`                 | no       |
-| `CURSOR_PAGE_MEMBERS`          | `size`, `after`, `before`                                     | no       |
-| `DEFAULT_PAGE_SIZE`            | 20                                                            | no       |
-| `DEFAULT_MAX_PAGE_SIZE`        | 100                                                           | no       |
-| `DEFAULT_MAX_OPERATIONS`       | 10                                                            | no       |
+| Name                                  | Value                                                                                        | Exported |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | -------- |
+| `JSON_API_MEDIA_TYPE`                 | `application/vnd.api+json`                                                                   | yes      |
+| `JSON_API_VERSION`                    | `1.1`                                                                                        | yes      |
+| `ATOMIC_OPERATIONS_EXTENSION`         | `https://jsonapi.org/ext/atomic`                                                             | yes      |
+| `CURSOR_PAGINATION_PROFILE`           | `http://jsonapi.org/profiles/ethanresnick/cursor-pagination/`                                | yes      |
+| `UNSUPPORTED_SORT_TYPE`               | `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort`               | yes      |
+| `MAX_SIZE_EXCEEDED_TYPE`              | `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/max-size-exceeded`              | yes      |
+| `RANGE_PAGINATION_NOT_SUPPORTED_TYPE` | `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/range-pagination-not-supported` | yes      |
+| `MEMBER_NAME_PATTERN`                 | section 2.1                                                                                  | no       |
+| `EXTENSION_NAMESPACE_PATTERN`         | `^[A-Za-z0-9]+$`                                                                             | no       |
+| `PAGE_SIZE_PATTERN`                   | `^[0-9]+$`                                                                                   | no       |
+| `PROTO_KEYS`                          | `__proto__`, `constructor`, `prototype`                                                      | no       |
+| `RESERVED_QUERY_FAMILIES`             | `include`, `fields`, `sort`, `page`, `filter`                                                | no       |
+| `CURSOR_PAGE_MEMBERS`                 | `size`, `after`, `before`                                                                    | no       |
+| `DEFAULT_PAGE_SIZE`                   | 20                                                                                           | no       |
+| `DEFAULT_MAX_PAGE_SIZE`               | 100                                                                                          | no       |
+| `DEFAULT_MAX_OPERATIONS`              | 10                                                                                           | no       |
 
 ---
 
@@ -913,19 +963,19 @@ combined (the `index.ts` barrels excluded). Every test names the clause or serve
 Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of the packages' own
 modules.
 
-| Area                  | Files                                                                                                                                               | What is pinned                                                                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Internal              | `object.test.ts`, `pointer.test.ts`                                                                                                                 | prototype-safe reads, RFC 6901 escaping                                                                                                              |
-| Media types           | `parse.test.ts`, `json-api.test.ts`                                                                                                                 | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                |
-| Negotiation           | `negotiate.test.ts`                                                                                                                                 | each rule of 3.3                                                                                                                                     |
-| Errors                | `json-api-error.test.ts`, `status.test.ts`                                                                                                          | status derivation, catalog closure, factories, registered codes only                                                                                 |
-| Documents             | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                  | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                       |
-| Resources             | `define-resource.test.ts`, `define-resource.test-d.ts`                                                                                              | every definition-time rejection, inference                                                                                                           |
-| Query                 | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                   | dispatch, aggregation, each family, the filter grammar                                                                                               |
-| Pagination            | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                              | link rebuilding, meta members, the profile's error objects                                                                                           |
-| Requests              | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                                      | pointers for every structural error, 403/409/422 cases, lids                                                                                         |
-| Hono (`hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, error rendering, the operations endpoint's 405, 415, 204, and rendering |
-| Atomic                | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `process-coverage.test.ts`        | the extension's examples, the host context, and every processing rule                                                                                |
+| Area                  | Files                                                                                                                                               | What is pinned                                                                                                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal              | `object.test.ts`, `pointer.test.ts`                                                                                                                 | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                  |
+| Media types           | `parse.test.ts`, `json-api.test.ts`                                                                                                                 | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                   |
+| Negotiation           | `negotiate.test.ts`                                                                                                                                 | each rule of 3.3                                                                                                                                                                        |
+| Errors                | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                  | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                         |
+| Documents             | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                  | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                          |
+| Resources             | `define-resource.test.ts`, `define-resource.test-d.ts`                                                                                              | every definition-time rejection, inference                                                                                                                                              |
+| Query                 | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                   | dispatch, aggregation, each family, the filter grammar                                                                                                                                  |
+| Pagination            | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                              | link rebuilding, meta members, the profile's error objects                                                                                                                              |
+| Requests              | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                                      | pointers for every structural error, 403/409/422 cases, lids                                                                                                                            |
+| Hono (`hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
+| Atomic                | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `process-coverage.test.ts`        | the extension's examples, the host context, and every processing rule                                                                                                                   |
 
 ### 14.1 End-to-end suite (`e2e/`)
 
@@ -944,6 +994,7 @@ only from the packages: `store.ts` and `resources.ts` import `jsonapi-kit`, the 
 | `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, update, relationship endpoints, delete      |
 | `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                    |
 | `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, 415 and 400 for bad requests                 |
+| `custom-catalog.e2e.test.ts`  | an application's own hono-ban instance rendering the packages' errors, its entries, and `HTTPException` |
 
 ### 14.2 Runtime smoke test (`e2e/smoke/`)
 

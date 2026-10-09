@@ -2,7 +2,7 @@
  * Response helpers (SPEC 10.2). `respond` sends a document with the
  * `Content-Type` the specification requires, deriving `ext` and `profile`
  * from the document's own `jsonapi` object so the header and the body
- * cannot disagree. `respondError` does the same for a `JsonApiError`.
+ * cannot disagree. `respondError` does the same for a `BanError`.
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-all
  * @packageDocumentation
  */
@@ -10,10 +10,11 @@ import type { Context, Env, TypedResponse } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { JSONParsed } from 'hono/utils/types';
 
-import type { Document, DocumentBase, JsonApiError } from 'jsonapi-kit';
+import type { BanError, Document, DocumentBase } from 'jsonapi-kit';
 
 import {
   JSON_API_MEDIA_TYPE,
+  errorDocument,
   formatJsonApiMediaType,
   isJsonApiMediaType,
   parseMediaType,
@@ -128,19 +129,25 @@ export function respond<E extends Env>(
 }
 
 /**
- * Sends `error.document(base)` with the error's status. Error documents
- * carry no extension or profile parameters: none are applied to them.
+ * Sends `errorDocument(error, base)` with the error's status and its own
+ * headers (`Allow`, `Vary`, ...), which win over `headers`. Error documents
+ * carry no extension or profile parameters: none are applied to them. A
+ * bare rendering: no request facts, no id header, no report; `errorHandler`
+ * does those for errors that are thrown.
  */
 export function respondError<E extends Env>(
   c: Context<E>,
-  error: JsonApiError,
+  error: BanError,
   base: DocumentBase = {},
   headers: ResponseHeaders = {},
 ): Response {
   return c.json(
-    error.document(base),
+    errorDocument(error, base),
     error.status,
-    withFixedHeaders(headers, { 'Content-Type': JSON_API_MEDIA_TYPE }),
+    withFixedHeaders(headers, {
+      ...Object.fromEntries(error.headers),
+      'Content-Type': JSON_API_MEDIA_TYPE,
+    }),
   );
 }
 

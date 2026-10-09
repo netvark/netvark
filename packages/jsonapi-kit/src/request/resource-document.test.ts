@@ -1,9 +1,10 @@
 import type { ErrorObject } from '../document/types';
 
+import { BanError, isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { defineResource } from '../resource/define-resource';
 import { parseCreateDocument, primaryData } from './resource-document';
 
@@ -42,17 +43,17 @@ async function errorsOf(promise: Promise<unknown>): Promise<{
   try {
     await promise;
   } catch (error) {
-    if (error instanceof JsonApiError) {
-      return { status: error.status, errors: error.errors };
+    if (isBanError(error)) {
+      return { status: error.status, errors: errorObjects(error) };
     }
     throw error;
   }
-  throw new Error('expected a JsonApiError');
+  throw new Error('expected a BanError');
 }
 
 describe('primaryData', () => {
   it('requires a JSON object with a data member', () => {
-    expect(() => primaryData(null)).toThrow(JsonApiError);
+    expect(() => primaryData(null)).toThrow(BanError);
     expect(() => primaryData([])).toThrow(/must be a JSON object/u);
     expect(() => primaryData({ meta: {} })).toThrow(
       /must contain a data member/u,

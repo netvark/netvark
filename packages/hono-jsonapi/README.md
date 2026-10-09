@@ -17,13 +17,15 @@ operations endpoint as a handler.
 ## Install
 
 ```bash
-pnpm add hono-jsonapi hono
+pnpm add hono-jsonapi hono hono-ban
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
-on Node 22 and 24 and a smoke test of both subpaths on Bun, Deno, and workerd. `hono` is the only
-peer dependency; validators are accepted through [Standard Schema](https://standardschema.dev) (Zod
-4, Valibot, ArkType, and others) without importing any of them.
+on Node 22 and 24 and a smoke test of both subpaths on Bun, Deno, and workerd. `hono` and
+[`hono-ban`](https://github.com/ali-issa/ban-kit) are the peer dependencies: every error is a
+ban-kit error and `errorHandler()` is a hono-ban handler (see Errors). Validators are accepted
+through [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others) without
+importing any of them.
 
 ## Quick start
 
@@ -31,10 +33,10 @@ peer dependency; validators are accepted through [Standard Schema](https://stand
 import { Hono } from 'hono';
 import type { JsonApiEnv } from 'hono-jsonapi';
 import {
-  JsonApiError,
   defineResource,
   errorHandler,
   jsonApi,
+  jsonApiError,
   notFoundHandler,
   queryValidator,
   resourceDocument,
@@ -59,7 +61,7 @@ app.notFound(notFoundHandler());
 app.get('/articles/:id', queryValidator(Articles), async (c) => {
   const row = await articles.find(c.req.param('id'));
   if (row === undefined) {
-    throw JsonApiError.notFound(`Article ${c.req.param('id')} does not exist`);
+    throw jsonApiError('NOT_FOUND', { detail: `Article ${c.req.param('id')} does not exist` });
   }
   return respond(c, resourceDocument(Articles, row, { query: c.req.valid('query') }));
 });
@@ -281,30 +283,69 @@ app.post(
 
 ### Errors
 
-`JsonApiError` carries one or more error objects and the status the specification derives from them.
-The catalog is closed: each `code` fixes `status` and `title`, while `detail` and `source` vary per
-occurrence.
+Every error is a [ban-kit](https://github.com/ali-issa/ban-kit) `BanError` from a closed catalog
+(`ERROR_CATALOG` over ban-kit's built-ins) in which each `code` fixes `status` and `title`; `detail`
+and `source` vary per occurrence. `jsonApiError` builds one error object; a list of `errorItem`s
+reports several problems at once, each object with its own identity and the response status the
+specification derives from them.
 
 ```ts
-throw JsonApiError.notFound(`Article ${id} does not exist`);
-throw JsonApiError.conflict('The article was modified by another request', { pointer: '/data' });
-throw JsonApiError.validationFailed([{ pointer: '/data/attributes/title', detail: 'Required' }]);
-throw new JsonApiError([errorObject('FORBIDDEN', { detail: 'Read-only' })], { status: 403 });
+throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+throw jsonApiError('CONFLICT', {
+  detail: 'The article was modified by another request',
+  source: { pointer: '/data' },
+});
+throw jsonApiError([
+  errorItem('VALIDATION_FAILED', {
+    detail: 'Required',
+    source: { pointer: '/data/attributes/title' },
+  }),
+  errorItem('INVALID_DOCUMENT', {
+    detail: 'Not an attribute',
+    source: { pointer: '/data/attributes/x' },
+  }),
+]); // 400, two error objects
 ```
 
-`errorHandler()` renders anything thrown: a `JsonApiError` as is, Hono's `HTTPException` by status
-with the RFC 9110 reason phrase as `title`, and everything else as a constant 500 that reveals
-nothing. The thrown value reaches `report` for logging, `cause` included. `notFoundHandler()` gives
-unmatched routes the same shape.
+`errorHandler()` is [hono-ban](https://github.com/ali-issa/ban-kit)'s handler over the same catalog.
+It renders anything thrown: a `BanError` as is (this package's, the rejections the validators and
+`jsonApi()` throw, your own instance's, any other library's on ban-kit), Hono's `HTTPException` by
+status, and everything else as a constant 500 that reveals nothing. Every response carries the error
+id in `X-Error-Id` and in each error object's `id`, `Cache-Control: no-store`, and `meta.traceId`
+from a W3C `traceparent`; the thrown value reaches `onReport` as `report.cause`. `notFoundHandler()`
+gives unmatched routes the same shape.
 
 ```ts
 app.onError(
   errorHandler({
-    report: (error, c) => logger.error({ error, path: c.req.path }),
-    headers: { 'Cache-Control': 'no-store' },
+    onReport: (report, c) =>
+      logger.error({ err: report.cause, path: c.req.path }, report.error.title),
+    document: { jsonapi: { version: '1.1' } },
+    format: { typeLinkBaseUrl: 'https://api.example.com/errors' },
   }),
 );
 ```
+
+`onReport`, `headers`, `map`, `transform`, `includeStack`, and the id and trace options are
+hono-ban's; `document` adds top-level members to every error document and `format` is the JSON:API
+format's own options. An application with entries of its own builds the instance itself with the
+catalog spread in and installs its `onError`; this package's errors render through it unchanged:
+
+```ts
+import { createBan } from 'hono-ban';
+import { jsonApi as jsonApiFormat } from 'hono-ban/formats/json-api';
+
+const ban = createBan({
+  errors: { ...ERROR_CATALOG, QUOTA_EXHAUSTED: { status: 429, title: 'Quota Exhausted' } },
+  format: jsonApiFormat({ mixedEntries: true }),
+  docsBaseUrl: 'https://api.example.com/errors',
+});
+app.onError(ban.onError());
+throw ban.QUOTA_EXHAUSTED('Daily quota exhausted');
+```
+
+Without `errorHandler()`, Hono's default handler still answers a thrown `BanError` through its
+`getResponse()`: the same document, without the id header and the report.
 
 ### Content negotiation
 

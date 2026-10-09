@@ -1,18 +1,15 @@
 /**
  * `jsonApi()` (SPEC 10.1): content negotiation as Hono middleware. A
- * request the specification says to reject gets a 415 or 406 error
- * document; otherwise the negotiation result is stored as the `jsonApi`
- * context variable and `Vary: Accept` is added to every JSON:API response.
+ * request the specification says to reject throws its 415 or 406, which
+ * `app.onError` renders as an error document; otherwise the negotiation
+ * result is stored as the `jsonApi` context variable and `Vary: Accept` is
+ * added to every JSON:API response.
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-servers
  * @packageDocumentation
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 
-import type {
-  JsonApiError,
-  NegotiationOptions,
-  NegotiationSuccess,
-} from 'jsonapi-kit';
+import type { NegotiationOptions, NegotiationSuccess } from 'jsonapi-kit';
 
 import type { JsonApiEnv } from './types';
 
@@ -20,16 +17,9 @@ import { createMiddleware } from 'hono/factory';
 
 import { negotiate } from 'jsonapi-kit';
 
-import { isJsonApiResponse, respondError, varyAccept } from './respond';
+import { isJsonApiResponse, varyAccept } from './respond';
 
 export type JsonApiOptions = NegotiationOptions;
-
-/** The 415 or 406; it varies by `Accept` like any other JSON:API response. */
-function rejected(c: Context<JsonApiEnv>, error: JsonApiError): Response {
-  const response = respondError(c, error);
-  response.headers.set('Vary', varyAccept(response.headers.get('vary')));
-  return response;
-}
 
 async function accepted(
   c: Context<JsonApiEnv>,
@@ -63,8 +53,11 @@ export function jsonApi(
       },
       options,
     );
-    return negotiation.ok
-      ? accepted(c, negotiation, next)
-      : rejected(c, negotiation.error);
+    // The error carries `Vary: Accept`; `app.onError` (or Hono's default
+    // handler, through `getResponse()`) renders it.
+    if (!negotiation.ok) {
+      throw negotiation.error;
+    }
+    return accepted(c, negotiation, next);
   });
 }

@@ -1,6 +1,7 @@
+import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import {
   MAX_SIZE_EXCEEDED_TYPE,
   RANGE_PAGINATION_NOT_SUPPORTED_TYPE,
@@ -24,50 +25,58 @@ describe('cursor pagination profile errors', () => {
     );
   });
 
-  it('builds the max size error with the limit in meta and the parameter as source', () => {
+  it('builds the max size item with the limit in meta and the parameter as its address', () => {
     expect(maxPageSizeExceededError(500, 100)).toEqual({
-      links: { type: MAX_SIZE_EXCEEDED_TYPE },
-      status: '400',
+      status: 400,
       code: 'MAX_PAGE_SIZE_EXCEEDED',
       title: 'Max Page Size Exceeded',
+      type: MAX_SIZE_EXCEEDED_TYPE,
       detail: 'page[size] 500 exceeds the maximum of 100',
-      source: { parameter: 'page[size]' },
+      location: 'query',
+      path: ['page[size]'],
       meta: { page: { maxSize: 100 } },
     });
   });
 
-  it('builds the sort and range errors against their parameters', () => {
+  it('builds the sort and range items against their parameters', () => {
     expect(unsupportedSortError('title')).toMatchObject({
-      links: { type: UNSUPPORTED_SORT_TYPE },
+      type: UNSUPPORTED_SORT_TYPE,
       code: 'UNSUPPORTED_SORT',
-      source: { parameter: 'sort' },
+      location: 'query',
+      path: ['sort'],
     });
     expect(rangePaginationNotSupportedError()).toMatchObject({
-      links: { type: RANGE_PAGINATION_NOT_SUPPORTED_TYPE },
+      type: RANGE_PAGINATION_NOT_SUPPORTED_TYPE,
       code: 'RANGE_PAGINATION_NOT_SUPPORTED',
-      source: { parameter: 'page[before]' },
+      path: ['page[before]'],
     });
   });
 
-  it('gives engines an invalid cursor error with a default or custom detail', () => {
+  it('gives engines an invalid cursor item with a default or custom detail', () => {
     expect(invalidCursorError('page[after]')).toEqual({
-      status: '400',
+      status: 400,
       code: 'INVALID_QUERY_PARAMETER',
       title: 'Invalid Query Parameter',
       detail: 'page[after] is not a valid cursor',
-      source: { parameter: 'page[after]' },
+      location: 'query',
+      path: ['page[after]'],
     });
     expect(invalidCursorError('page[before]', 'Expired').detail).toBe(
       'Expired',
     );
   });
 
-  it('wraps the engine errors as throwable JsonApiErrors', () => {
+  it('wraps the engine items as throwable errors that render with the type link', () => {
     const cursor = invalidCursor('page[after]');
-    expect(cursor).toBeInstanceOf(JsonApiError);
+    expect(isBanError(cursor)).toBe(true);
     expect(cursor.status).toBe(400);
-    expect(cursor.errors[0]?.source).toEqual({ parameter: 'page[after]' });
+    expect(errorObjects(cursor)[0]).toMatchObject({
+      source: { parameter: 'page[after]' },
+    });
+    expect(errorObjects(cursor)[0]?.links).toBeUndefined();
     const sort = unsupportedSort('x');
-    expect(sort.errors[0]?.links).toEqual({ type: UNSUPPORTED_SORT_TYPE });
+    expect(errorObjects(sort)[0]?.links).toEqual({
+      type: UNSUPPORTED_SORT_TYPE,
+    });
   });
 });

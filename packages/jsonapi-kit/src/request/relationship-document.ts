@@ -7,10 +7,12 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-to-many-relationships
  * @packageDocumentation
  */
-import type { ErrorObject, ResourceIdentifier } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
+import type { ResourceIdentifier } from '../document/types';
 import type { Cardinality } from '../resource/types';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { parseLinkage } from './identifiers';
 import { primaryData } from './resource-document';
 
@@ -25,7 +27,7 @@ export function parseToOneRelationshipDocument(
   body: unknown,
   options: Omit<RelationshipDocumentOptions, 'cardinality'>,
 ): ResourceIdentifier | null {
-  const errors: Array<ErrorObject> = [];
+  const errors: Array<ErrorItem> = [];
   const linkage = parseLinkage(
     primaryData(body),
     '/data',
@@ -34,7 +36,7 @@ export function parseToOneRelationshipDocument(
     errors,
   );
   if (linkage === undefined || errors.length > 0) {
-    throw new JsonApiError(errors);
+    throw jsonApiError(errors);
   }
   return linkage;
 }
@@ -44,7 +46,7 @@ export function parseToManyRelationshipDocument(
   body: unknown,
   options: Omit<RelationshipDocumentOptions, 'cardinality'>,
 ): ReadonlyArray<ResourceIdentifier> {
-  const errors: Array<ErrorObject> = [];
+  const errors: Array<ErrorItem> = [];
   const linkage = parseLinkage(
     primaryData(body),
     '/data',
@@ -53,7 +55,7 @@ export function parseToManyRelationshipDocument(
     errors,
   );
   if (linkage === undefined || errors.length > 0) {
-    throw new JsonApiError(errors);
+    throw jsonApiError(errors);
   }
   return linkage;
 }

@@ -1,9 +1,9 @@
 /**
  * Validator middleware (SPEC 10.4), in the shape of Hono's own `validator`:
  * each parses one part of the request against a resource definition, stores
- * the result for `c.req.valid()`, and answers a `JsonApiError` itself so
- * rejected requests are rendered as JSON:API whether or not `errorHandler()`
- * is installed.
+ * the result for `c.req.valid()`, and throws the parser's `BanError` for
+ * `app.onError` to render; Hono's default error handler answers it through
+ * `getResponse()`, so a rejection is JSON:API even without `errorHandler()`.
  * @ref https://hono.dev/docs/guides/validation
  * @packageDocumentation
  */
@@ -24,7 +24,6 @@ import type {
 import { createMiddleware } from 'hono/factory';
 
 import {
-  isJsonApiError,
   parseCreateDocument,
   parseQuery,
   parseToManyRelationshipDocument,
@@ -33,7 +32,6 @@ import {
 } from 'jsonapi-kit';
 
 import { readDocument } from './body';
-import { respondError } from './respond';
 
 export interface QueryValidation<TSort extends string, TFilter extends string> {
   readonly in: { readonly query: ValidationTargets['query'] };
@@ -70,26 +68,6 @@ interface ValidatedStore {
   addValidatedData(target: keyof ValidationTargets, data: unknown): void;
 }
 
-type Attempt<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly response: Response };
-
-/** Runs `parse`, turning a thrown `JsonApiError` into its response. */
-async function attempt<E extends Env, T>(
-  c: Context<E>,
-  parse: () => T | Promise<T>,
-): Promise<Attempt<T>> {
-  try {
-    return { ok: true, value: await parse() };
-  } catch (error) {
-    if (isJsonApiError(error)) {
-      return { ok: false, response: respondError(c, error) };
-    }
-    throw error;
-  }
-}
-
-/** The query string of a request URL, without the `?`. */
 function queryString(url: string): string {
   const index = url.indexOf('?');
   return index === -1 ? '' : url.slice(index + 1);
@@ -118,15 +96,12 @@ export function queryValidator<
 ): MiddlewareHandler<E, P, QueryValidation<TSort, TFilter>> {
   return createMiddleware<E, P, QueryValidation<TSort, TFilter>>(
     async (c, next) => {
-      const parsed = await attempt(c, () =>
+      const store: ValidatedStore = c.req;
+      store.addValidatedData(
+        'query',
         parseQuery(resource, queryString(c.req.url)),
       );
-      if (!parsed.ok) {
-        return parsed.response;
-      }
-      const store: ValidatedStore = c.req;
-      store.addValidatedData('query', parsed.value);
-      return next();
+      await next();
     },
   );
 }
@@ -183,13 +158,9 @@ export function bodyValidator<E extends Env, P extends string>(
   };
   return createMiddleware<E, P, BodyValidation<ParsedResourceObject<unknown>>>(
     async (c, next) => {
-      const parsed = await attempt(c, async () => parse(c));
-      if (!parsed.ok) {
-        return parsed.response;
-      }
       const store: ValidatedStore = c.req;
-      store.addValidatedData('json', parsed.value);
-      return next();
+      store.addValidatedData('json', await parse(c));
+      await next();
     },
   );
 }
@@ -243,12 +214,8 @@ export function relationshipValidator<E extends Env, P extends string>(
       : parseToManyRelationshipDocument(body, { type });
   };
   return createMiddleware<E, P, BodyValidation<Linkage>>(async (c, next) => {
-    const parsed = await attempt(c, async () => parse(c));
-    if (!parsed.ok) {
-      return parsed.response;
-    }
     const store: ValidatedStore = c.req;
-    store.addValidatedData('json', parsed.value);
-    return next();
+    store.addValidatedData('json', await parse(c));
+    await next();
   });
 }

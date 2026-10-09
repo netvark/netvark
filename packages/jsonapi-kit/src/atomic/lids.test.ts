@@ -1,6 +1,7 @@
+import { BanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { Lids } from './lids';
 
 describe('Lids', () => {
@@ -12,7 +13,7 @@ describe('Lids', () => {
     expect(lids.resolve('articles', 'x', '/r')).toBe('2');
     expect(() => {
       lids.define('authors', 'x', '3', '/dup');
-    }).toThrow(JsonApiError);
+    }).toThrow(BanError);
     expect(() => lids.resolve('tags', 'x', '/missing')).toThrow(
       /does not refer to a "tags"/u,
     );
@@ -39,7 +40,7 @@ describe('Lids', () => {
       { type: 'tags', id: 't1', meta: { m: 1 } },
     ]);
     expect(() => lids.linkage([{ type: 'tags', lid: 'b' }], '/d')).toThrow(
-      JsonApiError,
+      BanError,
     );
     try {
       lids.linkage(
@@ -50,8 +51,8 @@ describe('Lids', () => {
         '/d',
       );
     } catch (error) {
-      expect(error).toBeInstanceOf(JsonApiError);
-      expect((error as JsonApiError).errors[0]?.source).toEqual({
+      expect(error).toBeInstanceOf(BanError);
+      expect(errorObjects(error as BanError)[0]?.source).toEqual({
         pointer: '/d/1/lid',
       });
     }

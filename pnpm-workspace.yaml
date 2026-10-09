@@ -31,3 +31,12 @@ blockExoticSubdeps: true
 allowBuilds:
   lefthook: true
   workerd: true
+
+# Temporary, until ban-kit 1.0.0 and hono-ban 2.0.0 are on npm: resolve both
+# from tarballs packed out of ../hono-ban (`pnpm pack` in that repo), so this
+# workspace consumes exactly what `pnpm publish` would ship (dist only,
+# publishConfig exports applied) with one copy of `hono` and `ban-kit` in the
+# graph. Remove this block and run `pnpm install` once the two are published.
+overrides:
+  ban-kit: file:../hono-ban/.pack/ban-kit-1.0.0.tgz
+  hono-ban: file:../hono-ban/.pack/hono-ban-2.0.0.tgz

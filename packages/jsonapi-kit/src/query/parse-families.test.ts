@@ -21,14 +21,16 @@ describe('sort', () => {
   it('reports unsupported fields with the profile type link and repeats', () => {
     const errors = errorsOf('sort=body,-title,title,--created');
     expect(errors[0]).toEqual({
+      id: expect.any(String),
+      links: {
+        type: 'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort',
+      },
       status: '400',
       code: 'UNSUPPORTED_SORT',
       title: 'Unsupported Sort',
       detail: 'Sort field "body" is not supported by this endpoint',
       source: { parameter: 'sort' },
-      links: {
-        type: 'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort',
-      },
+      meta: { location: 'query' },
     });
     expect(errors[1]?.detail).toBe('Sort field "title" is repeated');
     expect(errors[2]?.detail).toBe(
@@ -87,15 +89,16 @@ describe('page', () => {
 
   it('reports a size over the max with meta.page.maxSize and the type link', () => {
     expect(errorsOf('page[size]=51')[0]).toEqual({
+      id: expect.any(String),
+      links: {
+        type: 'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/max-size-exceeded',
+      },
       status: '400',
       code: 'MAX_PAGE_SIZE_EXCEEDED',
       title: 'Max Page Size Exceeded',
       detail: 'page[size] 51 exceeds the maximum of 50',
       source: { parameter: 'page[size]' },
-      links: {
-        type: 'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/max-size-exceeded',
-      },
-      meta: { page: { maxSize: 50 } },
+      meta: { page: { maxSize: 50 }, location: 'query' },
     });
   });
 

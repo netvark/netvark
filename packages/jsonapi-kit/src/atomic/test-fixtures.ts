@@ -13,7 +13,7 @@ import type {
 
 import { z } from 'zod';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { toManyLinkage, toOneLinkage } from '../request/cardinality';
 import { defineResource } from '../resource/define-resource';
 import { operationsProcessor } from './process';
@@ -85,7 +85,9 @@ export class Store {
   public article(id: string): ArticleRow {
     const row = this.articles.get(id);
     if (row === undefined) {
-      throw JsonApiError.notFound(`Article "${id}" does not exist`);
+      throw jsonApiError('NOT_FOUND', {
+        detail: `Article "${id}" does not exist`,
+      });
     }
     return row;
   }
@@ -149,7 +151,9 @@ const authors: ResourceHandlers<typeof AuthorsResource, Store, Caller> = {
   },
   remove: ({ id }, { tx }) => {
     if (!tx.authors.delete(id)) {
-      throw JsonApiError.notFound(`Author "${id}" does not exist`);
+      throw jsonApiError('NOT_FOUND', {
+        detail: `Author "${id}" does not exist`,
+      });
     }
   },
 };

@@ -31,9 +31,9 @@ https://jsonapi.org/ext/atomic/#processing @ref https://jsonapi.org/ext/atomic/#
   `relationships.<name>.{update,add,remove}`); a missing handler is a 403, an unknown type a 404.
   `add` and `remove` apply to to-many relationships only. `href` is accepted only through an
   application-supplied resolver.
-- A `JsonApiError` from an operation gets the operation's pointer when its objects carry no
-  `source`; other errors propagate to `app.onError` after the rollback. Results carry `data` only
-  when a handler returned a row; when none did, the response is `204`.
+- An error from an operation (a `BanError` since ADR-0014) gets the operation's pointer when its
+  objects carry no `source`; other errors propagate to `app.onError` after the rollback. Results
+  carry `data` only when a handler returned a row; when none did, the response is `204`.
 - At most `maxOperations` (default 10, JsonApiDotNetCore's default) operations per request.
 
 ## Consequences

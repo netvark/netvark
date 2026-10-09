@@ -1,9 +1,10 @@
 import type { ErrorObject } from '../document/types';
 
+import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { defineResource } from '../resource/define-resource';
 import { parseResourceObject, parseUpdateDocument } from './resource-document';
 
@@ -35,12 +36,12 @@ async function errorsOf(promise: Promise<unknown>): Promise<{
   try {
     await promise;
   } catch (error) {
-    if (error instanceof JsonApiError) {
-      return { status: error.status, errors: error.errors };
+    if (isBanError(error)) {
+      return { status: error.status, errors: errorObjects(error) };
     }
     throw error;
   }
-  throw new Error('expected a JsonApiError');
+  throw new Error('expected a BanError');
 }
 
 describe('parseUpdateDocument', () => {

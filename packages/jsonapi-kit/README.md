@@ -18,10 +18,12 @@ this package as middleware, validators, response helpers, and handlers, and re-e
 pnpm add jsonapi-kit
 ```
 
-No dependencies. Node 22.12+, Bun, Deno, and Cloudflare Workers are supported; the package uses web
-standards only (`URL`, `URLSearchParams`, `JSON`) and never reads the environment. Validators are
-accepted through [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others)
-without importing any of them.
+[`ban-kit`](https://github.com/ali-issa/ban-kit) is the one dependency: every error is a ban-kit
+error, so an application's catalog and this package's share one model (see Errors). Node 22.12+,
+Bun, Deno, and Cloudflare Workers are supported; the package uses web standards only (`URL`,
+`URLSearchParams`, `JSON`) and never reads the environment. Validators are accepted through
+[Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others) without
+importing any of them.
 
 ## Quick start
 
@@ -31,10 +33,11 @@ package parses, checks, and builds; you send what it hands back.
 ```ts
 import {
   JSON_API_MEDIA_TYPE,
-  JsonApiError,
   defineResource,
+  errorDocument,
   formatJsonApiMediaType,
-  isJsonApiError,
+  isBanError,
+  jsonApiError,
   negotiate,
   parseQuery,
   resourceDocument,
@@ -64,7 +67,7 @@ export default {
       accept: request.headers.get('Accept') ?? undefined,
     });
     if (!negotiation.ok) {
-      return send(negotiation.error.document(), negotiation.error.status);
+      return send(errorDocument(negotiation.error), negotiation.error.status);
     }
     try {
       const url = new URL(request.url);
@@ -72,13 +75,13 @@ export default {
       const query = parseQuery(Articles, url.search.slice(1));
       const row = await articles.find(id);
       if (row === undefined) {
-        throw JsonApiError.notFound(`Article ${id} does not exist`);
+        throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
       }
       const document = resourceDocument(Articles, row, { query });
       return send(document, 200, formatJsonApiMediaType({ profile: document.jsonapi?.profile }));
     } catch (error) {
-      if (isJsonApiError(error)) {
-        return send(error.document(), error.status);
+      if (isBanError(error)) {
+        return send(errorDocument(error), error.status);
       }
       throw error;
     }
@@ -267,20 +270,62 @@ const tags = parseToManyRelationshipDocument(await request.json(), { type: 'tags
 
 ### Errors
 
-`JsonApiError` carries one or more error objects and the status the specification derives from them.
-The catalog is closed: each `code` fixes `status` and `title`, while `detail` and `source` vary per
-occurrence. `error.document()` is the error document to send, `error.status` the response status.
+Every error is a [ban-kit](https://github.com/ali-issa/ban-kit) `BanError` built by `jsonApiBan`,
+the package's ban-kit instance: a closed catalog (`ERROR_CATALOG` over ban-kit's built-ins) in which
+each `code` fixes `status` and `title`, rendered by ban-kit's JSON:API format. `jsonApiError` builds
+one error object; a list of `errorItem`s reports several problems at once, each object with its own
+identity and the response status the specification derives from them.
 
 ```ts
-throw JsonApiError.notFound(`Article ${id} does not exist`);
-throw JsonApiError.conflict('The article was modified by another request', { pointer: '/data' });
-throw JsonApiError.validationFailed([{ pointer: '/data/attributes/title', detail: 'Required' }]);
-throw new JsonApiError([errorObject('FORBIDDEN', { detail: 'Read-only' })], { status: 403 });
+throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+throw jsonApiError('CONFLICT', {
+  detail: 'The article was modified by another request',
+  source: { pointer: '/data' },
+});
+throw jsonApiError([
+  errorItem('VALIDATION_FAILED', {
+    detail: 'Required',
+    source: { pointer: '/data/attributes/title' },
+  }),
+  errorItem('INVALID_DOCUMENT', {
+    detail: 'Not an attribute',
+    source: { pointer: '/data/attributes/x' },
+  }),
+]); // 400, two error objects
+throw jsonApiError('METHOD_NOT_ALLOWED', { detail: 'Use POST', headers: { Allow: 'POST' } });
 ```
 
-`JsonApiError.internal(error)` is the constant 500 for anything unexpected: it reveals nothing and
-keeps the thrown value on `cause`. `isJsonApiError` recognizes errors structurally as well, so an
-error from a second installed copy still renders.
+`isBanError` narrows a caught error; `error.status` is the response status, `error.headers` the
+headers it carries (`Allow`, `Vary`), `errorDocument(error)` the document to send, and
+`error.getResponse()` a bare `Response`. For a fetch handler, `jsonApiBan.handler()` is ban-kit's
+framework-free handler: it renders anything thrown (a `BanError` as is, everything else as a
+constant 500 that reveals nothing), adds `X-Error-Id` and `Cache-Control: no-store`, reads a W3C
+`traceparent` into `meta.traceId`, and calls `onReport` once with the thrown value as `cause`.
+
+```ts
+import { fromRequest } from 'ban-kit';
+
+const handle = jsonApiBan.handler({
+  onReport: (report) => logger.error({ err: report.cause }, report.error.title),
+});
+// in fetch(): catch (thrown) { return handle(thrown, fromRequest(request)); }
+```
+
+An application with entries of its own builds its own instance with the catalog spread in. Any
+instance renders any `BanError`, so this package's errors go through it unchanged, and the
+application's errors carry `links.type` under its `docsBaseUrl`:
+
+```ts
+import { createBan } from 'ban-kit';
+import { jsonApi } from 'ban-kit/formats/json-api';
+
+const ban = createBan({
+  errors: { ...ERROR_CATALOG, QUOTA_EXHAUSTED: { status: 429, title: 'Quota Exhausted' } },
+  format: jsonApi({ mixedEntries: true }),
+  docsBaseUrl: 'https://api.example.com/errors',
+});
+throw ban.QUOTA_EXHAUSTED('Daily quota exhausted');
+```
 
 ### Content negotiation
 
@@ -296,7 +341,7 @@ const negotiation = negotiate(
   { extensions: [ATOMIC_OPERATIONS_EXTENSION], profiles: [CURSOR_PAGINATION_PROFILE] },
 );
 // { ok: true, request: { jsonApi, extensions, profiles }, extensions, profiles }
-// { ok: false, error: JsonApiError }
+// { ok: false, error: BanError }  415 or 406, with Vary: Accept in error.headers
 ```
 
 ### Atomic operations

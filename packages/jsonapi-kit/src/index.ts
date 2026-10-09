@@ -8,6 +8,8 @@
  * @ref https://jsonapi.org/format/1.1/
  * @packageDocumentation
  */
+export type { Ban, ErrorItem, ErrorStatusCode } from 'ban-kit';
+
 export type { DocumentOptions, Included } from './document/build';
 export type {
   AnyResourceIdentifier,
@@ -40,16 +42,17 @@ export type {
   ToOneLinkage,
   ToOneRelationshipDocument,
 } from './document/types';
-export type { CatalogEntry, ErrorCode } from './errors/catalog';
 export type {
+  ErrorCode,
+  JsonApiCatalog,
+  JsonApiCatalogKey,
+} from './errors/catalog';
+export type {
+  ErrorItemInit,
   ErrorObjectInit,
+  JsonApiErrorCode,
   JsonApiErrorOptions,
 } from './errors/json-api-error';
-export type {
-  ClientErrorStatusCode,
-  ErrorStatusCode,
-  ServerErrorStatusCode,
-} from './errors/status';
 export type {
   InferStandardInput,
   InferStandardOutput,
@@ -134,6 +137,8 @@ export type {
   UpdateAttributesOf,
 } from './resource/types';
 
+export { BanError, isBanError } from 'ban-kit';
+
 export {
   collectionDocument,
   include,
@@ -153,13 +158,12 @@ export {
 export { applyFields, identify, serializeResource } from './document/serialize';
 export { ERROR_CATALOG, ERROR_CODES } from './errors/catalog';
 export {
-  JsonApiError,
   errorDocument,
-  errorObject,
-  isJsonApiError,
-  responseStatus,
+  errorItem,
+  errorObjects,
+  jsonApiBan,
+  jsonApiError,
 } from './errors/json-api-error';
-export { isErrorStatusCode, reasonPhrase } from './errors/status';
 export {
   ATOMIC_OPERATIONS_EXTENSION,
   CURSOR_PAGINATION_PROFILE,

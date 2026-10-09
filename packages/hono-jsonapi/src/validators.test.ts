@@ -52,7 +52,7 @@ describe('queryValidator', () => {
     });
   });
 
-  it('answers an invalid query itself, as JSON:API, without an error handler', async () => {
+  it('throws an invalid query as a JSON:API error that renders without an error handler', async () => {
     const response = await app.request('/articles?sort=nope&foo=1');
     expect(response.status).toBe(400);
     expect(response.headers.get('content-type')).toBe(

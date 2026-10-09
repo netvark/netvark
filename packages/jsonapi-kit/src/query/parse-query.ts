@@ -1,7 +1,7 @@
 /**
  * `parseQuery` (SPEC 6): turns a request's query parameters into a
  * `ParsedQuery` checked against a resource definition, or throws one
- * `JsonApiError` carrying every problem found. A parameter the endpoint
+ * `BanError` carrying every problem found. A parameter the endpoint
  * does not know how to process is a 400, as the specification requires;
  * nothing is silently dropped.
  * @ref https://jsonapi.org/format/1.1/#query-parameters
@@ -18,7 +18,7 @@ import type {
   QueryInput,
 } from './types';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { rangePaginationNotSupportedError } from '../pagination/errors';
 import { groupByName, toPairs } from './input';
 import { parseParameterName } from './parameter-name';
@@ -70,7 +70,7 @@ function resolvePage(state: ParseState): PageRequest | undefined {
 
 /**
  * Parses and validates every query parameter of a request against
- * `resource`. Throws `JsonApiError` (400) listing all invalid and unknown
+ * `resource`. Throws a `BanError` (400) listing all invalid and unknown
  * parameters, each with `source.parameter`.
  */
 export function parseQuery<TSort extends string, TFilter extends string>(
@@ -152,7 +152,7 @@ export function parseQuery(
   }
   const page = resolvePage(state);
   if (state.errors.length > 0) {
-    throw new JsonApiError(state.errors);
+    throw jsonApiError(state.errors);
   }
   return {
     include,

@@ -52,19 +52,22 @@ It is a library for teams who treat their JSON:API surface as a contract.
    declared twice.
 2. **Spec-driven.** Each behavior is a cited clause, and the test names the clause. Where the
    specification leaves a choice to the server, the choice is an ADR (ADR-0007, ADR-0008, ADR-0009,
-   ADR-0010).
+   ADR-0010, ADR-0014).
 3. **Report everything, drop nothing.** A parser accumulates error objects and throws once. A
    parameter or member the endpoint does not know is a 400, never ignored.
 4. **A document that would violate the specification never leaves the server.** Builders throw a
    `TypeError` for a non-string id, an undeclared relationship, an empty relationship object, or an
    included resource without full linkage.
-5. **Nothing about the server reaches a client unless a factory put it there.** Unexpected errors
-   render as a constant 500; the thrown value stays on `cause` for `report` (ADR-0006).
+5. **Nothing about the server reaches a client unless a builder put it there.** Unexpected errors
+   render as a constant 500; the thrown value stays on `cause` for `onReport` (ADR-0014).
 6. **Web standards only. No ambient environment.** `URL`, `URLSearchParams`, `Response`, `btoa`;
    nothing reads `process` (ADR-0003).
-7. **The core depends on nothing; the adapter on the core and its framework.** `jsonapi-kit` has no
-   dependencies and imports no framework; `hono` is `hono-jsonapi`'s only peer dependency.
-   Validators arrive through Standard Schema; the types are vendored (ADR-0002, ADR-0013).
+7. **One error model, shared with the application.** Every error is a
+   [ban-kit](https://github.com/ali-issa/ban-kit) `BanError`; `jsonapi-kit` depends on `ban-kit` and
+   on nothing else, imports no framework, and the adapter renders through `hono-ban`, so an
+   application's own catalog, this package's, and any other library's on ban-kit go through one
+   handler (ADR-0014). Validators arrive through Standard Schema; the types are vendored (ADR-0002,
+   ADR-0013).
 8. **Headers follow the body.** `Content-Type` parameters are derived from the document's `jsonapi`
    object; `Location` from the created resource's `self` link (ADR-0005).
 9. **Client input is hostile.** Prototype keys are rejected wherever a name becomes a key; lookups
@@ -86,13 +89,13 @@ app.notFound(notFoundHandler());
 
 app.get('/articles/:id', queryValidator(Articles), async (c) => {
   const row = await articles.find(c.req.param('id'));
-  if (row === undefined) throw JsonApiError.notFound();
+  if (row === undefined) throw jsonApiError('NOT_FOUND');
   return respond(c, resourceDocument(Articles, row, { query: c.req.valid('query') }));
 });
 ```
 
 Three Hono hooks, one validator, one builder, one response helper. `jsonApi()` negotiates and adds
-`Vary`; `errorHandler()` renders thrown errors; the validator answers its own 400s (section 4.6).
+`Vary`; the validator throws its 400s; `errorHandler()` renders everything thrown (section 4.4).
 
 ### 3.2 The definition
 
@@ -123,29 +126,37 @@ definitions can reference each other.
 `parseQuery(Articles, 'include=author&fields[people]=name&sort=-title&filter[title][like]=rails')`
 returns a `ParsedQuery` with `include` as segment arrays, `fields` by type, `sort` with directions,
 `filter` as conditions and disjunction groups, `page` resolved with the definition's default size,
-and `params` for links. Or it throws one 400 with every problem:
+and `params` for links. Or it throws one 400 with every problem, which `errorHandler()` renders as:
 
 ```json
 {
   "errors": [
     {
+      "id": "6f1c2f0e-...",
+      "links": {
+        "type": "https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort"
+      },
       "status": "400",
       "code": "UNSUPPORTED_SORT",
       "title": "Unsupported Sort",
+      "detail": "Sort field \"nope\" is not supported by this endpoint",
       "source": { "parameter": "sort" },
-      "links": {
-        "type": "https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort"
-      }
+      "meta": { "location": "query" }
     },
     {
+      "id": "6f1c2f0e-...",
       "status": "400",
       "code": "UNKNOWN_QUERY_PARAMETER",
       "title": "Unknown Query Parameter",
-      "source": { "parameter": "bogus" }
+      "detail": "Query parameter \"bogus\" is not supported by this endpoint",
+      "source": { "parameter": "bogus" },
+      "meta": { "location": "query" }
     }
   ]
 }
 ```
+
+The `id` is the error id hono-ban also sends as `X-Error-Id` and hands to `onReport`.
 
 ### 3.4 Request documents
 
@@ -170,9 +181,9 @@ app.post(
 
 The processor parses the whole document first (every structural error in one 400), then runs the
 operations in order inside `run`, parsing each operation's `data` against the targeted definition
-with `lid` allowed, resolving `lid` references from earlier `add`s, and collecting results. A
-`JsonApiError` from a handler is given the operation's pointer and rendered; anything else
-propagates after the rollback. No data in any result means `204`.
+with `lid` allowed, resolving `lid` references from earlier `add`s, and collecting results. An error
+from a handler is given the operation's pointer; every failure propagates after the rollback to
+`errorHandler()`. No data in any result means `204`.
 
 ## 4. Architecture
 
@@ -182,7 +193,7 @@ propagates after the rollback. No data in any result means `204`.
 jsonapi-kit (packages/jsonapi-kit/src)
   media-type   RFC 9110 parsing and serialization; the JSON:API media type and its parameters
   negotiate    the server negotiation rules as a pure function of two header values
-  errors       JsonApiError, the closed catalog, the registered status table
+  errors       the catalog fragment, the ban-kit instance, jsonApiError and errorItem
   document     types, member names, serialization, builders, full linkage
   resource     defineResource and query capability resolution
   query        parseQuery and the family parsers
@@ -193,14 +204,15 @@ hono-jsonapi (packages/hono-jsonapi/src)
   middleware, respond, body, validators, handlers; atomic/handler wraps the core processor
 ```
 
-Imports form a DAG from `internal` outward. Nothing in `jsonapi-kit` imports a framework;
-`hono-jsonapi` imports `jsonapi-kit` and `hono`, and re-exports the core so applications see one
-package (ADR-0013). `import/no-cycle` is enforced.
+Imports form a DAG from `internal` outward. Nothing in `jsonapi-kit` imports a framework; it imports
+`ban-kit` for the error class, the catalog shape, and the JSON:API format. `hono-jsonapi` imports
+`jsonapi-kit`, `hono`, and `hono-ban`, and re-exports the core so applications see one package
+(ADR-0013). `import/no-cycle` is enforced.
 
 ### 4.2 Data flow for a read
 
 ```
-request ──jsonApi()──▶ negotiation stored, 415/406 answered
+request ──jsonApi()──▶ negotiation stored, 415/406 thrown
         ──queryValidator()──▶ parseQuery(definition, query string) ──▶ ParsedQuery | 400
         ──handler──▶ rows ──▶ resourceDocument / collectionDocument / paginatedDocument
                               serialize ▶ sparse fieldsets ▶ included (dedupe, full linkage)
@@ -219,10 +231,19 @@ request ──jsonApi()──▶ 415 on bad parameters or unsupported ext
 
 ### 4.4 Error rendering
 
-Hono's dispatcher catches a thrown error at every level of the middleware chain and hands it to
-`app.onError` directly; middleware cannot observe it. So thrown `JsonApiError`s are rendered by
-`errorHandler()`, validators render their own rejections so they work without it, and `jsonApi()`
-renders only its own 415 and 406 (ADR-0006).
+Every error is a `BanError` from `jsonApiBan`, the package's ban-kit instance: `ERROR_CATALOG` over
+ban-kit's built-in catalog, rendered by ban-kit's JSON:API format with `mixedEntries` on so one
+document can combine entries. A parser accumulates `ErrorItem`s, each with the entry's identity and
+the occurrence's `detail` and address, and throws once; the response status is the shared entry's,
+else the "most generally applicable" one. Everything in the adapter throws: the validators,
+`jsonApi()`, `readDocument`, and `atomicOperations()`. Hono hands a thrown error to `app.onError`,
+where `errorHandler()`, a hono-ban handler over the same catalog, renders it with an error id in the
+header and the body, `Cache-Control: no-store`, the trace id from `traceparent`, and a report;
+Hono's `HTTPException` is adopted by status and anything else is a constant 500. Without
+`errorHandler()`, Hono's default handler still answers a thrown `BanError` through its
+`getResponse()`, so a rejection is a JSON:API document either way (ADR-0014). An application with
+entries of its own spreads `ERROR_CATALOG` into its `createBan` and installs that instance's
+`onError`; the package's errors render through it unchanged.
 
 ### 4.5 Types
 
@@ -270,18 +291,19 @@ a cited clause with a test.
 
 ## 5. Decisions
 
-| ADR  | Decision                                                                                        |
-| ---- | ----------------------------------------------------------------------------------------------- |
-| 0001 | Record architecture decisions                                                                   |
-| 0002 | Validators through vendored Standard Schema types; `hono` is the adapter's only peer dependency |
-| 0003 | Web standards only; no ambient environment reads                                                |
-| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                  |
-| 0005 | `Content-Type` parameters and `Location` are derived from the document                          |
-| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own             |
-| 0007 | The `filter` grammar                                                                            |
-| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                           |
-| 0009 | A closed error catalog over registered status codes                                             |
-| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing                    |
-| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas                      |
-| 0012 | Definitions are validated at definition time, never at request time                             |
-| 0013 | Two packages: the framework-neutral core `jsonapi-kit` and the Hono adapter `hono-jsonapi`      |
+| ADR  | Decision                                                                                         |
+| ---- | ------------------------------------------------------------------------------------------------ |
+| 0001 | Record architecture decisions                                                                    |
+| 0002 | Validators through vendored Standard Schema types; `hono` is the adapter's peer dependency       |
+| 0003 | Web standards only; no ambient environment reads                                                 |
+| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                   |
+| 0005 | `Content-Type` parameters and `Location` are derived from the document                           |
+| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own (superseded) |
+| 0007 | The `filter` grammar                                                                             |
+| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                            |
+| 0009 | A closed error catalog over registered status codes                                              |
+| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing                     |
+| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas                       |
+| 0012 | Definitions are validated at definition time, never at request time                              |
+| 0013 | Two packages: the framework-neutral core `jsonapi-kit` and the Hono adapter `hono-jsonapi`       |
+| 0014 | Errors are ban-kit errors; the adapter renders through hono-ban; everything throws               |

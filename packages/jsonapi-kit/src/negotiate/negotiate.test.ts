@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { errorObjects } from '../errors/json-api-error';
 import { negotiate } from './negotiate';
 
 const JSON_API = 'application/vnd.api+json';
@@ -44,11 +45,12 @@ describe('Content-Type (server responsibilities, paragraphs 1 and 2)', () => {
       negotiate({ contentType: `${JSON_API}; charset=utf-8` }),
     );
     expect(error.status).toBe(415);
-    expect(error.errors[0]).toMatchObject({
+    expect(errorObjects(error)[0]).toMatchObject({
       code: 'UNSUPPORTED_MEDIA_TYPE',
       source: { header: 'Content-Type' },
       detail: expect.stringContaining('"charset"'),
     });
+    expect(error.headers.get('vary')).toBe('Accept');
     expect(
       failure(
         negotiate(
@@ -67,7 +69,7 @@ describe('Content-Type (server responsibilities, paragraphs 1 and 2)', () => {
       ),
     );
     expect(error.status).toBe(415);
-    expect(error.errors[0]?.detail).toContain(VERSION);
+    expect(error.message).toContain(VERSION);
     expect(
       success(
         negotiate(
@@ -127,10 +129,11 @@ describe('Accept (server responsibilities, paragraph 3)', () => {
       negotiate({ accept: `${JSON_API}; charset=utf-8, ${JSON_API};v=2` }),
     );
     expect(error.status).toBe(406);
-    expect(error.errors[0]).toMatchObject({
+    expect(errorObjects(error)[0]).toMatchObject({
       code: 'NOT_ACCEPTABLE',
       source: { header: 'Accept' },
     });
+    expect(error.headers.get('vary')).toBe('Accept');
   });
 
   it('responds 406 only when every instance requires an unsupported extension', () => {
@@ -143,7 +146,7 @@ describe('Accept (server responsibilities, paragraph 3)', () => {
       ),
     );
     expect(error.status).toBe(406);
-    expect(error.errors[0]?.detail).toContain('extension');
+    expect(error.message).toContain('extension');
     // One plain instance saves the request: the response applies no extension.
     const saved = success(
       negotiate(

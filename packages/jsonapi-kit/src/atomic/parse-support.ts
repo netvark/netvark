@@ -3,7 +3,8 @@
  * for members a document part may not carry.
  * @packageDocumentation
  */
-import type { ErrorObject } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
 import type { OperationTarget } from './types';
 
 import { isAtMember } from '../document/member-name';
@@ -26,7 +27,7 @@ export function unknownMembers(
   allowed: ReadonlySet<string>,
   pointer: string,
   what: string,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): void {
   for (const name of Object.keys(value)) {
     if (!allowed.has(name) && !isAtMember(name)) {

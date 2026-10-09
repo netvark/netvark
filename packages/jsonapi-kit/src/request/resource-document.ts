@@ -10,7 +10,9 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-resource-relationships
  * @packageDocumentation
  */
-import type { ErrorObject, Meta, ResourceLinkage } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
+import type { Meta, ResourceLinkage } from '../document/types';
 import type { StandardSchema } from '../internal/standard-schema-types';
 import type {
   AnyResource,
@@ -21,7 +23,7 @@ import type { RequestLinkage } from './identifiers';
 import type { ParseResourceOptions } from './types';
 
 import { isAtMember } from '../document/member-name';
-import { JsonApiError } from '../errors/json-api-error';
+import { errorItem, jsonApiError } from '../errors/json-api-error';
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
 import { pointer as toPointer } from '../internal/pointer';
 import { invalidDocument } from './identifiers';
@@ -56,7 +58,7 @@ export interface ParsedResourceObject<
 }
 
 /**
- * Runs the Standard Schema validator; issues become 422 error objects whose
+ * Runs the Standard Schema validator; issues become 422 error items whose
  * pointer is the attributes pointer plus the issue path.
  */
 async function validateAttributes(
@@ -71,23 +73,29 @@ async function validateAttributes(
   if (result.issues === undefined) {
     return result.value;
   }
-  throw JsonApiError.validationFailed(
-    result.issues.map((issue) => ({
-      pointer:
-        pointer +
-        toPointer(
-          (issue.path ?? []).map((segment) =>
-            typeof segment === 'object' ? String(segment.key) : String(segment),
-          ),
-        ),
-      detail: issue.message,
-    })),
+  throw jsonApiError(
+    result.issues.map((issue) =>
+      errorItem('VALIDATION_FAILED', {
+        detail: issue.message,
+        source: {
+          pointer:
+            pointer +
+            toPointer(
+              (issue.path ?? []).map((segment) =>
+                typeof segment === 'object'
+                  ? String(segment.key)
+                  : String(segment),
+              ),
+            ),
+        },
+      }),
+    ),
   );
 }
 
 /**
  * Parses the resource object at `options.pointer` (default `/data`). Throws
- * `JsonApiError`: 400 for structure, 403 for a client-generated id the
+ * `BanError`: 400 for structure, 403 for a client-generated id the
  * definition does not accept, 409 for a type or id mismatch, 422 for
  * attribute validation issues.
  */
@@ -98,12 +106,11 @@ export async function parseResourceObject(
 ): Promise<ParsedResourceObject<unknown, RequestLinkage>> {
   const pointer = options.pointer ?? '/data';
   if (!isRecord(value)) {
-    throw JsonApiError.invalidDocument(
-      pointer,
-      'Primary data must be a single resource object',
+    throw jsonApiError(
+      invalidDocument(pointer, 'Primary data must be a single resource object'),
     );
   }
-  const errors: Array<ErrorObject> = [];
+  const errors: Array<ErrorItem> = [];
   const identity = parseIdentity(resource, value, options, pointer, errors);
   for (const name of Object.keys(value)) {
     if (!RESOURCE_MEMBERS.has(name) && !isAtMember(name)) {
@@ -133,7 +140,7 @@ export async function parseResourceObject(
     errors,
   );
   if (errors.length > 0) {
-    throw new JsonApiError(errors);
+    throw jsonApiError(errors);
   }
   const schema =
     options.operation === 'create'
@@ -204,15 +211,13 @@ export async function parseUpdateDocument(
 /** The `data` member of a request document, or a 400 when there is none. */
 export function primaryData(body: unknown): unknown {
   if (!isRecord(body)) {
-    throw JsonApiError.invalidDocument(
-      '',
-      'A JSON:API document must be a JSON object',
+    throw jsonApiError(
+      invalidDocument('', 'A JSON:API document must be a JSON object'),
     );
   }
   if (!hasOwnMember(body, 'data')) {
-    throw JsonApiError.invalidDocument(
-      '',
-      'A request document must contain a data member',
+    throw jsonApiError(
+      invalidDocument('', 'A request document must contain a data member'),
     );
   }
   return ownMember(body, 'data');

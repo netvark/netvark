@@ -5,9 +5,10 @@
 import type { ErrorObject } from '../document/types';
 import type { AnyResource } from '../resource/types';
 
+import { isBanError } from 'ban-kit';
 import { expect } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { defineResource } from '../resource/define-resource';
 import { parseQuery } from './parse-query';
 
@@ -79,9 +80,9 @@ export function errorsOf(
   try {
     parseQuery(resource, input);
   } catch (error) {
-    if (error instanceof JsonApiError) {
+    if (isBanError(error)) {
       expect(error.status).toBe(400);
-      return error.errors;
+      return errorObjects(error);
     }
     throw error;
   }

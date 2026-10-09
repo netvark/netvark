@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   ATOMIC_OPERATIONS_EXTENSION,
-  JsonApiError,
+  jsonApiError,
   defineResource,
 } from 'jsonapi-kit';
 
@@ -65,7 +65,9 @@ const tags: AnyResourceHandlers<Store, Context<JsonApiEnv>> = {
       throw new Error('disk on fire');
     }
     if (!tx.tags.delete(id)) {
-      throw JsonApiError.notFound(`Tag "${id}" does not exist`);
+      throw jsonApiError('NOT_FOUND', {
+        detail: `Tag "${id}" does not exist`,
+      });
     }
   },
 };
@@ -149,6 +151,7 @@ describe('atomicOperations: request requirements', () => {
     expect(headers.get('content-type')).toBe('application/vnd.api+json');
     expect((body as Errors).errors[0]).toMatchObject({
       status: '405',
+      code: 'METHOD_NOT_ALLOWED',
       title: 'Method Not Allowed',
     });
   });
@@ -202,7 +205,7 @@ describe('atomicOperations: responses', () => {
     expect(store.tags.size).toBe(0);
   });
 
-  it('renders a JsonApiError from an operation with its status and pointer, after the rollback', async () => {
+  it('renders an error from an operation with its status and pointer, after the rollback', async () => {
     const { status, body } = await post(createApp(store), [
       { op: 'add', data: { type: 'tags', attributes: {} } },
       { op: 'remove', ref: { type: 'tags', id: 'nope' } },

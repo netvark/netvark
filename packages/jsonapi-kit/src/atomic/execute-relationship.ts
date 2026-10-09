@@ -7,7 +7,8 @@
  * @ref https://jsonapi.org/ext/atomic/#updating-to-many-relationships
  * @packageDocumentation
  */
-import type { ErrorObject } from '../document/types';
+import type { BanError, ErrorItem } from 'ban-kit';
+
 import type { RelationshipDefinition } from '../resource/types';
 import type { Execution, OperationResult } from './execute-support';
 import type { RawOperation } from './parse-document';
@@ -17,8 +18,8 @@ import type {
   RelationshipHandlers,
 } from './types';
 
-import { JsonApiError } from '../errors/json-api-error';
-import { parseLinkage } from '../request/identifiers';
+import { jsonApiError } from '../errors/json-api-error';
+import { invalidDocument, parseLinkage } from '../request/identifiers';
 import {
   forbidden,
   handlersFor,
@@ -36,15 +37,19 @@ function relationshipDefinition<TTransaction, TContext>(
     ? resource.relationships[name]
     : undefined;
   if (definition === undefined) {
-    throw JsonApiError.invalidDocument(
-      `${operation.pointer}/ref/relationship`,
-      `"${resource.type}" has no relationship "${name}"`,
+    throw jsonApiError(
+      invalidDocument(
+        `${operation.pointer}/ref/relationship`,
+        `"${resource.type}" has no relationship "${name}"`,
+      ),
     );
   }
   if (operation.op !== 'update' && definition.cardinality === 'one') {
-    throw JsonApiError.invalidDocument(
-      `${operation.pointer}/op`,
-      'Only update applies to a to-one relationship',
+    throw jsonApiError(
+      invalidDocument(
+        `${operation.pointer}/op`,
+        'Only update applies to a to-one relationship',
+      ),
     );
   }
   return definition;
@@ -74,8 +79,8 @@ export async function relationship<TTransaction, TContext>(
   const pointer = `${operation.pointer}/data`;
   const data = requireData(operation, 'changes a relationship');
   const options = { lids: true, type: definition.type };
-  const errors: Array<ErrorObject> = [];
-  const unsupported = (): JsonApiError =>
+  const errors: Array<ErrorItem> = [];
+  const unsupported = (): BanError =>
     forbidden(
       operation.pointer,
       `"${target.type}.${name}" does not support ${operation.op}`,
@@ -93,7 +98,7 @@ export async function relationship<TTransaction, TContext>(
       errors,
     );
     if (linkage === undefined) {
-      throw new JsonApiError(errors);
+      throw jsonApiError(errors);
     }
     await handler(
       { id, data: execution.lids.linkage(linkage, pointer) },
@@ -107,7 +112,7 @@ export async function relationship<TTransaction, TContext>(
   }
   const identifiers = parseLinkage(data, pointer, 'many', options, errors);
   if (identifiers === undefined) {
-    throw new JsonApiError(errors);
+    throw jsonApiError(errors);
   }
   await handler(
     { id, data: execution.lids.identifiers(identifiers, pointer) },

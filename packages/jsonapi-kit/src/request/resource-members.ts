@@ -9,13 +9,14 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-resource-relationships
  * @packageDocumentation
  */
-import type { ErrorObject } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
 import type { AnyResource } from '../resource/types';
 import type { RequestLinkage } from './identifiers';
 import type { ParseResourceOptions } from './types';
 
 import { isAtMember } from '../document/member-name';
-import { errorObject } from '../errors/json-api-error';
+import { errorItem } from '../errors/json-api-error';
 import {
   hasOwnMember,
   isRecord,
@@ -46,7 +47,7 @@ export function parseIdentity(
   data: Record<string, unknown>,
   options: ParseResourceOptions,
   pointer: string,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): Identity {
   const type = ownMember(data, 'type');
   if (typeof type !== 'string') {
@@ -85,7 +86,7 @@ export function parseIdentity(
   if (options.operation === 'create') {
     if (typeof id === 'string' && !resource.clientIds) {
       errors.push(
-        errorObject('CLIENT_GENERATED_ID_NOT_SUPPORTED', {
+        errorItem('CLIENT_GENERATED_ID_NOT_SUPPORTED', {
           detail: `"${resource.type}" does not accept client-generated ids`,
           source: { pointer: `${pointer}/id` },
         }),
@@ -119,7 +120,7 @@ export function parseRelationships(
   value: unknown,
   options: ParseResourceOptions,
   pointer: string,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): Record<string, RequestLinkage> {
   const out: Record<string, RequestLinkage> = {};
   if (value === undefined) {
@@ -169,7 +170,7 @@ export function parseAttributeNames(
   resource: AnyResource,
   value: unknown,
   pointer: string,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (value === undefined) {

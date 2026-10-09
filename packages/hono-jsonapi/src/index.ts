@@ -10,7 +10,7 @@
  */
 export * from 'jsonapi-kit';
 
-export type { ErrorHandlerOptions } from './handlers';
+export type { ErrorHandlerOptions, NotFoundHandlerOptions } from './handlers';
 export type { JsonApiOptions } from './middleware';
 export type { JsonApiResponse, ResponseHeaders } from './respond';
 export type { JsonApiContext, JsonApiEnv, JsonApiVariables } from './types';
@@ -23,7 +23,7 @@ export type {
 } from './validators';
 
 export { readDocument } from './body';
-export { errorHandler, notFoundHandler, toJsonApiError } from './handlers';
+export { errorHandler, notFoundHandler } from './handlers';
 export { jsonApi } from './middleware';
 export {
   isJsonApiResponse,

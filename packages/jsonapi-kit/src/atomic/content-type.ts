@@ -5,7 +5,7 @@
  * @ref https://jsonapi.org/ext/atomic/#processing
  * @packageDocumentation
  */
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { ATOMIC_OPERATIONS_EXTENSION } from '../internal/constants';
 import { jsonApiParameters } from '../media-type/json-api';
 import { parseMediaType } from '../media-type/parse';
@@ -25,8 +25,9 @@ export function assertOperationsContentType(
     mediaType !== undefined &&
     jsonApiParameters(mediaType).ext.includes(ATOMIC_OPERATIONS_EXTENSION);
   if (!declared) {
-    throw JsonApiError.unsupportedMediaType(
-      `Operations requests must declare the extension: Content-Type: application/vnd.api+json; ext="${ATOMIC_OPERATIONS_EXTENSION}"`,
-    );
+    throw jsonApiError('UNSUPPORTED_MEDIA_TYPE', {
+      detail: `Operations requests must declare the extension: Content-Type: application/vnd.api+json; ext="${ATOMIC_OPERATIONS_EXTENSION}"`,
+      source: { header: 'Content-Type' },
+    });
   }
 }

@@ -1,106 +1,104 @@
 /**
- * `app.onError` and `app.notFound` handlers (SPEC 10.5) that render every
- * failure as a JSON:API error document. Hono passes errors thrown by routes
- * to `app.onError` directly, so middleware cannot intercept them; this is
- * the one place thrown `JsonApiError`s become responses.
+ * `app.onError` and `app.notFound` handlers (SPEC 10.5). `errorHandler` is a
+ * hono-ban handler over an instance that carries this package's catalog and
+ * renders in ban-kit's JSON:API format with `mixedEntries` on, so every
+ * failure reaching `app.onError` becomes an error document: a `BanError`
+ * from `jsonapi-kit`, from the application's own ban-kit instance, or from
+ * any other library on ban-kit, as it is; Hono's `HTTPException` adopted by
+ * status; anything else as a constant 500 that reveals nothing.
  * @ref https://jsonapi.org/format/1.1/#errors
  * @ref https://hono.dev/docs/api/hono#error-handling
+ * @ref https://github.com/ali-issa/ban-kit/blob/main/docs/SPEC.md (section 6: the handler; section 7.2: the JSON:API format)
  * @packageDocumentation
  */
-import type { Context, Env, ErrorHandler, NotFoundHandler } from 'hono';
+import type { Env, ErrorHandler, NotFoundHandler } from 'hono';
+import type { HandlerOptions } from 'hono-ban';
+import type {
+  JsonApiDocumentMembers,
+  JsonApiOptions,
+} from 'hono-ban/formats/json-api';
 
-import type { DocumentBase } from 'jsonapi-kit';
+import type { DocumentBase, JsonApiCatalog } from 'jsonapi-kit';
 
 import type { ResponseHeaders } from './respond';
 
-import { HTTPException } from 'hono/http-exception';
+import { createBan } from 'hono-ban';
+import { jsonApi } from 'hono-ban/formats/json-api';
 
-import {
-  JsonApiError,
-  isErrorStatusCode,
-  isJsonApiError,
-  reasonPhrase,
-} from 'jsonapi-kit';
+import { ERROR_CATALOG, jsonApiError } from 'jsonapi-kit';
 
 import { respondError } from './respond';
 
-export interface ErrorHandlerOptions<E extends Env = Env> {
-  /**
-   * Called with every error before it is rendered, for logging or tracing.
-   * Anything it throws is ignored so a failing reporter cannot change the
-   * response.
-   */
-  readonly report?:
-    | ((error: unknown, c: Context<E>) => void | Promise<void>)
-    | undefined;
+/**
+ * hono-ban's handler options (`onReport`, `headers`, `map`, `includeStack`,
+ * the id headers, ...) plus the JSON:API document's own. `map` receives the
+ * handler's instance, whose catalog is `ERROR_CATALOG` over the built-ins.
+ */
+export interface ErrorHandlerOptions<
+  E extends Env = Env,
+> extends HandlerOptions<E, JsonApiCatalog> {
   /** Top-level members (`jsonapi`, `links`, `meta`) for every error document. */
   readonly document?: DocumentBase | undefined;
-  /** Headers added to every error response, such as `Cache-Control`. */
+  /**
+   * The JSON:API format's options: `typeLinkBaseUrl` for `links.type`,
+   * `aboutLink`, `includeId`, `traceIdMetaKey`. `mixedEntries` is always on,
+   * since the errors of this package combine catalog entries.
+   */
+  readonly format?:
+    | Omit<JsonApiOptions, 'mixedEntries' | 'document'>
+    | undefined;
+}
+
+export interface NotFoundHandlerOptions {
+  /** Top-level members (`jsonapi`, `links`, `meta`) for the error document. */
+  readonly document?: DocumentBase | undefined;
+  /** Headers added to the response, such as `Cache-Control`. */
   readonly headers?: ResponseHeaders | undefined;
 }
 
+/** `DocumentBase` in the format's shape; a `JsonApiObject` is spread into a plain record. */
+function documentMembers(base: DocumentBase): JsonApiDocumentMembers {
+  return {
+    ...(base.jsonapi === undefined ? {} : { jsonapi: { ...base.jsonapi } }),
+    ...(base.links === undefined ? {} : { links: base.links }),
+    ...(base.meta === undefined ? {} : { meta: base.meta }),
+  };
+}
+
 /**
- * The `JsonApiError` to render for anything thrown: a `JsonApiError` as is,
- * an `HTTPException` (Hono's own, such as the 400 of `validator('json')`)
- * by status with the registry's reason phrase as title, anything else as a
- * constant 500 that reveals nothing.
+ * For `app.onError`: renders anything thrown as a JSON:API error document.
+ * Equivalent to `createBan({ errors: ERROR_CATALOG, format: jsonApi({
+ * mixedEntries: true }) }).onError(options)` from `hono-ban`; an application
+ * with entries of its own builds that instance itself and installs its
+ * `onError`, which renders this package's errors the same way.
  */
-export function toJsonApiError(error: unknown): JsonApiError {
-  if (isJsonApiError(error)) {
-    return error;
-  }
-  if (error instanceof HTTPException && isErrorStatusCode(error.status)) {
-    const { status } = error;
-    return new JsonApiError(
-      {
-        status: String(status),
-        title: reasonPhrase(status),
-        ...(error.message === '' ? {} : { detail: error.message }),
-      },
-      { status, cause: error },
-    );
-  }
-  return JsonApiError.internal(error);
-}
-
-async function report<E extends Env>(
-  options: ErrorHandlerOptions<E>,
-  error: unknown,
-  c: Context<E>,
-): Promise<void> {
-  if (options.report === undefined) {
-    return;
-  }
-  try {
-    await options.report(error, c);
-  } catch {
-    // A broken reporter must not change the response; see the option's doc.
-  }
-}
-
-/** For `app.onError`: renders thrown errors as JSON:API error documents. */
 export function errorHandler<E extends Env = Env>(
   options: ErrorHandlerOptions<E> = {},
 ): ErrorHandler<E> {
-  return async (error, c) => {
-    await report(options, error, c);
-    return respondError(
-      c,
-      toJsonApiError(error),
-      options.document,
-      options.headers,
-    );
-  };
+  const { document, format, ...handlerOptions } = options;
+  const ban = createBan({
+    errors: ERROR_CATALOG,
+    format: jsonApi({
+      ...format,
+      mixedEntries: true,
+      ...(document === undefined
+        ? {}
+        : { document: documentMembers(document) }),
+    }),
+  });
+  return ban.onError<E>(handlerOptions);
 }
 
 /** For `app.notFound`: a 404 error document instead of Hono's plain text. */
 export function notFoundHandler<E extends Env = Env>(
-  options: Pick<ErrorHandlerOptions<E>, 'document' | 'headers'> = {},
+  options: NotFoundHandlerOptions = {},
 ): NotFoundHandler<E> {
   return (c) =>
     respondError(
       c,
-      JsonApiError.notFound('No resource exists at the requested URL'),
+      jsonApiError('NOT_FOUND', {
+        detail: 'No resource exists at the requested URL',
+      }),
       options.document,
       options.headers,
     );

@@ -10,7 +10,8 @@ import type { Execution, OperationResult } from './execute-support';
 import type { RawOperation } from './parse-document';
 import type { ResolvedResourceObject } from './types';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
+import { conflict, invalidDocument } from '../request/identifiers';
 import {
   dataType,
   forbidden,
@@ -31,9 +32,11 @@ export async function create<TTransaction, TContext>(
 ): Promise<OperationResult> {
   const { target } = operation;
   if (target !== undefined && (target.id ?? target.lid) !== undefined) {
-    throw JsonApiError.invalidDocument(
-      operation.pointer,
-      'An add operation may target a collection or a to-many relationship, not a resource',
+    throw jsonApiError(
+      invalidDocument(
+        operation.pointer,
+        'An add operation may target a collection or a to-many relationship, not a resource',
+      ),
     );
   }
   const type = target?.type ?? dataType(operation);
@@ -86,9 +89,11 @@ function updatedId<TTransaction, TContext>(
       `${operation.pointer}/data/lid`,
     );
   }
-  throw JsonApiError.invalidDocument(
-    `${operation.pointer}/data/id`,
-    'An update must identify the resource with a string id',
+  throw jsonApiError(
+    invalidDocument(
+      `${operation.pointer}/data/id`,
+      'An update must identify the resource with a string id',
+    ),
   );
 }
 
@@ -127,9 +132,11 @@ export async function update<TTransaction, TContext>(
     data.lid !== undefined &&
     data.lid !== target.lid
   ) {
-    throw JsonApiError.conflict(
-      `The document's lid "${data.lid}" does not match the target's lid "${target.lid}"`,
-      { pointer: `${operation.pointer}/data/lid` },
+    throw jsonApiError(
+      conflict(
+        `${operation.pointer}/data/lid`,
+        `The document's lid "${data.lid}" does not match the target's lid "${target.lid}"`,
+      ),
     );
   }
   const id = updatedId(execution, operation, type, data, targeted);
@@ -144,9 +151,11 @@ export async function remove<TTransaction, TContext>(
 ): Promise<OperationResult> {
   const { target } = operation;
   if (target === undefined) {
-    throw JsonApiError.invalidDocument(
-      operation.pointer,
-      'A remove operation must target a resource through ref or href',
+    throw jsonApiError(
+      invalidDocument(
+        operation.pointer,
+        'A remove operation must target a resource through ref or href',
+      ),
     );
   }
   const handlers = handlersFor(

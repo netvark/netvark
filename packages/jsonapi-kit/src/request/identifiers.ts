@@ -7,15 +7,16 @@
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-linkage
  * @packageDocumentation
  */
+import type { ErrorItem } from 'ban-kit';
+
 import type {
   AnyResourceIdentifier,
-  ErrorObject,
   ResourceIdentifier,
   ResourceLinkage,
 } from '../document/types';
 import type { Cardinality } from '../resource/types';
 
-import { errorObject } from '../errors/json-api-error';
+import { errorItem } from '../errors/json-api-error';
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
 
 /** Linkage a request may carry: identifiers that may use `lid`. */
@@ -31,12 +32,12 @@ export interface IdentifierOptions {
   readonly type?: string | undefined;
 }
 
-export function invalidDocument(pointer: string, detail: string): ErrorObject {
-  return errorObject('INVALID_DOCUMENT', { detail, source: { pointer } });
+export function invalidDocument(pointer: string, detail: string): ErrorItem {
+  return errorItem('INVALID_DOCUMENT', { detail, source: { pointer } });
 }
 
-export function conflict(pointer: string, detail: string): ErrorObject {
-  return errorObject('CONFLICT', { detail, source: { pointer } });
+export function conflict(pointer: string, detail: string): ErrorItem {
+  return errorItem('CONFLICT', { detail, source: { pointer } });
 }
 
 /**
@@ -47,19 +48,19 @@ export function parseIdentifier(
   value: unknown,
   pointer: string,
   options: IdentifierOptions & { readonly lids?: false | undefined },
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): ResourceIdentifier | undefined;
 export function parseIdentifier(
   value: unknown,
   pointer: string,
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): AnyResourceIdentifier | undefined;
 export function parseIdentifier(
   value: unknown,
   pointer: string,
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): AnyResourceIdentifier | undefined {
   if (!isRecord(value)) {
     errors.push(
@@ -127,49 +128,49 @@ export function parseLinkage(
   pointer: string,
   cardinality: 'one',
   options: IdentifierOptions & { readonly lids?: false | undefined },
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): ResourceIdentifier | null | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: 'many',
   options: IdentifierOptions & { readonly lids?: false | undefined },
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): ReadonlyArray<ResourceIdentifier> | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: Cardinality,
   options: IdentifierOptions & { readonly lids?: false | undefined },
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): ResourceLinkage | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: 'one',
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): AnyResourceIdentifier | null | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: 'many',
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): ReadonlyArray<AnyResourceIdentifier> | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: Cardinality,
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): RequestLinkage | undefined;
 export function parseLinkage(
   value: unknown,
   pointer: string,
   cardinality: Cardinality,
   options: IdentifierOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): RequestLinkage | undefined {
   if (cardinality === 'one') {
     if (value === null) {

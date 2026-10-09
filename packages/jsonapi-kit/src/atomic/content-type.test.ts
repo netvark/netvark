@@ -1,14 +1,17 @@
+import type { BanError } from 'ban-kit';
+
+import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { ATOMIC_OPERATIONS_EXTENSION } from '../internal/constants';
 import { assertOperationsContentType } from './content-type';
 
-function rejected(contentType: string | undefined): JsonApiError {
+function rejected(contentType: string | undefined): BanError {
   try {
     assertOperationsContentType(contentType);
   } catch (error) {
-    if (error instanceof JsonApiError) {
+    if (isBanError(error)) {
       return error;
     }
     throw error;
@@ -39,11 +42,12 @@ describe('assertOperationsContentType', () => {
     ]) {
       const error = rejected(contentType);
       expect(error.status, String(contentType)).toBe(415);
-      expect(error.errors[0]).toMatchObject({
+      const [object] = errorObjects(error);
+      expect(object).toMatchObject({
         code: 'UNSUPPORTED_MEDIA_TYPE',
         source: { header: 'Content-Type' },
       });
-      expect(error.errors[0]?.detail).toContain('ext=');
+      expect(object?.detail).toContain('ext=');
     }
   });
 });

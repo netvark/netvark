@@ -8,7 +8,9 @@ import type { OperationsProcessor, OperationsResultDocument } from './process';
 import type { Caller, Store } from './test-fixtures';
 import type { AtomicOptions } from './types';
 
-import { isJsonApiError } from '../errors/json-api-error';
+import { isBanError } from 'ban-kit';
+
+import { errorObjects } from '../errors/json-api-error';
 import { CALLER, createProcessor } from './test-fixtures';
 
 const HTTP_OK = 200;
@@ -43,12 +45,12 @@ export async function run(
       errors: [],
     };
   } catch (error) {
-    if (isJsonApiError(error)) {
+    if (isBanError(error)) {
       return {
         status: error.status,
         results: [],
         document: undefined,
-        errors: error.errors,
+        errors: errorObjects(error),
       };
     }
     throw error;

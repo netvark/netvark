@@ -33,8 +33,13 @@ export const ATOMIC_OPERATIONS_EXTENSION = 'https://jsonapi.org/ext/atomic';
  */
 export const CURSOR_PAGINATION_PROFILE =
   'http://jsonapi.org/profiles/ethanresnick/cursor-pagination/';
-export const CURSOR_PAGINATION_ERROR_BASE =
+const CURSOR_PAGINATION_ERROR_BASE =
   'https://jsonapi.org/profiles/ethanresnick/cursor-pagination';
+
+/** The profile's error type URIs, rendered as `links.type` (SPEC 8.4). */
+export const UNSUPPORTED_SORT_TYPE: string = `${CURSOR_PAGINATION_ERROR_BASE}/unsupported-sort`;
+export const MAX_SIZE_EXCEEDED_TYPE: string = `${CURSOR_PAGINATION_ERROR_BASE}/max-size-exceeded`;
+export const RANGE_PAGINATION_NOT_SUPPORTED_TYPE: string = `${CURSOR_PAGINATION_ERROR_BASE}/range-pagination-not-supported`;
 
 /**
  * Member names: at least one character, starting and ending with a letter,
@@ -102,8 +107,4 @@ export const DEFAULT_MAX_OPERATIONS = 10;
 
 export const HTTP_BAD_REQUEST = 400;
 export const HTTP_FORBIDDEN = 403;
-export const HTTP_NOT_FOUND = 404;
-export const HTTP_NOT_ACCEPTABLE = 406;
-export const HTTP_CONFLICT = 409;
-export const HTTP_UNSUPPORTED_MEDIA_TYPE = 415;
 export const HTTP_INTERNAL_SERVER_ERROR = 500;

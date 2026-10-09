@@ -7,7 +7,7 @@
  */
 import type { Context, Env } from 'hono';
 
-import { JsonApiError, isJsonApiMediaType, parseMediaType } from 'jsonapi-kit';
+import { isJsonApiMediaType, jsonApiError, parseMediaType } from 'jsonapi-kit';
 
 /** The parsed JSON body of a request declared as `application/vnd.api+json`. */
 export async function readDocument<E extends Env>(
@@ -17,14 +17,18 @@ export async function readDocument<E extends Env>(
   const mediaType =
     contentType === undefined ? undefined : parseMediaType(contentType);
   if (mediaType === undefined || !isJsonApiMediaType(mediaType)) {
-    throw JsonApiError.unsupportedMediaType(
-      'Request documents must be sent with Content-Type application/vnd.api+json',
-    );
+    throw jsonApiError('UNSUPPORTED_MEDIA_TYPE', {
+      detail:
+        'Request documents must be sent with Content-Type application/vnd.api+json',
+      source: { header: 'Content-Type' },
+    });
   }
   const text = await c.req.text();
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw JsonApiError.malformedJson();
+    throw jsonApiError('MALFORMED_JSON', {
+      detail: 'The request body is not valid JSON',
+    });
   }
 }

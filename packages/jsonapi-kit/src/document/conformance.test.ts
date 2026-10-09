@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import {
+  errorDocument,
+  errorItem,
+  jsonApiError,
+} from '../errors/json-api-error';
 import { paginatedDocument } from '../pagination/paginated';
 import { parseQuery } from '../query/parse-query';
 import { defineResource } from '../resource/define-resource';
@@ -134,22 +138,48 @@ describe('schema conformance', () => {
 
   it('error documents for every catalog factory', () => {
     const documents = [
-      JsonApiError.invalidParameter('sort', 'bad').document(),
-      JsonApiError.unknownParameter('x').document(),
-      JsonApiError.invalidDocument('/data', 'bad').document({
-        jsonapi: { version: '1.1' },
-      }),
-      JsonApiError.malformedJson().document(),
-      JsonApiError.forbidden('no').document(),
-      JsonApiError.clientGeneratedIdNotSupported().document(),
-      JsonApiError.notFound().document(),
-      JsonApiError.notAcceptable('no').document(),
-      JsonApiError.conflict('taken', { pointer: '/data/id' }).document(),
-      JsonApiError.unsupportedMediaType('no').document(),
-      JsonApiError.validationFailed([
-        { pointer: '/data/attributes/title', detail: 'Required' },
-      ]).document(),
-      JsonApiError.internal().document(),
+      errorDocument(
+        jsonApiError('INVALID_QUERY_PARAMETER', {
+          detail: 'bad',
+          source: { parameter: 'sort' },
+        }),
+      ),
+      errorDocument(
+        jsonApiError('INVALID_DOCUMENT', {
+          detail: 'bad',
+          source: { pointer: '/data' },
+        }),
+        { jsonapi: { version: '1.1' } },
+      ),
+      errorDocument(jsonApiError('MALFORMED_JSON')),
+      errorDocument(jsonApiError('FORBIDDEN', { detail: 'no' })),
+      errorDocument(jsonApiError('NOT_FOUND')),
+      errorDocument(
+        jsonApiError('NOT_ACCEPTABLE', {
+          detail: 'no',
+          source: { header: 'Accept' },
+        }),
+      ),
+      errorDocument(
+        jsonApiError('MAX_PAGE_SIZE_EXCEEDED', {
+          detail: 'no',
+          source: { parameter: 'page[size]' },
+          meta: { page: { maxSize: 10 } },
+        }),
+      ),
+      errorDocument(
+        jsonApiError([
+          errorItem('VALIDATION_FAILED', {
+            detail: 'Required',
+            source: { pointer: '/data/attributes/title' },
+          }),
+          errorItem('CONFLICT', {
+            detail: 'taken',
+            source: { pointer: '/data/id' },
+          }),
+        ]),
+      ),
+      errorDocument(jsonApiError('INTERNAL_SERVER_ERROR', { detail: 'x' })),
     ];
     for (const document of documents) {
       expect(schemaErrors(document), JSON.stringify(document)).toEqual([]);

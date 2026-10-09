@@ -1,7 +1,7 @@
 /**
  * Parsers for the reserved families (SPEC 6.4 to 6.7): `include`, `fields`,
  * `sort`, and `page`. Each reads one parameter, records what it understood,
- * and reports every problem as an error object rather than stopping at the
+ * and reports every problem as an error item rather than stopping at the
  * first, so a client sees all of its mistakes in one 400.
  * @ref https://jsonapi.org/format/1.1/#fetching-includes
  * @ref https://jsonapi.org/format/1.1/#fetching-sparse-fieldsets
@@ -9,13 +9,14 @@
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
  * @packageDocumentation
  */
-import type { ErrorObject } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
 import type { AnyResource } from '../resource/types';
 import type { Registry } from './registry';
 import type { ParameterValue, SortField } from './types';
 
 import { isMemberPath } from '../document/member-name';
-import { errorObject } from '../errors/json-api-error';
+import { errorItem } from '../errors/json-api-error';
 import { CURSOR_PAGE_MEMBERS, PAGE_SIZE_PATTERN } from '../internal/constants';
 import {
   maxPageSizeExceededError,
@@ -27,21 +28,21 @@ import { resolveIncludePath } from './registry';
 export interface ParseState {
   readonly resource: AnyResource;
   readonly registry: Registry;
-  readonly errors: Array<ErrorObject>;
+  readonly errors: Array<ErrorItem>;
   readonly fields: Map<string, ReadonlyArray<string>>;
   readonly sort: Array<SortField>;
   readonly page: Map<string, string>;
 }
 
-export function invalid(parameter: string, detail: string): ErrorObject {
-  return errorObject('INVALID_QUERY_PARAMETER', {
+export function invalid(parameter: string, detail: string): ErrorItem {
+  return errorItem('INVALID_QUERY_PARAMETER', {
     detail,
     source: { parameter },
   });
 }
 
-export function unknown(parameter: string, detail?: string): ErrorObject {
-  return errorObject('UNKNOWN_QUERY_PARAMETER', {
+export function unknown(parameter: string, detail?: string): ErrorItem {
+  return errorItem('UNKNOWN_QUERY_PARAMETER', {
     detail:
       detail ??
       `Query parameter "${parameter}" is not supported by this endpoint`,

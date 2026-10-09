@@ -5,9 +5,13 @@
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-servers
  * @packageDocumentation
  */
+import type { BanError } from 'ban-kit';
+
 import type { MediaRange, MediaType } from '../media-type/parse';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { isBanError } from 'ban-kit';
+
+import { jsonApiError } from '../errors/json-api-error';
 import { isJsonApiMediaType, jsonApiParameters } from '../media-type/json-api';
 import { parseAccept, parseMediaType } from '../media-type/parse';
 
@@ -48,11 +52,33 @@ export interface NegotiationSuccess {
 
 export interface NegotiationFailure {
   readonly ok: false;
-  /** A 415 or 406 `JsonApiError`. */
-  readonly error: JsonApiError;
+  /** A 415 or 406 `BanError` carrying `Vary: Accept`. */
+  readonly error: BanError;
 }
 
 export type Negotiation = NegotiationSuccess | NegotiationFailure;
+
+/**
+ * Every negotiated response varies on `Accept`, the rejections included
+ * (`#content-negotiation-servers`; RFC 9110 12.5.5).
+ */
+const VARY_ACCEPT = { Vary: 'Accept' };
+
+function unsupportedMediaType(detail: string): BanError {
+  return jsonApiError('UNSUPPORTED_MEDIA_TYPE', {
+    detail,
+    source: { header: 'Content-Type' },
+    headers: VARY_ACCEPT,
+  });
+}
+
+function notAcceptable(detail: string): BanError {
+  return jsonApiError('NOT_ACCEPTABLE', {
+    detail,
+    source: { header: 'Accept' },
+    headers: VARY_ACCEPT,
+  });
+}
 
 const NO_REQUEST: NegotiatedRequest = {
   mediaType: undefined,
@@ -68,7 +94,7 @@ const NO_REQUEST: NegotiatedRequest = {
 function negotiateContentType(
   value: string | null | undefined,
   supported: ReadonlySet<string>,
-): NegotiatedRequest | JsonApiError {
+): NegotiatedRequest | BanError {
   if (value == null) {
     return NO_REQUEST;
   }
@@ -81,13 +107,13 @@ function negotiateContentType(
   }
   const parameters = jsonApiParameters(mediaType);
   if (parameters.other.length > 0) {
-    return JsonApiError.unsupportedMediaType(
+    return unsupportedMediaType(
       `The JSON:API media type must not carry media type parameters other than ext and profile; received ${parameters.other.map((name) => `"${name}"`).join(', ')}`,
     );
   }
   const unsupported = parameters.ext.find((uri) => !supported.has(uri));
   if (unsupported !== undefined) {
-    return JsonApiError.unsupportedMediaType(
+    return unsupportedMediaType(
       `Extension "${unsupported}" is not supported by this endpoint`,
     );
   }
@@ -163,7 +189,7 @@ function negotiateAccept(
   supportedProfiles: ReadonlySet<string>,
 ):
   | { extensions: ReadonlyArray<string>; profiles: ReadonlyArray<string> }
-  | JsonApiError {
+  | BanError {
   if (value == null) {
     return { extensions: [], profiles: [] };
   }
@@ -175,13 +201,13 @@ function negotiateAccept(
     return { extensions: [], profiles: [] };
   }
   if (usable.length === 0) {
-    return JsonApiError.notAcceptable(
+    return notAcceptable(
       'Every JSON:API media type in Accept carries a media type parameter other than ext and profile',
     );
   }
   const candidates = usable.filter((instance) => !instance.unsupported);
   if (candidates.length === 0) {
-    return JsonApiError.notAcceptable(
+    return notAcceptable(
       'Every JSON:API media type in Accept requires an extension this endpoint does not support',
     );
   }
@@ -210,7 +236,7 @@ export function negotiate(
     headers.contentType,
     supportedExtensions,
   );
-  if (request instanceof JsonApiError) {
+  if (isBanError(request)) {
     return { ok: false, error: request };
   }
   const accepted = negotiateAccept(
@@ -218,7 +244,7 @@ export function negotiate(
     supportedExtensions,
     supportedProfiles,
   );
-  if (accepted instanceof JsonApiError) {
+  if (isBanError(accepted)) {
     return { ok: false, error: accepted };
   }
   return {

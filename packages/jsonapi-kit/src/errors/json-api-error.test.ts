@@ -1,179 +1,253 @@
+import type { ErrorItem } from 'ban-kit';
+
+import { createBan, isBanError } from 'ban-kit';
+import { jsonApi } from 'ban-kit/formats/json-api';
 import { describe, expect, it } from 'vitest';
 
 import { ERROR_CATALOG, ERROR_CODES } from './catalog';
 import {
-  JsonApiError,
-  errorDocument,
-  errorObject,
-  isJsonApiError,
-  responseStatus,
+  errorItem,
+  errorObjects,
+  jsonApiBan,
+  jsonApiError,
 } from './json-api-error';
 
-describe('errorObject', () => {
-  it('takes status (as a string) and title from the catalog and omits undefined members', () => {
-    const error = errorObject('NOT_FOUND', {
-      detail: 'Gone',
-      source: { parameter: 'x' },
-    });
-    expect(error).toEqual({
-      status: '404',
-      code: 'NOT_FOUND',
-      title: 'Not Found',
-      detail: 'Gone',
-      source: { parameter: 'x' },
-    });
-    expect(Object.keys(error)).toEqual([
-      'status',
-      'code',
-      'title',
-      'detail',
-      'source',
-    ]);
-    expect('id' in error).toBe(false);
+function invalid(parameter: string): ErrorItem {
+  return errorItem('INVALID_QUERY_PARAMETER', {
+    detail: `${parameter} is bad`,
+    source: { parameter },
   });
+}
 
-  it('has a catalog entry with a 4xx or 5xx status and a title for every code', () => {
+const UNSUPPORTED_SORT_TYPE =
+  'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/unsupported-sort';
+
+describe('the catalog', () => {
+  it('resolves every code the package emits with a 4xx or 5xx status and a title', () => {
     for (const code of ERROR_CODES) {
-      const entry = ERROR_CATALOG[code];
+      const entry = jsonApiBan.catalog[code];
       expect(entry.status, code).toBeGreaterThanOrEqual(400);
       expect(entry.status, code).toBeLessThan(600);
       expect(entry.title.length, code).toBeGreaterThan(0);
+      expect(entry.code, code).toBe(code);
     }
-    expect(ERROR_CODES).toEqual(Object.keys(ERROR_CATALOG));
-  });
-});
-
-describe('responseStatus', () => {
-  it('uses the single status, 400 for mixed 4xx, 500 otherwise', () => {
-    expect(responseStatus([{ status: '404' }, { status: '404' }])).toBe(404);
-    expect(responseStatus([{ status: '404' }, { status: '409' }])).toBe(400);
-    expect(responseStatus([{ status: '503' }, { status: '500' }])).toBe(500);
-    expect(responseStatus([{ status: '404' }, { status: '503' }])).toBe(500);
-    expect(responseStatus([{ title: 'no status' }])).toBe(500);
-    expect(responseStatus([{ status: '200' }, { status: 'abc' }])).toBe(500);
-    // An unregistered code cannot become the response status.
-    expect(responseStatus([{ status: '499' }])).toBe(500);
-    expect(responseStatus([{ status: '499' }, { status: '404' }])).toBe(404);
-  });
-});
-
-// Hono's status unions keep these out at the type level; the runtime check
-// guards callers without types.
-const unchecked = (status: number): JsonApiError =>
-  new JsonApiError({ title: 'x' }, { status: status as 404 });
-
-describe('JsonApiError', () => {
-  it('derives the status, keeps the objects, and renders a document', () => {
-    const error = new JsonApiError([
-      errorObject('INVALID_QUERY_PARAMETER', { detail: 'a' }),
-      errorObject('UNKNOWN_QUERY_PARAMETER', { detail: 'b' }),
-    ]);
-    expect(error.status).toBe(400);
-    expect(error.errors).toHaveLength(2);
-    expect(error.name).toBe('JsonApiError');
-    expect(error.message).toBe(
-      '400 INVALID_QUERY_PARAMETER, UNKNOWN_QUERY_PARAMETER: a',
+    expect(ERROR_CODES).toEqual([...new Set(ERROR_CODES)]);
+    expect(ERROR_CODES).toEqual(
+      expect.arrayContaining(Object.keys(ERROR_CATALOG)),
     );
-    expect(error.document({ meta: { requestId: 'r1' } })).toEqual({
-      meta: { requestId: 'r1' },
-      errors: error.errors,
+  });
+
+  it('spreads into an application instance that renders the same objects', () => {
+    const ban = createBan({
+      errors: { ...ERROR_CATALOG, TEAPOT: { status: 418 } },
+      format: jsonApi({ mixedEntries: true }),
     });
-    expect(Object.keys(error.document())).toEqual(['errors']);
-  });
-
-  it('accepts a status override and a cause, and rejects bad input', () => {
-    const cause = new Error('db');
-    const error = new JsonApiError({ title: 'x' }, { status: 503, cause });
-    expect(error.status).toBe(503);
-    expect(error.cause).toBe(cause);
-    expect(() => new JsonApiError([])).toThrow(TypeError);
-    expect(() => unchecked(200)).toThrow(TypeError);
-    expect(() => unchecked(404.5)).toThrow(TypeError);
-    expect(() => unchecked(499)).toThrow(/not a registered/u);
-  });
-
-  it('builds catalog errors with their source members', () => {
-    expect(
-      JsonApiError.invalidParameter('page[size]', 'bad').errors[0],
-    ).toMatchObject({
-      status: '400',
-      code: 'INVALID_QUERY_PARAMETER',
-      source: { parameter: 'page[size]' },
+    expect(ban.catalog.INVALID_DOCUMENT.title).toBe('Invalid Document');
+    expect(ban.catalog.UNSUPPORTED_SORT.type).toBe(UNSUPPORTED_SORT_TYPE);
+    expect(ban.TEAPOT().status).toBe(418);
+    const error = jsonApiError('INVALID_DOCUMENT', {
       detail: 'bad',
+      source: { pointer: '/data' },
     });
-    expect(JsonApiError.unknownParameter('foo').errors[0]).toMatchObject({
-      code: 'UNKNOWN_QUERY_PARAMETER',
-      detail: 'Query parameter "foo" is not supported by this endpoint',
-      source: { parameter: 'foo' },
+    expect(ban.render(error).body).toEqual(jsonApiBan.render(error).body);
+  });
+});
+
+describe('errorItem', () => {
+  it('carries the entry identity and turns a pointer into path segments', () => {
+    expect(
+      errorItem('INVALID_DOCUMENT', {
+        detail: 'bad',
+        source: { pointer: '/data/attributes/a~1b' },
+      }),
+    ).toEqual({
+      status: 400,
+      code: 'INVALID_DOCUMENT',
+      title: 'Invalid Document',
+      detail: 'bad',
+      path: ['data', 'attributes', 'a/b'],
     });
     expect(
-      JsonApiError.invalidDocument('/data', 'nope').errors[0]?.source,
-    ).toEqual({
-      pointer: '/data',
-    });
-    expect(JsonApiError.malformedJson().status).toBe(400);
-    expect(JsonApiError.notAcceptable('x').errors[0]?.source).toEqual({
-      header: 'Accept',
-    });
-    expect(JsonApiError.unsupportedMediaType('x').errors[0]?.source).toEqual({
-      header: 'Content-Type',
-    });
-    expect(JsonApiError.clientGeneratedIdNotSupported()).toMatchObject({
-      status: 403,
-      errors: [{ source: { pointer: '/data/id' } }],
-    });
-    expect(JsonApiError.notFound().errors[0]?.detail).toBe(
-      'The requested resource does not exist',
-    );
-    expect(JsonApiError.conflict('c', { pointer: '/data/type' }).status).toBe(
-      409,
-    );
-    expect(JsonApiError.forbidden('f').status).toBe(403);
+      errorItem('INVALID_DOCUMENT', {
+        detail: 'whole',
+        source: { pointer: '' },
+      }).path,
+    ).toEqual([]);
   });
 
-  it('builds one 422 object per validation issue', () => {
-    const error = JsonApiError.validationFailed([
-      { pointer: '/data/attributes/email', detail: 'Invalid email' },
-      { pointer: '/data/attributes/age', detail: 'Too young' },
-    ]);
-    expect(error.status).toBe(422);
-    expect(error.errors.map((e) => e.source?.pointer)).toEqual([
-      '/data/attributes/email',
-      '/data/attributes/age',
-    ]);
-    expect(() => JsonApiError.validationFailed([])).toThrow(TypeError);
+  it('locates parameters in the query and headers in the headers', () => {
+    expect(
+      errorItem('INVALID_QUERY_PARAMETER', {
+        detail: 'bad',
+        source: { parameter: 'page[size]' },
+      }),
+    ).toMatchObject({ location: 'query', path: ['page[size]'] });
+    expect(
+      errorItem('NOT_ACCEPTABLE', {
+        detail: 'bad',
+        source: { header: 'Accept' },
+      }),
+    ).toMatchObject({ location: 'header', path: ['Accept'] });
+    // One address per item: pointer wins, then parameter.
+    expect(
+      errorItem('NOT_FOUND', {
+        detail: 'x',
+        source: { pointer: '/a', parameter: 'b', header: 'C' },
+      }),
+    ).toMatchObject({ path: ['a'] });
+    expect(
+      errorItem('NOT_FOUND', {
+        detail: 'x',
+        source: { parameter: 'b', header: 'C' },
+      }),
+    ).toMatchObject({ location: 'query', path: ['b'] });
+    const bare = errorItem('NOT_FOUND', { detail: 'x', source: {} });
+    expect('path' in bare).toBe(false);
+    expect('location' in bare).toBe(false);
   });
 
-  it('keeps the internal error constant and attaches the cause', () => {
-    const cause = new Error('secret connection string');
-    const error = JsonApiError.internal(cause);
-    expect(error.status).toBe(500);
-    expect(JSON.stringify(error.document())).not.toContain('secret');
+  it('keeps meta and the entry type link, and accepts ban-kit built-in codes', () => {
+    expect(
+      errorItem('MAX_PAGE_SIZE_EXCEEDED', {
+        detail: 'x',
+        source: { parameter: 'page[size]' },
+        meta: { page: { maxSize: 10 } },
+      }),
+    ).toMatchObject({
+      type: 'https://jsonapi.org/profiles/ethanresnick/cursor-pagination/max-size-exceeded',
+      meta: { page: { maxSize: 10 } },
+    });
+    expect(errorItem('UNAUTHORIZED', { detail: 'x' })).toEqual({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      title: 'Unauthorized',
+      detail: 'x',
+    });
+  });
+});
+
+describe('jsonApiError from a code', () => {
+  it('renders the entry alone, or with a detail, as one object carrying the id', () => {
+    const bare = jsonApiError('NOT_FOUND');
+    expect(isBanError(bare)).toBe(true);
+    expect(bare.status).toBe(404);
+    expect(bare.errors).toBeUndefined();
+    expect(errorObjects(bare)).toEqual([
+      { id: bare.id, status: '404', code: 'NOT_FOUND', title: 'Not Found' },
+    ]);
+    const detailed = jsonApiError('FORBIDDEN', { detail: 'Read-only' });
+    expect(detailed.message).toBe('Read-only');
+    expect(errorObjects(detailed)[0]).toMatchObject({
+      status: '403',
+      detail: 'Read-only',
+    });
+  });
+
+  it('renders a source back as the JSON:API member it came from', () => {
+    const pointer = jsonApiError('CONFLICT', {
+      detail: 'Taken',
+      source: { pointer: '/data/id' },
+    });
+    expect(pointer.status).toBe(409);
+    expect(pointer.errors).toHaveLength(1);
+    expect(errorObjects(pointer)).toEqual([
+      {
+        id: pointer.id,
+        status: '409',
+        code: 'CONFLICT',
+        title: 'Conflict',
+        detail: 'Taken',
+        source: { pointer: '/data/id' },
+      },
+    ]);
+    const parameter = errorObjects(
+      jsonApiError('INVALID_QUERY_PARAMETER', {
+        detail: 'bad',
+        source: { parameter: 'sort' },
+      }),
+    )[0];
+    expect(parameter).toMatchObject({
+      source: { parameter: 'sort' },
+      meta: { location: 'query' },
+    });
+    const header = errorObjects(
+      jsonApiError('NOT_ACCEPTABLE', {
+        detail: 'bad',
+        source: { header: 'Accept' },
+      }),
+    )[0];
+    expect(header).toMatchObject({
+      source: { header: 'Accept' },
+      meta: { location: 'header' },
+    });
+  });
+
+  it('keeps headers and the cause, and needs a detail next to a source', () => {
+    const cause = new Error('db');
+    const error = jsonApiError('METHOD_NOT_ALLOWED', {
+      detail: 'POST only',
+      headers: { Allow: 'POST' },
+      cause,
+    });
+    expect(error.headers.get('allow')).toBe('POST');
     expect(error.cause).toBe(cause);
+    expect(() =>
+      // @ts-expect-error -- a source without a detail is a type error too
+      jsonApiError('CONFLICT', { source: { pointer: '/data' } }),
+    ).toThrow(TypeError);
   });
 });
 
-describe('isJsonApiError', () => {
-  it('accepts instances and structural look-alikes, rejects the rest', () => {
-    expect(isJsonApiError(JsonApiError.notFound())).toBe(true);
-    const foreign = Object.assign(new Error('x'), {
-      name: 'JsonApiError',
-      status: 404,
-      errors: [{ status: '404' }],
-    });
-    expect(isJsonApiError(foreign)).toBe(true);
-    expect(isJsonApiError(new Error('x'))).toBe(false);
-    expect(isJsonApiError({ status: 404, errors: [] })).toBe(false);
-    expect(isJsonApiError(null)).toBe(false);
+describe('jsonApiError from items', () => {
+  it('is the shared entry when every item carries the same code', () => {
+    const error = jsonApiError([invalid('sort'), invalid('include')]);
+    expect(error.status).toBe(400);
+    expect(error.code).toBe('INVALID_QUERY_PARAMETER');
+    expect(error.message).toBe('Invalid Query Parameter');
+    expect(errorObjects(error).map((object) => object.source)).toEqual([
+      { parameter: 'sort' },
+      { parameter: 'include' },
+    ]);
+    const single = jsonApiError(invalid('sort'));
+    expect(single.message).toBe('sort is bad');
+    expect(single.errors).toHaveLength(1);
   });
-});
 
-describe('errorDocument', () => {
-  it('orders jsonapi, links, meta before errors and drops undefined', () => {
-    const document = errorDocument([{ title: 't' }], {
-      jsonapi: { version: '1.1' },
-      meta: undefined,
+  it('derives the most generally applicable status when the codes differ', () => {
+    const mixed = jsonApiError([
+      invalid('sort'),
+      errorItem('UNKNOWN_QUERY_PARAMETER', {
+        detail: 'x',
+        source: { parameter: 'foo' },
+      }),
+    ]);
+    expect(mixed.status).toBe(400);
+    expect(mixed.code).toBe('BAD_REQUEST');
+    expect(errorObjects(mixed).map((object) => object.code)).toEqual([
+      'INVALID_QUERY_PARAMETER',
+      'UNKNOWN_QUERY_PARAMETER',
+    ]);
+    const severe = jsonApiError([
+      errorItem('NOT_FOUND', { detail: 'a' }),
+      errorItem('INTERNAL_SERVER_ERROR', { detail: 'b' }),
+    ]);
+    expect(severe.status).toBe(500);
+    const agreeing = jsonApiError([
+      errorItem('NOT_FOUND', { detail: 'a' }),
+      errorItem('NOT_FOUND', { detail: 'b', source: { pointer: '/x' } }),
+    ]);
+    expect(agreeing.code).toBe('NOT_FOUND');
+    expect(agreeing.message).toBe('Not Found');
+  });
+
+  it('falls back to a 500 for items without a status and rejects an empty list', () => {
+    const anonymous = jsonApiError([{ detail: 'no identity' }]);
+    expect(anonymous.status).toBe(500);
+    expect(errorObjects(anonymous)[0]).toMatchObject({
+      status: '500',
+      code: 'INTERNAL_SERVER_ERROR',
+      detail: 'no identity',
     });
-    expect(Object.keys(document)).toEqual(['jsonapi', 'errors']);
+    expect(() => jsonApiError([])).toThrow(TypeError);
   });
 });

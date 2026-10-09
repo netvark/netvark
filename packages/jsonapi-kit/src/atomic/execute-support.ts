@@ -3,6 +3,8 @@
  * the lookups and checks the runners make before calling a handler.
  * @packageDocumentation
  */
+import type { BanError } from 'ban-kit';
+
 import type { ResourceLinkage, ResourceObject } from '../document/types';
 import type { AnyResource } from '../resource/types';
 import type { Lids } from './lids';
@@ -15,8 +17,9 @@ import type {
 } from './types';
 
 import { serializeResource } from '../document/serialize';
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { isRecord, ownMember } from '../internal/object';
+import { invalidDocument } from '../request/identifiers';
 import { parseResourceObject } from '../request/resource-document';
 
 /** A result object: `data` when the handler returned a row, else empty. */
@@ -33,8 +36,8 @@ export interface Execution<TTransaction, TContext> {
   readonly context: OperationContext<TTransaction, TContext>;
 }
 
-export function forbidden(pointer: string, detail: string): JsonApiError {
-  return JsonApiError.forbidden(detail, { pointer });
+export function forbidden(pointer: string, detail: string): BanError {
+  return jsonApiError('FORBIDDEN', { detail, source: { pointer } });
 }
 
 export function handlersFor<TTransaction, TContext>(
@@ -44,8 +47,9 @@ export function handlersFor<TTransaction, TContext>(
 ): AnyResourceHandlers<TTransaction, TContext> {
   const handlers = execution.handlers.get(type);
   if (handlers === undefined) {
-    throw JsonApiError.notFound(`No resource type "${type}" exists`, {
-      pointer,
+    throw jsonApiError('NOT_FOUND', {
+      detail: `No resource type "${type}" exists`,
+      source: { pointer },
     });
   }
   return handlers;
@@ -63,17 +67,18 @@ export function targetId<TTransaction, TContext>(
   if (target.lid !== undefined) {
     return execution.lids.resolve(target.type, target.lid, `${pointer}/lid`);
   }
-  throw JsonApiError.invalidDocument(
-    pointer,
-    'The target must name a resource by id or lid',
+  throw jsonApiError(
+    invalidDocument(pointer, 'The target must name a resource by id or lid'),
   );
 }
 
 export function requireData(operation: RawOperation, what: string): unknown {
   if (!operation.hasData) {
-    throw JsonApiError.invalidDocument(
-      operation.pointer,
-      `An operation that ${what} must have a data member`,
+    throw jsonApiError(
+      invalidDocument(
+        operation.pointer,
+        `An operation that ${what} must have a data member`,
+      ),
     );
   }
   return operation.data;
@@ -112,9 +117,11 @@ export function dataType(operation: RawOperation): string {
   const data = requireData(operation, 'adds a resource');
   const type = isRecord(data) ? ownMember(data, 'type') : undefined;
   if (typeof type !== 'string') {
-    throw JsonApiError.invalidDocument(
-      `${operation.pointer}/data/type`,
-      'A resource object must have a string type',
+    throw jsonApiError(
+      invalidDocument(
+        `${operation.pointer}/data/type`,
+        'A resource object must have a string type',
+      ),
     );
   }
   return type;

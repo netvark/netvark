@@ -9,16 +9,20 @@
  * @ref https://jsonapi.org/ext/atomic/#processing-errors
  * @packageDocumentation
  */
+import type { ErrorItem } from 'ban-kit';
+
 import type { ExtensionDocument, JsonApiObject } from '../document/types';
 import type { OperationResult } from './execute';
 import type { AnyResourceHandlers, AtomicOptions } from './types';
 
-import { JsonApiError, isJsonApiError } from '../errors/json-api-error';
+import { BanError, isBanError } from 'ban-kit';
+
 import {
   ATOMIC_OPERATIONS_EXTENSION,
   DEFAULT_MAX_OPERATIONS,
   JSON_API_VERSION,
 } from '../internal/constants';
+import { pathFromPointer } from '../internal/pointer';
 import { executeOperation } from './execute';
 import { Lids } from './lids';
 import { RESULTS_MEMBER, parseOperationsDocument } from './parse-document';
@@ -43,7 +47,7 @@ export interface OperationsOutcome {
 
 /**
  * Parses an operations document (the request body as JSON) and runs it
- * inside one transaction. Rejects with the `JsonApiError` to render (a 400
+ * inside one transaction. Rejects with the `BanError` to render (a 400
  * for the document, the failing operation's error with its pointer added)
  * or with whatever else a handler threw, after the transaction rolled back.
  */
@@ -70,20 +74,43 @@ function indexHandlers<TTransaction, TContext>(
   return handlers;
 }
 
+/** The one item an error without a list renders as: its own identity and message. */
+function itemOf(error: BanError): ErrorItem {
+  return {
+    status: error.status,
+    code: error.code,
+    title: error.title,
+    ...(error.type === undefined ? {} : { type: error.type }),
+    detail: error.message,
+  };
+}
+
+/** The item, addressed at the operation. */
+function pointedAt(item: ErrorItem, path: ReadonlyArray<string>): ErrorItem {
+  return { ...item, path };
+}
+
 /**
  * Gives every error object of an operation's failure a pointer to the
- * operation when it has no source of its own, as the extension asks.
+ * operation when it has no source of its own, as the extension asks. The
+ * error is rebuilt from its own fields (`toInit`), so its id, headers, and
+ * rendering stay; an item with a `path` already points somewhere.
  */
-function atOperation(error: JsonApiError, pointer: string): JsonApiError {
-  if (error.errors.every((object) => object.source !== undefined)) {
+function atOperation(error: BanError, pointer: string): BanError {
+  const items =
+    error.errors === undefined || error.errors.length === 0
+      ? [itemOf(error)]
+      : error.errors;
+  if (items.every((item) => item.path !== undefined)) {
     return error;
   }
-  return new JsonApiError(
-    error.errors.map((object) =>
-      object.source === undefined ? { ...object, source: { pointer } } : object,
+  const path = pathFromPointer(pointer);
+  return new BanError({
+    ...error.toInit(),
+    errors: items.map((item) =>
+      item.path === undefined ? pointedAt(item, path) : item,
     ),
-    { status: error.status, cause: error },
-  );
+  });
 }
 
 function resultsDocument(
@@ -130,7 +157,7 @@ export function operationsProcessor<TTransaction, TContext = unknown>(
         try {
           out.push(await executeOperation(execution, operation));
         } catch (error) {
-          throw isJsonApiError(error)
+          throw isBanError(error)
             ? atOperation(error, operation.pointer)
             : error;
         }

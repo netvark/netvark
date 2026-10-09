@@ -6,11 +6,13 @@
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @packageDocumentation
  */
-import type { ErrorObject, Meta } from '../document/types';
+import type { ErrorItem } from 'ban-kit';
+
+import type { Meta } from '../document/types';
 import type { ParseDocumentOptions } from './parse-support';
 import type { OperationCode, OperationTarget } from './types';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { jsonApiError } from '../errors/json-api-error';
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
 import { invalidDocument } from '../request/identifiers';
 import { unknownMembers } from './parse-support';
@@ -60,7 +62,7 @@ function parseOperation(
   value: unknown,
   index: number,
   options: ParseDocumentOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): RawOperation | undefined {
   const pointer = `/${OPERATIONS_MEMBER}/${String(index)}`;
   if (!isRecord(value)) {
@@ -105,7 +107,7 @@ function parseOperation(
 function parseOperations(
   body: Record<string, unknown>,
   options: ParseDocumentOptions,
-  errors: Array<ErrorObject>,
+  errors: Array<ErrorItem>,
 ): Array<RawOperation> {
   const operations = ownMember(body, OPERATIONS_MEMBER);
   if (!Array.isArray(operations)) {
@@ -146,7 +148,7 @@ function parseOperations(
 }
 
 /**
- * Parses the operations document, throwing a 400 `JsonApiError` listing
+ * Parses the operations document, throwing a 400 `BanError` listing
  * every structural problem. The operations are returned in order with
  * their `data` untouched; `execute` parses that against the targeted
  * definition once the target is known.
@@ -156,12 +158,11 @@ export function parseOperationsDocument(
   options: ParseDocumentOptions,
 ): Array<RawOperation> {
   if (!isRecord(body)) {
-    throw JsonApiError.invalidDocument(
-      '',
-      'A JSON:API document must be a JSON object',
+    throw jsonApiError(
+      invalidDocument('', 'A JSON:API document must be a JSON object'),
     );
   }
-  const errors: Array<ErrorObject> = [];
+  const errors: Array<ErrorItem> = [];
   unknownMembers(
     body,
     TOP_LEVEL_MEMBERS,
@@ -171,7 +172,7 @@ export function parseOperationsDocument(
   );
   const operations = parseOperations(body, options, errors);
   if (errors.length > 0) {
-    throw new JsonApiError(errors);
+    throw jsonApiError(errors);
   }
   return operations;
 }

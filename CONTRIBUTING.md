@@ -112,15 +112,18 @@ surface falls into one of these:
 
 **Constraints every contribution inherits.**
 
-- `jsonapi-kit` has no dependencies; `hono` stays `hono-jsonapi`'s only peer dependency. Validators
-  are consumed through the Standard Schema interface, whose types are vendored in
-  `packages/jsonapi-kit/src/internal/standard-schema-types.ts`; the packages never import Zod,
-  Valibot, or ArkType (ADR 0002). The real libraries used in tests are devDependencies.
+- `jsonapi-kit` depends on `ban-kit` and on nothing else; `hono` and `hono-ban` are `hono-jsonapi`'s
+  only peer dependencies (ADR 0014). Validators are consumed through the Standard Schema interface,
+  whose types are vendored in `packages/jsonapi-kit/src/internal/standard-schema-types.ts`; the
+  packages never import Zod, Valibot, or ArkType (ADR 0002). The real libraries used in tests are
+  devDependencies.
 - A definition is validated once, in `defineResource`, with a `TypeError` naming the option. A
   request-time check that a definition mistake could trigger belongs there, not in a parser.
-- A parser reports every problem it finds in one `JsonApiError`, each error object with a `source`
-  (`pointer`, `parameter`, or `header`), and never drops input silently.
-- Every status a `JsonApiError` carries is a registered 4xx or 5xx code (ADR 0009).
+- A parser reports every problem it finds in one `BanError` built with `jsonApiError`, each error
+  item with a `source` (`pointer`, `parameter`, or `header`), and never drops input silently.
+- Every `code` the packages emit is in `ERROR_CODES`; a new one is a catalog entry, a SPEC 4.1 row,
+  and a `minor` changeset (ADR 0009, ADR 0014). Nothing in the adapter renders its own rejection; it
+  throws, and `errorHandler()` renders.
 
 **Checklist.** Every item below is checked by CI or by a reviewer.
 

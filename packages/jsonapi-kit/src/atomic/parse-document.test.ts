@@ -1,8 +1,9 @@
 import type { OperationTarget } from './types';
 
+import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from '../errors/json-api-error';
+import { errorObjects } from '../errors/json-api-error';
 import { parseOperationsDocument } from './parse-document';
 
 const DEFAULTS: Parameters<typeof parseOperationsDocument>[1] = {
@@ -18,13 +19,13 @@ function pointersOf(
   try {
     parseOperationsDocument(body, options);
   } catch (error) {
-    if (error instanceof JsonApiError) {
+    if (isBanError(error)) {
       expect(error.status).toBe(400);
-      return error.errors.map((object) => object.source?.pointer);
+      return errorObjects(error).map((object) => object.source?.pointer);
     }
     throw error;
   }
-  throw new Error('expected a JsonApiError');
+  throw new Error('expected a BanError');
 }
 
 describe('parseOperationsDocument', () => {

@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { JsonApiError } from 'jsonapi-kit';
+import { jsonApiError } from 'jsonapi-kit';
 
 import {
   isJsonApiResponse,
@@ -105,24 +105,31 @@ describe('respond', () => {
 });
 
 describe('respondError', () => {
-  it('sends the error document with the error status and base members', async () => {
+  it('sends the error document with the error status, its headers, and base members', async () => {
+    const error = jsonApiError('NOT_FOUND', {
+      detail: 'The requested resource does not exist',
+      headers: { 'Cache-Control': 'no-store', 'X-Request-Id': 'error' },
+    });
     const response = await handle((c) =>
       respondError(
         c,
-        JsonApiError.notFound(),
+        error,
         { meta: { requestId: 'r' } },
-        { 'X-Request-Id': 'r' },
+        { 'X-Request-Id': 'r', 'Cache-Control': 'private' },
       ),
     );
     expect(response.status).toBe(404);
     expect(response.headers.get('content-type')).toBe(
       'application/vnd.api+json',
     );
-    expect(response.headers.get('x-request-id')).toBe('r');
+    // The error's own headers win over the caller's.
+    expect(response.headers.get('x-request-id')).toBe('error');
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({
       meta: { requestId: 'r' },
       errors: [
         {
+          id: error.id,
           status: '404',
           code: 'NOT_FOUND',
           title: 'Not Found',

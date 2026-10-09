@@ -1,6 +1,8 @@
 # ADR 0009: A closed error catalog over registered status codes
 
-- Status: accepted
+- Status: accepted; construction and status derivation moved to ban-kit by ADR-0014 (`ERROR_CATALOG`
+  is a fragment over ban-kit's built-in catalog, `responseStatus` is ban-kit's, and the registered
+  status check is ban-kit's)
 - Date: 2026-10-08
 
 ## Context
