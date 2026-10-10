@@ -104,6 +104,11 @@ KEYSET_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter
   `isolatedDeclarations`); locals do not.
 - **No `any`, no non-null assertions, `Array<T>` over `T[]`, `??` over `||`.** oxlint enforces
   these.
+- **Shared dependency versions live in the catalog.** A dependency that two or more workspace
+  packages declare takes its version from the default catalog in `pnpm-workspace.yaml` and is
+  referenced as `"name": "catalog:"`. One that a single package uses stays pinned there, and peer
+  ranges always stay in the package
+  ([ADR 0005](docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md)).
 - **No emojis** in code, docs, or commit messages.
 - **Lint disables carry a reason.** `// oxlint-disable-next-line rule -- reason: <why>`.
 

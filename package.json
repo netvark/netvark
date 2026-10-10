@@ -38,7 +38,7 @@
     "@arethetypeswrong/cli": "0.18.5",
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
-    "@types/node": "26.6.4",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "5.0.3",
     "knip": "6.40.0",
     "lefthook": "2.1.17",
@@ -46,9 +46,9 @@
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2003",
     "publint": "0.3.25",
-    "tsdown": "0.23.0",
-    "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=22.12.0"
