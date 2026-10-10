@@ -18,6 +18,7 @@ const ban = createBan();
 describe('validator hook types', () => {
   it('fit @hono/zod-validator and @hono/zod-openapi', () => {
     expectTypeOf(zodHook(ban)).toExtend<
+      // oxlint-disable-next-line typescript/no-generated-empty-object-type -- reason: `O = {}` is the library's own default for the hook's response body, written out because the later `Schema` argument is what this assertion pins
       ZodHook<unknown, Env, string, 'json', Record<never, never>, ZodType>
     >();
     expectTypeOf(defaultHook(ban)).toExtend<

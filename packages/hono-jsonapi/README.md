@@ -30,8 +30,10 @@ ArkType, and others) without importing any of them.
 ## Quick start
 
 ```ts
-import { Hono } from 'hono';
 import type { JsonApiEnv } from '@netvark/hono-jsonapi';
+
+import { Hono } from 'hono';
+
 import {
   defineResource,
   errorHandler,
@@ -413,7 +415,9 @@ middleware set.
 
 ```ts
 import type { Context } from 'hono';
+
 import type { ResourceHandlers } from '@netvark/hono-jsonapi/atomic';
+
 import { atomicOperations } from '@netvark/hono-jsonapi/atomic';
 
 const articleHandlers: ResourceHandlers<typeof Articles, Transaction, Context<JsonApiEnv>> = {

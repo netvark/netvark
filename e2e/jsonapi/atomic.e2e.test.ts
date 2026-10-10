@@ -17,19 +17,19 @@ interface Results {
   readonly errors?: Array<Record<string, unknown>>;
 }
 
+function operations(
+  list: ReadonlyArray<unknown>,
+  contentType = MEDIA_TYPE,
+): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'content-type': contentType, accept: MEDIA_TYPE },
+    body: JSON.stringify({ 'atomic:operations': list }),
+  };
+}
+
 describe('atomic operations', () => {
   const blog = useBlog();
-
-  function operations(
-    list: ReadonlyArray<unknown>,
-    contentType = MEDIA_TYPE,
-  ): RequestInit {
-    return {
-      method: 'POST',
-      headers: { 'content-type': contentType, accept: MEDIA_TYPE },
-      body: JSON.stringify({ 'atomic:operations': list }),
-    };
-  }
 
   it('creates linked resources with a lid and answers with positional results', async () => {
     const { status, headers, body } = await blog.request(

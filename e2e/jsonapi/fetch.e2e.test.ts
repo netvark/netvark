@@ -107,14 +107,15 @@ describe('fetching', () => {
     expect(empty.included).toEqual([]);
   });
 
+  async function titles(query: string): Promise<Array<unknown>> {
+    const { status, body } = await blog.request(`/articles?${query}`);
+    expect(status, query).toBe(200);
+    return ((body as Doc).data as Array<Record<string, unknown>>).map(
+      (row) => (row['attributes'] as Record<string, unknown>)['title'],
+    );
+  }
+
   it('sorts and filters the collection', async () => {
-    const titles = async (query: string): Promise<Array<unknown>> => {
-      const { status, body } = await blog.request(`/articles?${query}`);
-      expect(status, query).toBe(200);
-      return ((body as Doc).data as Array<Record<string, unknown>>).map(
-        (row) => (row['attributes'] as Record<string, unknown>)['title'],
-      );
-    };
     expect(await titles('sort=-title&page[size]=3')).toEqual([
       'Rails is Omakase',
       'Nanoseconds',

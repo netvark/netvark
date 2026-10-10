@@ -26,6 +26,7 @@ on Node 22 and 24 and a smoke test of every subpath on Bun, Deno, and workerd.
 
 ```ts
 import { Hono } from 'hono';
+
 import { createBan } from '@netvark/hono-ban';
 
 const ban = createBan();
@@ -337,6 +338,7 @@ throw token.INVALID_GRANT('The refresh token has expired');
 
 ```ts
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
+
 import { errorResponses, validationResponse } from '@netvark/hono-ban/openapi';
 import { defaultHook } from '@netvark/hono-ban/zod';
 
@@ -393,6 +395,7 @@ Content-Type: application/problem+json
 
 ```ts
 import { trace } from '@opentelemetry/api';
+
 import { traceIdFromOtel } from '@netvark/hono-ban/otel';
 
 app.onError(

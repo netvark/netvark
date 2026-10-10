@@ -133,7 +133,8 @@ first so the scope is settled before code exists, then:
   `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`.
 - Keep pull requests focused. Describe the why in the body; link the issue.
 - Every user-visible change needs a changeset (next section). CI fails without one on
-  `packages/*/src` changes.
+  `packages/*/src` changes. A source change users cannot see, such as a comment, a lint directive,
+  or a test, takes an empty one: `pnpm changeset add --empty`.
 
 ## Changesets and releases
 

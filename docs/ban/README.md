@@ -21,6 +21,7 @@ pnpm add @netvark/hono-ban hono
 
 ```ts
 import { Hono } from 'hono';
+
 import { createBan } from '@netvark/hono-ban';
 
 const ban = createBan({
