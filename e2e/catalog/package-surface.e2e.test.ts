@@ -17,8 +17,11 @@ const CORE = ['CATALOG_FORMAT', 'diffCatalogs', 'toPublicCatalog'].toSorted();
 
 const PG_CATALOG = [
   'PgCatalogError',
+  'drift',
   'extract',
   'extractCatalog',
+  'formatDiff',
+  'introspectCatalog',
   'isPgCatalogError',
   'parseCatalogModule',
   'renderCatalogModule',

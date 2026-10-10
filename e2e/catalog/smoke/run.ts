@@ -2,11 +2,13 @@
  * In-process entry for Bun and Deno: the runtime under test loads both
  * packages from `node_modules` the way Node does (Deno 2 does so because
  * `package.json` puts it in manual `node_modules` mode), runs the neutral
- * checks, and extracts the contacts catalog with PGlite.
+ * checks, extracts the contacts catalog with PGlite, and runs drift against
+ * a live PGlite over a socket.
  * @ref https://bun.com/docs/runtime/modules
  * @ref https://docs.deno.com/runtime/fundamentals/node/#control-node_modules
  */
 import { neutralChecks } from './checks.ts';
+import { driftChecks } from './drift-checks.ts';
 import { extractChecks } from './extract-checks.ts';
 import { report, runChecks } from './report.ts';
 
@@ -32,4 +34,10 @@ function runtime(): string {
   return 'unknown runtime';
 }
 
-report(await runChecks(runtime(), { ...neutralChecks, ...extractChecks }));
+report(
+  await runChecks(runtime(), {
+    ...neutralChecks,
+    ...extractChecks,
+    ...driftChecks,
+  }),
+);

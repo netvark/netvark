@@ -1,7 +1,12 @@
 import pg from 'pg';
 import { describe, expect, it } from 'vitest';
 
-import { openThrowawayDatabase, throwawayName, withDatabase } from './server';
+import {
+  openLiveDatabase,
+  openThrowawayDatabase,
+  throwawayName,
+  withDatabase,
+} from './server';
 import { useSession } from './session';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Client } = pg` for ESM
@@ -35,6 +40,26 @@ describe('throwawayName and withDatabase (SPEC 6.2)', () => {
     expect(() => withDatabase('host=db user=app', 'x')).toThrow(
       'the database URL is not a valid URL',
     );
+  });
+});
+
+describe('openLiveDatabase (SPEC 10.2)', () => {
+  it('refuses anything but a postgres:// or postgresql:// URL before connecting, without echoing it', async () => {
+    await expect(
+      openLiveDatabase('mysql://root:secret@host/db'),
+    ).rejects.toMatchObject({
+      code: 'config_invalid',
+      message: 'the database URL must start with postgres:// or postgresql://',
+    });
+  });
+
+  it('fails with connection_failed when nothing listens at the URL', async () => {
+    await expect(
+      openLiveDatabase('postgres://app:secret@127.0.0.1:1/app'),
+    ).rejects.toMatchObject({
+      code: 'connection_failed',
+      message: 'cannot connect to the PostgreSQL server',
+    });
   });
 });
 
