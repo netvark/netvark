@@ -1,0 +1,74 @@
+{
+  "name": "hono-jsonapi",
+  "version": "0.0.0",
+  "description": "JSON:API 1.1 for Hono: content negotiation middleware, typed validators, response helpers, error handlers, and the Atomic Operations endpoint, on top of jsonapi-kit.",
+  "keywords": [
+    "atomic-operations",
+    "cursor-pagination",
+    "hono",
+    "json-api",
+    "jsonapi",
+    "middleware",
+    "rest"
+  ],
+  "homepage": "https://github.com/ali-issa/jsonapi-kit/tree/main/packages/hono-jsonapi#readme",
+  "bugs": "https://github.com/ali-issa/jsonapi-kit/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ali-issa/jsonapi-kit.git",
+    "directory": "packages/hono-jsonapi"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./atomic": {
+      "source": "./src/atomic/index.ts",
+      "default": "./dist/atomic.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./atomic": "./dist/atomic.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jsonapi-kit": "workspace:^"
+  },
+  "devDependencies": {
+    "hono": "4.13.7",
+    "hono-ban": "^2.0.0",
+    "zod": "4.5.4"
+  },
+  "peerDependencies": {
+    "hono": ">=4.12.34",
+    "hono-ban": ">=2.0.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

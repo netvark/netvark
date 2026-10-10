@@ -1,0 +1,42 @@
+# pnpm settings live here, not in .npmrc (pnpm 10+ reads only auth and
+# registry settings from .npmrc).
+# @ref https://pnpm.io/settings
+# @ref https://pnpm.io/supply-chain-security
+# @ref https://pnpm.io/workspaces
+
+# `packages/*` are the published packages: `jsonapi-kit` (the framework-free
+# core) and `hono-jsonapi` (the Hono adapter, which depends on the core
+# through `workspace:^`). `e2e/` is a private consumer package that installs
+# both through `workspace:*`, so its imports resolve through the published
+# `exports` maps into `dist/`.
+packages:
+  - packages/*
+  - e2e
+
+# Do not install versions published less than a day ago; most compromised
+# releases are pulled within hours.
+minimumReleaseAge: 1440
+
+# Refuse a version whose publisher verification is weaker than the previous
+# one (for example a release without provenance after releases with it).
+trustPolicy: no-downgrade
+
+# Transitive dependencies may not come from git or tarball URLs.
+blockExoticSubdeps: true
+
+# Dependencies allowed to run install scripts. lefthook downloads its binary
+# in postinstall; workerd (pulled in by miniflare for the e2e smoke test)
+# selects its platform binary in postinstall. Everything else is blocked
+# (pnpm default).
+allowBuilds:
+  lefthook: true
+  workerd: true
+
+# Temporary, until ban-kit 1.0.0 and hono-ban 2.0.0 are on npm: resolve both
+# from tarballs packed out of ../hono-ban (`pnpm pack` in that repo), so this
+# workspace consumes exactly what `pnpm publish` would ship (dist only,
+# publishConfig exports applied) with one copy of `hono` and `ban-kit` in the
+# graph. Remove this block and run `pnpm install` once the two are published.
+overrides:
+  ban-kit: file:../hono-ban/.pack/ban-kit-1.0.0.tgz
+  hono-ban: file:../hono-ban/.pack/hono-ban-2.0.0.tgz
