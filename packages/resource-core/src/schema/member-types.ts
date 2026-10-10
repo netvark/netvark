@@ -14,12 +14,13 @@ import type {
   PublicTable,
 } from '@netvark/catalog-core';
 
-/** The columns with a `notNull` rule among the CHECKs over exactly them; computed once per table. */
+/** The columns with a `notNull` rule among the enforced CHECKs over exactly them; computed once per table. */
 type NotNullRuleColumns<TTableDef extends PublicTable> = {
   [K in keyof TTableDef['constraints']]: TTableDef['constraints'][K] extends {
     readonly kind: 'check';
     readonly columns: readonly [infer TColumn extends string];
     readonly rule: { readonly kind: 'notNull' };
+    readonly enforced: true;
   }
     ? TColumn
     : never;

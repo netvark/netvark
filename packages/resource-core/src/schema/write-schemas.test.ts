@@ -18,11 +18,12 @@ function foreignKey(name: string, target: string) {
     kind: 'foreignKey',
     columns: [name],
     references: { table: target, columns: ['id'] },
+    enforced: true,
   } as const;
 }
 
 function check(...columns: ReadonlyArray<string>) {
-  return { kind: 'check', columns, rule: null } as const;
+  return { kind: 'check', columns, rule: null, enforced: true } as const;
 }
 
 const declare = untypedDeclare(

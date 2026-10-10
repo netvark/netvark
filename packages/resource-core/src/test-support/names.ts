@@ -61,7 +61,7 @@ import {
 } from './catalog/type-name-tables';
 
 export interface NamesCatalog {
-  readonly format: 2;
+  readonly format: 3;
   readonly enums: Readonly<Record<string, never>>;
   readonly domains: Readonly<Record<string, never>>;
   readonly tables: {
@@ -73,7 +73,7 @@ export interface NamesCatalog {
 }
 
 export const namesCatalog: NamesCatalog = {
-  format: 2,
+  format: 3,
   enums: {},
   domains: {},
   tables: {

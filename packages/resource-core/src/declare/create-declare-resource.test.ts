@@ -67,13 +67,13 @@ describe('createDeclareResource: the catalog (SPEC 2)', () => {
     ).toBe(
       'createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers',
     );
-    expect(failure({ catalog: { ...contactsCatalog, format: 3 } })).toBe(
-      'createDeclareResource.catalog: format 3 is not supported (expected 2)',
+    expect(failure({ catalog: { ...contactsCatalog, format: 4 } })).toBe(
+      'createDeclareResource.catalog: format 4 is not supported (expected 3)',
     );
     expect(failure({ catalog: undefined })).toBe(
       'createDeclareResource.catalog: must be an object, received undefined',
     );
-    expect(failure({ catalog: { format: 2, enums: {}, domains: {} } })).toBe(
+    expect(failure({ catalog: { format: 3, enums: {}, domains: {} } })).toBe(
       'createDeclareResource.catalog.tables: must be an object, received undefined',
     );
   });

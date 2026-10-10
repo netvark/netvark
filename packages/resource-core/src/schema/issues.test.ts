@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   catalogOf,
+  check,
   column,
   table,
   untypedDeclare,
@@ -51,40 +52,31 @@ const declare = untypedDeclare(
         rank: column({ type: 'int4', sqlType: 'integer' }),
       },
       {
-        samples_body_check: {
-          kind: 'check',
-          columns: ['body'],
-          rule: { kind: 'length', min: 2, max: null },
-        },
-        samples_status_check: {
-          kind: 'check',
-          columns: ['status'],
-          rule: { kind: 'enum', values: ['open', 'closed'] },
-        },
-        samples_handle_check: {
-          kind: 'check',
-          columns: ['handle'],
-          rule: { kind: 'pattern', source: '^@', flags: 'su' },
-        },
-        samples_rank_check: {
-          kind: 'check',
-          columns: ['rank'],
-          rule: {
-            kind: 'range',
-            min: { value: '1', inclusive: true },
-            max: { value: '10', inclusive: false },
-          },
-        },
-        samples_count_check: {
-          kind: 'check',
-          columns: ['count'],
-          rule: {
-            kind: 'range',
-            min: { value: '0', inclusive: false },
-            max: { value: '100', inclusive: true },
-          },
-        },
-        samples_code_check: { kind: 'check', columns: ['code'], rule: null },
+        samples_body_check: check('body', {
+          kind: 'length',
+          min: 2,
+          max: null,
+        }),
+        samples_status_check: check('status', {
+          kind: 'enum',
+          values: ['open', 'closed'],
+        }),
+        samples_handle_check: check('handle', {
+          kind: 'pattern',
+          source: '^@',
+          flags: 'su',
+        }),
+        samples_rank_check: check('rank', {
+          kind: 'range',
+          min: { value: '1', inclusive: true },
+          max: { value: '10', inclusive: false },
+        }),
+        samples_count_check: check('count', {
+          kind: 'range',
+          min: { value: '0', inclusive: false },
+          max: { value: '100', inclusive: true },
+        }),
+        samples_code_check: check('code', null),
       },
     ),
   }),

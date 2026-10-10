@@ -12,7 +12,7 @@ import type { Rule } from './rules';
  * increments it, so a reader refuses a catalog it does not understand
  * instead of misreading it (ADR 0004).
  */
-export const CATALOG_FORMAT = 2;
+export const CATALOG_FORMAT = 3;
 
 /** The kind of a column's (or domain's) type: `pg_type.typtype`. */
 export type TypeKind =

@@ -1,12 +1,14 @@
 /**
  * Runtime lookups into a public catalog's tables (SPEC 3.1, 5.1): the
- * single-column keys, the search columns, the NOT NULL keys, and a column's
- * type followed through its domains. Every lookup is prototype-safe.
+ * single-column keys, the search columns, the NOT NULL keys, whether a
+ * constraint is enforced, and a column's type followed through its domains.
+ * Every lookup is prototype-safe.
  * @packageDocumentation
  */
 import type {
   PublicCatalog,
   PublicColumn,
+  PublicConstraint,
   PublicForeignKeyConstraint,
   PublicTable,
   TypeKind,
@@ -110,6 +112,16 @@ export function foreignKeyOf(
       constraint.columns.length === 1 &&
       constraint.columns[0] === column,
   );
+}
+
+/**
+ * Whether PostgreSQL checks the constraint: every kind but a CHECK or a
+ * foreign key declared NOT ENFORCED, which the database never raises, so
+ * no schema applies it and no client can violate it (catalog ADR 0010).
+ * @ref https://www.postgresql.org/docs/18/sql-createtable.html (`NOT ENFORCED`)
+ */
+export function isEnforced(constraint: PublicConstraint): boolean {
+  return !('enforced' in constraint) || constraint.enforced;
 }
 
 /** Whether a column is a `tsvector` column, which only `search.column` names. */

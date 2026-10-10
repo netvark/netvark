@@ -56,6 +56,7 @@ const declare = untypedDeclare(
             kind: 'check',
             columns: ['checked'],
             rule: { kind: 'notNull' },
+            enforced: true,
           },
         },
       ),

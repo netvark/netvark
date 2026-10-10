@@ -33,7 +33,7 @@ afterAll(async () => {
 
 describe('readCatalog: the catalog (SPEC 2.2, 7.2)', () => {
   it('writes the format, the configured schemas, and the extensions installed into them, sorted', () => {
-    expect(catalog.format).toBe(2);
+    expect(catalog.format).toBe(3);
     expect(catalog.schemas).toEqual(['public', 'audit']);
     expect(catalog.extensions).toEqual([
       'btree_gist',
@@ -120,7 +120,7 @@ describe('readCatalog: reading (SPEC 2.1, 7.1)', () => {
       'empty_enum',
     ]);
     expect(await readCatalog(session, ['missing'])).toEqual({
-      format: 2,
+      format: 3,
       schemas: ['missing'],
       extensions: [],
       enums: {},

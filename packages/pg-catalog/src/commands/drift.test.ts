@@ -122,14 +122,14 @@ describe('drift before connecting (SPEC 10.2, 12)', () => {
     const current = renderCatalogModule(catalogOf({}));
     await writeFile(
       join(directory, 'catalog.ts'),
-      current.replace('"format": 2', '"format": 3'),
+      current.replace('"format": 3', '"format": 4'),
     );
     await expect(
       drift(config, 'production', { cwd: directory }),
     ).rejects.toMatchObject({
       code: 'catalog_format',
       message:
-        'the catalog module was written in format 3; this version reads format 2, so run pg-catalog extract again',
+        'the catalog module was written in format 4; this version reads format 3, so run pg-catalog extract again',
     });
   });
 });

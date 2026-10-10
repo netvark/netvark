@@ -117,6 +117,10 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   When a CHECK cannot be translated, write a validator with fixtures on both sides of every
   boundary, including empty and astral strings, and let `rules --check` prove it against the
   database.
+- **Enforce in the database what clients must obey.** A NOT ENFORCED CHECK or foreign key
+  (PostgreSQL 18) documents data the database never checks, so the API skips it: no schema check, no
+  validator, no code. Enforce it to hold clients to it: `ALTER CONSTRAINT ... ENFORCED` for a
+  foreign key, drop and add again for a CHECK; then extract the catalog again.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for computed or
   server-set columns, `write` only for values clients send but never read back.
 - **Keep foreign keys as relationships**, named `<thing>_id`, so the relationship name derives

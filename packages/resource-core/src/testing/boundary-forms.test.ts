@@ -42,6 +42,7 @@ const check = (name: string, rule: Rule): PublicCheckConstraint => ({
   kind: 'check',
   columns: [name],
   rule,
+  enforced: true,
 });
 const above = (value: string, inclusive: boolean): Rule => ({
   kind: 'range',
@@ -52,6 +53,7 @@ const reference = (name: string): PublicConstraint => ({
   kind: 'foreignKey',
   columns: [`by_${name}_id`],
   references: { table: `by_${name}`, columns: ['id'] },
+  enforced: true,
 });
 
 const declare = untypedDeclare({

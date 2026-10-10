@@ -6,10 +6,12 @@
  */
 import type {
   PublicCatalog,
+  PublicCheckConstraint,
   PublicColumn,
   PublicConstraint,
   PublicDomain,
   PublicTable,
+  Rule,
 } from '@netvark/catalog-core';
 
 import type { DeclaredResource } from '../declare/declared-resource';
@@ -46,6 +48,11 @@ export function table(
   return { schema: 'public', name, primaryKey, columns, constraints };
 }
 
+/** An enforced CHECK over the column `name`, with the rule read from it or `null`. */
+export function check(name: string, rule: Rule | null): PublicCheckConstraint {
+  return { kind: 'check', columns: [name], rule, enforced: true };
+}
+
 /** A domain over `text` with `overrides`. */
 export function domain(
   name: string,
@@ -73,7 +80,7 @@ export function catalogOf(
   tables: Readonly<Record<string, PublicTable>>,
   domains: Readonly<Record<string, PublicDomain>> = {},
 ): PublicCatalog {
-  return { format: 2, enums: {}, domains, tables };
+  return { format: 3, enums: {}, domains, tables };
 }
 
 /** `declareResource` with its types erased, as JavaScript calls it. */

@@ -1,6 +1,7 @@
 # ADR 0006: CHECK constraints become rules only when the rule is equivalent
 
-- Status: accepted
+- Status: accepted; amended by ADR-0010 (a NOT ENFORCED CHECK needs no validator, since the database
+  never checks it)
 - Date: 2026-10-10
 
 ## Context

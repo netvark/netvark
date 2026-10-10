@@ -3,17 +3,19 @@
  * `pg-catalog extract --check`, run in each database directory as its CI
  * would, replays the migrations into PGlite and finds the committed
  * catalog.ts and public-catalog.ts unchanged. The contacts application's
- * catalogs type the declarations; the oracle's type the probes (SPEC 15.3).
+ * catalogs type the declarations; the oracle's type the probes (SPEC 15.3);
+ * the PostgreSQL 18 schema's type the NOT ENFORCED declarations.
  */
 import { describe, expect, it } from 'vitest';
 
-import { CONTACTS_DIR, ORACLE_DIR } from './support/paths';
+import { CONTACTS_DIR, ORACLE_DIR, POSTGRES18_DIR } from './support/paths';
 import { binPath, runBin } from './support/run-bin';
 
 describe('the extracted catalogs', () => {
   it.each([
     ['contacts', CONTACTS_DIR],
     ['oracle', ORACLE_DIR],
+    ['PostgreSQL 18', POSTGRES18_DIR],
   ])('of the %s schema pass extract --check', async (_name, directory) => {
     const run = await runBin(
       await binPath('@netvark/pg-catalog', 'pg-catalog'),

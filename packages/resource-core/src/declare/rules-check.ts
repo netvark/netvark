@@ -1,8 +1,8 @@
 /**
  * The type-level check of `rules` (SPEC 3.5), the twin of `check-rules.ts`:
- * keys are constraint names or NOT NULL keys, a validator covers exactly a
- * CHECK without a rule and accepts what that CHECK's members hold (SPEC
- * 7.2), and every such CHECK over a written column names one.
+ * keys are constraint names or NOT NULL keys, a validator covers exactly an
+ * enforced CHECK without a rule and accepts what that CHECK's members hold
+ * (SPEC 7.2), and every such CHECK over a written column names one.
  * @packageDocumentation
  */
 import type { PublicTable } from '@netvark/catalog-core';
@@ -39,9 +39,14 @@ type ValidatorRequirement<
     ? K extends UntranslatedCheck<TTableDef>
       ? AttachmentRequirement<TContext, TTableDef, TDecl, K, TValidator>
       : K extends ConstraintName<TTableDef>
-        ? TTableDef['constraints'][K] extends { readonly kind: 'check' }
-          ? Requirement<'validator: the CHECK has a rule, which enforces it already'>
-          : Requirement<'validator: a validator covers only a CHECK without a rule'>
+        ? TTableDef['constraints'][K] extends {
+            readonly kind: 'check';
+            readonly enforced: false;
+          }
+          ? Requirement<'validator: PostgreSQL does not enforce this CHECK (NOT ENFORCED), so no validator covers it'>
+          : TTableDef['constraints'][K] extends { readonly kind: 'check' }
+            ? Requirement<'validator: the CHECK has a rule, which enforces it already'>
+            : Requirement<'validator: a validator covers only a CHECK without a rule'>
         : Requirement<'validator: a validator covers only a CHECK without a rule'>
     : Requirement<`validator: "${TValidator}" is not a validator of createDeclareResource`>
   : unknown;
@@ -77,7 +82,7 @@ type RuleKeyErrors<TTable extends string, TInvalid> = [TInvalid] extends [never]
       ]: `"${K}" is not a constraint or NOT NULL key of ${TTable}`;
     };
 
-/** CHECKs without a rule over a written column whose rule names no validator (SPEC 3.5). */
+/** Enforced CHECKs without a rule over a written column whose rule names no validator (SPEC 3.5). */
 type MissingValidator<
   TTableDef extends PublicTable,
   TDecl extends Declaration,

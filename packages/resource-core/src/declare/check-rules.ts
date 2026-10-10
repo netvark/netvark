@@ -1,7 +1,9 @@
 /**
  * `rules` against the table's constraints (SPEC 3.5): keys are constraint
- * names or NOT NULL keys, a validator covers exactly a CHECK without a rule,
- * and every such CHECK over a written column has one.
+ * names or NOT NULL keys, a validator covers exactly an enforced CHECK
+ * without a rule, and every such CHECK over a written column has one. A
+ * NOT ENFORCED CHECK takes none: the database stores what it forbids, so a
+ * validator would refuse values the table holds (catalog ADR 0010).
  * @packageDocumentation
  */
 import type { PublicTable } from '@netvark/catalog-core';
@@ -40,6 +42,11 @@ function checkValidator(
       `${path}.validator: a validator covers only a CHECK without a rule`,
     );
   }
+  if (!constraint.enforced) {
+    throw new TypeError(
+      `${path}.validator: PostgreSQL does not enforce this CHECK (NOT ENFORCED), so no validator covers it`,
+    );
+  }
   if (constraint.rule !== null) {
     throw new TypeError(
       `${path}.validator: the CHECK has a rule, which enforces it already`,
@@ -47,7 +54,7 @@ function checkValidator(
   }
 }
 
-/** Checks `rules` and the validators every written CHECK without a rule needs. */
+/** Checks `rules` and the validators every written, enforced CHECK without a rule needs. */
 export function checkRules(
   context: DefinerContext,
   table: string,
@@ -71,6 +78,7 @@ export function checkRules(
   for (const [name, constraint] of Object.entries(tableDef.constraints)) {
     const needsValidator =
       constraint.kind === 'check' &&
+      constraint.enforced &&
       constraint.rule === null &&
       constraint.columns.some((column) => written.has(column));
     if (needsValidator && ownValue(rules, name)?.validator === undefined) {
