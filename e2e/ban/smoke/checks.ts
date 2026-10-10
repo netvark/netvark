@@ -5,25 +5,22 @@
  * This module imports nothing: the Node harness for workerd loads it without
  * pulling the worker's dependencies into the host process.
  */
+import type { Dispatch } from './assert.ts';
+
+import {
+  check,
+  equal,
+  json,
+  list,
+  member,
+  object,
+  problem,
+  PROBLEM_JSON,
+} from './assert.ts';
+
+export type { Dispatch } from './assert.ts';
 
 export const DOCS_BASE_URL = 'https://errors.example.com';
-
-interface ResponseLike {
-  readonly status: number;
-  readonly headers: { get(name: string): string | null };
-  text(): Promise<string>;
-}
-
-interface DispatchInit {
-  readonly method?: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string;
-}
-
-export type Dispatch = (
-  path: string,
-  init?: DispatchInit,
-) => Promise<ResponseLike>;
 
 export interface SmokeResult {
   readonly runtime: string;
@@ -31,73 +28,11 @@ export interface SmokeResult {
   readonly failures: ReadonlyArray<string>;
 }
 
-type Json = Record<string, unknown>;
 type Check = (dispatch: Dispatch) => Promise<void>;
 
-const PROBLEM_JSON = 'application/problem+json';
 // @ref https://www.rfc-editor.org/rfc/rfc9562#name-uuid-format
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
-
-class CheckFailure extends Error {
-  override readonly name: string = 'CheckFailure';
-}
-
-function check(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new CheckFailure(message);
-  }
-}
-
-function equal(actual: unknown, expected: unknown, what: string): void {
-  check(
-    actual === expected,
-    `${what}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`,
-  );
-}
-
-function isJson(value: unknown): value is Json {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function object(value: unknown, what: string): Json {
-  if (!isJson(value)) {
-    throw new CheckFailure(`${what} is not a JSON object`);
-  }
-  return value;
-}
-
-function list(value: unknown, what: string): Array<unknown> {
-  if (!Array.isArray(value)) {
-    throw new CheckFailure(`${what} is not an array`);
-  }
-  return value;
-}
-
-async function json(res: ResponseLike): Promise<Json> {
-  const parsed: unknown = JSON.parse(await res.text());
-  return object(parsed, 'body');
-}
-
-function member(value: unknown, key: string): unknown {
-  return isJson(value) ? value[key] : undefined;
-}
-
-/** Fetches a Problem Details response and checks the parts every one shares. */
-async function problem(
-  dispatch: Dispatch,
-  path: string,
-  status: number,
-  init?: DispatchInit,
-): Promise<{ res: ResponseLike; body: Json }> {
-  const res = await dispatch(path, init);
-  equal(res.status, status, `${path} status`);
-  equal(res.headers.get('content-type'), PROBLEM_JSON, `${path} content-type`);
-  equal(res.headers.get('cache-control'), 'no-store', `${path} Cache-Control`);
-  const body = await json(res);
-  equal(res.headers.get('x-error-id'), body['id'], `${path} X-Error-Id`);
-  return { res, body };
-}
 
 /** Posts an invalid order and checks the 422 every validator hook must produce. */
 async function invalidOrder(dispatch: Dispatch, path: string): Promise<void> {
@@ -263,7 +198,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     const required = list(member(schemaOf('422'), 'required'), '422 required');
     check(required.includes('errors'), '422 requires errors');
   },
-  'ban-kit handler without Hono': async (dispatch) => {
+  '@netvark/ban-core handler without Hono': async (dispatch) => {
     const res = await dispatch('/core/missing');
     equal(res.status, 404, 'status');
     equal(res.headers.get('content-type'), 'application/json', 'content-type');
@@ -272,7 +207,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     equal(body['detail'], 'Order 42 does not exist', 'detail');
     equal(res.headers.get('x-error-id'), body['id'], 'X-Error-Id');
   },
-  'renderError from hono-ban/testing': async (dispatch) => {
+  'renderError from @netvark/hono-ban/testing': async (dispatch) => {
     const res = await dispatch('/rendered');
     equal(res.status, 410, 'status');
     equal(res.headers.get('content-type'), PROBLEM_JSON, 'content-type');
@@ -304,13 +239,15 @@ export async function runChecks(dispatch: Dispatch): Promise<SmokeResult> {
 export function report(result: SmokeResult): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
-    console.log(`ban-kit smoke: ${total} checks passed on ${result.runtime}`);
+    console.log(
+      `@netvark/ban-core smoke: ${total} checks passed on ${result.runtime}`,
+    );
     return;
   }
   for (const failure of result.failures) {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `ban-kit smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `@netvark/ban-core smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

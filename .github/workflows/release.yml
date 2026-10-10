@@ -19,11 +19,11 @@
 # Publishing uses npm trusted publishing (OIDC): no NPM_TOKEN secret. pnpm
 # publish exchanges the GitHub id-token for a short-lived npm token and npm
 # attaches provenance automatically. One-time setup on npmjs.com for each
-# package (keyset-kit and kysely-keyset): Settings > Trusted publisher >
-# GitHub Actions, repository ali-issa/keyset-kit, workflow filename
-# release.yml. pnpm publish also applies each package's publishConfig (the
-# dist-only exports map) and rewrites the workspace: range of kysely-keyset's
-# dependency on keyset-kit to the published version.
+# package under the @netvark scope: Settings > Trusted publisher > GitHub
+# Actions, repository netvark/netvark, workflow filename release.yml. pnpm
+# publish also applies each package's publishConfig (the dist-only exports
+# map) and rewrites every workspace: range between the packages to the
+# published versions.
 # @ref https://changesets.dev/guide/automating#how-do-i-run-the-version-and-publish-commands
 # @ref https://docs.npmjs.com/trusted-publishers
 # @ref https://github.com/pnpm/pnpm/releases/tag/v11.0.7 (OIDC in pnpm publish)

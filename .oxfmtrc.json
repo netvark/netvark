@@ -47,22 +47,12 @@
       {
         "groupName": "self-type",
         "modifiers": ["type"],
-        "elementNamePattern": [
-          "keyset-kit",
-          "keyset-kit/**",
-          "kysely-keyset",
-          "kysely-keyset/**"
-        ]
+        "elementNamePattern": ["@netvark/**"]
       },
       {
         "groupName": "self-value",
         "modifiers": ["value"],
-        "elementNamePattern": [
-          "keyset-kit",
-          "keyset-kit/**",
-          "kysely-keyset",
-          "kysely-keyset/**"
-        ]
+        "elementNamePattern": ["@netvark/**"]
       }
     ]
   },

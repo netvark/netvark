@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Package and version
-      placeholder: keyset-kit 1.0.0, or kysely-keyset 1.0.0
+      placeholder: '@netvark/keyset-core 0.1.0, or @netvark/hono-ban 2.0.0'
     validations:
       required: true
   - type: input
@@ -17,17 +17,17 @@ body:
     validations:
       required: true
   - type: input
-    id: kysely
+    id: host
     attributes:
-      label: Kysely version and PostgreSQL version
-      description: When the report concerns kysely-keyset.
+      label: Host library and version
+      description: When the report concerns a binding, the version of Hono or Kysely, and of PostgreSQL for the keyset packages.
     validations:
       required: false
   - type: textarea
     id: repro
     attributes:
       label: Minimal reproduction
-      description: A short script or a link to a repository. Include the keyset definition, the request (sort, filter, page), and the compiled SQL from `onQuery` when you have it.
+      description: A short script or a link to a repository. Include the definition (catalog, resource, or keyset), the request (method, URL, headers, body, or sort, filter, page), and for the keyset packages the compiled SQL from `onQuery` when you have it.
       render: ts
     validations:
       required: true
@@ -41,6 +41,6 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      description: Include the page returned, the SQL, or the error output.
+      description: Include the full response body and headers, the page returned, the SQL, or the error output.
     validations:
       required: true

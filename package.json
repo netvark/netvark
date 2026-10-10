@@ -1,15 +1,15 @@
 {
-  "name": "keyset-kit-monorepo",
+  "name": "@netvark/monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Keyset pagination for JavaScript: keyset-kit, the database-free core, and kysely-keyset, the Kysely adapter for PostgreSQL.",
-  "homepage": "https://github.com/ali-issa/keyset-kit#readme",
-  "bugs": "https://github.com/ali-issa/keyset-kit/issues",
+  "description": "The netvark packages: structured HTTP errors (ban), JSON:API 1.1 (jsonapi), and keyset pagination (keyset), each a framework-free core with bindings for a host.",
+  "homepage": "https://github.com/netvark/netvark#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
   "license": "MIT",
   "author": "Ali Issa (https://github.com/ali-issa)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ali-issa/keyset-kit.git"
+    "url": "git+https://github.com/netvark/netvark.git"
   },
   "type": "module",
   "scripts": {
@@ -29,8 +29,8 @@
     "release": "pnpm run build && changeset publish",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "pnpm run build && pnpm --filter keyset-kit-e2e run typecheck && pnpm --filter keyset-kit-e2e run test",
-    "test:runtimes": "pnpm run build && pnpm --filter keyset-kit-e2e run smoke:bun && pnpm --filter keyset-kit-e2e run smoke:deno && pnpm --filter keyset-kit-e2e run smoke:workerd",
+    "test:e2e": "pnpm run build && pnpm -r --workspace-concurrency=1 --filter \"./e2e/**\" run typecheck && pnpm -r --workspace-concurrency=1 --filter \"./e2e/**\" run test",
+    "test:runtimes": "pnpm run build && pnpm -r --workspace-concurrency=1 --filter \"./e2e/**\" run smoke:bun && pnpm -r --workspace-concurrency=1 --filter \"./e2e/**\" run smoke:deno && pnpm -r --workspace-concurrency=1 --filter \"./e2e/**\" run smoke:workerd",
     "test:watch": "vitest",
     "typecheck": "pnpm run check:types"
   },

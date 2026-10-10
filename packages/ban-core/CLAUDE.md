@@ -1,0 +1,1 @@
+@../../docs/ban/AGENTS.md

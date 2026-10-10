@@ -1,27 +1,27 @@
-# ban-kit
+# ban: structured HTTP errors
 
 Structured, extensible HTTP errors for JavaScript APIs: one typed catalog, one handler that turns
 anything thrown into a well-formed response, and pluggable wire formats (RFC 9457 Problem Details,
 JSON:API, Google's AIP-193, Stripe, or your own). Two packages, same subpaths:
 
-| Package                                  | Use it when                                                                                             |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| [`ban-kit`](./packages/ban-kit#readme)   | you render errors from a `fetch` handler, a worker, a library, or a test; no framework, no peers        |
-| [`hono-ban`](./packages/hono-ban#readme) | you are on [Hono](https://hono.dev): `ban-kit` plus `app.onError()` wiring and `HTTPException` adoption |
+| Package                                               | Use it when                                                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [`@netvark/ban-core`](../../packages/ban-core#readme) | you render errors from a `fetch` handler, a worker, a library, or a test; no framework, no peers                  |
+| [`@netvark/hono-ban`](../../packages/hono-ban#readme) | you are on [Hono](https://hono.dev): `@netvark/ban-core` plus `app.onError()` wiring and `HTTPException` adoption |
 
 ## Install
 
 ```bash
-pnpm add ban-kit
+pnpm add @netvark/ban-core
 # or, on Hono
-pnpm add hono-ban hono
+pnpm add @netvark/hono-ban hono
 ```
 
 ## Quick start
 
 ```ts
 import { Hono } from 'hono';
-import { createBan } from 'hono-ban';
+import { createBan } from '@netvark/hono-ban';
 
 const ban = createBan({
   errors: { ORDER_CONFLICT: { status: 409, title: 'Order Conflict' } },
@@ -37,7 +37,7 @@ app.get('/orders/:id', async (c) => {
 ```
 
 ```ts
-import { createBan, fromRequest } from 'ban-kit';
+import { createBan, fromRequest } from '@netvark/ban-core';
 
 const ban = createBan();
 const handle = ban.handler();
@@ -77,21 +77,22 @@ custom formats.
 
 ## Documentation
 
-- [`docs/DESIGN.md`](./docs/DESIGN.md): goals, the full API, architecture, security defaults, and
+- [`docs/ban/DESIGN.md`](./DESIGN.md): goals, the full API, architecture, security defaults, and
   roadmap
-- [`docs/SPEC.md`](./docs/SPEC.md): the normative implementation specification (exact types,
-  catalog, rendering rules, handler algorithm, validator mappings, packaging, test plan)
-- [`docs/adr/`](./docs/adr/): architecture decision records
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md): setup, quality gates, release process
-- [`packages/hono-ban/CHANGELOG.md`](./packages/hono-ban/CHANGELOG.md): hono-ban's history,
-  including the 2.0 migration notes
+- [`docs/ban/SPEC.md`](./SPEC.md): the normative implementation specification (exact types, catalog,
+  rendering rules, handler algorithm, validator mappings, packaging, test plan)
+- [`docs/ban/adr/`](./adr/): architecture decision records
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): the family's contribution guide; setup, gates, and
+  releases are in the root [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+- [`packages/hono-ban/CHANGELOG.md`](../../packages/hono-ban/CHANGELOG.md): @netvark/hono-ban's
+  history, including the 2.0 migration notes
 
 ## Repository
 
-A pnpm workspace: `packages/ban-kit` (the core), `packages/hono-ban` (the Hono adapter), and `e2e/`
-(the end-to-end suite over the built packages, plus the Bun, Deno, and workerd smoke test). Node
-22.12+ at runtime; CI runs the suites on Node 22 and 24.
+In this repository: `packages/ban-core` (the core), `packages/hono-ban` (the Hono binding),
+`docs/ban/` (this directory), and `e2e/ban/` (the end-to-end suite over the built packages, plus the
+Bun, Deno, and workerd smoke test). Node 22.12+ at runtime; CI runs the suites on Node 22 and 24.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](../../LICENSE)

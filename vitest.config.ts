@@ -15,11 +15,20 @@ const config: ViteUserConfig = defineConfig({
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      // Tests and the entry barrels (`index.ts` files hold re-exports only).
+      // Tests, the repository's own test helpers, and the files that hold
+      // re-exports only: every package's root barrel, the nested barrels of
+      // the jsonapi and keyset packages, and the one-line twins in
+      // @netvark/hono-ban of each @netvark/ban-core subpath. The nested
+      // index files of @netvark/ban-core implement its subpaths and stay in.
       exclude: [
         'packages/*/src/**/*.test.ts',
         'packages/*/src/**/*.test-d.ts',
-        'packages/*/src/**/index.ts',
+        'packages/*/src/test-support/**',
+        'packages/*/src/index.ts',
+        'packages/{jsonapi-core,hono-jsonapi,keyset-core,kysely-keyset}/src/**/index.ts',
+        'packages/hono-ban/src/**/index.ts',
+        'packages/hono-ban/src/formats/*.ts',
+        'packages/hono-ban/src/{openapi,otel,postgresql,standard-schema,testing,valibot,zod}.ts',
       ],
       reporter: ['text', 'lcov', 'json-summary'],
       thresholds: {

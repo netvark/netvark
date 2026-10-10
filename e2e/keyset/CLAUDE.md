@@ -1,0 +1,1 @@
+@../../docs/keyset/AGENTS.md

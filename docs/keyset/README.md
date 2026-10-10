@@ -1,11 +1,11 @@
-# keyset-kit
+# keyset: keyset pagination for PostgreSQL
 
 Keyset pagination for PostgreSQL in TypeScript, as two packages:
 
-| Package                                   | What it is                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`keyset-kit`](packages/keyset-kit)       | The database-free core: a definition of what a collection can sort, filter, and search on; a planner that turns a request into a query plan; HMAC-signed cursors bound to the request; page assembly with `prev` and `next`. Functions over plain values, web standards only; runs on Node, Bun, Deno, and Cloudflare Workers. No dependencies. |
-| [`kysely-keyset`](packages/kysely-keyset) | The [Kysely](https://kysely.dev) adapter: `createDefineKeyset<DB>()` checks every table and column name of a definition against your `DB` interface, and `paginate` renders the plan onto your own select query and runs it. Re-exports the core in full, so a Kysely application imports from one package.                                     |
+| Package                                                  | What it is                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@netvark/keyset-core`](../../packages/keyset-core)     | The database-free core: a definition of what a collection can sort, filter, and search on; a planner that turns a request into a query plan; HMAC-signed cursors bound to the request; page assembly with `prev` and `next`. Functions over plain values, web standards only; runs on Node, Bun, Deno, and Cloudflare Workers. No dependencies. |
+| [`@netvark/kysely-keyset`](../../packages/kysely-keyset) | The [Kysely](https://kysely.dev) adapter: `createDefineKeyset<DB>()` checks every table and column name of a definition against your `DB` interface, and `paginate` renders the plan onto your own select query and runs it. Re-exports the core in full, so a Kysely application imports from one package.                                     |
 
 Declare once what a collection can sort, filter, and search on; the request type, the validation,
 the seek predicate, the cursors, and the SQL all follow from the definition. The page semantics are
@@ -13,24 +13,25 @@ those of the JSON:API
 [Cursor Pagination profile](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/)
 (`page[size]`, `page[after]`, `page[before]`, `prev` and `next` that are `null` when there is no
 page, range requests, `rangeTruncated`), and every choice the profile leaves open is written down in
-[`docs/SPEC.md`](docs/SPEC.md).
+[`docs/keyset/SPEC.md`](SPEC.md).
 
 ## Install
 
 ```bash
-pnpm add kysely-keyset kysely   # Kysely applications (pulls in keyset-kit)
-pnpm add keyset-kit             # another query builder, a driver, a client
+pnpm add @netvark/kysely-keyset kysely   # Kysely applications (pulls in @netvark/keyset-core)
+pnpm add @netvark/keyset-core             # another query builder, a driver, a client
 ```
 
-Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. `kysely-keyset` has `kysely >= 0.28`
-as its peer dependency and targets PostgreSQL 14+ (and PGlite). CI runs the unit suites on Node 22
-and 24, the adapter's tests on Kysely 0.28, the end-to-end suite on PGlite, on node-postgres, and on
-PostgreSQL 14 and 18 servers, and a smoke test of both packages on Bun, Deno, and workerd.
+Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. `@netvark/kysely-keyset` has
+`kysely >= 0.28` as its peer dependency and targets PostgreSQL 14+ (and PGlite). CI runs the unit
+suites on Node 22 and 24, the adapter's tests on Kysely 0.28, the end-to-end suite on PGlite, on
+node-postgres, and on PostgreSQL 14 and 18 servers, and a smoke test of both packages on Bun, Deno,
+and workerd.
 
 ## Quick start with Kysely
 
 ```ts
-import { createDefineKeyset } from 'kysely-keyset';
+import { createDefineKeyset } from '@netvark/kysely-keyset';
 
 import type { DB } from './db'; // your Kysely database interface
 
@@ -116,7 +117,7 @@ wrong.
 The core is the same library without the SQL: it plans, you render, it assembles the page.
 
 ```ts
-import { defineKeyset } from 'keyset-kit';
+import { defineKeyset } from '@netvark/keyset-core';
 
 const contacts = defineKeyset({
   table: 'contacts',
@@ -157,28 +158,32 @@ Both quick starts answer with the same `Page`, and the cursors they issue are in
   values are bound parameters, and the one literal (the text search configuration) is validated
   against PostgreSQL's name syntax.
 
-The package READMEs walk through each area: [`keyset-kit`](packages/keyset-kit/README.md) for the
-definition, the request, the plan, the page, the cursors, and the errors;
-[`kysely-keyset`](packages/kysely-keyset/README.md) for the typed definer, `paginate`, the SQL it
-renders, and the best practices for secrets, indexes, totals, and `CamelCasePlugin`.
+The package READMEs walk through each area:
+[`@netvark/keyset-core`](../../packages/keyset-core/README.md) for the definition, the request, the
+plan, the page, the cursors, and the errors;
+[`@netvark/kysely-keyset`](../../packages/kysely-keyset/README.md) for the typed definer,
+`paginate`, the SQL it renders, and the best practices for secrets, indexes, totals, and
+`CamelCasePlugin`.
 
 ## Documentation
 
-- [`docs/DESIGN.md`](docs/DESIGN.md): what the packages are, the principles, and the API by example
-- [`docs/SPEC.md`](docs/SPEC.md): the normative contract, section by section, with the tests that
+- [`docs/keyset/DESIGN.md`](DESIGN.md): what the packages are, the principles, and the API by
+  example
+- [`docs/keyset/SPEC.md`](SPEC.md): the normative contract, section by section, with the tests that
   prove it
-- [`docs/adr/`](docs/adr): the decisions, including every choice the profile leaves to the server
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): setup, gates, and release process
+- [`docs/keyset/adr/`](adr): the decisions, including every choice the profile leaves to the server
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): the family's contribution guide; setup, gates, and releases
+  are in the root [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
 
 ## Why
 
 Offset pagination drifts under writes and gets slower with every page. Hand-written keyset
 pagination is usually right on the happy path and wrong on ties, nulls, backward pages, and
 precision, and its cursors are usually base64 of whatever the last row had, which a client can edit
-or replay under another sort. keyset-kit takes the position that the definition is the contract and
-the profile and the PostgreSQL manual are the test plan: every rule is cited where it is implemented
-and pinned by a test, the adapter's tests assert the exact SQL, and the e2e suite walks real tables
-with ties and nulls in both directions on three databases.
+or replay under another sort. @netvark/keyset-core takes the position that the definition is the
+contract and the profile and the PostgreSQL manual are the test plan: every rule is cited where it
+is implemented and pinned by a test, the adapter's tests assert the exact SQL, and the e2e suite
+walks real tables with ties and nulls in both directions on three databases.
 
 ## License
 

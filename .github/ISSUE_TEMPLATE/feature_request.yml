@@ -2,6 +2,23 @@ name: Feature request
 description: Propose an addition or change to the API.
 labels: [enhancement]
 body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        [
+          '@netvark/ban-core',
+          '@netvark/hono-ban',
+          '@netvark/jsonapi-core',
+          '@netvark/hono-jsonapi',
+          '@netvark/keyset-core',
+          '@netvark/kysely-keyset',
+          a new package,
+          the repository or its docs,
+        ]
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -21,21 +38,3 @@ body:
     id: alternatives
     attributes:
       label: Alternatives considered
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
-      options:
-        [
-          definition,
-          filter,
-          sort,
-          cursor,
-          plan,
-          kysely,
-          search,
-          relations,
-          docs,
-        ]
-    validations:
-      required: true
