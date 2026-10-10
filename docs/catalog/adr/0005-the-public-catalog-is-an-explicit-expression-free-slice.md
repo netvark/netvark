@@ -1,6 +1,7 @@
 # ADR 0005: The public catalog is an explicit, expression-free slice
 
-- Status: accepted
+- Status: accepted; amended by ADR-0009 (a unique index that no constraint backs appears among the
+  public constraints, marked `partial` when a predicate limits it)
 - Date: 2026-10-10
 
 ## Context

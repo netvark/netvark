@@ -83,6 +83,8 @@ export const VIOLATIONS: ReadonlyArray<Violation> = [
   violation(Contacts, 'CONTACTS_WEBSITE_CHECK', {
     website: "'http://example.com'",
   }),
+  // The partial unique index holds among active contacts, and Ada is one.
+  violation(Contacts, 'CONTACT_NAME_TAKEN', { name: "'Ada'" }),
   violation(Contacts, 'CONTACTS_KIND_NOT_NULL', { kind: 'null' }),
   violation(Contacts, 'CONTACT_NAME_REQUIRED', { name: 'null' }),
   violation(Contacts, 'CONTACTS_STATUS_NOT_NULL', { status: 'null' }),

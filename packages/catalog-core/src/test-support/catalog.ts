@@ -10,7 +10,7 @@ import type { Catalog } from '../model';
 import { contactsTable } from './contacts-table';
 
 export const fixture: Catalog = {
-  format: 1,
+  format: 2,
   schemas: ['public'],
   extensions: ['pg_trgm'],
   enums: {

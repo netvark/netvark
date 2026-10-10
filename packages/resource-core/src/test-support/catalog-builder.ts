@@ -73,7 +73,7 @@ export function catalogOf(
   tables: Readonly<Record<string, PublicTable>>,
   domains: Readonly<Record<string, PublicDomain>> = {},
 ): PublicCatalog {
-  return { format: 1, enums: {}, domains, tables };
+  return { format: 2, enums: {}, domains, tables };
 }
 
 /** `declareResource` with its types erased, as JavaScript calls it. */

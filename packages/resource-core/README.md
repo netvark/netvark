@@ -416,6 +416,21 @@ The scope column is never a member. `contacts_email_unique` covers `(organizatio
 the server writes `organization_id`, so the code points at `email`, and the scope's foreign key has
 no code at all.
 
+A unique index counts as a constraint. PostgreSQL reports its violation under the index's name, and
+the public catalog lists each unique index that no constraint backs among the constraints, partial
+or not, so its code follows the same rules and takes `code` like any rule key:
+
+```ts
+// create unique index contacts_active_name_unique on contacts (organization_id, name)
+//   where status = 'active';
+rules: { contacts_active_name_unique: { code: 'CONTACT_NAME_TAKEN' } },
+
+Contacts.errors.CONTACT_NAME_TAKEN;
+// { status: 409, title: 'Conflict', kind: 'unique', fields: ['name'] }
+```
+
+An index over an expression, such as `lower(email)`, is not in the public catalog and has no code.
+
 `errorCatalog` assembles the codes of the resources the application serves, resource-core's
 `QUOTA_EXCEEDED`, and the application's own codes into one `@netvark/ban-core` catalog fragment. It
 checks the list as a registry (SPEC 4.2): each type once, each code from one constraint and taken by
@@ -473,6 +488,10 @@ same message as the runtime.
   PostgreSQL generates from the columns unless the migration names it; `code: 'CONTACT_EMAIL_TAKEN'`
   stays put when a migration renames the constraint. Name constraints in ASCII, or give `code`: a
   CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z.
+- **Express uniqueness over columns.** A unique index derives its code from its name, as a
+  constraint does, so name it like one. An index over an expression has no code: prefer a `citext`
+  column with a plain UNIQUE to a unique index on `lower(email)`, or map the index by name with
+  `postgresMapper`'s `constraints`.
 - **Pass `errorCatalog` the registry you serve.** Give it the same list of resources the server and
   the OpenAPI document take, so its checks cover every code and relationship a client can reach.
 - **Keep derived codes unique.** A code is the constraint's name upper-cased, without its table, so

@@ -5,16 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { toPublicCatalog } from './public';
 import { fixture } from './test-support/catalog';
-
-function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null) {
-    for (const member of Object.values(value)) {
-      deepFreeze(member);
-    }
-    Object.freeze(value);
-  }
-  return value;
-}
+import { deepFreeze } from './test-support/deep-freeze';
 
 const catalog: Catalog = deepFreeze(structuredClone(fixture));
 
@@ -34,7 +25,7 @@ describe('toPublicCatalog: tables (SPEC 3, ADR 0005)', () => {
   it('keeps only the listed tables, in the catalog order rather than the list order', () => {
     const result = toPublicCatalog(catalog, ['organizations', 'contacts']);
     expect(Object.keys(result.tables)).toEqual(['contacts', 'organizations']);
-    expect(result.format).toBe(1);
+    expect(result.format).toBe(2);
   });
 
   it('drops the comment, the indexes, and row security of a table', () => {
@@ -96,6 +87,7 @@ describe('toPublicCatalog: tables (SPEC 3, ADR 0005)', () => {
         kind: 'unique',
         columns: ['organization_id', 'email'],
         nullsDistinct: false,
+        partial: false,
       },
       contacts_name_length: {
         kind: 'check',
@@ -172,7 +164,7 @@ describe('toPublicCatalog: enums and domains (SPEC 3)', () => {
 
   it('returns empty enums and domains when the list is empty', () => {
     expect(toPublicCatalog(catalog, [])).toEqual({
-      format: 1,
+      format: 2,
       enums: {},
       domains: {},
       tables: {},

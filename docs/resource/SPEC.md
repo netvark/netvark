@@ -99,14 +99,17 @@ interface DeclareResourceConfig<TCatalog, TCodecs, TValidators, TScopes, TDomain
 `DeclareContext` bundles the catalog and the four registries into the one type parameter every
 type-level check reads.
 
-- `catalog` MUST be a public catalog (`toPublicCatalog`, catalog SPEC 3) of format 1
+- `catalog` MUST be a public catalog (`toPublicCatalog`, catalog SPEC 3) of format 2
   (`CATALOG_FORMAT` of `@netvark/catalog-core`); a catalog of another format throws `TypeError`, and
   its literal type fails the `TCatalog` constraint. The full catalog is rejected too, because
-  declarations reach browsers (ADR 0002): structurally it would satisfy `PublicCatalog`, so the
-  constraint also requires the absence of its `schemas` member (`NotFullCatalog`), whose requirement
-  (3, "How mistakes are reported") reads
+  declarations reach browsers (ADR 0002): structurally it comes close to `PublicCatalog`, lacking
+  only the `partial` of its unique constraints, so the constraint first requires the absence of its
+  `schemas` member (`NotFullCatalog`), whose requirement (3, "How mistakes are reported") reads
   `catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`,
-  and the runtime check tests the same member.
+  and the runtime check tests the same member. `NotFullCatalog` comes first in the intersection
+  because TypeScript reports only the first member a type fails. @ref
+  https://github.com/microsoft/typescript-go/blob/typescript/v7.0.2/internal/checker/relater.go
+  (`typeRelatedToEachType`)
 - Registries map a name to a value made by `defineCodec`, `defineValidator`, or
   `{ column: string }`. A codec or validator value that the define function did not produce, a copy
   included, fails `tsc` (the values carry a type-only mark, so the error reads
@@ -898,8 +901,9 @@ Tests: `field-meta.test.ts` (the contacts fixture, the folds), `field-meta.test-
 
 A declared resource has one code per constraint a client can cause and see:
 
-- each constraint of the table with a column, other than the scope column, that is a public field or
-  relationship, whatever its access;
+- each constraint of the table, unique indexes that no constraint backs among them (catalog ADR
+  0009), with a column, other than the scope column, that is a public field or relationship,
+  whatever its access;
 - the primary key, when `clientIds` is true;
 - the NOT NULL key (3.5) of each public member writable by an operation;
 - each CHECK of each domain a member's type passes, directly, through a base domain, or as the
@@ -916,6 +920,7 @@ behind them (14).
 | domain CHECK | `check`      | 422    | Invalid Attribute          | each member whose type passes the domain | The value violates a constraint.         |
 | NOT NULL     | `notNull`    | 422    | Invalid Attribute          | the member                               | A value is required.                     |
 | UNIQUE       | `unique`     | 409    | Conflict                   | each public member of `columns`          | Another record already has this value.   |
+| unique index | `unique`     | 409    | Conflict                   | each public member of `columns`          | Another record already has this value.   |
 | PRIMARY KEY  | `primaryKey` | 409    | Conflict                   | `id`                                     | A record with this id already exists.    |
 | EXCLUDE      | `exclusion`  | 409    | Conflict                   | each public member of `columns`          | The value conflicts with another record. |
 | FOREIGN KEY  | `foreignKey` | 404    | Related Resource Not Found | the relationship                         | The related resource does not exist.     |
@@ -926,8 +931,14 @@ foreign key has no code, so `code` on it is refused as on any key without one. A
 scope column alone has no code either: stern's `business_profiles_organization_id_key`, one profile
 per organization, is violated only by a second create in the same organization, which falls back to
 the ban's own mapping, `CONFLICT` for 23505 (9.5). Without a scope the column is a member like any
-other. A unique index that no constraint backs has no code yet, since the public catalog does not
-carry indexes, and takes the same fallback.
+other.
+
+A unique index that no constraint backs is a unique constraint of the public table, keyed by its
+name, which is the name PostgreSQL reports (catalog SPEC 3, ADR 0009), so it derives a code by the
+rules above, partial or not: stern's partial `tools_org_name_unique (organization_id, name)` points
+at `name`. An index with an expression element, or named like a CHECK or FOREIGN KEY constraint of
+its table, is not in the public catalog, so it has no code and takes the same fallback;
+`postgresMapper`'s `constraints` can map it by name.
 
 JSON:API requires 404 for a request that references a related resource that does not exist and 409
 for a client-generated id that exists, and allows 409 for a uniqueness violation on update; 422 with
@@ -1031,8 +1042,11 @@ error raised inside an operation into the declared error, or returns `undefined`
    `(table, column)`. A domain's CHECK (23514) names the domain in `dataType` and no table: find the
    code of `(schema, dataType, constraint)` among the operation resource's domain CHECKs. Other
    integrity errors (23505, 23P01, 23514, 23503 on a write): find the rule key of
-   `(table, constraint)`. Tables and domains are matched by schema and name, so two schemas' objects
-   of one name stay apart.
+   `(table, constraint)`, and keep it only when its entry's kind is the one the SQLSTATE reports
+   (23505 `unique` or `primaryKey`, 23P01 `exclusion`, 23514 `check`, 23503 `foreignKey`), since a
+   unique index may share its name with a CHECK or FOREIGN KEY constraint of its table, which keeps
+   the key (catalog ADR 0009). Tables and domains are matched by schema and name, so two schemas'
+   objects of one name stay apart.
 4. Found: build the error from 9.1 with one item per member of the entry's `fields`, each with
    `path` under `pointer` (`/data/attributes/<field>`, `/data/relationships/<name>`, `/data/id`),
    and the driver error as `cause`. Not found: return `undefined`, and the ban's own `map`
@@ -1051,9 +1065,10 @@ What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
 | NOT NULL column                                        | 23502                             | the table and the column; no constraint, though PostgreSQL 18 catalogs one |
 | table CHECK, UNIQUE, PRIMARY KEY, EXCLUDE, FOREIGN KEY | 23514, 23505, 23505, 23P01, 23503 | the table and the constraint                                               |
 | domain CHECK                                           | 23514                             | the domain as `dataType`, and the constraint; no table or column           |
+| unique index, partial or not                           | 23505                             | the table, and the index as the constraint                                 |
 
-A unique index counts as a constraint in these fields, and a NOT NULL domain's 23502 names only the
-domain, which has no code (9.1). @ref https://www.postgresql.org/docs/18/protocol-error-fields.html
+A NOT NULL domain's 23502 names only the domain, which has no code (9.1). @ref
+https://www.postgresql.org/docs/18/protocol-error-fields.html
 
 ---
 
@@ -1459,7 +1474,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | Condition                                                                                        | Message (example)                                                                                                                                           |
 | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | an unknown configuration or declaration member, or a member of the wrong kind                    | `contacts.fields.name: unknown member "sortable"`                                                                                                           |
-| a catalog of another format                                                                      | `createDeclareResource.catalog: format 2 is not supported (expected 1)`                                                                                     |
+| a catalog of another format                                                                      | `createDeclareResource.catalog: format 3 is not supported (expected 2)`                                                                                     |
 | the full catalog (2)                                                                             | `createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`                               |
 | a registry entry `defineCodec` or `defineValidator` did not make, or `null` for a registry       | `createDeclareResource.codecs.phone: must be made by defineCodec`                                                                                           |
 | `types`, `fixtures`, or a fixture list that is empty, or a schema that is not a Zod 4 schema (7) | `defineCodec.types: must be a non-empty list of type names`                                                                                                 |
@@ -1601,10 +1616,10 @@ A private workspace package, `@netvark/resource-e2e`, that consumes the built pa
 `workspace:*` and never imports from `src/`. It holds its own fixture migrations (the contacts
 application of `e2e/catalog`, extended with a multi-column CHECK, a CHECK the rule translator does
 not cover, a domain CHECK without a rule, a codec column, an exclusion constraint, two tables keyed
-by `jsonb`, and a `notes` table whose columns need `as` and `code`), the catalogs
-`@netvark/pg-catalog` extracts from them (checked with `extract --check`), and declarations over
-them. It proves: the declarations type-check, and a `fails/` directory of declarations fails `tsc`
-with the expected errors; the derived names, recorded in a reviewed snapshot
+by `jsonb`, a `notes` table whose columns need `as` and `code`, and a partial unique index), the
+catalogs `@netvark/pg-catalog` extracts from them (checked with `extract --check`), and declarations
+over them. It proves: the declarations type-check, and a `fails/` directory of declarations fails
+`tsc` with the expected errors; the derived names, recorded in a reviewed snapshot
 (`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
 metadata, and definitions; the derived error codes, recorded in a reviewed snapshot
 (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
@@ -1701,13 +1716,13 @@ The fourth record covers section 9. At runtime every declaration derived its cod
 | GitLab 17.11 slice | 1,248 | 448   | 774      | 0      | 26          | 4.2 ms         |
 
 No declared column of either schema passes a domain with a CHECK, and the GitLab slice enforces
-uniqueness with 62 unique indexes, which the public catalog does not carry (9.1); stern has 7 such
-indexes besides its 29 codes. The run changed section 9 twice. stern scopes 52 of its declarations
-by organization, and the first version gave each scope foreign key a code whose items pointed at
-nothing; the scope column now makes no code. And the GitLab slice repeats CHECK names across tables
-(`push_rules` and `organization_push_rules`, `application_settings` and `namespace_settings`), so
-six codes were derived twice; the registry check named both constraints of each, and `code` on the
-six rules of the second table of each pair resolved them.
+uniqueness with 62 unique indexes, which the public catalog did not carry yet (the sixth record);
+stern has 7 such indexes besides its 29 codes. The run changed section 9 twice. stern scopes 52 of
+its declarations by organization, and the first version gave each scope foreign key a code whose
+items pointed at nothing; the scope column now makes no code. And the GitLab slice repeats CHECK
+names across tables (`push_rules` and `organization_push_rules`, `application_settings` and
+`namespace_settings`), so six codes were derived twice; the registry check named both constraints of
+each, and `code` on the six rules of the second table of each pair resolved them.
 
 In types, with those six codes, as medians of five runs; the declarations alone took 0.4 and 2.1
 percent more instantiations than the third record:
@@ -1735,6 +1750,33 @@ slice 764,840 instead of 1,219,669; the declarations alone did not change. Decla
 of `DeclaredResource` covariant with `out` measured the same, but TypeScript cannot verify the
 annotation, since the typed members are not covariant in the context in general, and a consumer that
 checks library declarations would see the error.
+
+The sixth record covers unique indexes (9.1, catalog ADR 0009). Extracted again in format 2, the
+public catalogs list stern's 7 unique indexes that no constraint backs, 5 of them partial, and 61 of
+the GitLab slice's 62, 11 of them partial; the 62nd,
+`index_customer_relations_contacts_on_unique_email_per_group (group_id, lower(email), id)`, has an
+expression element and stays out. At runtime, on Node.js 24:
+
+| Catalog            | Codes | UNIQUE | Unique indexes without a code | `errorCatalog` |
+| ------------------ | ----- | ------ | ----------------------------- | -------------- |
+| stern              | 745   | 35     | 1                             | 2.8 ms         |
+| GitLab 17.11 slice | 1,302 | 54     | 7                             | 4.1 ms         |
+
+An index without a code has no member in its key: stern's `business_profiles_organization_id_idx`
+repeats the scope-only UNIQUE constraint of 9.1, and GitLab's seven cover the scope column, the
+primary key column, or columns the generated declarations leave out. A `code` on stern's partial
+`tools_org_name_unique` type-checks and renames its code, and a misspelled key fails `tsc`. In
+types, as medians of five runs:
+
+| Catalog            | File                                         | Instantiations | Check time | Peak memory |
+| ------------------ | -------------------------------------------- | -------------- | ---------- | ----------- |
+| stern              | the declarations                             | 411,566        | 0.179 s    | 129 MB      |
+| stern              | plus `errorCatalog` over all and `createBan` | 655,758        | 0.370 s    | 145 MB      |
+| GitLab 17.11 slice | the declarations                             | 494,950        | 0.257 s    | 152 MB      |
+| GitLab 17.11 slice | plus `errorCatalog` over all and `createBan` | 774,833        | 0.379 s    | 169 MB      |
+
+The declarations took 0.05 and 0.3 percent more instantiations than in the fourth record, and
+`errorCatalog` 0.2 and 1.3 percent more than in the fifth.
 
 ### 15.6 The Zod floor
 

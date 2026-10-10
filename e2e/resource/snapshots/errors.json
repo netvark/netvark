@@ -98,6 +98,12 @@
       "kind": "check",
       "fields": ["website"]
     },
+    "CONTACT_NAME_TAKEN": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "unique",
+      "fields": ["name"]
+    },
     "CONTACTS_KIND_NOT_NULL": {
       "status": 422,
       "title": "Invalid Attribute",

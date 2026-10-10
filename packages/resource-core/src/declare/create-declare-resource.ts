@@ -29,7 +29,11 @@ import { declareResourceIn } from './declare-resource';
 /**
  * A full catalog has `schemas`, which the public catalog drops; the
  * definer takes the public catalog only, since declarations reach browsers
- * (SPEC 2, ADR 0002).
+ * (SPEC 2, ADR 0002). It comes first in the constraint of `TCatalog`: a
+ * full catalog fails `PublicCatalog` too, since its unique constraints have
+ * no `partial`, and TypeScript reports only the first member of an
+ * intersection that a type fails, so this message is the one a caller reads.
+ * @ref https://github.com/microsoft/typescript-go/blob/typescript/v7.0.2/internal/checker/relater.go (`typeRelatedToEachType` returns at the first member that fails)
  */
 interface NotFullCatalog {
   readonly schemas?: Requirement<'catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers'>;
@@ -63,7 +67,7 @@ export interface DeclareResourceConfig<
  * catalog is refused, since declarations reach browsers (ADR 0002).
  */
 export function createDeclareResource<
-  const TCatalog extends PublicCatalog & NotFullCatalog,
+  const TCatalog extends NotFullCatalog & PublicCatalog,
   const TCodecs extends CodecRegistry = EmptyRegistry,
   const TValidators extends ValidatorRegistry = EmptyRegistry,
   const TScopes extends ScopeRegistry = EmptyRegistry,

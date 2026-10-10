@@ -21,7 +21,7 @@ import { PEOPLE_TABLE, TEAMS_TABLE } from './catalog/teams-tables';
 import { DOMAINS, ENUMS } from './catalog/types';
 
 export interface ContactsCatalog {
-  readonly format: 1;
+  readonly format: 2;
   readonly enums: typeof ENUMS;
   readonly domains: typeof DOMAINS;
   readonly tables: {
@@ -39,7 +39,7 @@ export interface ContactsCatalog {
 }
 
 export const contactsCatalog: ContactsCatalog = {
-  format: 1,
+  format: 2,
   enums: ENUMS,
   domains: DOMAINS,
   tables: {

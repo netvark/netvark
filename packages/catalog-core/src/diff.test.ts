@@ -141,9 +141,9 @@ describe('diffCatalogs: order and contract', () => {
 
   it('throws TypeError for catalogs of different formats, whose members are not comparable', () => {
     const actual = copy();
-    actual.format = 2;
+    actual.format = 3;
     expect(() => diffCatalogs(fixture, actual as Catalog)).toThrow(
-      new TypeError('cannot compare catalogs of format 1 and 2'),
+      new TypeError('cannot compare catalogs of format 2 and 3'),
     );
   });
 

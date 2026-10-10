@@ -115,7 +115,9 @@ const outdated = report.files.filter((file) => file.status !== 'unchanged');
   PostgreSQL's own deparsed text; objects that belong to an extension, views, functions, sequences,
   and partitions are left out.
 - **`public-catalog.ts`** (with `out.public`): `export const publicCatalog`, the slice of the tables
-  you list that a browser may see, without expressions, policies, indexes, or comments.
+  you list that a browser may see, without expressions, policies, or comments. Of the indexes it
+  keeps the unique ones no constraint backs, as unique constraints marked `partial` when a `WHERE`
+  clause limits them.
 - **`db.ts`** (with `out.types`): the Kysely types, one interface per table and the `DB` interface
   that collects them. It imports only types from `kysely`.
 
