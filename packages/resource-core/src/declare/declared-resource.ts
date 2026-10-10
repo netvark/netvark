@@ -98,6 +98,29 @@ export interface DeclaredResource<
   readonly '~context'?: TContext | undefined;
 }
 
+/**
+ * The constraint of a type helper that takes any declared resource, such as
+ * `Infer` and `ErrorCatalog`: the members every resource's type records,
+ * which TypeScript compares one by one and never fails on. The wide
+ * `DeclaredResource` is the wrong constraint for a type parameter. Its
+ * members are conditional types of the definer context, so TypeScript
+ * relates two contexts invariantly, fails in the wide-to-specific
+ * direction, and falls back to comparing the members. A type argument's
+ * constraint check reports errors from the start, and in that mode the
+ * failed check is recomputed on every reference instead of read from the
+ * cache: about 45 ms and 23 MB per reference on stern's declarations
+ * (SPEC 15.5). A variable's initializer is checked without reporting first,
+ * so annotating a value with `DeclaredResource` stays cheap.
+ * @ref https://github.com/microsoft/typescript-go/blob/typescript/v7.0.2/internal/checker/checker.go (`checkTypeArgumentConstraints` calls `checkTypeAssignableTo`)
+ * @ref https://github.com/microsoft/typescript-go/blob/typescript/v7.0.2/internal/checker/relater.go ("We are elaborating errors and the cached result is a failure")
+ */
+export interface AnyDeclaredResource {
+  readonly table: string;
+  readonly declaration: Declaration;
+  readonly names: ResourceNames;
+  readonly '~context'?: DeclareContext | undefined;
+}
+
 /** What a declared resource was built from, beyond its public members. */
 export interface DeclaredInternals {
   /** The resource itself, so one lookup gives a registry both. */

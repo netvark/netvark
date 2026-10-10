@@ -4,11 +4,14 @@
  * update } }`, keyed by public name.
  * @packageDocumentation
  */
-import type { DeclaredResource } from '../declare/declared-resource';
+import type {
+  AnyDeclaredResource,
+  DeclaredResource,
+} from '../declare/declared-resource';
 import type { TypesOf } from './resource-types';
 
 /** The output types of a declared resource's schemas. */
-export type Infer<TResource extends DeclaredResource> =
+export type Infer<TResource extends AnyDeclaredResource> =
   TResource extends DeclaredResource<infer TContext, infer TTable, infer TDecl>
     ? TypesOf<TContext, TTable, TDecl>
     : never;
