@@ -25,7 +25,8 @@ ADR 0003 of the repository names a family's database-free part `<thing>-core` an
   loader, the replay, the extraction queries, the CHECK recognizer, the renderers of the three
   output files, the Kysely type generator, the configuration, and the CLI. It depends on
   `@netvark/catalog-core` and re-exports it in full, depends on `pg`, and takes
-  `@electric-sql/pglite` as an optional peer dependency. It runs on Node.js 22.12 and later.
+  `@electric-sql/pglite` as an optional peer dependency. It runs on Node.js 22.12 and later, Bun,
+  and Deno, and not on Workers, which have no file system for the migrations and the output files.
 
 ## Consequences
 

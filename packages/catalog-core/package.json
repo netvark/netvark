@@ -1,0 +1,57 @@
+{
+  "name": "@netvark/catalog-core",
+  "version": "0.0.0",
+  "description": "The PostgreSQL catalog model as TypeScript types: tables, columns, constraints with the rules read from their CHECK expressions, indexes, row security policies, enums, and domains, plus the browser-safe public slice. Database-free, no dependencies.",
+  "keywords": [
+    "catalog",
+    "check-constraint",
+    "pg-catalog",
+    "postgres",
+    "postgresql",
+    "schema",
+    "types"
+  ],
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/catalog-core#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/catalog-core"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

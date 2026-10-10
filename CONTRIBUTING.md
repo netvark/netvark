@@ -1,13 +1,14 @@
 # Contributing
 
 Thanks for helping. This repository holds every `@netvark` package, grouped in families: ban
-(`@netvark/ban-core`, `@netvark/hono-ban`), jsonapi (`@netvark/jsonapi-core`,
-`@netvark/hono-jsonapi`), and keyset (`@netvark/keyset-core`, `@netvark/kysely-keyset`). This guide
-covers what every family shares: setup, the quality gates, the conventions, commits, changesets, and
-releases. Each family adds its own guide with its layout, extension points, constraints, and
-checklist:
+(`@netvark/ban-core`, `@netvark/hono-ban`), catalog (`@netvark/catalog-core`,
+`@netvark/pg-catalog`), jsonapi (`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`), and keyset
+(`@netvark/keyset-core`, `@netvark/kysely-keyset`). This guide covers what every family shares:
+setup, the quality gates, the conventions, commits, changesets, and releases. Each family adds its
+own guide with its layout, extension points, constraints, and checklist:
 
 - [`docs/ban/CONTRIBUTING.md`](docs/ban/CONTRIBUTING.md)
+- [`docs/catalog/CONTRIBUTING.md`](docs/catalog/CONTRIBUTING.md)
 - [`docs/jsonapi/CONTRIBUTING.md`](docs/jsonapi/CONTRIBUTING.md)
 - [`docs/keyset/CONTRIBUTING.md`](docs/keyset/CONTRIBUTING.md)
 
@@ -23,6 +24,8 @@ itself are in [`docs/adr/`](docs/adr).
 - `bun` and `deno` for `pnpm test:runtimes` (optional locally; CI installs both)
 - a PostgreSQL server for `e2e/keyset/postgres.e2e.test.ts` (optional locally; the file skips itself
   without `KEYSET_PG_URL`, and CI runs it against PostgreSQL 14 and 18)
+- a PostgreSQL server whose role has `CREATEDB` for the catalog's server tests (optional locally;
+  they skip themselves without `CATALOG_PG_URL`, and CI runs them against PostgreSQL 14 and 18)
 
 ## Setup
 
@@ -57,16 +60,18 @@ else, `e2e/*` included, resolves `dist/`.
 | `pnpm format` / `lint:fix` | Apply formatting / autofixable lint fixes                              |
 
 CI runs the same commands, plus `@netvark/kysely-keyset`'s unit tests on Kysely 0.28.17 (the floor
-of its peer range) and the keyset e2e file for a PostgreSQL server. A pull request must be green on
-all of them: the last CI job, `CI passed`, needs every other job and is the one check `main`
-requires ([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI job goes
-into its `needs` list. To work on one package or family, filter by name:
+of its peer range), the keyset e2e suite on a PostgreSQL server, and `@netvark/pg-catalog`'s tests
+and the catalog e2e suite on PostgreSQL servers. A pull request must be green on all of them: the
+last CI job, `CI passed`, needs every other job and is the one check `main` requires
+([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI job goes into its
+`needs` list. To work on one package or family, filter by name:
 
 ```bash
 pnpm --filter @netvark/keyset-core test
 pnpm --filter @netvark/kysely-keyset exec vitest run paginate
 pnpm --filter @netvark/keyset-e2e exec vitest run cursors        # after pnpm build
 KEYSET_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter @netvark/keyset-e2e exec vitest run postgres
+CATALOG_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter @netvark/pg-catalog test
 ```
 
 ## Conventions

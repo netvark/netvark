@@ -20,14 +20,14 @@ body:
     id: host
     attributes:
       label: Host library and version
-      description: When the report concerns a binding, the version of Hono or Kysely, and of PostgreSQL for the keyset packages.
+      description: When the report concerns a binding, the version of Hono, Kysely, or pg, and of PostgreSQL (or PGlite) for the keyset and catalog packages.
     validations:
       required: false
   - type: textarea
     id: repro
     attributes:
       label: Minimal reproduction
-      description: A short script or a link to a repository. Include the definition (catalog, resource, or keyset), the request (method, URL, headers, body, or sort, filter, page), and for the keyset packages the compiled SQL from `onQuery` when you have it.
+      description: A short script or a link to a repository. Include the definition (catalog, resource, or keyset), the request (method, URL, headers, body, or sort, filter, page), for the keyset packages the compiled SQL from `onQuery` when you have it, and for the catalog packages the migration that reproduces it.
       render: ts
     validations:
       required: true

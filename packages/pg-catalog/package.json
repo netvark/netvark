@@ -1,0 +1,75 @@
+{
+  "name": "@netvark/pg-catalog",
+  "version": "0.0.0",
+  "description": "Your PostgreSQL schema as committed TypeScript: replays SQL migrations into PGlite or a throwaway database, reads pg_catalog, and writes a deterministic typed catalog of every table, column, constraint, index, policy, enum, and domain, with a browser-safe public slice.",
+  "keywords": [
+    "catalog",
+    "codegen",
+    "migrations",
+    "pg-catalog",
+    "pglite",
+    "postgres",
+    "postgresql",
+    "schema"
+  ],
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/pg-catalog#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/pg-catalog"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netvark/catalog-core": "workspace:^",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "^0.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@electric-sql/pglite": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
