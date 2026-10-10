@@ -1,0 +1,64 @@
+{
+  "name": "@netvark/resource-core",
+  "version": "0.0.0",
+  "description": "One declaration per PostgreSQL table, keyed by its database names and typed by the catalog @netvark/pg-catalog extracts, from which the public API follows: public names, Zod schemas, field metadata, error codes, localized messages, JSON:API and keyset definitions, and OpenAPI. Runs in browsers and servers.",
+  "keywords": [
+    "api",
+    "catalog",
+    "json-api",
+    "jsonapi",
+    "openapi",
+    "postgres",
+    "postgresql",
+    "schema",
+    "zod"
+  ],
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/resource-core#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/resource-core"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netvark/catalog-core": "workspace:^",
+    "@netvark/jsonapi-core": "workspace:^",
+    "@netvark/keyset-core": "workspace:^"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

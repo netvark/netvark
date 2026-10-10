@@ -305,6 +305,8 @@
     "node_modules/**",
     "**/*.min.js",
     "**/*.d.ts",
-    "e2e/catalog/fixtures/*/expected/**"
+    "e2e/catalog/fixtures/*/expected/**",
+    "e2e/resource/fixtures/*/catalog.ts",
+    "e2e/resource/fixtures/*/public-catalog.ts"
   ]
 }

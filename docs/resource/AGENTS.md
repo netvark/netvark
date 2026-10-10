@@ -26,6 +26,12 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Compile errors first. Every rule TypeScript can check gets a `@ts-expect-error` case next to the
   valid form, and the same rule a runtime `TypeError` test for JavaScript callers. A type-level
   derivation and its runtime twin read one case table.
+- Checks cost nothing on the valid path. A type-level check reports a mistake at the offending
+  option, as a `Requirement` or a message type (SPEC 3), never by intersecting two different literal
+  types, which reduces the declaration to `never`. It builds error types only for an actual mistake:
+  guard a mapped type of unknown members (`KnownMembers`), and give invalid keys their own mapped
+  type, built only when there is one (`FieldsCheck`). A check that changes shape is measured on the
+  real catalogs of SPEC 15.5 with `tsc --extendedDiagnostics --checkers 1`.
 - The core knows no host. Nothing under `packages/resource-core/` imports Kysely, Hono, React, a
   driver, or a Node.js module; `server/` holds contracts, and adapters implement them (ADR 0008).
   The root and `openapi` entries never import from `server/`.

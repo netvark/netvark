@@ -124,7 +124,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [ban, catalog, jsonapi, keyset]
+        family: [ban, catalog, jsonapi, keyset, resource]
         node: [22, 24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -137,8 +137,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Each e2e workspace consumes its family's built packages through
       # `workspace:*`, so it type-checks and runs against dist/ exactly as an
-      # install would. The keyset and catalog suites run on PGlite here;
-      # PostgreSQL servers are the jobs below.
+      # install would. The keyset, catalog, and resource suites run on PGlite
+      # here; PostgreSQL servers are the jobs below.
       - run: pnpm run build
       - run: pnpm --filter @netvark/${{ matrix.family }}-e2e run typecheck
       - run: pnpm --filter @netvark/${{ matrix.family }}-e2e run test
