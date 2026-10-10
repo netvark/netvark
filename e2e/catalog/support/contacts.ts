@@ -42,3 +42,26 @@ export const contactsConfig: ExtractionConfig = {
     types: 'src/db/db.ts',
   },
 };
+
+/** What a hotfix outside the migrations leaves behind: a column added, a policy dropped, a CHECK loosened. */
+export const HOTFIX = `alter table contacts add column fax text;
+drop policy meetings_tenant_isolation on meetings;
+alter table organizations drop constraint organizations_seats_check,
+  add constraint organizations_seats_check check (seats >= 0);`;
+
+/** `formatDiff` of the committed catalog against a database after `HOTFIX`. */
+export const HOTFIX_REPORT: string = [
+  '3 objects differ: 1 added, 1 removed, 1 changed',
+  '',
+  'Columns',
+  '  + contacts.fax',
+  '',
+  'Constraints',
+  '  ~ organizations.organizations_seats_check',
+  '      expression: expected "(seats > 0)", actual "(seats >= 0)"',
+  '      rule.min.inclusive: expected false, actual true',
+  '      definition: expected "CHECK ((seats > 0))", actual "CHECK ((seats >= 0))"',
+  '',
+  'Policies',
+  '  - meetings.meetings_tenant_isolation',
+].join('\n');

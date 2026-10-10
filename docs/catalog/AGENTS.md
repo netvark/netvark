@@ -52,8 +52,9 @@ never imports anything outside itself.
 - `recognize/` the CHECK recognizer and the regular expression subset
 - `render/` the catalog modules, their parser, and the Kysely types with their mapping table
 - `commands/` `extractCatalog`, `extract`, `introspectCatalog`, `drift`, `formatDiff`
-- `config.ts`, `config-file.ts` `defineExtraction` and loading `netvark.config.*`
-- `cli.ts`, `cli/main.ts` the bin
+- `config.ts`, `config-validate.ts`, `config-file.ts` `defineExtraction`, its checks, and loading
+  `netvark.config.*`
+- `cli.ts`, `cli/arguments.ts`, `cli/main.ts` the bin, its argument parser, and `runCli`
 
 `e2e/catalog/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`. `fixtures/contacts/` holds a realistic

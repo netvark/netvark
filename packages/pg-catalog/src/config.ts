@@ -1,10 +1,12 @@
 /**
- * The configuration types (SPEC 11.1). `defineExtraction`, which validates
- * a configuration eagerly, arrives with the CLI.
+ * The configuration types and `defineExtraction`, which validates a
+ * configuration eagerly (SPEC 11.1).
  * @packageDocumentation
  */
 import type { MigrationSource } from './migrations/load';
 import type { PgliteExtension } from './target/pglite';
+
+import { validateConfig } from './config-validate';
 
 /**
  * Where migrations replay. PGlite, the default, runs PostgreSQL 18
@@ -98,3 +100,17 @@ export interface ExtractionConfig {
 
 /** The schemas read when the configuration names none (SPEC 15). */
 export const DEFAULT_SCHEMAS: ReadonlyArray<string> = ['public'];
+
+/**
+ * Validates a configuration eagerly and returns it unchanged, for the
+ * default export of `netvark.config.ts`. A mistake throws `TypeError`
+ * naming the option: an unknown key at any level, an empty string, a
+ * `database` with both or neither of `pglite` and `url`, a system,
+ * duplicate, or overlong schema name, an empty or duplicate
+ * `out.public.tables`, or a drift environment name outside
+ * `^[A-Za-z0-9][A-Za-z0-9_-]*$`. URL functions are not called.
+ */
+export function defineExtraction(config: ExtractionConfig): ExtractionConfig {
+  validateConfig(config);
+  return config;
+}

@@ -21,6 +21,9 @@
     "url": "git+https://github.com/netvark/netvark.git",
     "directory": "packages/pg-catalog"
   },
+  "bin": {
+    "pg-catalog": "./dist/cli.mjs"
+  },
   "files": [
     "dist",
     "CHANGELOG.md",
@@ -28,7 +31,9 @@
     "README.md"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/cli.mjs"
+  ],
   "exports": {
     ".": {
       "source": "./src/index.ts",

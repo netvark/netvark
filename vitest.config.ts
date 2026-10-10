@@ -20,11 +20,14 @@ const config: ViteUserConfig = defineConfig({
       // the jsonapi and keyset packages, and the one-line twins in
       // @netvark/hono-ban of each @netvark/ban-core subpath. The nested
       // index files of @netvark/ban-core implement its subpaths and stay in.
+      // The pg-catalog bin only hands the process to runCli; the catalog
+      // e2e suite runs it as a built bin.
       exclude: [
         'packages/*/src/**/*.test.ts',
         'packages/*/src/**/*.test-d.ts',
         'packages/*/src/test-support/**',
         'packages/*/src/index.ts',
+        'packages/pg-catalog/src/cli.ts',
         'packages/{jsonapi-core,hono-jsonapi,keyset-core,kysely-keyset}/src/**/index.ts',
         'packages/hono-ban/src/**/index.ts',
         'packages/hono-ban/src/formats/*.ts',

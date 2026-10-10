@@ -61,6 +61,22 @@ export function withDatabase(url: string, database: string): string {
   return parsed.toString();
 }
 
+/**
+ * Why node-postgres could not connect, for the message: the socket error
+ * (`connect ECONNREFUSED 127.0.0.1:5432`, `getaddrinfo ENOTFOUND db`) or
+ * the server's (`database "app" does not exist`), which name the host,
+ * role, or database but never the password. When every address of a host
+ * such as `localhost` refuses, Node.js reports an `AggregateError` with an
+ * empty message, so its errors speak instead.
+ * @ref https://nodejs.org/api/net.html#socketconnectoptions-connectlistener (autoSelectFamily)
+ */
+function reasonOf(error: unknown): string {
+  if (error instanceof AggregateError && error.message === '') {
+    return error.errors.map(reasonOf).join('; ');
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 function reportedByNextQuery(): void {
   // The failed connection rejects the next query, which reports it.
 }
@@ -75,7 +91,7 @@ async function connect(url: string): Promise<pg.Client> {
   } catch (error) {
     throw new PgCatalogError(
       'connection_failed',
-      'cannot connect to the PostgreSQL server',
+      `cannot connect to the PostgreSQL server: ${reasonOf(error)}`,
       {
         cause: error,
       },
@@ -110,7 +126,7 @@ async function dropDatabase(admin: pg.Client, name: string): Promise<void> {
   } catch (error) {
     throw new PgCatalogError(
       'connection_failed',
-      `cannot drop the database ${name}`,
+      `cannot drop the database ${name}: ${reasonOf(error)}`,
       {
         cause: error,
       },
@@ -137,7 +153,7 @@ export async function openThrowawayDatabase(url: string): Promise<SqlSession> {
     await admin.end();
     throw new PgCatalogError(
       'connection_failed',
-      `cannot create the database ${name}`,
+      `cannot create the database ${name}: ${reasonOf(error)}`,
       {
         cause: error,
       },

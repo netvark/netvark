@@ -62,6 +62,7 @@ packages/pg-catalog/src/
   cli.ts                       the bin entry (11.2)
   errors.ts                    PgCatalogError, isPgCatalogError() (12)
   config.ts                    defineExtraction(), the config types (11.1)
+  config-validate.ts           validateConfig(): the checks defineExtraction runs (11.1)
   config-file.ts               findConfigFile(), loadConfigFile() (11.1)
   migrations/order.ts          orderMigrations(), naturalCompare() (5)
   migrations/load.ts           loadMigrations() (5)
@@ -98,6 +99,7 @@ packages/pg-catalog/src/
   commands/extract.ts          extractCatalog(), extract() (10.1)
   commands/drift.ts            introspectCatalog(), drift() (10.2)
   commands/format-diff.ts      formatDiff() (10.2)
+  cli/arguments.ts             parseCommand(), USAGE, UsageError (11.2)
   cli/main.ts                  runCli() (11.2)
 ```
 
@@ -1001,17 +1003,23 @@ naming the option. It rejects unknown keys at every level (a misspelled `postgre
 being ignored), empty strings, a `database` with both or neither of `pglite` and `url`, schema names
 that are empty, longer than 63 bytes, starting with `pg_`, or equal to `information_schema`,
 duplicate schemas or public tables, an empty `public.tables`, and environment names outside
-`^[A-Za-z0-9][A-Za-z0-9_-]*$`. URL functions are called only when a command needs the URL, so a
-missing environment variable only fails the command that needs it. Relative paths resolve against
-the configuration file's directory, or the `cwd` option of the programmatic API.
+`^[A-Za-z0-9][A-Za-z0-9_-]*$`. Each message starts with `defineExtraction: ` and names the option by
+its path (`out.types.camelCase.upperCase must be a boolean`); an option set to `undefined` counts as
+absent, as a JavaScript configuration may write it. URL functions are called only when a command
+needs the URL, so a missing environment variable only fails the command that needs it. Relative
+paths resolve against the configuration file's directory, or the `cwd` option of the programmatic
+API.
 
 The CLI loads `--config <file>`, or else the first of `netvark.config.ts`, `netvark.config.mts`,
 `netvark.config.js`, and `netvark.config.mjs` in the working directory, with a dynamic `import()`;
-the default export must pass `defineExtraction`'s validation. A TypeScript configuration needs a
-runtime that strips types: Node.js 22.18 or later, Node.js 22.12 to 22.17 with
-`--experimental-strip-types`, Bun, or Deno. @ref https://nodejs.org/api/typescript.html
+the default export must pass `defineExtraction`'s validation. A file that does not exist, fails to
+import, has no default export, or fails validation is a `config_invalid` naming it, as is a working
+directory without one. A TypeScript configuration needs a runtime that strips types: Node.js 22.18
+or later, Node.js 22.12 to 22.17 with `--experimental-strip-types` (which `NODE_OPTIONS` can carry),
+Bun, or Deno. Where Node.js does not strip types it reports the file as an unknown extension, and
+the message says what to do instead. @ref https://nodejs.org/api/typescript.html
 
-### 11.2 The CLI (`cli.ts`, `cli/main.ts`)
+### 11.2 The CLI (`cli.ts`, `cli/arguments.ts`, `cli/main.ts`)
 
 ```
 pg-catalog extract [--check] [--config <file>]
@@ -1020,9 +1028,22 @@ pg-catalog --help
 pg-catalog --version
 ```
 
-Arguments are parsed with `node:util`'s `parseArgs` in strict mode. Results go to standard output;
-errors go to standard error as `pg-catalog: <message>`. @ref
+Arguments are parsed with `node:util`'s `parseArgs` in strict mode, so an unknown option or a
+missing value fails; options may come before or after the command, and `--name=value` works. Results
+go to standard output; errors go to standard error as `pg-catalog: <message>`. @ref
 https://nodejs.org/api/util.html#utilparseargsconfig
+
+- `--help` (`-h`) prints the usage and `--version` (`-v`) the installed package's version, wherever
+  they appear; both exit 0.
+- `extract` prints one line per file, in the order of 10.1: the status padded to nine characters, a
+  space, and the path relative to the working directory. `--config` resolves against the working
+  directory, and the configuration's own paths against its directory.
+- `drift` prints `formatDiff` (10.2), or with `--json` the `CatalogDiff` as JSON indented by two
+  spaces.
+- A missing or unknown command, an extra argument, an option the command does not take, and `drift`
+  without `--env` are usage errors, followed by `Run pg-catalog --help for usage.` A
+  `PgCatalogError` prints its message. Any other error, such as one a function of the configuration
+  throws, prints its stack.
 
 | Command           | 0                        | 1                          | 2                                                       |
 | ----------------- | ------------------------ | -------------------------- | ------------------------------------------------------- |
@@ -1038,22 +1059,22 @@ Commands throw `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a
 object or file involved, and the PostgreSQL error as `cause` where there is one. The CLI exits 2 on
 all of them. `defineExtraction` and `toPublicCatalog` throw `TypeError` for programming mistakes.
 
-| `code`                 | Raised when                                                                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config_invalid`       | no configuration file, a file that fails to load or validate, an unknown environment, a URL function returning nothing, or a malformed contrib extension name |
-| `pglite_missing`       | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist                                             |
-| `migrations_invalid`   | the directory is missing or holds no migrations, or two Flyway migrations share a version or a repeatable description                                         |
-| `migration_failed`     | a migration fails during replay                                                                                                                               |
-| `connection_failed`    | connecting, creating, or dropping a database fails                                                                                                            |
-| `unsupported_server`   | the server is older than PostgreSQL 14, or returns a catalog code this version does not know                                                                  |
-| `schema_usage`         | the drift role lacks `USAGE` on a configured schema                                                                                                           |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                         |
-| `duplicate_key`        | two objects map to the same reference name                                                                                                                    |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                   |
-| `name_collision`       | two objects map to the same TypeScript name                                                                                                                   |
-| `camel_case_mismatch`  | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                         |
-| `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                                                                 |
-| `catalog_format`       | the committed catalog was written in another `format`                                                                                                         |
+| `code`                 | Raised when                                                                                                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config_invalid`       | no configuration file, a file that fails to load or validate, an unknown environment, a URL function returning nothing, or a malformed contrib extension name                                                          |
+| `pglite_missing`       | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist                                                                                                      |
+| `migrations_invalid`   | the directory is missing or holds no migrations, or two Flyway migrations share a version or a repeatable description                                                                                                  |
+| `migration_failed`     | a migration fails during replay                                                                                                                                                                                        |
+| `connection_failed`    | connecting, creating, or dropping a database fails; the message ends with the driver's or the server's reason (`connect ECONNREFUSED 127.0.0.1:5432`, `database "app" does not exist`), which never holds the password |
+| `unsupported_server`   | the server is older than PostgreSQL 14, or returns a catalog code this version does not know                                                                                                                           |
+| `schema_usage`         | the drift role lacks `USAGE` on a configured schema                                                                                                                                                                    |
+| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                                                                                  |
+| `duplicate_key`        | two objects map to the same reference name                                                                                                                                                                             |
+| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                                                                            |
+| `name_collision`       | two objects map to the same TypeScript name                                                                                                                                                                            |
+| `camel_case_mismatch`  | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                                                                                  |
+| `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                                                                                                                          |
+| `catalog_format`       | the committed catalog was written in another `format`                                                                                                                                                                  |
 
 ---
 
@@ -1072,7 +1093,7 @@ PostgreSQL 18; nothing is mocked.
 | Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                      | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                             |
 | Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                      |
 | Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                            | exact output text, parse round trip, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out |
-| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                                                               | statuses, writes only on change, every validation, exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                                                                                                |
+| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `config-validate.test.ts`, `config-file.test.ts`, `arguments.test.ts`, `main.test.ts`                                                                        | statuses, writes only on change, every validation message, loading each kind of configuration file, every usage error, output and exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                 |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -1093,7 +1114,7 @@ reviewed by hand, and `db-camel.ts`, the types rendered with `camelCase: true`.
 | `kysely.e2e.test.ts`          | the contacts application writing and reading every table through Kysely with the generated `DB`: query results have the types the test states and the refused inserts fail to compile (the typecheck script), and every value node-postgres reads back has the declared select type; the same through `CamelCasePlugin` with `db-camel.ts`; on PGlite over a socket and on the server |
 | `consumer.e2e.test.ts`        | the generated modules imported as TypeScript: assignable to the model with literal types, the public module equal to `toPublicCatalog` of the catalog, and `parseCatalogModule` reading the file back with no diff                                                                                                                                                                    |
 | `rules.e2e.test.ts`           | the public catalog's rules enforced as a client would: each value's verdict equals the database's evaluation of the recorded CHECK, for tables and domains, and the rules are literal types                                                                                                                                                                                           |
-| `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                                                                                                                                                                                                                  |
+| `cli.e2e.test.ts`             | the built bin run as a package manager runs it, in a temporary project whose configuration imports `defineExtraction`: `--version`, the three files byte for byte, `--check` passing and then failing on a hand edit, `drift` output and exit codes on PGlite over a socket and on the server, a missing URL variable, and a TypeScript configuration with and without type stripping |
 
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `drift` against
 PGlite behind a socket server, and `toPublicCatalog` and `diffCatalogs` in workerd. CI runs the

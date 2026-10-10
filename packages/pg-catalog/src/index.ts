@@ -3,9 +3,10 @@
  * PostgreSQL (PGlite in-process, or a server), reads `pg_catalog`, and
  * writes the catalog as an `as const` TypeScript module, with Kysely types
  * rendered from it when configured; `drift` compares a live database with
- * the committed catalog. It re-exports all of
- * `@netvark/catalog-core`, the model and the pure functions over it. See
- * `docs/catalog/SPEC.md` for the contract.
+ * the committed catalog; `defineExtraction` checks the configuration the
+ * `pg-catalog` bin reads. It re-exports all of `@netvark/catalog-core`, the
+ * model and the pure functions over it. See `docs/catalog/SPEC.md` for the
+ * contract.
  * @packageDocumentation
  */
 export * from '@netvark/catalog-core';
@@ -18,6 +19,7 @@ export type {
   TypeOverride,
   TypesConfig,
 } from './config';
+export { defineExtraction } from './config';
 export type {
   ExtractCatalogOptions,
   ExtractedFile,
