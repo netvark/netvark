@@ -71,6 +71,7 @@ export const DOCUMENT_NOTES_TABLE = {
         table: 'documents',
         columns: ['id'],
       },
+      enforced: true,
     },
     document_notes_pkey: {
       kind: 'primaryKey',

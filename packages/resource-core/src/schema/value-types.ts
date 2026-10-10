@@ -72,9 +72,9 @@ type DomainEnumValues<
 }[number];
 
 /**
- * The values of each column's `enum` rules, from the CHECKs over exactly
- * that column; computed once per table, since TypeScript caches an alias
- * by its arguments.
+ * The values of each column's `enum` rules, from the enforced CHECKs over
+ * exactly that column; computed once per table, since TypeScript caches an
+ * alias by its arguments.
  */
 export type ColumnEnumValues<TTableDef extends PublicTable> = {
   [
@@ -82,6 +82,7 @@ export type ColumnEnumValues<TTableDef extends PublicTable> = {
       readonly kind: 'check';
       readonly columns: readonly [string];
       readonly rule: { readonly kind: 'enum' };
+      readonly enforced: true;
     }
       ? TTableDef['constraints'][K]['columns'][0]
       : never

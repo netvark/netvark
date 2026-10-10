@@ -58,7 +58,7 @@ export interface PublicUniqueConstraint {
   readonly partial: boolean;
 }
 
-/** A foreign key, without its actions, state, or definition. */
+/** A foreign key, without its actions, validation state, or definition. */
 export interface PublicForeignKeyConstraint {
   readonly kind: 'foreignKey';
   readonly columns: ReadonlyArray<string>;
@@ -66,6 +66,8 @@ export interface PublicForeignKeyConstraint {
     readonly table: string;
     readonly columns: ReadonlyArray<string>;
   };
+  /** False for NOT ENFORCED (PostgreSQL 18), which the database never checks (ADR 0010). */
+  readonly enforced: boolean;
 }
 
 /** A check constraint: its rule, never its expression. */
@@ -73,6 +75,12 @@ export interface PublicCheckConstraint {
   readonly kind: 'check';
   readonly columns: ReadonlyArray<string>;
   readonly rule: Rule | null;
+  /**
+   * False for NOT ENFORCED (PostgreSQL 18), which the database never
+   * checks, so its `rule` is `null` (ADR 0006, 0010).
+   * @ref https://www.postgresql.org/docs/18/sql-createtable.html (`NOT ENFORCED`)
+   */
+  readonly enforced: boolean;
 }
 
 /** An exclusion constraint, without its definition. */

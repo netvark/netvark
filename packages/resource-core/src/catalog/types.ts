@@ -62,11 +62,16 @@ export type SearchColumn<TTableDef extends PublicTable> = {
     : never;
 }[ColumnName<TTableDef>];
 
-/** The CHECK constraints whose rule the recognizer could not read. */
+/**
+ * The enforced CHECK constraints whose rule the recognizer could not read.
+ * A NOT ENFORCED CHECK has no rule either, but the database never applies
+ * it, so no validator covers it (catalog ADR 0010).
+ */
 export type UntranslatedCheck<TTableDef extends PublicTable> = {
   [K in ConstraintName<TTableDef>]: TTableDef['constraints'][K] extends {
     readonly kind: 'check';
     readonly rule: null;
+    readonly enforced: true;
   }
     ? K
     : never;

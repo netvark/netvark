@@ -99,7 +99,7 @@ interface DeclareResourceConfig<TCatalog, TCodecs, TValidators, TScopes, TDomain
 `DeclareContext` bundles the catalog and the four registries into the one type parameter every
 type-level check reads.
 
-- `catalog` MUST be a public catalog (`toPublicCatalog`, catalog SPEC 3) of format 2
+- `catalog` MUST be a public catalog (`toPublicCatalog`, catalog SPEC 3) of format 3
   (`CATALOG_FORMAT` of `@netvark/catalog-core`); a catalog of another format throws `TypeError`, and
   its literal type fails the `TCatalog` constraint. The full catalog is rejected too, because
   declarations reach browsers (ADR 0002): structurally it comes close to `PublicCatalog`, lacking
@@ -251,7 +251,9 @@ The column decides which modes are allowed; anything else fails `tsc` and throws
 A relationship's foreign key MUST reference the primary key of a table of the public catalog,
 because the linkage it produces is that table's resource id (3.4); a foreign key to a unique column
 or to a table outside the public catalog is refused. Its column's type MUST be able to carry a
-resource id (3.4).
+resource id (3.4). A NOT ENFORCED foreign key (`enforced: false`, catalog ADR 0010) declares a
+relationship too, since it still relates the two tables; the database lets its column hold an id
+that no row of the target has, so a linkage may name a resource that does not exist.
 
 @ref https://jsonapi.org/format/1.1/#document-resource-object-attributes
 
@@ -304,14 +306,18 @@ https://www.postgresql.org/docs/18/sql-createtable.html#SQL-CREATETABLE-PARMS-GE
 
 `rules` keys are the names of the table's constraints (any kind) and, for each column that is NOT
 NULL in the catalog (`nullable: false`), the key `<table>_<column>_not_null` (PostgreSQL 18's own
-name for that constraint; ADR 0003). `code` renames the derived error code of any key. `validator`
-names a validator for a CHECK whose `rule` is `null`:
+name for that constraint; ADR 0003). `code` renames the derived error code of any key that has one
+(9.1). `validator` names a validator for an enforced CHECK whose `rule` is `null`:
 
 - It is REQUIRED for every such CHECK whose `columns` include a column that a declared operation
   writes (a field or relationship whose access is not `read`); the declaration fails `tsc` without
   it.
 - It is an error on a CHECK that has a rule (the rule already enforces it, proven by the recognizer)
   and on any other constraint kind.
+- It is an error on a NOT ENFORCED CHECK (`enforced: false`, catalog ADR 0010), whatever its rule,
+  and such a CHECK never requires one: PostgreSQL never checks it and stores rows that break it, so
+  a validator would refuse values the table holds. Its rule, if a catalog carries one, applies
+  nowhere (6.1), and it derives no code (9.1).
 
 ### 3.6 Domain rules
 
@@ -375,7 +381,8 @@ of `linkage` or `write` (6.2), which reads every target, is where a wrong target
 read throws again on the next.
 
 Tests: `declare-resource.test.ts`, `declare-fields.test.ts`, `declare-relationships.test.ts`, and
-`declare-options.test.ts` (every `TypeError` of 14 a declaration can throw);
+`declare-options.test.ts` (every `TypeError` of 14 a declaration can throw), with
+`not-enforced.test.ts` and `not-enforced.test-d.ts` for NOT ENFORCED constraints (3.5, 6.1, 9.1);
 `declare-resource.test-d.ts` (the valid forms, two declarations that reference each other among
 them); `declare-resource-errors.test-d.ts` and `declare-options-errors.test-d.ts` (every compile
 error above, each as a `@ts-expect-error` on the offending option); and `e2e/resource/fails/`, which
@@ -614,7 +621,9 @@ A field's value schema is built in this order, each step narrowing the previous 
 
 1. The wire form of the column's type (5), or the codec's schema when the field names one (7.1).
 2. For a domain, the rules of the domain and of each base domain, and its NOT NULL.
-3. The rules of the table's CHECK constraints whose `columns` are exactly this column.
+3. The rules of the table's enforced CHECK constraints whose `columns` are exactly this column; a
+   NOT ENFORCED one (catalog ADR 0010) contributes nothing, not even `notNull`, so the schema
+   accepts every value the database stores.
 4. `.nullable()` when the column is effectively nullable: `nullable: true` in the catalog, no
    `notNull` rule on the column or a domain, and no NOT NULL domain.
 5. The validator of each such CHECK whose rule is `null` (3.5), and of each such domain CHECK (3.6).
@@ -901,8 +910,8 @@ Tests: `field-meta.test.ts` (the contacts fixture, the folds), `field-meta.test-
 
 A declared resource has one code per constraint a client can cause and see:
 
-- each constraint of the table, unique indexes that no constraint backs among them (catalog ADR
-  0009), with a column, other than the scope column, that is a public field or relationship,
+- each enforced constraint of the table, unique indexes that no constraint backs among them (catalog
+  ADR 0009), with a column, other than the scope column, that is a public field or relationship,
   whatever its access;
 - the primary key, when `clientIds` is true;
 - the NOT NULL key (3.5) of each public member writable by an operation;
@@ -932,6 +941,11 @@ scope column alone has no code either: stern's `business_profiles_organization_i
 per organization, is violated only by a second create in the same organization, which falls back to
 the ban's own mapping, `CONFLICT` for 23505 (9.5). Without a scope the column is a member like any
 other.
+
+A NOT ENFORCED CHECK or foreign key (`enforced: false`, catalog ADR 0010) has no code, so `code` on
+it is refused: PostgreSQL never raises it, and no client can cause it. Enforcing it in the database,
+`ALTER CONSTRAINT ... ENFORCED` for a foreign key or dropping and adding a CHECK again, gives it a
+code at the next extraction.
 
 A unique index that no constraint backs is a unique constraint of the public table, keyed by its
 name, which is the name PostgreSQL reports (catalog SPEC 3, ADR 0009), so it derives a code by the
@@ -1474,7 +1488,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | Condition                                                                                        | Message (example)                                                                                                                                           |
 | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | an unknown configuration or declaration member, or a member of the wrong kind                    | `contacts.fields.name: unknown member "sortable"`                                                                                                           |
-| a catalog of another format                                                                      | `createDeclareResource.catalog: format 3 is not supported (expected 2)`                                                                                     |
+| a catalog of another format                                                                      | `createDeclareResource.catalog: format 4 is not supported (expected 3)`                                                                                     |
 | the full catalog (2)                                                                             | `createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`                               |
 | a registry entry `defineCodec` or `defineValidator` did not make, or `null` for a registry       | `createDeclareResource.codecs.phone: must be made by defineCodec`                                                                                           |
 | `types`, `fixtures`, or a fixture list that is empty, or a schema that is not a Zod 4 schema (7) | `defineCodec.types: must be a non-empty list of type names`                                                                                                 |
@@ -1507,6 +1521,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a page default above the max page size                                                           | `contacts.page.default: 200 exceeds the max page size 100`                                                                                                  |
 | a CHECK without a rule over written columns and no validator (3.5)                               | `meetings.rules.meetings_contact_or_notes: a CHECK without a rule needs a validator`                                                                        |
 | a validator on a CHECK with a rule, or on another constraint kind                                | `contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already`                                                             |
+| a validator on a NOT ENFORCED CHECK (3.5)                                                        | `imported_contacts.rules.imported_contacts_email_check.validator: PostgreSQL does not enforce this CHECK (NOT ENFORCED), so no validator covers it`         |
 | a written field whose domain has an uncovered CHECK without a rule (3.6)                         | `contacts.fields.email: domain email's CHECK email_check has no rule; give it a validator in createDeclareResource domains`                                 |
 | a relationship column without the `_id` suffix and no `as`                                       | `notes.relationships.author: the column does not end in _id; set as`                                                                                        |
 | a derived name that is not a member name, is reserved, or collides (4.2)                         | `notes.fields.type: public name "type" is a member of every resource object; set as`                                                                        |
@@ -1616,17 +1631,20 @@ A private workspace package, `@netvark/resource-e2e`, that consumes the built pa
 `workspace:*` and never imports from `src/`. It holds its own fixture migrations (the contacts
 application of `e2e/catalog`, extended with a multi-column CHECK, a CHECK the rule translator does
 not cover, a domain CHECK without a rule, a codec column, an exclusion constraint, two tables keyed
-by `jsonb`, a `notes` table whose columns need `as` and `code`, and a partial unique index), the
-catalogs `@netvark/pg-catalog` extracts from them (checked with `extract --check`), and declarations
-over them. It proves: the declarations type-check, and a `fails/` directory of declarations fails
-`tsc` with the expected errors; the derived names, recorded in a reviewed snapshot
-(`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
-metadata, and definitions; the derived error codes, recorded in a reviewed snapshot
-(`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
-both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
-them, rendered by `createBan`; `constraintError` against the same violations; localized error
-documents; the package surface (every value export listed); and the runtime smoke test on Bun, Deno,
-and workerd for the root and `openapi` entries.
+by `jsonb`, a `notes` table whose columns need `as` and `code`, and a partial unique index), a
+PostgreSQL 18 schema of NOT ENFORCED constraints (`fixtures/postgres18`, run on PGlite and on a
+server of major 18 or later), the catalogs `@netvark/pg-catalog` extracts from them (checked with
+`extract --check`), and declarations over them. It proves: the declarations type-check, and a
+`fails/` directory of declarations fails `tsc` with the expected errors; the derived names, recorded
+in a reviewed snapshot (`snapshots/names.json`), and a derived code TypeScript leaves to the
+runtime; the derived schemas, metadata, and definitions; the derived error codes, recorded in a
+reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
+(`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
+catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
+same violations; localized error documents; that a row breaking every NOT ENFORCED constraint is
+stored by the database and accepted by the schemas, while the enforced CHECK beside them refuses in
+both (`not-enforced.e2e.test.ts`); the package surface (every value export listed); and the runtime
+smoke test on Bun, Deno, and workerd for the root and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -1777,6 +1795,31 @@ types, as medians of five runs:
 
 The declarations took 0.05 and 0.3 percent more instantiations than in the fourth record, and
 `errorCatalog` 0.2 and 1.3 percent more than in the fifth.
+
+The seventh record covers NOT ENFORCED constraints (3.5, 6.1, 9.1, catalog ADR 0010). Neither
+catalog has one. Extracted again in format 3, stern's public catalog gains `enforced: true` on 201
+CHECKs and foreign keys and the GitLab slice's on 552, the full catalogs change only in `format`,
+and the codes stay 745 and 1,302.
+
+A migration that marks stern's `notes_subject_id_fkey` and `notes_target_check` NOT ENFORCED makes
+`tsc` fail once, at the validator the `notes` declaration names for the CHECK. Without it, `notes`
+loses those two codes (743 in all) and keeps its `subject` relationship. Its `write.create` accepts
+a note with both targets and a subject no row holds, which PGlite stores, while the enforced
+`notes_entity_id_fkey` still refuses a missing entity with 23503. A second migration enforces both
+again: the foreign key with `ALTER CONSTRAINT ... ENFORCED`, which refuses with 23503 while a row
+breaks it, and the CHECK by dropping and adding it. It restores the original public catalog byte for
+byte, and `tsc` asks for the validator again. In types, as medians of five runs:
+
+| Catalog            | File                                         | Instantiations | Check time | Peak memory |
+| ------------------ | -------------------------------------------- | -------------- | ---------- | ----------- |
+| stern              | the declarations                             | 411,577        | 0.175 s    | 129 MB      |
+| stern              | plus `errorCatalog` over all and `createBan` | 657,651        | 0.373 s    | 144 MB      |
+| GitLab 17.11 slice | the declarations                             | 495,111        | 0.250 s    | 156 MB      |
+| GitLab 17.11 slice | plus `errorCatalog` over all and `createBan` | 778,465        | 0.379 s    | 173 MB      |
+
+The declarations took under 0.1 percent more instantiations than in the sixth record, and
+`errorCatalog` 0.3 and 0.5 percent more, the cost of leaving unenforced constraints out of the typed
+codes.
 
 ### 15.6 The Zod floor
 

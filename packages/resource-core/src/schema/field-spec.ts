@@ -68,7 +68,7 @@ function specContext(context: DefinerContext): SpecContext {
   };
 }
 
-/** The table's CHECKs over exactly this column (SPEC 6.1 step 3). */
+/** The table's enforced CHECKs over exactly this column (SPEC 6.1 step 3); PostgreSQL never applies a NOT ENFORCED one, so neither does the schema. */
 function columnChecks(
   tableDef: PublicTable,
   column: string,
@@ -78,6 +78,7 @@ function columnChecks(
       const [, constraint] = entry;
       return (
         constraint.kind === 'check' &&
+        constraint.enforced &&
         constraint.columns.length === 1 &&
         constraint.columns[0] === column
       );

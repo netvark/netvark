@@ -153,6 +153,7 @@ export const ADDRESSES_TABLE = {
         table: 'addresses',
         columns: ['id'],
       },
+      enforced: true,
     },
     addresses_pkey: {
       kind: 'primaryKey',

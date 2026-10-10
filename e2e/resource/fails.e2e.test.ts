@@ -34,6 +34,7 @@ const FILES = [
   'errors.ts',
   'fields.ts',
   'names.ts',
+  'not-enforced.ts',
   'options.ts',
   'relationships.ts',
   'rules.ts',

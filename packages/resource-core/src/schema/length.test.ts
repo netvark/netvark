@@ -38,6 +38,7 @@ const declare = untypedDeclare(
           kind: 'check',
           columns: ['pair'],
           rule: { kind: 'length', min: 2, max: null },
+          enforced: true,
         },
       },
     ),

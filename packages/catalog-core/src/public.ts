@@ -87,6 +87,7 @@ function publicConstraint(constraint: Constraint): PublicConstraint {
         kind: 'foreignKey',
         columns: constraint.columns,
         references: { table, columns },
+        enforced: constraint.enforced,
       };
     }
     case 'check': {
@@ -94,6 +95,7 @@ function publicConstraint(constraint: Constraint): PublicConstraint {
         kind: 'check',
         columns: constraint.columns,
         rule: constraint.rule,
+        enforced: constraint.enforced,
       };
     }
     default: {

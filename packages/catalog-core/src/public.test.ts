@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { toPublicCatalog } from './public';
 import { fixture } from './test-support/catalog';
+import { contactsTable as fullContactsTable } from './test-support/contacts-table';
 import { deepFreeze } from './test-support/deep-freeze';
 
 const catalog: Catalog = deepFreeze(structuredClone(fixture));
@@ -25,7 +26,7 @@ describe('toPublicCatalog: tables (SPEC 3, ADR 0005)', () => {
   it('keeps only the listed tables, in the catalog order rather than the list order', () => {
     const result = toPublicCatalog(catalog, ['organizations', 'contacts']);
     expect(Object.keys(result.tables)).toEqual(['contacts', 'organizations']);
-    expect(result.format).toBe(2);
+    expect(result.format).toBe(3);
   });
 
   it('drops the comment, the indexes, and row security of a table', () => {
@@ -93,14 +94,69 @@ describe('toPublicCatalog: tables (SPEC 3, ADR 0005)', () => {
         kind: 'check',
         columns: ['name'],
         rule: { kind: 'length', min: 1, max: 200 },
+        enforced: true,
       },
       contacts_no_overlap: { kind: 'exclusion', columns: ['organization_id'] },
       contacts_organization_fk: {
         kind: 'foreignKey',
         columns: ['organization_id'],
         references: { table: 'organizations', columns: ['id'] },
+        enforced: true,
       },
       contacts_pkey: { kind: 'primaryKey', columns: ['id'] },
+    });
+  });
+
+  it('keeps enforced, so a NOT ENFORCED CHECK or foreign key reads false (ADR 0010)', () => {
+    const contacts = structuredClone(fullContactsTable);
+    const unenforced: Catalog = {
+      ...catalog,
+      tables: {
+        ...catalog.tables,
+        contacts: {
+          ...contacts,
+          constraints: {
+            ...contacts.constraints,
+            // PostgreSQL 18 stores NOT ENFORCED as conenforced = false and
+            // convalidated = false, and the recognizer reads no rule from it.
+            contacts_name_length: {
+              kind: 'check',
+              columns: ['name'],
+              expression: '(char_length(name) <= 200)',
+              rule: null,
+              validated: false,
+              enforced: false,
+              definition: 'CHECK ((char_length(name) <= 200)) NOT ENFORCED',
+            },
+            contacts_organization_fk: {
+              kind: 'foreignKey',
+              columns: ['organization_id'],
+              references: { table: 'organizations', columns: ['id'] },
+              onUpdate: 'noAction',
+              onDelete: 'noAction',
+              validated: false,
+              enforced: false,
+              definition:
+                'FOREIGN KEY (organization_id) REFERENCES organizations(id) NOT ENFORCED',
+            },
+          },
+        },
+      },
+    };
+    const constraints =
+      toPublicCatalog(deepFreeze(unenforced), ['contacts']).tables['contacts']
+        ?.constraints ?? {};
+    expect(constraints['contacts_name_length']).toEqual({
+      kind: 'check',
+      columns: ['name'],
+      rule: null,
+      enforced: false,
+    });
+    expect(constraints['contacts_organization_fk']).toEqual({
+      kind: 'foreignKey',
+      columns: ['organization_id'],
+      references: { table: 'organizations', columns: ['id'] },
+      enforced: false,
     });
   });
 });
@@ -164,7 +220,7 @@ describe('toPublicCatalog: enums and domains (SPEC 3)', () => {
 
   it('returns empty enums and domains when the list is empty', () => {
     expect(toPublicCatalog(catalog, [])).toEqual({
-      format: 2,
+      format: 3,
       enums: {},
       domains: {},
       tables: {},

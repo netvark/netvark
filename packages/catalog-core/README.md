@@ -138,9 +138,10 @@ columns and rules. Expressions, definitions, comments, collations, indexes, and 
 dropped, but a unique index that no constraint backs follows the constraints as a unique one, keyed
 by its name, since PostgreSQL reports its violation the same way. Every unique constraint carries
 `partial`, true when a `WHERE` clause limits the rule to some rows; a unique index over an
-expression stays out. `enums` and `domains` keep exactly the ones the kept columns use, through
-domains over domains. A table the catalog does not hold, or a table listed twice, throws `TypeError`
-naming it.
+expression stays out. Every CHECK and foreign key carries `enforced`, false when the constraint is
+NOT ENFORCED (PostgreSQL 18), which the database records but never checks. `enums` and `domains`
+keep exactly the ones the kept columns use, through domains over domains. A table the catalog does
+not hold, or a table listed twice, throws `TypeError` naming it.
 
 ```ts
 const tools = toPublicCatalog(catalog, ['tools']).tables['tools'];
@@ -153,6 +154,19 @@ tools?.constraints['tools_org_name_unique'];
 - **Leave a partial rule to the database.** A unique constraint with `partial: true` holds only
   among the rows its private predicate selects, so a client cannot tell whether a value breaks it;
   check it on the server, or by the error it raises.
+- **Skip what the database does not enforce.** A CHECK or foreign key with `enforced: false` never
+  raises an error, and the table may hold rows that break it, so a form that applies it refuses
+  values the database stores. Its `rule` is always `null`. To make clients see the rule, enforce it
+  in the database: `ALTER TABLE ... ALTER CONSTRAINT ... ENFORCED` for a foreign key, and for a
+  CHECK, drop it and add it again without `NOT ENFORCED`; then extract the catalog again.
+
+```ts
+const imports = toPublicCatalog(catalog, ['imports']).tables['imports'];
+imports?.constraints['imports_status_check'];
+// { kind: 'check', columns: ['status'], rule: null, enforced: false }
+// from: status text constraint imports_status_check
+//         check (status in ('active', 'archived')) not enforced
+```
 
 ## `diffCatalogs(expected, actual)`
 

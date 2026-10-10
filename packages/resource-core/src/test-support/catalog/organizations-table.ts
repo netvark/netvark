@@ -103,6 +103,7 @@ export const ORGANIZATIONS_TABLE = {
         },
         max: null,
       },
+      enforced: true,
     },
     organizations_slug_check: {
       kind: 'check',
@@ -112,6 +113,7 @@ export const ORGANIZATIONS_TABLE = {
         source: '^[a-z0-9-]+$',
         flags: 'su',
       },
+      enforced: true,
     },
     organizations_slug_key: {
       kind: 'unique',
@@ -190,6 +192,7 @@ export const CONTACT_PHONES_TABLE = {
         table: 'contacts',
         columns: ['id'],
       },
+      enforced: true,
     },
     contact_phones_number_check: {
       kind: 'check',
@@ -199,6 +202,7 @@ export const CONTACT_PHONES_TABLE = {
         source: '^\\+?[0-9 ]+$',
         flags: 'su',
       },
+      enforced: true,
     },
     contact_phones_pkey: {
       kind: 'primaryKey',
@@ -215,6 +219,7 @@ export const CONTACT_PHONES_TABLE = {
         },
         max: null,
       },
+      enforced: true,
     },
   },
 } as const;

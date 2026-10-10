@@ -1,3 +1,4 @@
+import { AUDIT_CHANGES_TABLE } from './catalog/audit-changes-table';
 /**
  * The unit-test catalog (SPEC 15.1): a public catalog literal modeled on the
  * contacts application of `e2e/catalog`. `createDeclareResource` holds it
@@ -11,7 +12,7 @@ import {
   DOCUMENT_NOTES_TABLE,
   DOCUMENTS_TABLE,
 } from './catalog/documents-tables';
-import { AUDIT_CHANGES_TABLE, MEETINGS_TABLE } from './catalog/meetings-table';
+import { MEETINGS_TABLE } from './catalog/meetings-table';
 import {
   CONTACT_PHONES_TABLE,
   ORGANIZATIONS_TABLE,
@@ -21,7 +22,7 @@ import { PEOPLE_TABLE, TEAMS_TABLE } from './catalog/teams-tables';
 import { DOMAINS, ENUMS } from './catalog/types';
 
 export interface ContactsCatalog {
-  readonly format: 2;
+  readonly format: 3;
   readonly enums: typeof ENUMS;
   readonly domains: typeof DOMAINS;
   readonly tables: {
@@ -39,7 +40,7 @@ export interface ContactsCatalog {
 }
 
 export const contactsCatalog: ContactsCatalog = {
-  format: 2,
+  format: 3,
   enums: ENUMS,
   domains: DOMAINS,
   tables: {

@@ -115,7 +115,7 @@ Contacts.names.fields.get('createdAt'); // 'created_at'
 | `clientIds`            | a primary key that accepts a client value: not a generated column and not an identity `ALWAYS` column                                                                          |
 | `search`               | a `tsvector` column; `config` equals the one the column is generated with, or is given                                                                                         |
 | `sort.default`         | fields declared with `sort: true`                                                                                                                                              |
-| `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on a CHECK without a translated rule, and required on every such CHECK over a written column   |
+| `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on an enforced CHECK without a rule, and required on every such CHECK over a written column    |
 | `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
 | `codecs`, `validators` | values `defineCodec` and `defineValidator` made, never objects written by hand; each fixture typed by its schema's input                                                       |
 
@@ -430,6 +430,8 @@ Contacts.errors.CONTACT_NAME_TAKEN;
 ```
 
 An index over an expression, such as `lower(email)`, is not in the public catalog and has no code.
+Neither has a NOT ENFORCED CHECK or foreign key, which PostgreSQL never raises; `code` on its key
+fails `tsc`, and the foreign key still declares a relationship.
 
 `errorCatalog` assembles the codes of the resources the application serves, resource-core's
 `QUOTA_EXCEEDED`, and the application's own codes into one `@netvark/ban-core` catalog fragment. It
@@ -526,6 +528,13 @@ same message as the runtime.
 - **Cover every CHECK without a rule.** Name the validator in the declaration's `rules`, and a
   domain's once in the definer's `domains`; prefer CHECKs `@netvark/pg-catalog` translates (length,
   range, `IN`, `IS NOT NULL`, simple patterns), which need no code at all.
+- **Enforce in the database what the API enforces.** A NOT ENFORCED CHECK or foreign key
+  (PostgreSQL 18) is one the database records but never checks, so the schemas skip it, it takes no
+  validator, and it has no error code; rows that break it can be read and saved again unchanged. To
+  have clients held to it, enforce it: `ALTER TABLE ... ALTER CONSTRAINT ... ENFORCED` for a foreign
+  key, which first checks the existing rows, and for a CHECK, drop it and add it again without
+  `NOT ENFORCED`. A rule too costly for the database belongs in server code, with an error of your
+  own.
 
 ## Performance
 

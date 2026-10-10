@@ -8,10 +8,12 @@ import {
 } from '../test-support/catalog-builder';
 import { contactsCatalog } from '../test-support/contacts';
 import { RESOLVE_CASES } from '../test-support/resolve-cases';
+import { unenforcedCatalog } from '../test-support/unenforced';
 import {
   codecTypeName,
   foreignKeyOf,
   hasWireForm,
+  isEnforced,
   isIdentifierColumn,
   isSearchColumn,
   notNullKey,
@@ -133,5 +135,29 @@ describe('table lookups', () => {
       'changes_payload_not_null',
     );
     expect(codecTypeName(tables.contacts.columns.tags)).toBe('text[]');
+  });
+
+  it('counts every constraint as enforced but a NOT ENFORCED CHECK or foreign key (catalog ADR 0010)', () => {
+    const { constraints } = unenforcedCatalog.tables.imported_contacts;
+    expect(
+      Object.entries(constraints).map(([name, constraint]) => [
+        name,
+        isEnforced(constraint),
+      ]),
+    ).toEqual([
+      ['imported_contacts_email_check', false],
+      ['imported_contacts_nickname_check', false],
+      ['imported_contacts_owner_id_fkey', false],
+      ['imported_contacts_pkey', true],
+      ['imported_contacts_reachable_check', false],
+      ['imported_contacts_score_check', true],
+      ['imported_contacts_status_check', false],
+    ]);
+    // Unique, primary key, CHECK, and foreign key; and exclusion.
+    const others = [
+      ...Object.values(tables.contacts.constraints),
+      ...Object.values(tables.meetings.constraints),
+    ];
+    expect(others.every((constraint) => isEnforced(constraint))).toBe(true);
   });
 });

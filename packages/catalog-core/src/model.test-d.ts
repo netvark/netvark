@@ -10,7 +10,7 @@ import { toPublicCatalog } from './public';
 
 /** A one-table catalog exactly as the renderer declares it: JSON under `as const`. */
 const generated = {
-  format: 2,
+  format: 3,
   schemas: ['public'],
   extensions: [],
   enums: { contact_kind: ['person', 'company'] },
@@ -77,7 +77,7 @@ describe('model types (SPEC 2, ADR 0004)', () => {
 
   it('pins the format to the literal type of CATALOG_FORMAT', () => {
     expectTypeOf<Catalog['format']>().toEqualTypeOf<typeof CATALOG_FORMAT>();
-    expectTypeOf<PublicCatalog['format']>().toEqualTypeOf<2>();
+    expectTypeOf<PublicCatalog['format']>().toEqualTypeOf<3>();
   });
 
   it('types the public slice as PublicCatalog', () => {

@@ -67,6 +67,7 @@ export const TEAMS_TABLE = {
         table: 'people',
         columns: ['id'],
       },
+      enforced: true,
     },
     teams_pkey: {
       kind: 'primaryKey',
@@ -153,6 +154,7 @@ export const PEOPLE_TABLE = {
         table: 'teams',
         columns: ['id'],
       },
+      enforced: true,
     },
     people_team_slug_fkey: {
       kind: 'foreignKey',
@@ -161,6 +163,7 @@ export const PEOPLE_TABLE = {
         table: 'teams',
         columns: ['slug'],
       },
+      enforced: true,
     },
   },
 } as const;

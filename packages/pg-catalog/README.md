@@ -117,7 +117,7 @@ const outdated = report.files.filter((file) => file.status !== 'unchanged');
 - **`public-catalog.ts`** (with `out.public`): `export const publicCatalog`, the slice of the tables
   you list that a browser may see, without expressions, policies, or comments. Of the indexes it
   keeps the unique ones no constraint backs, as unique constraints marked `partial` when a `WHERE`
-  clause limits them.
+  clause limits them. A CHECK or foreign key keeps `enforced`, false when it is NOT ENFORCED.
 - **`db.ts`** (with `out.types`): the Kysely types, one interface per table and the `DB` interface
   that collects them. It imports only types from `kysely`.
 
@@ -278,7 +278,8 @@ validator must cover it. From the repository's test schema:
   lists. The recognizer reads PostgreSQL's deparsed text, so `between`, `in`, and an `is null or`
   guard all qualify.
 - A NOT VALID CHECK keeps its rule, since PostgreSQL checks every new row; its `validated: false`
-  says older rows may break it. A NOT ENFORCED CHECK (PostgreSQL 18) has none.
+  says older rows may break it. A NOT ENFORCED CHECK (PostgreSQL 18) has none, since the database
+  never checks it, and the public catalog marks it `enforced: false`.
 - Columns under a nondeterministic (case- or accent-insensitive) collation, and `citext`, `char(n)`,
   and `real` columns, get no rule but `notNull`: their comparisons are not the ones a rule
   describes. A domain's CHECK compares under the collation of the type the domain is declared over.

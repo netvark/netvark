@@ -19,6 +19,7 @@ const check = (name: string, rule: Rule): PublicCheckConstraint => ({
   kind: 'check',
   columns: [name],
   rule,
+  enforced: true,
 });
 const declare = untypedDeclare(
   {
@@ -72,6 +73,7 @@ const declare = untypedDeclare(
             kind: 'foreignKey',
             columns: ['owner_id'],
             references: { table: 'owners', columns: ['id'] },
+            enforced: true,
           },
         },
       ),

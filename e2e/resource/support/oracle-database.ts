@@ -27,7 +27,7 @@ import { citext } from '@electric-sql/pglite/contrib/citext';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import pg from 'pg';
 
-import { CONTACTS_DIR, ORACLE_DIR } from './paths.ts';
+import { CONTACTS_DIR, ORACLE_DIR, POSTGRES18_DIR } from './paths.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Client } = pg` for ESM
 const { Client } = pg;
@@ -35,6 +35,8 @@ const { Client } = pg;
 const VERSIONED = /^V(\d+)__.+\.sql$/u;
 const NAME_BYTES = 8;
 const SESSION = "set time zone 'UTC'; set datestyle = 'ISO, YMD'";
+/** `server_version_num` of PostgreSQL 18.0, the first major that parses NOT ENFORCED. */
+const POSTGRES_18 = 180_000;
 /** The errors one PGlite instance takes before the oracle replaces it, well below the leak's limit. */
 export const ERROR_BUDGET = 1000;
 
@@ -54,6 +56,12 @@ const ORACLE_SCHEMA: LiveSchema = {
 export const CONTACTS_SCHEMA: LiveSchema = {
   migrations: join(CONTACTS_DIR, 'migrations'),
   extensions: { btree_gist, citext, pg_trgm },
+};
+
+/** The PostgreSQL 18 schema (SPEC 15.4): NOT ENFORCED constraints, which PostgreSQL 14 cannot parse. */
+const POSTGRES18_SCHEMA: LiveSchema = {
+  migrations: join(POSTGRES18_DIR, 'migrations'),
+  extensions: {},
 };
 
 /** One row of a result, by column name. */
@@ -119,14 +127,26 @@ async function openPglite(schema: LiveSchema): Promise<OracleDatabase> {
   };
 }
 
-async function onServer(url: string, statement: string): Promise<void> {
+async function onServer(
+  url: string,
+  statement: string,
+): Promise<ReadonlyArray<Row>> {
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(statement);
+    return (await client.query<Row>(statement)).rows;
   } finally {
     await client.end();
   }
+}
+
+/** The server's `server_version_num`. */
+async function serverVersion(url: string): Promise<number> {
+  const [row] = await onServer(
+    url,
+    "select current_setting('server_version_num')::int as version",
+  );
+  return Number(row?.['version']);
 }
 
 /** A database of its own on the server, created from `template0` in UTF-8 and dropped by `close`. */
@@ -162,11 +182,11 @@ async function openServer(
   };
 }
 
-/** Databases holding `schema`: PGlite always, and the server `RESOURCE_PG_URL` names when it is set. */
-export function liveDatabases(
+/** Databases holding `schema`: PGlite always, and the server at `url` when there is one. */
+function databasesOn(
   schema: LiveSchema,
+  url: string | undefined,
 ): ReadonlyArray<readonly [string, () => Promise<OracleDatabase>]> {
-  const url = process.env['RESOURCE_PG_URL'];
   return [
     ['PGlite', async () => openPglite(schema)],
     ...(url === undefined
@@ -175,6 +195,22 @@ export function liveDatabases(
           ['a PostgreSQL server', async () => openServer(url, schema)] as const,
         ]),
   ];
+}
+
+/** Databases holding `schema`: PGlite always, and the server `RESOURCE_PG_URL` names when it is set. */
+export function liveDatabases(
+  schema: LiveSchema,
+): ReadonlyArray<readonly [string, () => Promise<OracleDatabase>]> {
+  return databasesOn(schema, process.env['RESOURCE_PG_URL']);
+}
+
+/** Databases holding the PostgreSQL 18 schema: PGlite always, and the server `RESOURCE_PG_URL` names when it runs PostgreSQL 18 or later. */
+export async function postgres18Databases(): Promise<
+  ReadonlyArray<readonly [string, () => Promise<OracleDatabase>]>
+> {
+  const url = process.env['RESOURCE_PG_URL'];
+  const recent = url !== undefined && (await serverVersion(url)) >= POSTGRES_18;
+  return databasesOn(POSTGRES18_SCHEMA, recent ? url : undefined);
 }
 
 /** Databases holding the oracle's schema. */

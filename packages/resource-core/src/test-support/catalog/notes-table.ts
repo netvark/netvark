@@ -204,6 +204,7 @@ export const NOTES_TABLE = {
         min: 1,
         max: null,
       },
+      enforced: true,
     },
     notes_author_fkey: {
       kind: 'foreignKey',
@@ -212,6 +213,7 @@ export const NOTES_TABLE = {
         table: 'notes',
         columns: ['id'],
       },
+      enforced: true,
     },
     notes_body_check: {
       kind: 'check',
@@ -221,6 +223,7 @@ export const NOTES_TABLE = {
         min: null,
         max: 999,
       },
+      enforced: true,
     },
     notes_contact_id_fkey: {
       kind: 'foreignKey',
@@ -229,6 +232,7 @@ export const NOTES_TABLE = {
         table: 'notes',
         columns: ['id'],
       },
+      enforced: true,
     },
     notes_größe_check: {
       kind: 'check',
@@ -241,6 +245,7 @@ export const NOTES_TABLE = {
         },
         max: null,
       },
+      enforced: true,
     },
     notes_pkey: {
       kind: 'primaryKey',
@@ -253,6 +258,7 @@ export const NOTES_TABLE = {
         kind: 'enum',
         values: ['call', 'email'],
       },
+      enforced: true,
     },
   },
 } as const;

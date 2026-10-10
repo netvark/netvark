@@ -10,7 +10,7 @@ import {
 } from '../test-support/errors';
 
 const V_CHECK = {
-  v_check: { kind: 'check', columns: ['v'], rule: SIZE },
+  v_check: { kind: 'check', columns: ['v'], rule: SIZE, enforced: true },
 } as const;
 
 const WRITTEN_V = { fields: { v: { access: 'readWrite' } } };

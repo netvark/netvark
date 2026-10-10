@@ -1,12 +1,13 @@
 /**
- * The rule keys a resource derives a code for (SPEC 9.1): each constraint
- * with a column that is a public field or relationship other than the
- * scope column, the primary key when `clientIds` is true, and the NOT NULL
- * key (SPEC 3.5) of each public member an operation writes. Clients can
- * cause and see exactly these, so no other key takes `code`. The server
- * writes the scope column (SPEC 3.2), so declaring it as a read
+ * The rule keys a resource derives a code for (SPEC 9.1): each enforced
+ * constraint with a column that is a public field or relationship other
+ * than the scope column, the primary key when `clientIds` is true, and the
+ * NOT NULL key (SPEC 3.5) of each public member an operation writes.
+ * Clients can cause and see exactly these, so no other key takes `code`.
+ * The server writes the scope column (SPEC 3.2), so declaring it as a read
  * relationship changes no code: a foreign key over it alone is the
- * server's to violate.
+ * server's to violate. A NOT ENFORCED CHECK or foreign key is no one's to
+ * violate, since the database never raises it (catalog ADR 0010).
  * @packageDocumentation
  */
 import type { PublicConstraint, PublicTable } from '@netvark/catalog-core';
@@ -16,7 +17,7 @@ import type { MemberColumn, WrittenColumn } from '../declare/members';
 import type { Declaration, MemberOf } from '../declare/types';
 import type { CodeOf } from './code';
 
-import { notNullKey } from '../catalog/columns';
+import { isEnforced, notNullKey } from '../catalog/columns';
 import { memberColumns, writtenColumns } from '../declare/members';
 
 /** The member columns whose constraints clients can cause: every one but the scope column. */
@@ -31,18 +32,22 @@ export type CodedConstraint<
   TDecl extends Declaration,
   TScopeColumn,
 > = {
-  [K in ConstraintName<TTableDef>]: [
-    Extract<
-      TTableDef['constraints'][K]['columns'][number],
-      CodingColumn<TDecl, TScopeColumn>
-    >,
-  ] extends [never]
-    ? TTableDef['constraints'][K]['kind'] extends 'primaryKey'
-      ? MemberOf<TDecl, 'clientIds'> extends true
-        ? K
+  [K in ConstraintName<TTableDef>]: TTableDef['constraints'][K] extends {
+    readonly enforced: false;
+  }
+    ? never
+    : [
+          Extract<
+            TTableDef['constraints'][K]['columns'][number],
+            CodingColumn<TDecl, TScopeColumn>
+          >,
+        ] extends [never]
+      ? TTableDef['constraints'][K]['kind'] extends 'primaryKey'
+        ? MemberOf<TDecl, 'clientIds'> extends true
+          ? K
+          : never
         : never
-      : never
-    : K;
+      : K;
 }[ConstraintName<TTableDef>];
 
 type CodedNotNullKey<
@@ -87,8 +92,9 @@ function isCoded(
   clientIds: boolean,
 ): boolean {
   return (
-    constraint.columns.some((column) => members.has(column)) ||
-    (constraint.kind === 'primaryKey' && clientIds)
+    isEnforced(constraint) &&
+    (constraint.columns.some((column) => members.has(column)) ||
+      (constraint.kind === 'primaryKey' && clientIds))
   );
 }
 

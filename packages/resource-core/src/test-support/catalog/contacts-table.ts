@@ -204,6 +204,7 @@ export const CONTACTS_TABLE = {
         min: 1,
         max: 200,
       },
+      enforced: true,
     },
     contacts_nickname_check: {
       kind: 'check',
@@ -213,6 +214,7 @@ export const CONTACTS_TABLE = {
         min: 1,
         max: null,
       },
+      enforced: true,
     },
     contacts_organization_id_fkey: {
       kind: 'foreignKey',
@@ -221,6 +223,7 @@ export const CONTACTS_TABLE = {
         table: 'organizations',
         columns: ['id'],
       },
+      enforced: true,
     },
     contacts_pkey: {
       kind: 'primaryKey',
@@ -240,6 +243,7 @@ export const CONTACTS_TABLE = {
           inclusive: true,
         },
       },
+      enforced: true,
     },
     contacts_status_check: {
       kind: 'check',
@@ -248,6 +252,7 @@ export const CONTACTS_TABLE = {
         kind: 'enum',
         values: ['active', 'archived'],
       },
+      enforced: true,
     },
     contacts_website_check: {
       kind: 'check',
@@ -257,6 +262,7 @@ export const CONTACTS_TABLE = {
         source: '^https://',
         flags: 'su',
       },
+      enforced: true,
     },
   },
 } as const;
