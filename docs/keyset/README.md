@@ -154,7 +154,8 @@ Both quick starts answer with the same `Page`, and the cursors they issue are in
   and backward without skipping or repeating a row. The end-to-end suite proves it on PGlite,
   node-postgres, and PostgreSQL servers.
 - **Cursors a client cannot forge or misuse.** Signed with HMAC-SHA256, bound to the sort, filter,
-  and search they were issued for, versioned, with optional expiry and secret rotation.
+  and search they were issued for and, when you pass one, to a context such as the tenant;
+  versioned, with optional expiry and secret rotation.
 - **Typed requests, typed errors.** `sort` accepts only sortable fields, `filter` only declared
   fields and relation paths with the operators their types allow; values are checked by type; every
   problem is a `KeysetError` with a stable `code` and the detail in fields, never in the message.

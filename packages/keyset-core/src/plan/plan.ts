@@ -14,6 +14,7 @@ import type {
 } from '../definition/types';
 import type { Filter, RelationFieldMap } from '../filter/types';
 import type { PageInput } from '../page/page-request';
+import type { PlanOptions } from './context';
 import type { CursorValue, PlanKey, Predicate, QueryPlan } from './types';
 
 import { InvalidCursorError, UnsupportedSearchError } from '../errors';
@@ -24,6 +25,7 @@ import { sha256Base64Url } from '../internal/crypto';
 import { escapeLike } from '../internal/like';
 import { resolvePage } from '../page/page-request';
 import { resolveSort, sortSignature } from '../sort/resolve-sort';
+import { bindingContext } from './context';
 import { seekPredicate } from './seek';
 
 export interface KeysetRequest<
@@ -111,8 +113,11 @@ async function decode(
 export function createPlanner(
   definition: KeysetDefinition,
   codec: CursorCodec,
-): (request: KeysetRequest) => Promise<QueryPlan> {
-  return async (request) => {
+): (request: KeysetRequest, options?: PlanOptions) => Promise<QueryPlan> {
+  return async (request, options) => {
+    // The server's context first: a bad one is a bug in the caller,
+    // whatever the client asked for.
+    const bound = bindingContext(options?.context);
     const sort = resolveSort(definition, request.sort);
     const userFilter = normalizeFilter(definition, request.filter);
     const search = searchPredicate(definition, request.search);
@@ -123,6 +128,9 @@ export function createPlanner(
         sort: sortSignature(sort),
         filter: request.filter ?? null,
         search: request.search?.trim() ?? '',
+        // Canonical JSON drops an undefined member, so a request without a
+        // context keeps the binding it had before contexts (ADR 0015).
+        context: bound,
       }),
     );
     const requested = sort.map((item) => {

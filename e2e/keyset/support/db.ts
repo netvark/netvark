@@ -197,3 +197,19 @@ export async function openPostgres(url: string): Promise<Harness> {
     },
   };
 }
+
+/**
+ * The databases a feature file runs on: PGlite always, and the server
+ * `KEYSET_PG_URL` names when it is set (CI provides PostgreSQL 14 and 18).
+ */
+export function databases(): ReadonlyArray<
+  readonly [string, () => Promise<Harness>]
+> {
+  const url = process.env['KEYSET_PG_URL'];
+  return [
+    ['PGlite', openPglite],
+    ...(url === undefined
+      ? []
+      : [['PostgreSQL server', async () => openPostgres(url)] as const]),
+  ];
+}

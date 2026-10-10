@@ -179,6 +179,22 @@ const page = await contacts.paginate(
 );
 ```
 
+When the query is scoped by something outside the request, such as the tenant, pass the same values
+as `context` so the cursors are bound to that scope too:
+
+```ts
+const page = await contacts.paginate(
+  db.selectFrom('contacts').where('org_id', '=', org.id).select(['id', 'name']),
+  request,
+  { context: { org: org.id } },
+);
+```
+
+A cursor issued for one organization is then rejected for another with `InvalidCursorError` (reason
+`context`) before any query runs, even when the sort, filter, and search are the same. `context`
+takes named strings, numbers, bigints, booleans, or `null`; it binds cursors and nothing else, so
+the `where` clause still scopes the rows.
+
 `paginate(keyset, query, request, options?)` is also exported as a function, for keysets defined
 with the core's `defineKeyset` (untyped column names).
 
@@ -328,6 +344,11 @@ Keep both definitions' page bounds equal, since each applies its own default and
   old one after your longest cursor lifetime. Set `ttl` when cursors leave your control (emailed
   links, saved searches). A cursor is signed, not encrypted: anyone holding it can read the sort-key
   values of the row it points at, so do not offer a sort over a column the client must not learn.
+- **Bind cursors to the tenant.** In a multi-tenant API, pass the scope your query applies as
+  `context` on every page (`{ context: { org: org.id } }`). Without it, two tenants sending the same
+  request share cursors, so a cursor from one tenant is accepted by the other and seeks with the
+  first tenant's values. Pass it from one place, such as the module that builds the scoped query, so
+  no endpoint forgets it; an endpoint that does issues cursors the others reject.
 - **Index for the sorts you offer.** A keyset query is a range scan over the sort columns followed
   by the key: `create index on contacts (created_at, id)` serves `-createdAt` in both directions. An
   insensitive field sorts and compares through `lower()`, so index the expression:

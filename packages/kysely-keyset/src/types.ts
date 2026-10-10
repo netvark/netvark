@@ -6,6 +6,7 @@ import type { ExpressionBuilder, SelectQueryBuilder } from 'kysely';
  * @packageDocumentation
  */
 import type {
+  CursorContext,
   FieldsInit,
   Keyset,
   KeysetRequestOf,
@@ -45,6 +46,12 @@ export interface PaginateOptions {
   readonly total?: boolean | undefined;
   /** Called after each query with its SQL, parameters, and timing. */
   readonly onQuery?: ((event: QueryEvent) => void) | undefined;
+  /**
+   * Values the page's cursors are bound to besides the request, such as
+   * the tenant `query` is scoped to (SPEC 6.1, ADR 0015): a cursor issued
+   * under one context is rejected under any other, before a query runs.
+   */
+  readonly context?: CursorContext | undefined;
 }
 
 /** A keyset that paginates Kysely select queries. */

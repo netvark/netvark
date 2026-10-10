@@ -117,3 +117,30 @@ describe('defineKeyset types', () => {
     void open;
   });
 });
+
+describe('plan options types', () => {
+  it('accepts a context of named scalar values', () => {
+    void contacts.plan(
+      {},
+      {
+        context: {
+          tenant: 'acme',
+          shard: 3,
+          account: 1n,
+          admin: true,
+          region: null,
+        },
+      },
+    );
+  });
+
+  it('rejects context values that cannot be bound', () => {
+    const tenant: string | undefined = undefined;
+    // @ts-expect-error a possibly undefined tenant must be resolved before binding
+    void contacts.plan({}, { context: { tenant } });
+    // @ts-expect-error nested values are not bound
+    void contacts.plan({}, { context: { tenant: { id: 'acme' } } });
+    // @ts-expect-error a Date is not a context value
+    void contacts.plan({}, { context: { since: new Date(0) } });
+  });
+});

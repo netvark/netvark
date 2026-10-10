@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCursorCodec } from '../cursor/codec';
-import { InvalidCursorError } from '../errors';
+import { InvalidCursorError, UnsupportedSortError } from '../errors';
+import { canonicalJson } from '../internal/canonical';
+import { sha256Base64Url } from '../internal/crypto';
+import { sortSignature } from '../sort/resolve-sort';
 import { definition, rejected, SECRET } from '../test-support/fixtures';
 import { createPlanner } from './plan';
 
@@ -147,5 +150,87 @@ describe('createPlanner (cursors)', () => {
         reason: 'malformed',
       },
     );
+  });
+});
+
+/** A cursor on the first page of `-createdAt` under `context`. */
+async function cursorUnder(
+  context?: Readonly<Record<string, string | number | bigint>>,
+): Promise<string> {
+  const first = await plan({ sort: ['-createdAt'] }, { context });
+  return codec.encode(['2024-01-02', 'k2'], first.context);
+}
+
+async function resume(
+  after: string,
+  context?: Readonly<Record<string, string | number | bigint>>,
+): Promise<unknown> {
+  return rejected(plan({ sort: ['-createdAt'], page: { after } }, { context }));
+}
+
+describe('createPlanner (context, SPEC 6.1, ADR 0015)', () => {
+  const ACME = { tenant: 'acme' } as const;
+  const GLOBEX = { tenant: 'globex' } as const;
+
+  it('resumes a cursor under the context it was issued in, whatever the member order', async () => {
+    const after = await cursorUnder({ tenant: 'acme', region: 'eu' });
+    expect(
+      await resume(after, { region: 'eu', tenant: 'acme' }),
+    ).toBeUndefined();
+  });
+
+  it('rejects it under another context or none, naming the parameter', async () => {
+    const after = await cursorUnder(ACME);
+    expect(await resume(after, GLOBEX)).toEqual(
+      new InvalidCursorError('after', 'context'),
+    );
+    expect(await resume(after)).toMatchObject({
+      parameter: 'after',
+      reason: 'context',
+    });
+    const before = await cursorUnder(ACME);
+    expect(
+      await rejected(
+        plan({ sort: ['-createdAt'], page: { before } }, { context: GLOBEX }),
+      ),
+    ).toMatchObject({ parameter: 'before', reason: 'context' });
+  });
+
+  it('rejects an unbound cursor where a context is passed', async () => {
+    const after = await cursorUnder();
+    expect(await resume(after, ACME)).toMatchObject({ reason: 'context' });
+    expect(await resume(after)).toBeUndefined();
+  });
+
+  it('keeps the binding of a request without a context, so earlier cursors still resume', async () => {
+    const unbound = await plan({ sort: ['-createdAt'] });
+    const sort = [
+      { field: 'createdAt', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ] as const;
+    expect(unbound.context).toBe(
+      await sha256Base64Url(
+        canonicalJson({ sort: sortSignature(sort), filter: null, search: '' }),
+      ),
+    );
+    expect(
+      (await plan({ sort: ['-createdAt'] }, { context: {} })).context,
+    ).toBe(unbound.context);
+  });
+
+  it('binds a bigint as its decimal text and a number apart from a string', async () => {
+    const big = await plan({}, { context: { tenant: 42n } });
+    const text = await plan({}, { context: { tenant: '42' } });
+    const number = await plan({}, { context: { tenant: 42 } });
+    expect(big.context).toBe(text.context);
+    expect(number.context).not.toBe(text.context);
+  });
+
+  it('checks the context before the request', async () => {
+    const error = await rejected(
+      plan({ sort: ['bio'] }, { context: { tenant: Number.NaN } }),
+    );
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error).not.toBeInstanceOf(UnsupportedSortError);
   });
 });

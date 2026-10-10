@@ -84,6 +84,11 @@ export type {
   QueryPlan,
   Target,
 } from './plan/types';
+export type {
+  CursorContext,
+  CursorContextValue,
+  PlanOptions,
+} from './plan/context';
 export type { InvalidCursorReason, KeysetErrorCode } from './errors';
 
 export { createDefineKeyset } from './definition/create-define-keyset';

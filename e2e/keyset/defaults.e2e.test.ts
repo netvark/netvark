@@ -17,7 +17,7 @@ import {
   PageSizeExceededError,
 } from '@netvark/kysely-keyset';
 
-import { openPglite, openPostgres } from './support/db.ts';
+import { databases } from './support/db.ts';
 import { COLUMN_FIELDS, SECRET } from './support/keysets.ts';
 import { expectedIds } from './support/schema.ts';
 
@@ -48,16 +48,7 @@ const exact = defineKeyset({
   page: { max: OWN_MAX },
 });
 
-const URL = process.env['KEYSET_PG_URL'];
-
-const HARNESSES: ReadonlyArray<readonly [string, () => Promise<Harness>]> = [
-  ['PGlite', openPglite],
-  ...(URL === undefined
-    ? []
-    : [['PostgreSQL server', async () => openPostgres(URL)] as const]),
-];
-
-describe.each(HARNESSES)('%s: a configured definer', (_name, open) => {
+describe.each(databases())('%s: a configured definer', (_name, open) => {
   let harness: Harness;
   beforeAll(async () => {
     harness = await open();
