@@ -9,8 +9,9 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 
 Status: in development and unreleased. This line implements the definer, the declaration, the public
 names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
-`defineValidator`, and the boundary fixtures of the `testing` entry (SPEC sections 2 to 7). Field
-metadata, the error catalog, messages, the `server` subpath, and OpenAPI follow;
+`defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
+derived error codes with `errorCatalog` (SPEC 9.1 and 9.2). Field metadata, `forbiddenMembers`,
+messages, the `server` subpath, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -395,6 +396,60 @@ each must come back as the same value, compared per type as SPEC 15.3 does, so a
 a value fails at the fixture that shows it, such as a `timestamptz` parsed into a `Date`, which
 keeps only milliseconds.
 
+## Errors
+
+Each declared resource carries the error codes clients can cause, derived from its constraints (SPEC
+9.1): one per constraint over a member, per NOT NULL member an operation writes, per CHECK of a
+domain a member passes, and for the primary key with `clientIds`. An entry holds the status and
+title the error renders with, the constraint's kind, and the public members it points at:
+
+```ts
+Contacts.errors.CONTACT_EMAIL_TAKEN;
+// { status: 409, title: 'Conflict', kind: 'unique', fields: ['email'] }
+Contacts.errors.CONTACTS_NAME_NOT_NULL;
+// { status: 422, title: 'Invalid Attribute', kind: 'notNull', fields: ['name'] }
+Contacts.errors.EMAIL_CHECK; // the email domain's CHECK
+// { status: 422, title: 'Invalid Attribute', kind: 'check', fields: ['email'] }
+```
+
+The scope column is never a member. `contacts_email_unique` covers `(organization_id, email)` and
+the server writes `organization_id`, so the code points at `email`, and the scope's foreign key has
+no code at all.
+
+`errorCatalog` assembles the codes of the resources the application serves, resource-core's
+`QUOTA_EXCEEDED`, and the application's own codes into one `@netvark/ban-core` catalog fragment. It
+checks the list as a registry (SPEC 4.2): each type once, each code from one constraint and taken by
+neither `@netvark/ban-core`, `@netvark/jsonapi-core`, nor the application, and each relationship's
+target in the list.
+
+```ts
+// errors.ts
+import { createBan } from '@netvark/ban-core';
+import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import { errorCatalog } from '@netvark/resource-core';
+
+import { Contacts } from './resources/contacts';
+import { Meetings } from './resources/meetings';
+import { Organizations } from './resources/organizations';
+
+const catalog = errorCatalog([Organizations, Contacts, Meetings], {
+  SEAT_LIMIT: { status: 402, title: 'Seat Limit' },
+});
+export const ban = createBan({ errors: { ...ERROR_CATALOG, ...catalog } });
+
+ban.error('CONTACT_EMAIL_TAKEN'); // every derived code is a key
+```
+
+A conflict throws one `TypeError` that lists them all. A duplicate code names each constraint behind
+it, so the message says where `code` goes:
+
+```
+errorCatalog: code SHORT_TEXT_CHECK is derived by organizations from domain short_text.short_text_check and by contacts from contacts.contacts_name_check, so all but one need a code
+```
+
+`tsc` reports a relationship whose target the list leaves out at that resource in the list, with the
+same message as the runtime.
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -418,6 +473,11 @@ keeps only milliseconds.
   PostgreSQL generates from the columns unless the migration names it; `code: 'CONTACT_EMAIL_TAKEN'`
   stays put when a migration renames the constraint. Name constraints in ASCII, or give `code`: a
   CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z.
+- **Pass `errorCatalog` the registry you serve.** Give it the same list of resources the server and
+  the OpenAPI document take, so its checks cover every code and relationship a client can reach.
+- **Keep derived codes unique.** A code is the constraint's name upper-cased, without its table, so
+  two tables that share a CHECK name, as tables copied from one another do, derive one code twice.
+  `errorCatalog` names both constraints; give `code` on one, or name constraints after their table.
 - **Review names as API changes.** Snapshot `names` in a test, so a migration that renames a column
   shows up in review as the public name it changes.
 - **Write fixtures at the edges.** A fixture is an example and a test: give the boundary values, the
@@ -461,7 +521,9 @@ memory are medians of at least five runs:
 
 The names checks account for about 15 percent of the stern check time and 11 percent of the GitLab
 one. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB of peak
-memory, most of it to parse Zod's own declarations.
+memory, most of it to parse Zod's own declarations. A resource's codes are typed only where code
+reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the check
+from 0.19 s and 129 MB to 0.49 s and 165 MB.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in

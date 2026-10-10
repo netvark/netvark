@@ -1,9 +1,12 @@
 /**
  * The rule keys a resource derives a code for (SPEC 9.1): each constraint
- * with a column that is a public field or relationship, the primary key
- * when `clientIds` is true, and the NOT NULL key (SPEC 3.5) of each public
- * member an operation writes. Clients can cause and see exactly these, so
- * no other key takes `code`.
+ * with a column that is a public field or relationship other than the
+ * scope column, the primary key when `clientIds` is true, and the NOT NULL
+ * key (SPEC 3.5) of each public member an operation writes. Clients can
+ * cause and see exactly these, so no other key takes `code`. The server
+ * writes the scope column (SPEC 3.2), so declaring it as a read
+ * relationship changes no code: a foreign key over it alone is the
+ * server's to violate.
  * @packageDocumentation
  */
 import type { PublicConstraint, PublicTable } from '@netvark/catalog-core';
@@ -16,14 +19,22 @@ import type { CodeOf } from './code';
 import { notNullKey } from '../catalog/columns';
 import { memberColumns, writtenColumns } from '../declare/members';
 
-type CodedConstraint<
+/** The member columns whose constraints clients can cause: every one but the scope column. */
+export type CodingColumn<TDecl extends Declaration, TScopeColumn> = Exclude<
+  MemberColumn<TDecl>,
+  TScopeColumn
+>;
+
+/** The constraints with a code. */
+export type CodedConstraint<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
+  TScopeColumn,
 > = {
   [K in ConstraintName<TTableDef>]: [
     Extract<
       TTableDef['constraints'][K]['columns'][number],
-      MemberColumn<TDecl>
+      CodingColumn<TDecl, TScopeColumn>
     >,
   ] extends [never]
     ? TTableDef['constraints'][K]['kind'] extends 'primaryKey'
@@ -49,7 +60,11 @@ type CodedNotNullKey<
 export type CodedKey<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
-> = (CodedConstraint<TTableDef, TDecl> | CodedNotNullKey<TTableDef, TDecl>) &
+  TScopeColumn,
+> = (
+  | CodedConstraint<TTableDef, TDecl, TScopeColumn>
+  | CodedNotNullKey<TTableDef, TDecl>
+) &
   string;
 
 /**
@@ -61,8 +76,9 @@ export type CodedKey<
 export type CodeNames<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
+  TScopeColumn,
 > = {
-  [K in CodedKey<TTableDef, TDecl> as CodeOf<TDecl, K>]: K;
+  [K in CodedKey<TTableDef, TDecl, TScopeColumn> as CodeOf<TDecl, K>]: K;
 };
 
 function isCoded(
@@ -80,8 +96,12 @@ function isCoded(
 export function codedKeys(
   tableDef: PublicTable,
   declaration: Declaration,
+  scopeColumn: string | undefined,
 ): ReadonlyArray<string> {
-  const members = memberColumns(declaration);
+  const members = new Set(memberColumns(declaration));
+  if (scopeColumn !== undefined) {
+    members.delete(scopeColumn);
+  }
   const clientIds = declaration.clientIds === true;
   const constraints = Object.entries(tableDef.constraints)
     .filter(([, constraint]) => isCoded(constraint, members, clientIds))

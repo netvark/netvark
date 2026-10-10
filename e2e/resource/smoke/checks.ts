@@ -3,13 +3,22 @@
  * `@netvark/resource-core`: the contacts application's declarations load,
  * resolve, and derive their public names, the codecs and validators parse
  * their fixtures with the application's Zod, the composed schemas parse
- * and report issues, and mistakes throw the documented `TypeError`s. Codes are upper-cased by the runtime's
- * `String.prototype.toUpperCase`, so each runtime derives them here. No
- * Node.js API, so the same module runs on Bun, Deno, and workerd.
+ * and report issues, the error catalog assembles and renders through
+ * `@netvark/ban-core`, and mistakes throw the documented `TypeError`s.
+ * Codes are upper-cased by the runtime's `String.prototype.toUpperCase`, so
+ * each runtime derives them here. No Node.js API, so the same module runs
+ * on Bun, Deno, and workerd.
  */
 import type { Checks } from './report.ts';
 
-import { createDeclareResource, defineValidator } from '@netvark/resource-core';
+import { createBan } from '@netvark/ban-core';
+import { jsonApi } from '@netvark/ban-core/formats/json-api';
+import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import {
+  createDeclareResource,
+  defineValidator,
+  errorCatalog,
+} from '@netvark/resource-core';
 
 import { catalog } from '../fixtures/contacts/catalog.ts';
 import { Contacts } from '../resources/contacts.ts';
@@ -126,6 +135,26 @@ export const neutralChecks: Checks = {
     check(
       codes === 'MEETING_NEEDS_CONTACT_OR_NOTES,MEETING_NEEDS_CONTACT_OR_NOTES',
       codes,
+    );
+  },
+  'assembles the error catalog and renders a derived code': () => {
+    const codes = errorCatalog([Organizations, Contacts, Meetings, Notes]);
+    const ban = createBan({
+      format: jsonApi(),
+      errors: { ...ERROR_CATALOG, ...codes },
+    });
+    const rendered = ban.render(ban.error('MEETING_ROOM_DOUBLE_BOOKED'));
+    const domain = Object.hasOwn(codes, 'EMAIL_CHECK');
+    check(rendered.status === 409, `status ${String(rendered.status)}`);
+    check(domain, 'no EMAIL_CHECK');
+    check(Object.isFrozen(codes), 'catalog not frozen');
+  },
+  'refuses a list without a relationship target': () => {
+    const message = messageOf(errorCatalog, [[Contacts]]);
+    check(
+      message ===
+        'errorCatalog: relationship contacts.organization targets organizations, which is not listed',
+      message,
     );
   },
   'refuses the full catalog': () => {

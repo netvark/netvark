@@ -33,6 +33,8 @@ export type {
   SearchDeclaration,
   SortDeclaration,
 } from './declare/types';
+export type { ErrorCatalog } from './errors/error-catalog';
+export type { ConstraintKind, ErrorEntry } from './errors/error-entry';
 export type { ResourceNames } from './names/types';
 export type { Infer } from './schema/infer';
 export type { IssueKind } from './schema/issue-kinds';
@@ -41,4 +43,5 @@ export type { ResourceIssue } from './schema/issues';
 export { defineCodec } from './codecs/define-codec';
 export { defineValidator } from './codecs/define-validator';
 export { createDeclareResource } from './declare/create-declare-resource';
+export { errorCatalog } from './errors/error-catalog';
 export { ISSUE_KINDS } from './schema/issue-kinds';

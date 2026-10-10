@@ -8,6 +8,8 @@
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 
+import type { ErrorEntry } from '../errors/error-entry';
+import type { ResourceErrors } from '../errors/error-types';
 import type { ResourceNames } from '../names/types';
 import type { AttributeValidators } from '../schema/attribute-schemas';
 import type { ObjectSchemas } from '../schema/object-schemas';
@@ -45,6 +47,12 @@ export interface DeclaredResource<
   readonly declaration: TDecl;
   /** The public names and both directions of each mapping (SPEC 4.3). */
   readonly names: ResourceNames;
+  /** Each derived error code's status, title, constraint kind, and the members its items point at (SPEC 9.1). */
+  readonly errors: Typed<
+    TTable,
+    Readonly<Record<string, ErrorEntry>>,
+    ResourceErrors<TContext, TTable, TDecl>
+  >;
   /** The read, create, and update schemas of the attributes (SPEC 6.2), built on first read. */
   readonly schema: Typed<
     TTable,
@@ -92,8 +100,12 @@ export interface DeclaredResource<
 
 /** What a declared resource was built from, beyond its public members. */
 export interface DeclaredInternals {
+  /** The resource itself, so one lookup gives a registry both. */
+  readonly resource: DeclaredResource;
   readonly specs: ResourceSpecs;
   readonly catalog: PublicCatalog;
+  /** Each error code's origin, the constraint behind it, for the registry checks (SPEC 4.2). */
+  readonly errorOrigins: ReadonlyMap<string, string>;
 }
 
 const DECLARED = new WeakMap<object, DeclaredInternals>();
@@ -101,9 +113,9 @@ const DECLARED = new WeakMap<object, DeclaredInternals>();
 /** Brands a resource built by `declareResource`. */
 export function brandDeclared<TResource extends DeclaredResource>(
   resource: TResource,
-  internals: DeclaredInternals,
+  internals: Omit<DeclaredInternals, 'resource'>,
 ): TResource {
-  DECLARED.set(resource, internals);
+  DECLARED.set(resource, { ...internals, resource });
   return resource;
 }
 

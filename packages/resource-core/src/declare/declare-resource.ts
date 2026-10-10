@@ -2,14 +2,15 @@
  * `declareResource` at runtime (SPEC 3, 4, 14): every check TypeScript
  * makes, made again for declarations written in JavaScript, plus those
  * types cannot express; each throws `TypeError` naming the option. The
- * result carries the derived names (`names/derive-names.ts`) and the
- * schemas (SPEC 6), whose specs are computed here and whose Zod schemas are
- * built on first read.
+ * result carries the derived names (`names/derive-names.ts`), the derived
+ * error codes (`errors/derive-errors.ts`), and the schemas (SPEC 6), whose
+ * specs are computed here and whose Zod schemas are built on first read.
  * @packageDocumentation
  */
 import type { DefinerContext } from './check-config';
 import type { DeclaredResource } from './declared-resource';
 
+import { deriveErrors } from '../errors/derive-errors';
 import { lazy } from '../internal/lazy';
 import { describe, ownValue } from '../internal/object';
 import { deriveNames } from '../names/derive-names';
@@ -66,8 +67,21 @@ export function declareResourceIn(
   checkSort(table, declaration);
   checkPage(context, table, declaration.page);
   checkRules(context, table, tableDef, declaration);
-  const names = deriveNames(table, tableDef, identity.id, declaration);
+  const names = deriveNames(
+    table,
+    tableDef,
+    { id: identity.id, scopeColumn },
+    declaration,
+  );
   const frozen = freezeDeclaration(declaration);
+  const { errors, origins } = deriveErrors({
+    catalog: context.catalog,
+    domains: context.domains,
+    table,
+    tableDef,
+    names,
+    scopeColumn,
+  });
   const specs = resourceSpecs({
     context,
     table,
@@ -85,6 +99,7 @@ export function declareResourceIn(
       table,
       declaration: frozen,
       names,
+      errors,
       get schema() {
         return schema();
       },
@@ -98,6 +113,6 @@ export function declareResourceIn(
         return write();
       },
     }),
-    { specs, catalog: context.catalog },
+    { specs, catalog: context.catalog, errorOrigins: origins },
   );
 }

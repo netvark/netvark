@@ -31,6 +31,7 @@ beforeAll(async () => {
 
 const FILES = [
   'definer.ts',
+  'errors.ts',
   'fields.ts',
   'names.ts',
   'options.ts',

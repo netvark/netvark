@@ -54,8 +54,10 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - `wire/` and `schema/` the wire forms, exact decimals, value and object schemas, rules, issues, and
   the Standard Schema wrappers
 - `codecs/` `defineCodec`, `defineValidator`, `StorageCodecs`
-- `meta/`, `errors/`, `messages/` field metadata, codes and `forbiddenMembers`, messages and
-  localization
+- `meta/`, `errors/`, `messages/` field metadata, codes, `errorCatalog`, and `forbiddenMembers`,
+  messages and localization
+- `registry/` the checks every list of resources runs (types, codes, targets) and their type-level
+  twin
 - `jsonapi/` the `@netvark/jsonapi-core` and `@netvark/keyset-core` definitions
 - `server/`, `openapi/`, `testing/` the three other entry points
 

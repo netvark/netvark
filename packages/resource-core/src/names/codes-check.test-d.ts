@@ -7,6 +7,7 @@ import type { CodesCheck } from './codes-check';
 import { describe, expectTypeOf, it } from 'vitest';
 
 import { createDeclareResource } from '../declare/create-declare-resource';
+import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
 import { namesCatalog } from '../test-support/names';
 
@@ -92,6 +93,35 @@ describe('CodesCheck (SPEC 4.2, 9.1)', () => {
       },
     });
   });
+
+  it('refuses code on a foreign key over the scope column alone, which the server writes', () => {
+    const declareContacts = createDeclareResource({
+      catalog: contactsCatalog,
+      ...TEST_REGISTRIES,
+    });
+    const relationships = {
+      organization_id: { target: () => null, access: 'read' },
+    } as const;
+    declareContacts('contacts', {
+      operations: ['get'],
+      scope: 'organization',
+      fields: { email: { access: 'read' } },
+      relationships,
+      rules: {
+        contacts_email_unique: { code: 'CONTACT_EMAIL_TAKEN' },
+        // @ts-expect-error code: the key has no code, since clients cannot violate it
+        contacts_organization_id_fkey: { code: 'CONTACT_ORGANIZATION_MISSING' },
+      },
+    });
+    declareContacts('contacts', {
+      operations: ['get'],
+      fields: {},
+      relationships,
+      rules: {
+        contacts_organization_id_fkey: { code: 'CONTACT_ORGANIZATION_MISSING' },
+      },
+    });
+  });
 });
 
 describe('CodesCheck over wide types', () => {
@@ -101,11 +131,15 @@ describe('CodesCheck over wide types', () => {
       readonly fields: { readonly contact: { readonly access: 'read' } };
       readonly rules: { readonly notes_pkey: { readonly code: 'NOTE_EXISTS' } };
     }
-    expectTypeOf<CodesCheck<PublicTable, Members>>().toEqualTypeOf<unknown>();
+    expectTypeOf<
+      CodesCheck<PublicTable, Members, never>
+    >().toEqualTypeOf<unknown>();
   });
 
   it('leaves a declaration typed only as Declaration to the runtime', () => {
     type Notes = NamesCatalog['tables']['notes'];
-    expectTypeOf<CodesCheck<Notes, Declaration>>().toEqualTypeOf<unknown>();
+    expectTypeOf<
+      CodesCheck<Notes, Declaration, never>
+    >().toEqualTypeOf<unknown>();
   });
 });

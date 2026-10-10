@@ -35,21 +35,30 @@ type OtherOwners<TOwners, TCode, K> = Exclude<OwnersOf<TOwners, TCode>, K>;
 type CodeProblem<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
+  TScopeColumn,
   K extends string,
 > =
-  K extends CodedKey<TTableDef, TDecl>
+  K extends CodedKey<TTableDef, TDecl, TScopeColumn>
     ? IsCode<CodeOf<TDecl, K>> extends false
       ? `code: "${CodeOf<TDecl, K>}" is not A-Z, 0-9, _`
       : [
-            OtherOwners<CodeNames<TTableDef, TDecl>, CodeOf<TDecl, K>, K>,
+            OtherOwners<
+              CodeNames<TTableDef, TDecl, TScopeColumn>,
+              CodeOf<TDecl, K>,
+              K
+            >,
           ] extends [never]
         ? never
-        : `code: "${CodeOf<TDecl, K>}" collides with ${OtherOwners<CodeNames<TTableDef, TDecl>, CodeOf<TDecl, K>, K> & string}`
+        : `code: "${CodeOf<TDecl, K>}" collides with ${OtherOwners<CodeNames<TTableDef, TDecl, TScopeColumn>, CodeOf<TDecl, K>, K> & string}`
     : 'code: the key has no code, since clients cannot violate it';
 
-type ProblemKey<TTableDef extends PublicTable, TDecl extends Declaration> = {
+type ProblemKey<
+  TTableDef extends PublicTable,
+  TDecl extends Declaration,
+  TScopeColumn,
+> = {
   [K in GivenCodeKey<TTableDef, TDecl>]: [
-    CodeProblem<TTableDef, TDecl, K>,
+    CodeProblem<TTableDef, TDecl, TScopeColumn, K>,
   ] extends [never]
     ? never
     : K;
@@ -58,12 +67,15 @@ type ProblemKey<TTableDef extends PublicTable, TDecl extends Declaration> = {
 type CodeErrors<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
+  TScopeColumn,
   TKey extends string,
 > = [TKey] extends [never]
   ? unknown
   : {
       readonly rules: {
-        readonly [K in TKey]: Requirement<CodeProblem<TTableDef, TDecl, K>>;
+        readonly [K in TKey]: Requirement<
+          CodeProblem<TTableDef, TDecl, TScopeColumn, K>
+        >;
       };
     };
 
@@ -88,9 +100,15 @@ type GivesCode<TDecl extends Declaration> = [
 export type CodesCheck<
   TTableDef extends PublicTable,
   TDecl extends Declaration,
+  TScopeColumn,
 > =
   GivesCode<TDecl> extends false
     ? unknown
     : string extends MemberColumn<TDecl> | ConstraintName<TTableDef>
       ? unknown
-      : CodeErrors<TTableDef, TDecl, ProblemKey<TTableDef, TDecl>>;
+      : CodeErrors<
+          TTableDef,
+          TDecl,
+          TScopeColumn,
+          ProblemKey<TTableDef, TDecl, TScopeColumn>
+        >;

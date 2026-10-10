@@ -17,6 +17,7 @@ describe('package surface (SPEC 1)', () => {
       'createDeclareResource',
       'defineCodec',
       'defineValidator',
+      'errorCatalog',
     ]);
   });
 
