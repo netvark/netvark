@@ -171,7 +171,7 @@ describe('declareResource: columns declared against SPEC 3.1', () => {
       fields: {},
       relationships: {
         // @ts-expect-error document is a jsonb column, which cannot carry a resource id
-        document: { target: () => null, access: 'read' },
+        document: { target: () => null, access: 'read', as: 'document' },
       },
     });
     declareResource('contacts', {

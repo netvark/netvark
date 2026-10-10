@@ -18,6 +18,7 @@ export default defineExtraction({
         'import_batches',
         'import_rows',
         'meetings',
+        'notes',
         'organizations',
       ],
     },

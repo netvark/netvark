@@ -36,10 +36,10 @@ no dependencies and runs anywhere the other cores run. `@netvark/pg-catalog` rep
 renders, compares, and runs the CLI; it depends on `@netvark/catalog-core` (and re-exports all of
 it) and on `pg`, and takes `@electric-sql/pglite` as an optional peer dependency.
 
-| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `CATALOG_FORMAT`; and the types of sections 2 to 4 (`Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`) |
-| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `TypesConfig`, `TypeOverride`, `CamelCaseOptions`, `DriftEnvironment`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `PgCatalogErrorCode`; and the `pg-catalog` bin                                                                               |
+| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `toCamelCase`, `toSnakeCase`, `CATALOG_FORMAT`; and the types of sections 2 to 4 and 9.2 (`CamelCaseOptions`, `Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`) |
+| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `PgCatalogErrorCode`; and the `pg-catalog` bin                                                                                                                                                             |
 
 `e2e/catalog/package-surface.e2e.test.ts` asserts the exact value export lists against the built
 packages and that the re-exports are the core's own bindings.
@@ -56,6 +56,7 @@ packages/catalog-core/src/
   public.ts                    toPublicCatalog() (3)
   public-types.ts              the public types (3)
   diff.ts                      diffCatalogs(), CatalogDiff, CatalogChange (4)
+  camel-case.ts                toCamelCase(), toSnakeCase(), CamelCaseOptions: CamelCasePlugin's conversions (9.2)
   internal/json.ts             JsonValue, isPlainObject(), jsonEqual() (4)
 packages/pg-catalog/src/
   index.ts                     root entry: re-exports @netvark/catalog-core, adds the rest
@@ -94,7 +95,7 @@ packages/pg-catalog/src/
   render/catalog-module.ts     renderCatalogModule(), renderPublicCatalogModule(), parseCatalogModule() (9.1)
   render/kysely-mapping.ts     mapType(), the type table (9.2)
   render/kysely-names.ts       pascalCase(), memberName(), stringLiteral() (9.2)
-  render/camel-case.ts         toCamelCase(), toSnakeCase(), KeyNames: CamelCasePlugin's names (9.2)
+  render/key-names.ts          KeyNames: the camelCase keys and the names that do not map back (9.2)
   render/kysely-types.ts       renderKyselyTypes() (9.2)
   commands/extract.ts          extractCatalog(), extract() (10.1)
   commands/drift.ts            introspectCatalog(), drift() (10.2)
@@ -808,7 +809,7 @@ whose `format` equals `CATALOG_FORMAT` and whose `schemas`, `extensions`, `enums
 `tables` have the model's shapes; another format throws `catalog_format`, anything else
 `catalog_unreadable`.
 
-### 9.2 Kysely types (`render/kysely-types.ts`, `render/kysely-mapping.ts`, `render/kysely-names.ts`, `render/camel-case.ts`, ADR 0007)
+### 9.2 Kysely types (`render/kysely-types.ts`, `render/kysely-mapping.ts`, `render/kysely-names.ts`, `render/key-names.ts`, ADR 0007)
 
 `renderKyselyTypes(catalog, options)` writes, in order and separated by blank lines: the header
 line, `import type { ... } from 'kysely';` naming the Kysely types the file uses, sorted, and the
@@ -888,9 +889,11 @@ https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/commo
   match the application's. In queries the plugin turns each key back with its snake-case conversion,
   so a key works only when that gives the database name again: `line_1` becomes `line1`, which turns
   back into `line1`. Every name that does not survive the round trip is listed in one
-  `camel_case_mismatch`. The conversions are a port of the plugin's, tested against it. Unless
-  `maintainNestedObjectKeys` is set, the plugin also camelCases the keys of objects inside parsed
-  `json` and `jsonb` values, while values written keep their keys. @ref
+  `camel_case_mismatch`. The conversions are `toCamelCase` and `toSnakeCase` of
+  `@netvark/catalog-core`, a port of the plugin's that `render/key-names.test.ts` runs against the
+  plugin itself over every short string, and that `@netvark/resource-core` also derives public names
+  with. Unless `maintainNestedObjectKeys` is set, the plugin also camelCases the keys of objects
+  inside parsed `json` and `jsonb` values, while values written keep their keys. @ref
   https://github.com/kysely-org/kysely/blob/v0.28.17/src/plugin/camel-case/camel-case.ts @ref
   https://kysely.dev/docs/plugins#camel-case-plugin
 

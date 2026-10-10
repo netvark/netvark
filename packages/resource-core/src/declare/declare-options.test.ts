@@ -191,8 +191,8 @@ describe('declareResource: rules (SPEC 3.5)', () => {
   it('accepts constraint names and NOT NULL keys, and refuses anything else', () => {
     expect(
       withRules('contacts', base, {
-        contacts_email_unique: { code: 'CONTACT_EMAIL_TAKEN' },
-        contacts_name_not_null: { code: 'CONTACT_NAME_REQUIRED' },
+        contacts_email_unique: {},
+        contacts_name_not_null: {},
       }),
     ).not.toThrow();
     expect(

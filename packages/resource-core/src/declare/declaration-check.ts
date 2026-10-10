@@ -6,7 +6,8 @@
  * Nothing here reads a relationship's target (SPEC 3.8). The runtime twins
  * are `check-shape.ts` and `check-options.ts`; fields and relationships are
  * in `fields-check.ts` and `relationships-check.ts`, rules in
- * `rules-check.ts`.
+ * `rules-check.ts`, and the derived names and codes in
+ * `names/names-check.ts` and `names/codes-check.ts`.
  * @packageDocumentation
  */
 import type {
@@ -26,6 +27,8 @@ import type {
   SearchColumn,
   TableName,
 } from '../catalog/types';
+import type { CodesCheck } from '../names/codes-check';
+import type { NamesCheck } from '../names/names-check';
 import type { OperationOf } from './access-check';
 import type { FieldsCheck } from './fields-check';
 import type { DeclareContext } from './registries';
@@ -253,7 +256,9 @@ type DeclarationCheckOf<
   AtMember<'scope', ScopeCheck<TContext, TTable, TTableDef, TDecl>> &
   AtMember<'search', SearchCheck<TTable, TTableDef, TDecl['search']>> &
   AtMember<'sort', SortCheck<TDecl>> &
-  RulesCheck<TContext, TTable, TTableDef, TDecl> & {
+  RulesCheck<TContext, TTable, TTableDef, TDecl> &
+  NamesCheck<TTableDef, TDecl> &
+  CodesCheck<TTableDef, TDecl> & {
     readonly fields: FieldsCheck<
       TContext,
       TTable,

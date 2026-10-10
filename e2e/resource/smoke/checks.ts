@@ -1,8 +1,10 @@
 /**
  * Runtime-neutral checks (resource SPEC 15.4, 16) over the built
- * `@netvark/resource-core`: the contacts application's declarations load
- * and resolve, and mistakes throw the documented `TypeError`s. No Node.js
- * API, so the same module runs on Bun, Deno, and workerd.
+ * `@netvark/resource-core`: the contacts application's declarations load,
+ * resolve, and derive their public names, and mistakes throw the
+ * documented `TypeError`s. Codes are upper-cased by the runtime's
+ * `String.prototype.toUpperCase`, so each runtime derives them here. No
+ * Node.js API, so the same module runs on Bun, Deno, and workerd.
  */
 import type { Checks } from './report.ts';
 
@@ -12,6 +14,7 @@ import { catalog } from '../fixtures/contacts/catalog.ts';
 import { Contacts } from '../resources/contacts.ts';
 import { declareResource } from '../resources/declare-resource.ts';
 import { Meetings } from '../resources/meetings.ts';
+import { Notes } from '../resources/notes.ts';
 import { Organizations } from '../resources/organizations.ts';
 import { check } from './report.ts';
 
@@ -49,6 +52,25 @@ export const neutralChecks: Checks = {
       Contacts.declaration.relationships.organization_id.target() ===
         Organizations,
       'organization_id target',
+    );
+  },
+  'derives the public names': () => {
+    const kind = Notes.names.fields.get('kind');
+    const created = Notes.names.columns.get('created_at');
+    const code = Notes.names.rules.get('notes_type_check');
+    check(kind === 'type', `kind ${String(kind)}`);
+    check(created === 'createdAt', `created_at ${String(created)}`);
+    check(code === 'NOTES_TYPE_CHECK', `notes_type_check ${String(code)}`);
+  },
+  'refuses a derived code outside A-Z': () => {
+    const message = messageOf(declareResource, [
+      'notes',
+      { operations: ['get'], fields: { priorität: { access: 'read' } } },
+    ]);
+    check(
+      message ===
+        'notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code',
+      message,
     );
   },
   'refuses a written CHECK without a validator': () => {

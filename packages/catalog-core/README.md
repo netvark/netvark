@@ -151,6 +151,25 @@ Compares two catalogs member by member and returns `{ changes }`, depth first:
 Objects recurse; arrays and scalars compare as whole values. An empty list means the catalogs are
 equal, whatever the order of their members. Catalogs of different `format` throw `TypeError`.
 
+## `toCamelCase(text, options?)` and `toSnakeCase(text, options?)`
+
+Kysely's `CamelCasePlugin` conversions, ported line by line and tested against the plugin, so a key
+computed from the catalog is the key the plugin produces at runtime:
+
+```ts
+import { toCamelCase, toSnakeCase } from '@netvark/catalog-core';
+
+toCamelCase('created_at'); // 'createdAt'
+toCamelCase('address_line_1'); // 'addressLine1'
+toSnakeCase('addressLine1'); // 'address_line1': not the column, so this name does not round-trip
+toSnakeCase('addressLine1', { underscoreBeforeDigits: true }); // 'address_line_1'
+```
+
+The options are the plugin's `upperCase`, `underscoreBeforeDigits`, and
+`underscoreBetweenUppercaseLetters`; pass the ones your application gives the plugin. Characters are
+read as UTF-16 code units, as the plugin reads them. `@netvark/pg-catalog` uses both for its
+`camelCase` Kysely types, and `@netvark/resource-core` uses `toCamelCase` for public field names.
+
 ## Versioning
 
 `CATALOG_FORMAT` is the shape of the model. A release that changes the shape increments it and is a

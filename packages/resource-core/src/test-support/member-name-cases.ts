@@ -1,0 +1,70 @@
+/**
+ * The member-name case table (SPEC 4.2): a name and whether JSON:API 1.1
+ * allows it as a member name. `isMemberName` of `@netvark/jsonapi-core`
+ * (`names/member-name.test.ts`) and the type-level `IsMemberName`
+ * (`names/member-name.test-d.ts`) are both held to it. Every reserved
+ * ASCII punctuation character appears once, between two letters. Not
+ * published with the package.
+ * @ref https://jsonapi.org/format/1.1/#document-member-names
+ * @packageDocumentation
+ */
+
+export const MEMBER_NAME_CASES = [
+  ['a', true],
+  ['createdAt', true],
+  ['1', true],
+  ['a b', true],
+  ['a-b', true],
+  ['a_b', true],
+  ['a-_ b', true],
+  ['größe', true],
+  ['名前', true],
+  ['😀', true],
+  ['\u0080', true],
+  ['a\u0080', true],
+  ['', false],
+  ['-a', false],
+  ['a-', false],
+  ['_a', false],
+  ['a_', false],
+  [' a', false],
+  ['a ', false],
+  ['-', false],
+  ['_', false],
+  [' ', false],
+  ['@a', false],
+  ['a+b', false],
+  ['a,b', false],
+  ['a.b', false],
+  ['a[b', false],
+  ['a]b', false],
+  ['a!b', false],
+  ['a"b', false],
+  ['a#b', false],
+  ['a$b', false],
+  ['a%b', false],
+  ['a&b', false],
+  ["a'b", false],
+  ['a(b', false],
+  ['a)b', false],
+  ['a*b', false],
+  ['a/b', false],
+  ['a:b', false],
+  ['a;b', false],
+  ['a<b', false],
+  ['a=b', false],
+  ['a>b', false],
+  ['a?b', false],
+  ['a@b', false],
+  ['a\\b', false],
+  ['a^b', false],
+  ['a`b', false],
+  ['a{b', false],
+  ['a|b', false],
+  ['a}b', false],
+  ['a~b', false],
+  ['a\u0000b', false],
+  ['a\u0009b', false],
+  ['a\u001Fb', false],
+  ['a\u007Fb', false],
+] as const;

@@ -1566,6 +1566,290 @@ export const catalog = {
         }
       }
     },
+    "notes": {
+      "schema": "public",
+      "name": "notes",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "gen_random_uuid()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "organization_id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "type": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "author": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": "The contact who wrote the note."
+        },
+        "contact": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "contact_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "body": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "priorität": {
+          "type": "int2",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "smallint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp with time zone",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "now()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "notes_author_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "author"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "setNull",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (author) REFERENCES contacts(id) ON DELETE SET NULL"
+        },
+        "notes_body_check": {
+          "kind": "check",
+          "columns": [
+            "body"
+          ],
+          "expression": "((char_length(body) >= 1) AND (char_length(body) <= 2000))",
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 2000
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK (((char_length(body) >= 1) AND (char_length(body) <= 2000)))"
+        },
+        "notes_contact_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "contact_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "setNull",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL"
+        },
+        "notes_organization_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "organization_id"
+          ],
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "cascade",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
+        },
+        "notes_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        },
+        "notes_priorität_check": {
+          "kind": "check",
+          "columns": [
+            "priorität"
+          ],
+          "expression": "((\"priorität\" >= 1) AND (\"priorität\" <= 3))",
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "3",
+              "inclusive": true
+            }
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK (((\"priorität\" >= 1) AND (\"priorität\" <= 3)))"
+        },
+        "notes_type_check": {
+          "kind": "check",
+          "columns": [
+            "type"
+          ],
+          "expression": "(type = ANY (ARRAY['call'::text, 'email'::text, 'visit'::text]))",
+          "rule": {
+            "kind": "enum",
+            "values": [
+              "call",
+              "email",
+              "visit"
+            ]
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK ((type = ANY (ARRAY['call'::text, 'email'::text, 'visit'::text])))"
+        }
+      },
+      "indexes": {
+        "notes_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX notes_pkey ON public.notes USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "organizations": {
       "schema": "public",
       "name": "organizations",

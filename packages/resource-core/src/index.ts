@@ -31,5 +31,6 @@ export type {
   SearchDeclaration,
   SortDeclaration,
 } from './declare/types';
+export type { ResourceNames } from './names/types';
 
 export { createDeclareResource } from './declare/create-declare-resource';

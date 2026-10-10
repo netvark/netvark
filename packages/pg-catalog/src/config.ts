@@ -3,6 +3,8 @@
  * configuration eagerly (SPEC 11.1).
  * @packageDocumentation
  */
+import type { CamelCaseOptions } from '@netvark/catalog-core';
+
 import type { MigrationSource } from './migrations/load';
 import type { PgliteExtension } from './target/pglite';
 
@@ -31,17 +33,6 @@ export interface TypeOverride {
   readonly select: string;
   readonly insert?: string;
   readonly update?: string;
-}
-
-/**
- * The options of Kysely's `CamelCasePlugin` that change names; give the
- * ones the application gives the plugin.
- * @ref https://kysely-org.github.io/kysely-apidoc/interfaces/CamelCasePluginOptions.html
- */
-export interface CamelCaseOptions {
-  readonly upperCase?: boolean;
-  readonly underscoreBeforeDigits?: boolean;
-  readonly underscoreBetweenUppercaseLetters?: boolean;
 }
 
 /** The Kysely types file and how it maps types (SPEC 9.2). */

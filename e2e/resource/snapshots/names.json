@@ -1,0 +1,189 @@
+{
+  "organizations": {
+    "type": "organizations",
+    "table": "organizations",
+    "id": "id",
+    "fields": {
+      "name": "name",
+      "slug": "slug",
+      "handle": "handle",
+      "seats": "seats",
+      "country": "country",
+      "createdAt": "created_at"
+    },
+    "relationships": {},
+    "columns": {
+      "name": "name",
+      "slug": "slug",
+      "handle": "handle",
+      "seats": "seats",
+      "country": "country",
+      "created_at": "createdAt"
+    },
+    "codes": {
+      "ORGANIZATION_HANDLE_TAKEN": "organizations_handle_key",
+      "ORGANIZATIONS_SEATS_CHECK": "organizations_seats_check",
+      "ORGANIZATIONS_SLUG_CHECK": "organizations_slug_check",
+      "ORGANIZATION_SLUG_TAKEN": "organizations_slug_key",
+      "ORGANIZATIONS_NAME_NOT_NULL": "organizations_name_not_null",
+      "ORGANIZATIONS_SLUG_NOT_NULL": "organizations_slug_not_null",
+      "ORGANIZATIONS_SEATS_NOT_NULL": "organizations_seats_not_null"
+    },
+    "rules": {
+      "organizations_handle_key": "ORGANIZATION_HANDLE_TAKEN",
+      "organizations_seats_check": "ORGANIZATIONS_SEATS_CHECK",
+      "organizations_slug_check": "ORGANIZATIONS_SLUG_CHECK",
+      "organizations_slug_key": "ORGANIZATION_SLUG_TAKEN",
+      "organizations_name_not_null": "ORGANIZATIONS_NAME_NOT_NULL",
+      "organizations_slug_not_null": "ORGANIZATIONS_SLUG_NOT_NULL",
+      "organizations_seats_not_null": "ORGANIZATIONS_SEATS_NOT_NULL"
+    }
+  },
+  "contacts": {
+    "type": "contacts",
+    "table": "contacts",
+    "id": "id",
+    "fields": {
+      "kind": "kind",
+      "name": "name",
+      "nickname": "nickname",
+      "email": "email",
+      "website": "website",
+      "status": "status",
+      "priority": "priority",
+      "discount": "discount",
+      "tags": "tags",
+      "createdAt": "created_at"
+    },
+    "relationships": {
+      "organization": "organization_id"
+    },
+    "columns": {
+      "kind": "kind",
+      "name": "name",
+      "nickname": "nickname",
+      "email": "email",
+      "website": "website",
+      "status": "status",
+      "priority": "priority",
+      "discount": "discount",
+      "tags": "tags",
+      "created_at": "createdAt",
+      "organization_id": "organization"
+    },
+    "codes": {
+      "CONTACT_EMAIL_TAKEN": "contacts_email_unique",
+      "CONTACTS_NAME_CHECK": "contacts_name_check",
+      "CONTACTS_NICKNAME_CHECK": "contacts_nickname_check",
+      "CONTACTS_ORGANIZATION_ID_FKEY": "contacts_organization_id_fkey",
+      "CONTACTS_PRIORITY_CHECK": "contacts_priority_check",
+      "CONTACTS_STATUS_CHECK": "contacts_status_check",
+      "CONTACTS_WEBSITE_CHECK": "contacts_website_check",
+      "CONTACTS_KIND_NOT_NULL": "contacts_kind_not_null",
+      "CONTACT_NAME_REQUIRED": "contacts_name_not_null",
+      "CONTACTS_STATUS_NOT_NULL": "contacts_status_not_null",
+      "CONTACTS_TAGS_NOT_NULL": "contacts_tags_not_null"
+    },
+    "rules": {
+      "contacts_email_unique": "CONTACT_EMAIL_TAKEN",
+      "contacts_name_check": "CONTACTS_NAME_CHECK",
+      "contacts_nickname_check": "CONTACTS_NICKNAME_CHECK",
+      "contacts_organization_id_fkey": "CONTACTS_ORGANIZATION_ID_FKEY",
+      "contacts_priority_check": "CONTACTS_PRIORITY_CHECK",
+      "contacts_status_check": "CONTACTS_STATUS_CHECK",
+      "contacts_website_check": "CONTACTS_WEBSITE_CHECK",
+      "contacts_kind_not_null": "CONTACTS_KIND_NOT_NULL",
+      "contacts_name_not_null": "CONTACT_NAME_REQUIRED",
+      "contacts_status_not_null": "CONTACTS_STATUS_NOT_NULL",
+      "contacts_tags_not_null": "CONTACTS_TAGS_NOT_NULL"
+    }
+  },
+  "meetings": {
+    "type": "meetings",
+    "table": "meetings",
+    "id": "id",
+    "fields": {
+      "room": "room",
+      "during": "during",
+      "notes": "notes"
+    },
+    "relationships": {
+      "organization": "organization_id",
+      "contact": "contact_id"
+    },
+    "columns": {
+      "room": "room",
+      "during": "during",
+      "notes": "notes",
+      "organization_id": "organization",
+      "contact_id": "contact"
+    },
+    "codes": {
+      "MEETINGS_CONTACT_ID_FKEY": "meetings_contact_id_fkey",
+      "MEETING_NEEDS_CONTACT_OR_NOTES": "meetings_contact_or_notes",
+      "MEETING_ROOM_DOUBLE_BOOKED": "meetings_no_double_booking",
+      "MEETINGS_ORGANIZATION_ID_FKEY": "meetings_organization_id_fkey",
+      "MEETINGS_PKEY": "meetings_pkey",
+      "MEETING_ROOM_NOT_LOWERCASE": "meetings_room_lowercase",
+      "MEETINGS_ROOM_NOT_NULL": "meetings_room_not_null",
+      "MEETINGS_DURING_NOT_NULL": "meetings_during_not_null"
+    },
+    "rules": {
+      "meetings_contact_id_fkey": "MEETINGS_CONTACT_ID_FKEY",
+      "meetings_contact_or_notes": "MEETING_NEEDS_CONTACT_OR_NOTES",
+      "meetings_no_double_booking": "MEETING_ROOM_DOUBLE_BOOKED",
+      "meetings_organization_id_fkey": "MEETINGS_ORGANIZATION_ID_FKEY",
+      "meetings_pkey": "MEETINGS_PKEY",
+      "meetings_room_lowercase": "MEETING_ROOM_NOT_LOWERCASE",
+      "meetings_room_not_null": "MEETINGS_ROOM_NOT_NULL",
+      "meetings_during_not_null": "MEETINGS_DURING_NOT_NULL"
+    }
+  },
+  "notes": {
+    "type": "notes",
+    "table": "notes",
+    "id": "id",
+    "fields": {
+      "kind": "type",
+      "contactName": "contact",
+      "body": "body",
+      "priorität": "priorität",
+      "createdAt": "created_at"
+    },
+    "relationships": {
+      "organization": "organization_id",
+      "author": "author",
+      "contact": "contact_id"
+    },
+    "columns": {
+      "type": "kind",
+      "contact": "contactName",
+      "body": "body",
+      "priorität": "priorität",
+      "created_at": "createdAt",
+      "organization_id": "organization",
+      "author": "author",
+      "contact_id": "contact"
+    },
+    "codes": {
+      "NOTES_AUTHOR_FKEY": "notes_author_fkey",
+      "NOTES_BODY_CHECK": "notes_body_check",
+      "NOTES_CONTACT_ID_FKEY": "notes_contact_id_fkey",
+      "NOTES_ORGANIZATION_ID_FKEY": "notes_organization_id_fkey",
+      "NOTE_PRIORITY_OUT_OF_RANGE": "notes_priorität_check",
+      "NOTES_TYPE_CHECK": "notes_type_check",
+      "NOTES_TYPE_NOT_NULL": "notes_type_not_null",
+      "NOTES_BODY_NOT_NULL": "notes_body_not_null"
+    },
+    "rules": {
+      "notes_author_fkey": "NOTES_AUTHOR_FKEY",
+      "notes_body_check": "NOTES_BODY_CHECK",
+      "notes_contact_id_fkey": "NOTES_CONTACT_ID_FKEY",
+      "notes_organization_id_fkey": "NOTES_ORGANIZATION_ID_FKEY",
+      "notes_priorität_check": "NOTE_PRIORITY_OUT_OF_RANGE",
+      "notes_type_check": "NOTES_TYPE_CHECK",
+      "notes_type_not_null": "NOTES_TYPE_NOT_NULL",
+      "notes_body_not_null": "NOTES_BODY_NOT_NULL"
+    }
+  }
+}

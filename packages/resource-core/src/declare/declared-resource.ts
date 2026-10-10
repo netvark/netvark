@@ -4,6 +4,7 @@
  * is never taken for a declaration where a registry is assembled.
  * @packageDocumentation
  */
+import type { ResourceNames } from '../names/types';
 import type { DeclareContext } from './registries';
 import type { Declaration } from './types';
 
@@ -17,6 +18,8 @@ export interface DeclaredResource<
   readonly table: TTable;
   /** The declaration as given, frozen. */
   readonly declaration: TDecl;
+  /** The public names and both directions of each mapping (SPEC 4.3). */
+  readonly names: ResourceNames;
   /**
    * Type-only: the definer's catalog and registries, for type helpers such as
    * `Infer`. Always absent at runtime.

@@ -2,15 +2,27 @@
  * Kysely's CamelCasePlugin conversions, ported line by line from its
  * mappers (identical in Kysely 0.28 and 0.29): the plugin renames result
  * keys from snake_case to camelCase and turns every identifier of a query
- * back into snake_case. A camelCase key therefore reaches its table or
- * column only when that round trip gives the database name back.
+ * back into snake_case. `@netvark/pg-catalog` names its `camelCase` Kysely
+ * types with them, and `@netvark/resource-core` derives public field names
+ * with `toCamelCase` under the default options, so both read one
+ * implementation. Characters are read as UTF-16 code units, as the plugin
+ * reads them. `@netvark/pg-catalog` holds the test that runs these against
+ * the plugin itself, since a core imports no query builder.
  * @ref https://github.com/kysely-org/kysely/blob/v0.28.17/src/plugin/camel-case/camel-case.ts
  * @ref https://kysely.dev/docs/plugins#camel-case-plugin
  * @packageDocumentation
  */
-import type { CamelCaseOptions } from '../config';
 
-import { PgCatalogError } from '../errors';
+/**
+ * The options of Kysely's `CamelCasePlugin` that change names; give the
+ * ones the application gives the plugin.
+ * @ref https://kysely-org.github.io/kysely-apidoc/interfaces/CamelCasePluginOptions.html
+ */
+export interface CamelCaseOptions {
+  readonly upperCase?: boolean;
+  readonly underscoreBeforeDigits?: boolean;
+  readonly underscoreBetweenUppercaseLetters?: boolean;
+}
 
 const UNDERSCORE = '_';
 
@@ -71,7 +83,11 @@ function isUpperSnakeCase(text: string): boolean {
   return true;
 }
 
-/** CamelCasePlugin's `camelCase`: what a result key becomes. */
+/**
+ * CamelCasePlugin's `camelCase`: what a result key becomes. Under the
+ * default options the first character is kept, every `_` is dropped, and
+ * the character after a `_` is upper-cased: `created_at` is `createdAt`.
+ */
 export function toCamelCase(
   text: string,
   options: CamelCaseOptions = {},
@@ -94,49 +110,4 @@ export function toCamelCase(
     }
   }
   return out;
-}
-
-/**
- * The keys of the Kysely types: database names as they are, or with
- * `camelCase` the names CamelCasePlugin gives them. A name the plugin would
- * not turn back into itself is collected, and `assertMapped` reports every
- * one in a single `camel_case_mismatch`.
- */
-export class KeyNames {
-  private readonly options: CamelCaseOptions | null;
-  private readonly mismatches: Array<string> = [];
-
-  public constructor(camelCase: boolean | CamelCaseOptions | undefined) {
-    this.options =
-      camelCase === undefined || camelCase === false
-        ? null
-        : camelCase === true
-          ? {}
-          : camelCase;
-  }
-
-  /** The key of a table or column; `owner` describes it in the error. */
-  public key(name: string, owner: string): string {
-    if (this.options === null) {
-      return name;
-    }
-    const key = toCamelCase(name, this.options);
-    const back = toSnakeCase(key, this.options);
-    if (back !== name) {
-      this.mismatches.push(
-        `${owner} becomes ${key} in camelCase, which CamelCasePlugin turns back into ${back}`,
-      );
-    }
-    return key;
-  }
-
-  /** Throws one `camel_case_mismatch` listing every name that failed, in the order seen. */
-  public assertMapped(): void {
-    if (this.mismatches.length > 0) {
-      throw new PgCatalogError(
-        'camel_case_mismatch',
-        this.mismatches.join('; '),
-      );
-    }
-  }
 }

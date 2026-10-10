@@ -12,6 +12,7 @@ import type {
   RuleKey,
   UntranslatedCheck,
 } from '../catalog/types';
+import type { WrittenColumn } from './members';
 import type { DeclareContext } from './registries';
 import type { KnownMembers, Requirement, RequireWhen } from './requirement';
 import type {
@@ -21,28 +22,7 @@ import type {
   RuleDeclaration,
 } from './types';
 
-type Fields<TDecl extends Declaration> = TDecl['fields'];
-type Relationships<TDecl extends Declaration> = DeclaredMembers<
-  TDecl,
-  'relationships'
->;
 type Rules<TDecl extends Declaration> = DeclaredMembers<TDecl, 'rules'>;
-
-/** Members with an access other than `read`: what the declared operations write. */
-type WrittenColumn<TDecl extends Declaration> =
-  | {
-      [K in keyof Fields<TDecl>]: Fields<TDecl>[K]['access'] extends 'read'
-        ? never
-        : K;
-    }[keyof Fields<TDecl>]
-  | {
-      [K in keyof Relationships<TDecl>]: MemberOf<
-        Relationships<TDecl>[K],
-        'access'
-      > extends 'read'
-        ? never
-        : K;
-    }[keyof Relationships<TDecl>];
 
 type ValidatorName<TContext extends DeclareContext> =
   keyof TContext['validators'] & string;

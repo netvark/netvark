@@ -2,7 +2,9 @@
  * `@netvark/catalog-core`: the PostgreSQL catalog model as TypeScript types
  * and the pure functions over it. `@netvark/pg-catalog` writes catalogs of
  * this shape from your migrations; `toPublicCatalog` slices one for
- * browsers, and `diffCatalogs` compares two. See `docs/catalog/SPEC.md` for the contract.
+ * browsers, `diffCatalogs` compares two, and `toCamelCase` and `toSnakeCase`
+ * name keys as Kysely's CamelCasePlugin does. See `docs/catalog/SPEC.md` for
+ * the contract.
  * @packageDocumentation
  */
 export type {
@@ -28,6 +30,8 @@ export type {
   UniqueConstraint,
 } from './model';
 export { CATALOG_FORMAT } from './model';
+export type { CamelCaseOptions } from './camel-case';
+export { toCamelCase, toSnakeCase } from './camel-case';
 export type { CatalogChange, CatalogDiff } from './diff';
 export { diffCatalogs } from './diff';
 export type { JsonValue } from './internal/json';

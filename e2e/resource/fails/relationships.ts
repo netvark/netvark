@@ -23,7 +23,7 @@ declareResource('import_rows', {
   fields: { payload: { access: 'read' } },
   relationships: {
     // error: type jsonb cannot carry a resource id
-    batch: { target: () => Organizations, access: 'read' },
+    batch: { target: () => Organizations, access: 'read', as: 'batch' },
   },
 });
 

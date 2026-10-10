@@ -11,6 +11,7 @@ import type { Declaration } from './types';
 
 import { notNullKey } from '../catalog/columns';
 import { ownValue } from '../internal/object';
+import { writtenColumns } from './members';
 
 function ruleKeys(tableDef: PublicTable): ReadonlySet<string> {
   const keys = new Set(Object.keys(tableDef.constraints));
@@ -20,19 +21,6 @@ function ruleKeys(tableDef: PublicTable): ReadonlySet<string> {
     }
   }
   return keys;
-}
-
-/** Columns the declared operations write: members whose access is not `read`. */
-function writtenColumns(declaration: Declaration): ReadonlySet<string> {
-  const members = [
-    ...Object.entries(declaration.fields),
-    ...Object.entries(declaration.relationships ?? {}),
-  ];
-  return new Set(
-    members
-      .filter(([, member]) => member.access !== 'read')
-      .map(([column]) => column),
-  );
 }
 
 function checkValidator(

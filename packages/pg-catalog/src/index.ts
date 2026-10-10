@@ -11,7 +11,6 @@
  */
 export * from '@netvark/catalog-core';
 export type {
-  CamelCaseOptions,
   DatabaseConfig,
   DriftEnvironment,
   ExtractionConfig,
