@@ -1,0 +1,45 @@
+# ADR 0004: Protect main with one aggregate check
+
+- Status: accepted
+- Date: 2026-10-10
+
+## Context
+
+Every change reaches `main` through a squash-merged pull request, and in a repository with one
+maintainer CI is the reviewer that never skips a step. The CI workflow is a job matrix whose names
+change whenever a family, a Node.js version, or a PostgreSQL version is added. Requiring the jobs by
+name would need a ruleset change with every matrix change, and a job left off the list would stop
+being required without anyone noticing.
+
+GitHub reports a job skipped by its own `if` condition as successful, and a job skipped because a
+job it needs failed may not block a merge; required checks that depend on other jobs should use
+`always()` with `needs`
+([troubleshooting required status checks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/troubleshooting-required-status-checks)).
+`needs.<job_id>.result` is one of `success`, `failure`, `cancelled`, or `skipped`
+([contexts reference](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#needs-context)).
+
+The release workflow opens the "Version Packages" pull request with the repository `GITHUB_TOKEN`.
+The workflow runs for that pull request are created in the `action_required` state and wait for a
+maintainer to approve them in the Actions tab.
+
+## Decision
+
+- The `protect main` ruleset requires a pull request, allows only squash merges, requires linear
+  history, and requires one status check, `CI passed`, with the strict policy: a branch must be up
+  to date with `main` before it merges. It keeps blocking deletion and force pushes.
+- `CI passed` is the last job of `.github/workflows/ci.yml`. It needs every other job, runs with
+  `if: always()`, and fails when any of them failed or was cancelled. A change that adds a CI job
+  adds it to that `needs` list.
+- Organization admins can bypass the ruleset only through a pull request, for release housekeeping.
+  Nobody pushes to `main` directly.
+- To release, approve the held runs of the "Version Packages" pull request, wait for `CI passed`,
+  then merge it.
+
+## Consequences
+
+- A new matrix entry needs no ruleset change. A new job needs its `needs` entry; without it the job
+  is advisory only, which the review of the workflow diff has to catch.
+- Under the strict policy, a pull request that was opened before another one merged needs
+  `gh pr update-branch <number>` and a fresh CI run before it can merge.
+- A GitHub App installation token for the changesets action would let the "Version Packages" pull
+  request run CI without approval. Revisit when releases become frequent.

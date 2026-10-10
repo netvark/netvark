@@ -63,4 +63,6 @@ A pnpm workspace of three families:
 - `docs/adr/`: decisions about the repository.
 - Root configs apply to every package: `vitest.config.ts` (projects and coverage),
   `tsconfig.base.json`, `knip.jsonc`, `.oxlintrc.json`, `.oxfmtrc.json`, `pnpm-workspace.yaml` (pnpm
-  settings), `.changeset/`, and `.github/workflows/` (CI, CodeQL, release).
+  settings), `.changeset/`, and `.github/workflows/` (CI, CodeQL, release). The last CI job,
+  `CI passed`, is the only check `main` requires; a new CI job goes into its `needs` list
+  (`docs/adr/0004-protect-main-with-one-aggregate-check.md`).
