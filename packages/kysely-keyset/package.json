@@ -57,7 +57,7 @@
     "@netvark/keyset-core": "workspace:^"
   },
   "devDependencies": {
-    "kysely": "0.29.6"
+    "kysely": "catalog:"
   },
   "peerDependencies": {
     "kysely": ">=0.28.0"

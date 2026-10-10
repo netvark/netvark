@@ -35,6 +35,9 @@ and e2e directory imports; read the family's file before changing that family.
   goes into structured fields, never into `message`.
 - No `process.env` at module scope, no Node-only APIs in `src/` (web standards only), no enums or
   parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis.
+- A dependency that two or more workspace packages declare takes its version from the default
+  catalog in `pnpm-workspace.yaml` (`"zod": "catalog:"`); peer ranges stay in each package
+  (`docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md`).
 - Commit subjects use conventional commits with the package or family as the scope. Every
   user-visible change needs a changeset in `.changeset/` (`pnpm changeset`) naming the package or
   packages it changes.
