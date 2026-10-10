@@ -35,8 +35,11 @@ import type { DB } from './db'; // your Kysely database interface
 
 import { createDefineKeyset } from '@netvark/kysely-keyset';
 
-// keysets/define.ts: one definer for the whole application.
-export const defineKeyset = createDefineKeyset<DB>();
+// keysets/define.ts: one definer for the whole application, holding what every keyset shares.
+export const defineKeyset = createDefineKeyset<DB>({
+  cursor: { secret: env.CURSOR_SECRET }, // at least 32 bytes; see Best practices
+  page: { default: 20, max: 100 },
+});
 
 export const contacts = defineKeyset({
   table: 'contacts',
@@ -58,8 +61,6 @@ export const contacts = defineKeyset({
   },
   search: { columns: ['name', 'bio'] },
   sort: { default: ['-createdAt'] },
-  page: { default: 20, max: 100 },
-  cursor: { secret: env.CURSOR_SECRET }, // at least 32 bytes; see Best practices
 });
 ```
 
@@ -145,6 +146,9 @@ Both quick starts answer with the same `Page`, and the cursors they issue are in
   the aggregates, the search, the key, the default sort, the page bounds, and the cursor secret.
   Planning, cursors, and SQL all read from it; a mistake in it is a `TypeError` at startup. With
   `createDefineKeyset<DB>()`, every table and column name is checked against your Kysely interface.
+- **Shared options in one place.** `createDefineKeyset(defaults)` holds the cursor secret, the page
+  bounds, and the search configuration your keysets share, merged under every definition option by
+  option, so a secret rotation is one edit.
 - **Keyset pagination that survives the hard cases.** Equal sort values, `NULL`s in sort columns,
   backward pages, microsecond timestamps, and sorts over aggregates of related rows all walk forward
   and backward without skipping or repeating a row. The end-to-end suite proves it on PGlite,
@@ -161,9 +165,9 @@ Both quick starts answer with the same `Page`, and the cursors they issue are in
 The package READMEs walk through each area:
 [`@netvark/keyset-core`](../../packages/keyset-core/README.md) for the definition, the request, the
 plan, the page, the cursors, and the errors;
-[`@netvark/kysely-keyset`](../../packages/kysely-keyset/README.md) for the typed definer,
-`paginate`, the SQL it renders, and the best practices for secrets, indexes, totals, and
-`CamelCasePlugin`.
+[`@netvark/kysely-keyset`](../../packages/kysely-keyset/README.md) for the typed definer and its
+shared defaults, `paginate`, the SQL it renders, and the best practices for secrets, indexes,
+totals, and `CamelCasePlugin`.
 
 ## Documentation
 

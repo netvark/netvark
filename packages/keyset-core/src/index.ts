@@ -1,6 +1,7 @@
 /**
  * `@netvark/keyset-core`: keyset pagination for any JavaScript runtime, database-free.
- * `defineKeyset` validates a definition; `plan` turns a request into a
+ * `defineKeyset` validates a definition (`createDefineKeyset` configures one
+ * with an application's shared defaults); `plan` turns a request into a
  * query plan an adapter renders; `page` assembles the result with signed
  * cursors. See `docs/keyset/SPEC.md` for the contract.
  * @packageDocumentation
@@ -51,6 +52,12 @@ export type {
   NoRelations,
 } from './definition/define-keyset';
 export type {
+  DefaultedKeysetInit,
+  DefineDefaultedKeyset,
+  DefineKeyset,
+  KeysetDefaults,
+} from './definition/create-define-keyset';
+export type {
   Filter,
   FilterCondition,
   RelationFieldMap,
@@ -79,6 +86,7 @@ export type {
 } from './plan/types';
 export type { InvalidCursorReason, KeysetErrorCode } from './errors';
 
+export { createDefineKeyset } from './definition/create-define-keyset';
 export {
   defineKeyset,
   DEFAULT_MAX_PAGE_SIZE,

@@ -33,8 +33,11 @@ import type { DB } from './db'; // your Kysely database interface
 
 import { createDefineKeyset } from '@netvark/kysely-keyset';
 
-// keysets/define.ts: one definer for the whole application.
-export const defineKeyset = createDefineKeyset<DB>();
+// keysets/define.ts: one definer for the whole application, holding what every keyset shares.
+export const defineKeyset = createDefineKeyset<DB>({
+  cursor: { secret: env.CURSOR_SECRET }, // at least 32 bytes; see Best practices
+  page: { default: 20, max: 100 },
+});
 
 export const contacts = defineKeyset({
   table: 'contacts',
@@ -56,8 +59,6 @@ export const contacts = defineKeyset({
   },
   search: { columns: ['name', 'bio'] },
   sort: { default: ['-createdAt'] },
-  page: { default: 20, max: 100 },
-  cursor: { secret: env.CURSOR_SECRET }, // at least 32 bytes; see Best practices
 });
 ```
 
@@ -91,12 +92,12 @@ issued under another sort is rejected before any query runs, with a typed error 
 
 ### Define keysets against `DB`
 
-`createDefineKeyset<DB>()` returns the core's `defineKeyset` with the names checked at compile time:
-`table` must be a table of `DB`, every `column` a column of it, every relation's `table` a table of
-`DB` with `on` pairing its columns to the main table's, every aggregate `column` a column of the
-relation's table, and the search `columns` or `vector` columns of the main table. Call it once and
-define every keyset with the result. The runtime is the core's, unchanged: the same validation, the
-same `TypeError` naming the option at startup, the same definition.
+`createDefineKeyset<DB>(defaults?)` returns the core's `defineKeyset` with the names checked at
+compile time: `table` must be a table of `DB`, every `column` a column of it, every relation's
+`table` a table of `DB` with `on` pairing its columns to the main table's, every aggregate `column`
+a column of the relation's table, and the search `columns` or `vector` columns of the main table.
+Call it once and define every keyset with the result. The runtime is the core's, unchanged: the same
+validation, the same `TypeError` naming the option at startup, the same definition.
 
 Column names are the interface's. Under a `CamelCasePlugin` the interface says `createdAt`, so the
 definition says `column: 'createdAt'`, and the plugin maps the `"contacts"."created_at"` reference
@@ -105,6 +106,43 @@ the adapter emits exactly as it maps your own. The adapter's private aliases (`k
 
 The core README covers what a definition can hold: field types and their operators, aggregates,
 relations, search modes, the key, page bounds, and cursor options.
+
+### Shared defaults
+
+What most keysets of an application share goes into the definer once: the cursor options, the page
+bounds, and the text-search configuration. Every definition the definer creates inherits them and
+overrides them option by option.
+
+```ts
+export const defineKeyset = createDefineKeyset<DB>({
+  cursor: { secret: env.CURSOR_SECRET, previousSecrets: [env.OLD_CURSOR_SECRET] },
+  page: { default: 20, max: 100 },
+  search: { config: 'english' },
+});
+
+export const auditEvents = defineKeyset({
+  table: 'audit_events',
+  key: ['id'],
+  fields: {
+    id: { column: 'id', type: 'uuid' },
+    at: { column: 'at', type: 'timestamptz' },
+  },
+  sort: { default: ['-at'] },
+  page: { max: 500 }, // page.default stays 20
+  cursor: { ttl: 3600 }, // the shared secrets stay
+});
+```
+
+- **`cursor` and `page` merge option by option.** A definition's `cursor: { ttl: 3600 }` keeps the
+  shared secret; an option set to `undefined` removes the default (`cursor: { ttl: undefined }`).
+- **`search.config` fills a full-text search that names none.** A `like` search has no
+  configuration, and a definition without `search` stays without one.
+- **The defaults are checked when `createDefineKeyset` runs**, with the rules and messages a
+  definition gets. A definition that ends up without a secret throws
+  `cursor.secret must be set by the definition or the defaults`; a default `page.default` above a
+  definition's own `page.max` throws when that definition is created.
+- **Types follow.** With a `cursor` default, `cursor` is optional in a definition; without one it
+  stays required. Every name check against `DB` is unchanged.
 
 ### Paginate
 
@@ -280,14 +318,16 @@ Keep both definitions' page bounds equal, since each applies its own default and
 
 ### Best practices
 
-- **One definer, one module.** Export `createDefineKeyset<DB>()` once and define every keyset with
-  it; a keyset defined with the core's untyped `defineKeyset` by mistake loses the name checks.
+- **One definer, one module.** Export `createDefineKeyset<DB>(defaults)` once, with the cursor
+  secret and whatever page bounds and search configuration your keysets share, and define every
+  keyset with it. A rotation or a new page bound is then one edit, and no keyset is left behind. A
+  keyset defined with the core's untyped `defineKeyset` by mistake loses the name checks.
 - **The secret is 32 random bytes from your secret manager**, never typed, never reused for another
-  signing purpose, one per environment. Rotate with `previousSecrets`: add the current secret there,
-  set the new one, deploy, and drop the old one after your longest cursor lifetime. Set `ttl` when
-  cursors leave your control (emailed links, saved searches). A cursor is signed, not encrypted:
-  anyone holding it can read the sort-key values of the row it points at, so do not offer a sort
-  over a column the client must not learn.
+  signing purpose, one per environment. Rotate with `previousSecrets` in the definer's defaults, so
+  every keyset rotates together: add the current secret there, set the new one, deploy, and drop the
+  old one after your longest cursor lifetime. Set `ttl` when cursors leave your control (emailed
+  links, saved searches). A cursor is signed, not encrypted: anyone holding it can read the sort-key
+  values of the row it points at, so do not offer a sort over a column the client must not learn.
 - **Index for the sorts you offer.** A keyset query is a range scan over the sort columns followed
   by the key: `create index on contacts (created_at, id)` serves `-createdAt` in both directions. An
   insensitive field sorts and compares through `lower()`, so index the expression:

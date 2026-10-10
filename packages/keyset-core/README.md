@@ -128,6 +128,36 @@ const contacts = defineKeyset({
 The literal types flow into the result: `sort` accepts only sortable field names, `filter` only
 declared fields and `relation.field` paths, and `{ relation, some }` only the relation's fields.
 
+### Shared defaults
+
+`createDefineKeyset(defaults)` returns a `defineKeyset` that merges what most keysets of an
+application share under every definition: the cursor options, the page bounds, and the text-search
+configuration.
+
+```ts
+import { createDefineKeyset } from '@netvark/keyset-core';
+
+export const defineKeyset = createDefineKeyset({
+  cursor: { secret: env.CURSOR_SECRET },
+  page: { default: 20, max: 100 },
+  search: { config: 'english' },
+});
+
+const contacts = defineKeyset({
+  table: 'contacts',
+  key: ['id'],
+  fields: { id: { column: 'id', type: 'uuid' }, name: { column: 'name', type: 'text' } },
+  search: { columns: ['name'] }, // to_tsvector('english', ...)
+  cursor: { ttl: 86_400 }, // keeps the shared secret
+});
+```
+
+`cursor` and `page` merge option by option, and an option the definition sets, even to `undefined`,
+wins. `search.config` fills only a full-text search that names none. The defaults are validated when
+`createDefineKeyset` runs; the merged definition is validated as if it had spelled them out, and it
+must end up with a secret. With a `cursor` default, `cursor` is optional in the definition's type.
+Each definer keeps its own defaults; nothing is global.
+
 ### The request
 
 ```ts
@@ -259,9 +289,9 @@ Best practices:
   a session rarely needs one.
 - **A cursor is signed, not encrypted.** Anyone holding it can read the sort-key values of the row
   it points at. Do not offer a sort over a column the client must not learn.
-- **Share one secret across the keysets of one API** so a cursor from one endpoint is never accepted
-  by another by accident: the context already binds it to its sort, filter, and search, and the
-  secret binds it to your service.
+- **Share one secret across the keysets of one API**, through the definer's defaults (see Shared
+  defaults), so a cursor from one endpoint is never accepted by another by accident: the context
+  already binds it to its sort, filter, and search, and the secret binds it to your service.
 
 `createCursorCodec(options)` is exported for callers who want to inspect or issue cursors outside a
 keyset; `decode(cursor, context, length)` never throws and reports why a cursor was rejected

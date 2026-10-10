@@ -53,7 +53,9 @@ interface DB {
   };
 }
 
-const defineKeyset = createDefineKeyset<DB>();
+const defineKeyset = createDefineKeyset<DB>({
+  cursor: { secret: 'smoke-secret-with-at-least-32-bytes!!' },
+});
 const contacts = defineKeyset({
   table: 'contacts',
   key: ['id'],
@@ -64,7 +66,6 @@ const contacts = defineKeyset({
     age: { column: 'age', type: 'integer', nullable: true },
   },
   search: { columns: ['name'] },
-  cursor: { secret: 'smoke-secret-with-at-least-32-bytes!!' },
 });
 
 const db = new Kysely<DB>({

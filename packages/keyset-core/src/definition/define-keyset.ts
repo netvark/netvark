@@ -33,7 +33,7 @@ import { normalizeRelations } from './normalize-relations';
 export const DEFAULT_PAGE_SIZE = 20;
 export const DEFAULT_MAX_PAGE_SIZE = 100;
 /** `regconfig` names a definition may use as text search configurations. */
-const SEARCH_CONFIG = /^[a-z_][a-z0-9_]{0,62}$/u;
+export const SEARCH_CONFIG: RegExp = /^[a-z_][a-z0-9_]{0,62}$/u;
 
 /** The relations type of a definition without relations. */
 // oxlint-disable-next-line typescript/no-generated-empty-object-type -- reason: the default must have no relation names at all, so no relation field path exists; a `Record<string, never>` would admit every string
@@ -110,7 +110,8 @@ function normalizeSearch(init: unknown): SearchSpec | null {
   return { mode, source, config };
 }
 
-function positiveInteger(
+/** `value` when it is a positive integer, `fallback` when it is absent. */
+export function positiveInteger(
   what: string,
   value: unknown,
   fallback: number,

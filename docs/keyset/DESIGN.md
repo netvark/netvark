@@ -60,7 +60,7 @@ It is a library for teams who paginate large tables and want the hard cases hand
 2. **Spec-driven.** The profile fixes the page semantics; PostgreSQL's documentation fixes ordering,
    pattern matching, arrays, and text search; RFCs fix HMAC, base64url, and canonical JSON. Each
    behavior is a cited clause, and the test names the rule. Where a choice is the library's, it is
-   an ADR (ADR-0005 to ADR-0009, ADR-0012, ADR-0013).
+   an ADR (ADR-0005 to ADR-0009, ADR-0012 to ADR-0014).
 3. **Every identifier from the definition, every value a parameter.** No request data reaches SQL
    except as a bound parameter. The one literal, the text search configuration, is validated against
    `regconfig`'s name syntax at definition time.
@@ -90,7 +90,7 @@ the same flow without Kysely.
 ### 3.1 Minimal
 
 ```ts
-export const defineKeyset = createDefineKeyset<DB>();
+export const defineKeyset = createDefineKeyset<DB>({ cursor: { secret: env.CURSOR_SECRET } });
 
 export const contacts = defineKeyset({
   table: 'contacts',
@@ -100,7 +100,6 @@ export const contacts = defineKeyset({
     name: { column: 'name', type: 'text' },
     createdAt: { column: 'created_at', type: 'timestamptz' },
   },
-  cursor: { secret: env.CURSOR_SECRET },
 });
 
 const page = await contacts.paginate(db.selectFrom('contacts').selectAll(), {
@@ -109,7 +108,8 @@ const page = await contacts.paginate(db.selectFrom('contacts').selectAll(), {
 });
 ```
 
-One definition, one call. `page.rows` is the selection as Kysely typed it; `page.next` and
+One definer per application holds what its keysets share, here the cursor secret; one definition per
+collection; one call per page. `page.rows` is the selection as Kysely typed it; `page.next` and
 `page.prev` are the cursors for the neighbouring pages or `null`; `page.cursor(row)` is the cursor
 that falls on a row.
 
@@ -155,6 +155,12 @@ and filter like any other field. Relations declare their own fields, reachable a
 a condition or inside `{ relation: 'emails', some: ... }`. The literal types flow into the result:
 `sort` accepts only sortable field names, `filter` only declared fields and relation paths, and with
 `createDefineKeyset<DB>()` every table and column name is checked against the Kysely interface.
+
+What most keysets share belongs in the definer rather than in each definition:
+`createDefineKeyset<DB>({ cursor, page, search: { config } })` merges those options under every
+definition it creates, option by option, so `cursor: { ttl: 3600 }` in one definition keeps the
+shared secret, and a full-text search that names no configuration takes the shared one (ADR-0014,
+SPEC 3.6). The merged definition is validated as if it had spelled the defaults out.
 
 ### 3.3 The request
 
@@ -298,9 +304,10 @@ identical cursors across sessions fixes the zone on its connections.
 Two type parameters ride on `Keyset`: the fields and the relations, as declared (`const` type
 parameters keep the literals). From them derive the request type (`KeysetRequestOf`): sortable field
 names, filterable field names and relation paths, and the relation filters. The adapter adds the
-database: `createDefineKeyset<DB>()` returns a definer whose `TypedKeysetInit` checks `table`, every
-`column`, every relation `table` and `on` pair, aggregate columns, and search columns against `DB`;
-`paginate` is generic over the caller's query, so `Page<TRow>` is the selection's row type.
+database: `createDefineKeyset<DB>(defaults?)` returns a definer whose `TypedKeysetInit` checks
+`table`, every `column`, every relation `table` and `on` pair, aggregate columns, and search columns
+against `DB`, and makes `cursor` optional when the defaults carry one; `paginate` is generic over
+the caller's query, so `Page<TRow>` is the selection's row type.
 
 ## 5. Decisions
 
@@ -319,3 +326,4 @@ database: `createDefineKeyset<DB>()` returns a definer whose `TypedKeysetInit` c
 | 0011 | Definitions are validated at definition time, never at request time                                         |
 | 0012 | Totals are an opt-in second query; the base query must be a plain selection                                 |
 | 0013 | Page size bounds, defaults, and range requests                                                              |
+| 0014 | Definer defaults are merged member by member                                                                |
