@@ -18,7 +18,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { drift, formatDiff } from '@netvark/pg-catalog';
 
-import { contactsConfig, EXPECTED_CATALOG } from './support/contacts';
+import {
+  contactsConfig,
+  EXPECTED_CATALOG,
+  HOTFIX,
+  HOTFIX_REPORT,
+} from './support/contacts';
 import {
   liveDatabases,
   onServer,
@@ -27,11 +32,6 @@ import {
 
 const SERVER = process.env['CATALOG_PG_URL'];
 const SECRET_BYTES = 12;
-
-const HOTFIX = `alter table contacts add column fax text;
-drop policy meetings_tenant_isolation on meetings;
-alter table organizations drop constraint organizations_seats_check,
-  add constraint organizations_seats_check check (seats >= 0);`;
 
 /** The contacts configuration with the committed catalog and one drift environment. */
 function driftConfig(url: () => string): ExtractionConfig {
@@ -72,23 +72,7 @@ for (const [name, open] of liveDatabases()) {
         driftConfig(() => live.url),
         'production',
       );
-      expect(formatDiff(report.diff)).toBe(
-        [
-          '3 objects differ: 1 added, 1 removed, 1 changed',
-          '',
-          'Columns',
-          '  + contacts.fax',
-          '',
-          'Constraints',
-          '  ~ organizations.organizations_seats_check',
-          '      expression: expected "(seats > 0)", actual "(seats >= 0)"',
-          '      rule.min.inclusive: expected false, actual true',
-          '      definition: expected "CHECK ((seats > 0))", actual "CHECK ((seats >= 0))"',
-          '',
-          'Policies',
-          '  - meetings.meetings_tenant_isolation',
-        ].join('\n'),
-      );
+      expect(formatDiff(report.diff)).toBe(HOTFIX_REPORT);
     });
   });
 }

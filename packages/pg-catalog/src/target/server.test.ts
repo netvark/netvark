@@ -53,13 +53,26 @@ describe('openLiveDatabase (SPEC 10.2)', () => {
     });
   });
 
-  it('fails with connection_failed when nothing listens at the URL', async () => {
+  it('fails with connection_failed, saying why and never echoing the password, when nothing listens at the URL', async () => {
     await expect(
       openLiveDatabase('postgres://app:secret@127.0.0.1:1/app'),
     ).rejects.toMatchObject({
       code: 'connection_failed',
-      message: 'cannot connect to the PostgreSQL server',
+      message:
+        'cannot connect to the PostgreSQL server: connect ECONNREFUSED 127.0.0.1:1',
     });
+  });
+
+  it('names every refused address when a host name resolves to several', async () => {
+    const error: unknown = await openLiveDatabase(
+      'postgres://app:secret@localhost:1/app',
+    ).catch((reason: unknown) => reason);
+    expect(error).toMatchObject({ code: 'connection_failed' });
+    const { message } = error as Error;
+    expect(message).toMatch(
+      /^cannot connect to the PostgreSQL server: connect ECONNREFUSED (?:::1|127\.0\.0\.1):1/u,
+    );
+    expect(message).not.toContain('secret');
   });
 });
 
@@ -114,11 +127,13 @@ describe.skipIf(SERVER === undefined)(
       expect(await databases()).not.toContain(created);
     });
 
-    it('fails with connection_failed when the server refuses the connection', async () => {
+    it('fails with connection_failed, giving the server’s reason, when the server refuses the connection', async () => {
       await expect(
         openThrowawayDatabase(withDatabase(url, 'netvark_no_such_database')),
       ).rejects.toMatchObject({
         code: 'connection_failed',
+        message:
+          'cannot connect to the PostgreSQL server: database "netvark_no_such_database" does not exist',
       });
     });
   },

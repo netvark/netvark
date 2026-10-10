@@ -23,33 +23,31 @@ your application bundle.
 ## Quick start
 
 ```ts
-// scripts/catalog.ts: `node scripts/catalog.ts`, or `node scripts/catalog.ts --check` in CI
-import { extract } from '@netvark/pg-catalog';
+// netvark.config.ts
+import { defineExtraction } from '@netvark/pg-catalog';
 
-const report = await extract(
-  {
-    migrations: 'db/migrations',
-    database: { pglite: { extensions: ['pg_trgm', 'citext'] } },
-    schemas: ['public', 'audit'],
-    out: {
-      catalog: 'src/generated/catalog.ts',
-      public: { file: 'src/generated/public-catalog.ts', tables: ['contacts', 'organizations'] },
-      types: 'src/generated/db.ts',
-    },
+export default defineExtraction({
+  migrations: 'db/migrations',
+  database: { pglite: { extensions: ['pg_trgm', 'citext'] } },
+  schemas: ['public', 'audit'],
+  out: {
+    catalog: 'src/generated/catalog.ts',
+    public: { file: 'src/generated/public-catalog.ts', tables: ['contacts', 'organizations'] },
+    types: 'src/generated/db.ts',
   },
-  { check: process.argv.includes('--check') },
-);
-
-for (const file of report.files) {
-  console.log(`${file.status.padEnd(9)} ${file.path}`);
-}
-if (report.files.some((file) => file.status === 'stale' || file.status === 'missing')) {
-  process.exitCode = 1;
-}
+});
 ```
 
-Node 22.18 and later run TypeScript files directly; Bun and Deno always do. Relative paths resolve
-against the `cwd` option, which defaults to the working directory.
+```bash
+pnpm exec pg-catalog extract           # write the files
+pnpm exec pg-catalog extract --check   # in CI: write nothing, exit 1 when a file is stale or missing
+```
+
+```text
+written   src/generated/catalog.ts
+written   src/generated/public-catalog.ts
+written   src/generated/db.ts
+```
 
 ```ts
 import { catalog } from './generated/catalog';
@@ -58,6 +56,56 @@ catalog.tables.contacts.columns.status.default;
 // { expression: "'active'::text", literal: 'active' }
 catalog.tables.contacts.constraints.contacts_organization_id_fkey.references;
 // { table: 'organizations', columns: ['id'] }
+```
+
+## The CLI
+
+```text
+pg-catalog extract [--check] [--config <file>]
+pg-catalog drift --env <name> [--json] [--config <file>]
+pg-catalog --help
+pg-catalog --version
+```
+
+| Command           | Exits 0                  | Exits 1                    | Exits 2          |
+| ----------------- | ------------------------ | -------------------------- | ---------------- |
+| `extract`         | files written or current | never                      | it could not run |
+| `extract --check` | every file current       | a file is stale or missing | it could not run |
+| `drift`           | no differences           | differences                | it could not run |
+
+`extract` prints one line per file: its status (`written`, `unchanged`, `stale`, or `missing`) and
+its path. `drift` prints the differences, or with `--json` the `CatalogDiff` itself (see
+[Drift](#drift)). Failures go to standard error as `pg-catalog: <message>`, and a mistake in the
+arguments adds a pointer to `--help`.
+
+Without `--config`, the CLI loads the first of `netvark.config.ts`, `netvark.config.mts`,
+`netvark.config.js`, and `netvark.config.mjs` in the working directory. Relative paths in it resolve
+against its own directory, so `pg-catalog extract --config db/netvark.config.ts` works from
+anywhere. Its default export must be a configuration. `defineExtraction` types it and checks it as
+the file loads: an unknown option (`postgres:` where `database:` was meant), an empty path, a
+`database` with both or neither of `pglite` and `url`, a system or duplicate schema, or a drift
+environment name outside `^[A-Za-z0-9][A-Za-z0-9_-]*$` fails with a message naming the option. URL
+functions run only in the command that needs them, so `extract` never reads the variable behind a
+drift URL.
+
+A TypeScript configuration needs a runtime that strips types: Node.js 22.18 or later, Bun, or Deno.
+On Node.js 22.12 to 22.17, set `NODE_OPTIONS=--experimental-strip-types`, or write
+`netvark.config.mjs`. Node.js strips types without compiling, so imports of your own modules carry
+their extension (`'./db/migrations.ts'`), and `enum` and `namespace` are not available. Bun runs the
+CLI as `bunx --bun pg-catalog`, and Deno as `deno run -A npm:@netvark/pg-catalog`.
+
+The same commands are functions. `extract(config, { check, cwd })` returns the status of each file
+without printing anything, and relative paths resolve against `cwd`, which defaults to the working
+directory:
+
+```ts
+import { extract } from '@netvark/pg-catalog';
+
+const report = await extract(
+  { migrations: 'db/migrations', out: { catalog: 'src/generated/catalog.ts' } },
+  { check: true },
+);
+const outdated = report.files.filter((file) => file.status !== 'unchanged');
 ```
 
 ## What it writes
@@ -279,26 +327,24 @@ called only when the URL is needed.
 
 ## Drift
 
-`drift` compares a live database with the committed catalog. It connects to the environment's URL,
-reads the catalog with the queries `extract` uses inside a `REPEATABLE READ READ ONLY` transaction,
-rolls back, and diffs the result against `out.catalog`. It replays nothing and cannot write, even
-through a privileged role.
+`pg-catalog drift --env <name>` compares a live database with the committed catalog. It connects to
+the environment's URL, reads the catalog with the queries `extract` uses inside a
+`REPEATABLE READ READ ONLY` transaction, rolls back, and diffs the result against `out.catalog`. It
+replays nothing and cannot write, even through a privileged role.
 
 ```ts
-// scripts/drift.ts: run on a schedule against production
-import { drift, formatDiff } from '@netvark/pg-catalog';
+// netvark.config.ts
+export default defineExtraction({
+  migrations: 'db/migrations',
+  schemas: ['public', 'audit'],
+  out: { catalog: 'src/generated/catalog.ts' },
+  drift: { production: { url: () => process.env['PRODUCTION_READONLY_URL'] } },
+});
+```
 
-const report = await drift(
-  {
-    migrations: 'db/migrations',
-    schemas: ['public', 'audit'],
-    out: { catalog: 'src/generated/catalog.ts' },
-    drift: { production: { url: () => process.env['PRODUCTION_READONLY_URL'] } },
-  },
-  'production',
-);
-console.log(formatDiff(report.diff));
-process.exitCode = report.diff.changes.length === 0 ? 0 : 1;
+```bash
+pnpm exec pg-catalog drift --env production          # exit 1 when the database differs
+pnpm exec pg-catalog drift --env production --json   # the CatalogDiff, for scripts
 ```
 
 After a hotfix outside the migrations, the repository's contacts application reports:
@@ -320,9 +366,10 @@ Policies
 ```
 
 `+` marks an object only the live database has, `-` one only the committed catalog has, and `~` one
-that differs. The text is for people and may change between minor versions; `report.diff`, the
-`CatalogDiff` of `diffCatalogs`, is the stable format for machines.
-`introspectCatalog({ url, schemas })` returns the live catalog itself.
+that differs. The text is for people and may change between minor versions; the `--json` output, the
+`CatalogDiff` of `diffCatalogs`, is the stable format for machines. From code,
+`drift(config, 'production')` returns `{ environment, diff }`, `formatDiff(diff)` gives the text,
+and `introspectCatalog({ url, schemas })` returns the live catalog itself.
 
 The URL is meant for a role of its own that can only connect and read names:
 
@@ -340,31 +387,37 @@ fail before any connection is made.
 ## Errors
 
 Every failure is a `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a message naming
-the object or file, and PostgreSQL's error as `cause` where there is one:
+the object or file, and PostgreSQL's error as `cause` where there is one. The CLI prints the message
+and exits 2. `defineExtraction` throws a `TypeError` instead, since its mistakes are in the code:
 
-| `code`                 | When                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `config_invalid`       | a URL function returned nothing, a drift environment is unknown, or a contrib extension name is malformed        |
-| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                      |
-| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                                      |
-| `migration_failed`     | a migration fails during replay                                                                                  |
-| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails                                  |
-| `unsupported_server`   | the server is older than PostgreSQL 14                                                                           |
-| `schema_usage`         | the role `drift` connects as lacks `USAGE` on a configured schema                                                |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                            |
-| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                             |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                      |
-| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                              |
-| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                    |
-| `catalog_unreadable`   | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module |
-| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                                               |
+| `code`                 | When                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config_invalid`       | no configuration file, a file that fails to load or validate, a URL function returned nothing, an unknown drift environment, or a malformed contrib extension name |
+| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                                                                        |
+| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                                                                                        |
+| `migration_failed`     | a migration fails during replay                                                                                                                                    |
+| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails; the message gives the reason, never the URL                                       |
+| `unsupported_server`   | the server is older than PostgreSQL 14                                                                                                                             |
+| `schema_usage`         | the role `drift` connects as lacks `USAGE` on a configured schema                                                                                                  |
+| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                              |
+| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                                                                               |
+| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                        |
+| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                                                                                |
+| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                                                                      |
+| `catalog_unreadable`   | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module                                                   |
+| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                                                                                                 |
 
 ## Best practices
 
 - **Commit the generated files, and exclude them from formatters and linters.** Their bytes are what
   `check` compares; a formatter that rewrites their quotes makes every check fail.
-- **Run the check in CI.** `extract(config, { check: true })` writes nothing and reports `stale` or
-  `missing` when a migration changed and the files were not extracted again.
+- **Run the check in CI.** `pg-catalog extract --check` writes nothing and exits 1 when a migration
+  changed and the files were not extracted again.
+- **Keep URLs and passwords out of the configuration file.** Write `url: () => process.env['X']`:
+  the function runs only in the command that needs it, so extraction and the check need no secrets,
+  and the file can be committed.
+- **Parse `--json`, not the text.** The `CatalogDiff` is the stable format; the text of `drift` may
+  change between minor versions.
 - **Name every constraint.** `constraint contacts_name_length check (...)` gives the catalog and its
   diffs a stable key; generated names change when a column is renamed.
 - **One rule per CHECK.** `check (char_length(slug) <= 63)` and `check (slug ~ '^[a-z0-9-]+$')`

@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 e2e/*/smoke/.workerd/
+e2e/*/.tmp/
 .vitest/
 *.tsbuildinfo
 *.tgz
