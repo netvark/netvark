@@ -22,6 +22,9 @@ grammar, the derivations, or the error model.
 - **Startup, not requests.** A mistake in a declaration fails `tsc` where TypeScript can see it and
   throws `TypeError` when the module loads where it cannot; nothing is deferred to the first
   request.
+- **Measure type-level checks.** A check that changes shape is compiled against the real catalogs of
+  SPEC 15.5 (`tsc --extendedDiagnostics --checkers 1`) before it merges, and the numbers go into the
+  pull request; the package README's performance notes say what keeps the valid path cheap.
 - **End-to-end tests live in `e2e/resource/`.** Run one file with
   `pnpm --filter @netvark/resource-e2e exec vitest run <name>` after `pnpm build`; set
   `RESOURCE_PG_URL` to a PostgreSQL server (a role with `CREATEDB`) to include the server files.
@@ -39,8 +42,9 @@ grammar, the derivations, or the error model.
 - **An issue kind or a constraint kind.** SPEC 6.4 or 9.1, the `Messages` types, the English
   default, the template variables, a localization test, and an ADR: the vocabulary is a public
   contract, so removing or renaming a kind is `major`.
-- **A declaration option.** SPEC 3 and 14, the type-level check with its `@ts-expect-error` case,
-  the runtime `TypeError` with its message, the README when a user would look for it, and a `minor`
+- **A declaration option.** SPEC 3 and 14, the type-level check with its `@ts-expect-error` case, a
+  `fails/` declaration in `e2e/resource/` whose `// error:` marker pins the compiler's message, the
+  runtime `TypeError` with its message, the README when a user would look for it, and a `minor`
   changeset.
 - **A server contract.** SPEC 12, a case in the storage contract suite, the reference adapter in
   `e2e/resource/`, and a changeset for every adapter package that must follow.

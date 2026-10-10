@@ -1,0 +1,35 @@
+/**
+ * `@netvark/resource-core`: one declaration per PostgreSQL table, keyed by
+ * its database names and typed by the public catalog `@netvark/pg-catalog`
+ * extracts, from which the public API follows. See `docs/resource/SPEC.md`
+ * for the contract.
+ * @packageDocumentation
+ */
+export type { DeclarationCheck } from './declare/declaration-check';
+export type { DeclareResourceConfig } from './declare/create-declare-resource';
+export type { DeclareResource } from './declare/declare-resource-type';
+export type { DeclaredResource } from './declare/declared-resource';
+export type {
+  CodecRegistry,
+  CodecTypes,
+  DeclareContext,
+  DomainRule,
+  DomainRules,
+  EmptyRegistry,
+  ScopeColumn,
+  ScopeRegistry,
+  ValidatorRegistry,
+} from './declare/registries';
+export type {
+  Access,
+  Declaration,
+  FieldDeclaration,
+  Operation,
+  RelationshipDeclaration,
+  RelationshipOperator,
+  RuleDeclaration,
+  SearchDeclaration,
+  SortDeclaration,
+} from './declare/types';
+
+export { createDeclareResource } from './declare/create-declare-resource';

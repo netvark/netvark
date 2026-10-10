@@ -25,6 +25,18 @@
       // modules an application imports, so all of their exports are public.
       "entry": ["smoke/worker.ts", "fixtures/*/expected/*.ts"],
       "project": ["**/*.ts"]
+    },
+    "e2e/resource": {
+      // As e2e/*, plus: the generated catalogs (all exports public); the
+      // extraction config the pg-catalog bin loads; and `fails/`, which
+      // fails.e2e.test.ts compiles with tsc instead of importing.
+      "entry": [
+        "smoke/worker.ts",
+        "fixtures/*/*catalog.ts",
+        "fixtures/*/netvark.config.mjs",
+        "fails/*.ts"
+      ],
+      "project": ["**/*.ts", "**/*.mjs"]
     }
   }
 }

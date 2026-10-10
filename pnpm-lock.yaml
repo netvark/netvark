@@ -413,6 +413,33 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
 
+  e2e/resource:
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: 'catalog:'
+        version: 0.5.8
+      '@netvark/pg-catalog':
+        specifier: workspace:*
+        version: link:../../packages/pg-catalog
+      '@netvark/resource-core':
+        specifier: workspace:*
+        version: link:../../packages/resource-core
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.4
+      miniflare:
+        specifier: 'catalog:'
+        version: 4.20260730.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@arethetypeswrong/core@0.18.5)(oxc-resolver@11.24.2)(publint@0.3.25)(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+
   packages/ban-core:
     devDependencies:
       '@opentelemetry/api':
@@ -532,6 +559,18 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.29.6
+
+  packages/resource-core:
+    dependencies:
+      '@netvark/catalog-core':
+        specifier: workspace:^
+        version: link:../catalog-core
+      '@netvark/jsonapi-core':
+        specifier: workspace:^
+        version: link:../jsonapi-core
+      '@netvark/keyset-core':
+        specifier: workspace:^
+        version: link:../keyset-core
 
 packages:
 

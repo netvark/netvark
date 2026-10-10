@@ -35,17 +35,17 @@ Contents
 
 ## 1. Public surface and module map
 
-One package with four entry points (ADR 0008). It depends on `@netvark/catalog-core` (types only),
-`@netvark/jsonapi-core`, `@netvark/keyset-core`, and `@netvark/ban-core`, and takes `zod` `^4.5.0`
-as a peer dependency. Nothing in it imports a framework, a query builder, a driver, or a Node.js
-module.
+One package with four entry points (ADR 0008). It depends on `@netvark/catalog-core` (its types and
+`CATALOG_FORMAT`), `@netvark/jsonapi-core`, `@netvark/keyset-core`, and `@netvark/ban-core`, and
+takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
+driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclaredResource`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RuleDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodecs`, `Messages`, `MessagesFor` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                   |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                     |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`                                                                                                                                                                                                                                                                                                                                                                                 |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodecs`, `Messages`, `MessagesFor` |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ```
 packages/resource-core/src/
@@ -74,37 +74,55 @@ The end-to-end package is `@netvark/resource-e2e` in `e2e/resource/` (15.4).
 
 ```ts
 function createDeclareResource<
-  const TCatalog extends PublicCatalog,
+  const TCatalog extends PublicCatalog & NotFullCatalog,
   const TCodecs extends CodecRegistry = EmptyRegistry,
   const TValidators extends ValidatorRegistry = EmptyRegistry,
   const TScopes extends ScopeRegistry = EmptyRegistry,
->(config: {
+  const TDomains extends DomainRules = EmptyRegistry,
+>(
+  config: DeclareResourceConfig<TCatalog, TCodecs, TValidators, TScopes, TDomains> &
+    DomainsCheck<TCatalog, TValidators, TDomains>, // 3.6
+): DeclareResource<DeclareContext<TCatalog, TCodecs, TValidators, TScopes, TDomains>>;
+
+interface DeclareResourceConfig<TCatalog, TCodecs, TValidators, TScopes, TDomains> {
   readonly catalog: TCatalog; // the generated public catalog, `as const`
   readonly codecs?: TCodecs | undefined; // { name: defineCodec(...) }
   readonly validators?: TValidators | undefined; // { name: defineValidator(...) }
   readonly scopes?: TScopes | undefined; // { name: { column } }
-  readonly domains?: DomainRules<TCatalog, TValidators> | undefined; // 3.6
+  readonly domains?: TDomains | undefined; // { domain: { constraint: { validator } } } (3.6)
   readonly links?: ResourceLinksInit | undefined; // @netvark/jsonapi-core
   readonly page?: PageCapabilitiesInit | undefined; // @netvark/jsonapi-core
-}): DeclareResource<TCatalog, TCodecs, TValidators, TScopes>;
+}
 ```
 
+`DeclareContext` bundles the catalog and the four registries into the one type parameter every
+type-level check reads.
+
 - `catalog` MUST be a public catalog (`toPublicCatalog`, catalog SPEC 3) of format 1
-  (`SUPPORTED_CATALOG_FORMAT`); a catalog of another format throws `TypeError`, and its literal type
-  fails the `TCatalog` constraint. The full catalog is rejected too, because declarations reach
-  browsers (ADR 0002): structurally it would satisfy `PublicCatalog`, so the constraint also
-  requires the absence of its `schemas` member, and the runtime check tests the same member.
+  (`CATALOG_FORMAT` of `@netvark/catalog-core`); a catalog of another format throws `TypeError`, and
+  its literal type fails the `TCatalog` constraint. The full catalog is rejected too, because
+  declarations reach browsers (ADR 0002): structurally it would satisfy `PublicCatalog`, so the
+  constraint also requires the absence of its `schemas` member (`NotFullCatalog`), whose requirement
+  (3, "How mistakes are reported") reads
+  `catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`,
+  and the runtime check tests the same member.
 - Registries map a name to a value made by `defineCodec`, `defineValidator`, or
   `{ column: string }`. A codec or validator value that the define function did not produce throws
   `TypeError` (they carry a private brand). Scope names are internal and unconstrained; a scope's
   `column` is checked per declaration (3.2).
+- An omitted registry is empty. A registry, or any other optional member, that is present MUST hold
+  a value of its kind: `null` is refused
+  (`createDeclareResource.codecs: must be an object, received null`), since only `undefined` means
+  absent, as for JavaScript default parameters. @ref
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Default_parameters
 - `links` and `page` are the application's defaults, checked here with `@netvark/jsonapi-core`'s own
   rules (`links.base` by its link convention, `page.default` and `page.max` positive integers with
   `default <= max`) and merged under every declaration member by member, as `createDefineResource`
-  and `createDefineKeyset` merge theirs (jsonapi ADR 0015, keyset ADR 0014). They live in the module
-  that exports the configured definer, never in module-level state.
+  and `createDefineKeyset` merge theirs (jsonapi ADR 0015, keyset ADR 0014). A message from those
+  rules gains the definer's prefix (`createDeclareResource.links.base must not end with "/"`). They
+  live in the module that exports the configured definer, never in module-level state.
 
-The result is `declareResource(table, declaration)`, typed by the four registries. Tests:
+The result is `declareResource(table, declaration)`, typed by the catalog and the registries. Tests:
 `create-declare-resource.test.ts`, `create-declare-resource.test-d.ts`.
 
 ---
@@ -141,7 +159,7 @@ interface FieldDeclaration {
 }
 
 interface RelationshipDeclaration {
-  readonly target: () => DeclaredResource; // read lazily, so declarations can reference each other
+  readonly target: () => void; // returns the target's DeclaredResource, read lazily (3.8)
   readonly access: Exclude<Access, 'write'>;
   readonly as?: string | undefined;
   readonly filter?: ReadonlyArray<'eq' | 'ne' | 'in' | 'nin' | 'isNull'> | undefined;
@@ -164,9 +182,31 @@ interface RuleDeclaration {
 Every key is a database name (ADR 0002): `table` is a key of `catalog.tables`, `fields` keys are
 columns of that table, `relationships` keys are columns of a single-column foreign key, sort entries
 are sortable field columns with an optional `-` prefix, and `rules` keys are constraint names or the
-NOT NULL keys of 3.5. `declareResource` returns a `DeclaredResource` (sections 4 to 11); its members
-are computed once, at declaration, except `resource` and `keyset`, which read their relationship
-targets lazily (11.1).
+NOT NULL keys of 3.5. `declareResource` returns a `DeclaredResource`: `table` (the catalog key),
+`declaration` (the declaration as given, frozen), and the members of sections 4 to 11. Its members
+are computed once, at declaration, except `linkage`, `fields`, and `resource`, which need the
+relationship targets and are computed on first access (3.8). Its type also carries the definer's
+`DeclareContext` as the type-only member `'~context'`, always absent at runtime, for type helpers
+such as `Infer`.
+
+How mistakes are reported (`declare/requirement.ts`). `declareResource` is
+`(table: TTable & IdentityCheck, declaration: TDecl & DeclarationCheck) => DeclaredResource`, with
+`const` type parameters: TypeScript infers the literal declaration, then holds it against what the
+catalog and the registries allow. A check adds nothing for a valid part. For a mistake it adds one
+of two things, so the error sits at the offending option and carries its reason:
+
+- a requirement, a property no value has whose key is the message:
+  `Property '"access: immutable needs the create operation"' is missing in type '{ access: "immutable"; }'`;
+- for a key that cannot be declared at all, a string-literal type the declared object cannot match:
+  `Type '{ access: "read"; }' is not assignable to type '"\"fax\" is not a column of contacts"'`.
+
+A check never intersects a member with a different literal type: TypeScript reduces such an object
+to `never` and the message is lost. Each check is built so a valid declaration pays for no error
+type: a mapped type of unknown members is built only when a member is unknown, and the messages for
+invalid keys come from a separate mapped type built only when there is one; on real catalogs the
+first rule alone made the check about six times faster (15.5, and the package README's performance
+notes). @ref
+https://devblogs.microsoft.com/typescript/announcing-typescript-3-9/#intersections-reduced-by-discriminant-properties
 
 ### 3.1 Access
 
@@ -191,6 +231,11 @@ The column decides which modes are allowed; anything else fails `tsc` and throws
 | a `tsvector` column                        | not a field; `search.column` only                                                              |
 | any other column                           | a field with any mode                                                                          |
 
+A relationship's foreign key MUST reference the primary key of a table of the public catalog,
+because the linkage it produces is that table's resource id (3.4); a foreign key to a unique column
+or to a table outside the public catalog is refused. Its column's type MUST be able to carry a
+resource id (3.4).
+
 @ref https://jsonapi.org/format/1.1/#document-resource-object-attributes
 
 ### 3.2 Scope
@@ -212,12 +257,23 @@ value, and the server definition fails `tsc` until it supplies it (`ServerValues
 ### 3.4 Identity
 
 The table MUST have a single-column primary key; it becomes the resource `id`, a string on the wire
-in the id column's wire form (5). With `clientIds: true` a create MAY carry an `id`, validated by
-that form; without it a create that carries one is rejected by `@netvark/jsonapi-core` (403,
-JSON:API "Client-Generated IDs"). A primary key with no default and no identity, and no `clientIds`,
-is a server value on create.
+in the id column's wire form (5). The column's type MUST have a scalar wire form other than `json`
+and `jsonb`, followed through its domains (`isIdentifierColumn`): JSON:API ids are strings, and a
+JSON value has no string form to be one. PostgreSQL accepts a `jsonb` primary key and a foreign key
+to it, since `jsonb` has a btree operator class, so the definer is what refuses them; the same rule
+holds for a relationship's foreign-key column, whose values are the target's ids.
 
-@ref https://jsonapi.org/format/1.1/#crud-creating-client-ids
+With `clientIds: true` a create MAY carry an `id`, validated by that form; without it a create that
+carries one is rejected by `@netvark/jsonapi-core` (403, JSON:API "Client-Generated IDs").
+`clientIds` requires a primary key that accepts a client value: a generated column and an identity
+column `GENERATED ALWAYS` reject an explicit value on insert ("cannot insert a non-DEFAULT value"),
+while an identity column `BY DEFAULT` accepts one. A primary key with no default and no identity,
+and no `clientIds`, is a server value on create.
+
+@ref https://jsonapi.org/format/1.1/#document-resource-object-identification @ref
+https://jsonapi.org/format/1.1/#crud-creating-client-ids @ref
+https://www.postgresql.org/docs/18/sql-createtable.html#SQL-CREATETABLE-PARMS-GENERATED-IDENTITY
+@ref https://www.postgresql.org/docs/18/datatype-json.html#JSON-INDEXING
 
 ### 3.5 Rules
 
@@ -237,7 +293,9 @@ names a validator for a CHECK whose `rule` is `null`:
 A domain's CHECK whose `rule` is `null` is covered once for the application, in the definer:
 `domains: { email: { email_check: { validator: 'email' } } }`, keyed by the domain's reference name
 and its constraint name. It is REQUIRED when a declared writable field's column, or the element of
-an array column, has that domain, directly or through a base domain.
+an array column, has that domain, directly or through a base domain, and it is an error on a CHECK
+that has a rule, as in 3.5. TypeScript checks `domains` against the catalog and the validators
+(`DomainsCheck`) where the definer is created.
 
 ### 3.7 Search, sort, page
 
@@ -249,9 +307,31 @@ an array column, has that domain, directly or through a base domain.
   `@netvark/keyset-core` (keyset SPEC 5).
 - `page` overrides the definer's `page` member by member.
 
-Tests: `declare-resource.test.ts` (every `TypeError` of 14), `declare-resource.test-d.ts` (every
-compile error above, each as a `@ts-expect-error` on the offending option, next to the valid form
-that compiles).
+### 3.8 Relationship targets
+
+`target` returns the declared resource of the table the foreign key references, so a declaration
+names its targets and declarations may reference each other in either order and across modules. Its
+declared type is `() => void`, not `() => DeclaredResource`: TypeScript compares a function against
+one returning `void` without resolving the function's return type, so it infers each declaration
+without first inferring its targets. With any other return type, two declarations that reference
+each other fail with TS7022 ("implicitly has type 'any' because it ... is referenced directly or
+indirectly in its own initializer"), as TypeScript 7.0 reports. The declaration's type still records
+the function, and with it the target's type, for `Infer` and the linkage schemas. @ref
+https://github.com/microsoft/TypeScript/wiki/FAQ#why-are-functions-returning-non-void-assignable-to-function-returning-void
+
+The check that the target is a declared resource of the referenced table therefore runs where the
+targets are read: TypeScript checks it where a registry is assembled (4.2), and at runtime the first
+read of a target, and the registry, throw `TypeError`
+(`contacts.relationships.organization_id.target: the target is a resource of users; the foreign key references organizations`).
+Nothing reads a target while modules load, so a target declared later in the module graph is read
+after it exists.
+
+Tests: `declare-resource.test.ts`, `declare-fields.test.ts`, `declare-relationships.test.ts`, and
+`declare-options.test.ts` (every `TypeError` of 14 a declaration can throw);
+`declare-resource.test-d.ts` (the valid forms, two declarations that reference each other among
+them); `declare-resource-errors.test-d.ts` and `declare-options-errors.test-d.ts` (every compile
+error above, each as a `@ts-expect-error` on the offending option); and `e2e/resource/fails/`, which
+pins the compiler's message for each.
 
 ---
 
@@ -292,7 +372,9 @@ REQUIRED.
 - Across a registry (every place that takes a list of resources: `errorCatalog`, `defineMessages`,
   `openapi`, the server runtime), types are unique, and codes are unique and distinct from the
   application's own codes, `@netvark/jsonapi-core`'s `ERROR_CODES`, and `@netvark/ban-core`'s
-  built-in keys (a derived `CONFLICT` would replace the built-in entry).
+  built-in keys (a derived `CONFLICT` would replace the built-in entry), and every relationship's
+  target is a declared resource of the table its foreign key references and is in the registry
+  (3.8).
 
 TypeScript reports what it can see at the declaration: an invalid character in a literal name, a
 reserved name, a collision inside one resource. The registry checks run where the registry is
@@ -332,32 +414,39 @@ Tests: `camel-case.test.ts` in `@netvark/catalog-core` and `names.test-d.ts` rea
 A column's wire form is chosen by its catalog `type` (the element type for an array) and `typeKind`.
 Reads produce exactly the read form; writes accept exactly the values in the "Write" column.
 
-| `type`                                  | Wire            | Write accepts                                                                                                          | Read form                                                  | JSON Schema                                              |
-| --------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
-| `text`, `varchar`, `bpchar`, `citext`   | string          | a well-formed string (no unpaired surrogate) without U+0000; with `maxLength` n, at most n code points                 | as stored; `bpchar(n)` padded to n as PostgreSQL prints it | `{ type: 'string', maxLength }`                          |
-| `int2`                                  | number          | an integer in [-32768, 32767]                                                                                          | the number                                                 | `{ type: 'integer', format: 'int16', minimum, maximum }` |
-| `int4`                                  | number          | an integer in [-2147483648, 2147483647]                                                                                | the number                                                 | `{ type: 'integer', format: 'int32', minimum, maximum }` |
-| `int8`                                  | string          | `^-?(0\|[1-9][0-9]*)$` within [-9223372036854775808, 9223372036854775807]                                              | PostgreSQL's text                                          | `{ type: 'string', format: 'int64', pattern }`           |
-| `numeric`                               | string          | `^-?(0\|[1-9][0-9]*)(\.[0-9]+)?$`; with `(p, s)`, at most s fraction digits and an absolute value below 10^(p-s)       | PostgreSQL's text (`numeric(5,2)` prints `1.00`)           | `{ type: 'string', format: 'decimal', pattern }`         |
-| `float4`                                | number          | a finite number whose `Math.fround` is finite, and nonzero when the number is                                          | the number                                                 | `{ type: 'number', format: 'float' }`                    |
-| `float8`                                | number          | a finite number                                                                                                        | the number                                                 | `{ type: 'number', format: 'double' }`                   |
-| `bool`                                  | boolean         | `true`, `false`                                                                                                        | the boolean                                                | `{ type: 'boolean' }`                                    |
-| `uuid`                                  | string          | 8-4-4-4-12 hexadecimal digits, either case                                                                             | lower case                                                 | `{ type: 'string', format: 'uuid' }`                     |
-| `date`                                  | string          | `YYYY-MM-DD` naming a real calendar day in the years 0001 to 9999                                                      | the same                                                   | `{ type: 'string', format: 'date' }`                     |
-| `timestamp`                             | string          | RFC 3339 `full-date "T" full-time` without an offset: seconds required, at most six fraction digits, the date as above | the same, fraction as PostgreSQL prints it                 | `{ type: 'string', format: 'date-time-local' }`          |
-| `timestamptz`                           | string          | RFC 3339 `date-time` with `Z` or `±HH:MM`: seconds required, at most six fraction digits, the date as above            | the instant in UTC with `Z`                                | `{ type: 'string', format: 'date-time' }`                |
-| `json`, `jsonb`                         | any             | any JSON value; for `jsonb`, no U+0000 in any string                                                                   | the parsed value                                           | `{}`                                                     |
-| an enum (`typeKind: 'enum'`)            | string          | one of the labels, in the catalog's order                                                                              | the label                                                  | `{ type: 'string', enum }`                               |
-| a domain (`typeKind: 'domain'`)         | the base type's | the base type's form, then the domain's rules and NOT NULL                                                             | the base type's                                            | the base type's, with the rules' keywords                |
-| an array of any of the above but `json` | array           | a one-dimensional array of non-null elements in the element's form                                                     | the same                                                   | `{ type: 'array', items }`                               |
+| `type`                                              | Wire            | Write accepts                                                                                                          | Read form                                                  | JSON Schema                                              |
+| --------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| `text`, `varchar`, `bpchar`, `citext`               | string          | a well-formed string (no unpaired surrogate) without U+0000; with `maxLength` n, at most n code points                 | as stored; `bpchar(n)` padded to n as PostgreSQL prints it | `{ type: 'string', maxLength }`                          |
+| `int2`                                              | number          | an integer in [-32768, 32767]                                                                                          | the number                                                 | `{ type: 'integer', format: 'int16', minimum, maximum }` |
+| `int4`                                              | number          | an integer in [-2147483648, 2147483647]                                                                                | the number                                                 | `{ type: 'integer', format: 'int32', minimum, maximum }` |
+| `int8`                                              | string          | `^-?(0\|[1-9][0-9]*)$` within [-9223372036854775808, 9223372036854775807]                                              | PostgreSQL's text                                          | `{ type: 'string', format: 'int64', pattern }`           |
+| `numeric`                                           | string          | `^-?(0\|[1-9][0-9]*)(\.[0-9]+)?$`; with `(p, s)`, at most s fraction digits and an absolute value below 10^(p-s)       | PostgreSQL's text (`numeric(5,2)` prints `1.00`)           | `{ type: 'string', format: 'decimal', pattern }`         |
+| `float4`                                            | number          | a finite number whose `Math.fround` is finite, and nonzero when the number is                                          | the number                                                 | `{ type: 'number', format: 'float' }`                    |
+| `float8`                                            | number          | a finite number                                                                                                        | the number                                                 | `{ type: 'number', format: 'double' }`                   |
+| `bool`                                              | boolean         | `true`, `false`                                                                                                        | the boolean                                                | `{ type: 'boolean' }`                                    |
+| `uuid`                                              | string          | 8-4-4-4-12 hexadecimal digits, either case                                                                             | lower case                                                 | `{ type: 'string', format: 'uuid' }`                     |
+| `date`                                              | string          | `YYYY-MM-DD` naming a real calendar day in the years 0001 to 9999                                                      | the same                                                   | `{ type: 'string', format: 'date' }`                     |
+| `timestamp`                                         | string          | RFC 3339 `full-date "T" full-time` without an offset: seconds required, at most six fraction digits, the date as above | the same, fraction as PostgreSQL prints it                 | `{ type: 'string', format: 'date-time-local' }`          |
+| `timestamptz`                                       | string          | RFC 3339 `date-time` with `Z` or `±HH:MM`: seconds required, at most six fraction digits, the date as above            | the instant in UTC with `Z`                                | `{ type: 'string', format: 'date-time' }`                |
+| `json`, `jsonb`                                     | any             | any JSON value; for `jsonb`, no U+0000 in any string                                                                   | the parsed value                                           | `{}`                                                     |
+| an enum (`typeKind: 'enum'`)                        | string          | one of the labels, in the catalog's order                                                                              | the label                                                  | `{ type: 'string', enum }`                               |
+| a domain (`typeKind: 'domain'`)                     | the base type's | the base type's form, then the domain's rules and NOT NULL                                                             | the base type's                                            | the base type's, with the rules' keywords                |
+| an array of any of the above but `json` and `jsonb` | array           | a one-dimensional array of non-null elements in the element's form                                                     | the same                                                   | `{ type: 'array', items }`                               |
 
 @ref https://www.postgresql.org/docs/18/datatype.html @ref
 https://www.rfc-editor.org/rfc/rfc3339#section-5.6 @ref https://spec.openapis.org/registry/format/
 
+`citext` is an extension type, matched by its reference name in any schema (`extensions.citext` when
+the extension lives outside the default schema); it has `text`'s wire form and compares
+case-insensitively in the database, which the wire form does not change. @ref
+https://www.postgresql.org/docs/18/citext.html
+
 Every other type has no wire form and needs a codec (7): among them `time`, `timetz`, `interval`,
-`bytea`, `money`, `inet`, `cidr`, `macaddr`, `bit`, `varbit`, `xml`, `tsquery`, the geometric types,
-ranges, multiranges, composites, the `oid` types, and extension types such as `vector`, `hstore`,
-and `ltree`. A `tsvector` column is only ever a search column (3.7).
+`bytea` (a codec states its encoding, base64 or hex), `money`, `inet`, `cidr`, `macaddr`, `bit`,
+`varbit`, `xml`, `tsquery`, the geometric types, ranges, multiranges, composites, the `oid` types,
+and extension types such as `vector`, `hstore`, and `ltree`, and arrays of `json` and `jsonb`, whose
+`null` element would mean either SQL `NULL` or the JSON value `null`. A `tsvector` column is only
+ever a search column (3.7).
 
 ### 5.2 Why each restriction exists
 
@@ -858,8 +947,8 @@ document).
 | `validate`      | `{ create, update }` from 6.5, for the declared operations                                                                     |
 | `clientIds`     | the declaration's `clientIds`                                                                                                  |
 
-Relationship targets are read lazily, so `Contacts` and `Users` may reference each other in either
-order.
+Relationship targets are read lazily (3.8), so `Contacts` and `Users` may reference each other in
+either order.
 
 ### 11.2 `keyset`
 
@@ -1129,32 +1218,50 @@ case per row.
 
 Mistakes TypeScript cannot see, and every mistake made from JavaScript, throw `TypeError` when the
 definer or the declaration runs, at startup. The message starts with the path, uses database names
-for declaration paths and public names for registry conflicts, and never contains request data:
+for declaration paths and public names for registry conflicts, and never contains request data.
+TypeScript reports the mistakes it can see at compile time, at the offending option, in the two
+forms of 3; its message names the option relative to the declaration
+(`access: immutable needs the create operation`) and states the same reason as the runtime check.
 
-| Condition                                                                    | Message (example)                                                                                  |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| a catalog of another format                                                  | `createDeclareResource.catalog: format 2 is not supported (expected 1)`                            |
-| a table outside the public catalog                                           | `declareResource: "accounts" is not a table of the public catalog`                                 |
-| no single-column primary key                                                 | `contact_phones: a resource needs a single-column primary key`                                     |
-| an unknown column, foreign key, constraint, scope, codec, or validator       | `contacts.fields.nick: "nick" is not a column of contacts`                                         |
-| a column declared against 3.1                                                | `contacts.fields.organization_id: a foreign-key column is declared under relationships`            |
-| an access the column does not allow                                          | `contacts.fields.search: a generated column is read-only`                                          |
-| a codec that does not accept the column's type                               | `contacts.fields.email.codec: codec "phone" does not accept type email`                            |
-| a type without a wire form and no codec                                      | `meetings.fields.during: type tstzrange has no wire form; name a codec`                            |
-| an operator the keyset type does not accept, or `isNull` on a non-null field | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                     |
-| a sort entry that is not sortable                                            | `contacts.sort.default[0]: "name" is not declared with sort: true`                                 |
-| a search column that is not `tsvector`, or a config mismatch or omission     | `contacts.search.config: the column is generated with config "simple"`                             |
-| a CHECK without a rule over writable columns and no validator                | `contacts.rules.contacts_phone_check: a CHECK without a rule needs a validator`                    |
-| a validator on a CHECK with a rule, or on another constraint kind            | `contacts.rules.contacts_name_check.validator: the CHECK has a rule`                               |
-| an uncovered domain CHECK (3.6)                                              | `createDeclareResource.domains.email.email_check: a domain CHECK without a rule needs a validator` |
-| a relationship column without the `_id` suffix and no `as`                   | `contacts.relationships.owner: the column does not end in _id; set as`                             |
-| a name that is not a member name, is reserved, or collides                   | `contacts: fields "type" and the type member collide; set as`                                      |
-| a code that does not match `CODE_PATTERN`                                    | `contacts.rules.contacts_größe_check: code "CONTACTS_GRÖSSE_CHECK" is not A-Z, 0-9, _; set code`   |
-| `update` with no member writable on update                                   | `contacts.operations: update needs a member writable on update`                                    |
-| an `example` the field schema rejects                                        | `contacts.fields.name.example: the field schema rejects the example`                               |
-| registry conflicts (4.2)                                                     | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                        |
+| Condition                                                                      | Message (example)                                                                                                             |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| an unknown configuration or declaration member, or a member of the wrong kind  | `contacts.fields.name: unknown member "sortable"`                                                                             |
+| a catalog of another format                                                    | `createDeclareResource.catalog: format 2 is not supported (expected 1)`                                                       |
+| the full catalog (2)                                                           | `createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers` |
+| a registry entry of the wrong shape, or `null` for a registry                  | `createDeclareResource.codecs.phone.types: must be a non-empty list of type names`                                            |
+| a domain rule for an unknown domain or CHECK, or for a CHECK with a rule (3.6) | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                             |
+| `links` or `page` that `@netvark/jsonapi-core`'s rules refuse                  | `createDeclareResource.links.base must not end with "/"`                                                                      |
+| a table outside the public catalog                                             | `declareResource: "accounts" is not a table of the public catalog`                                                            |
+| no single-column primary key                                                   | `contact_phones: a resource needs a single-column primary key`                                                                |
+| a primary key whose type cannot carry a resource id (3.4)                      | `import_batches: the primary key's type jsonb cannot carry a resource id`                                                     |
+| `clientIds` on a primary key that takes no client value (3.4)                  | `organizations.clientIds: the primary key is an identity column generated always, which takes no client value`                |
+| an unknown column, foreign key, constraint, scope, codec, or validator         | `contacts.fields.nick: "nick" is not a column of contacts`                                                                    |
+| a column declared against 3.1                                                  | `contacts.fields.organization_id: a foreign-key column is declared under relationships`                                       |
+| an access the column does not allow                                            | `meetings.fields.duration_minutes.access: a generated column is read-only`                                                    |
+| an access no declared operation writes (3.3)                                   | `contacts.fields.kind.access: immutable needs the create operation`                                                           |
+| a foreign key to anything but the primary key of a public table (3.1)          | `people.relationships.team_slug: the foreign key references teams.slug, which is not its primary key`                         |
+| a foreign-key column whose type cannot carry a resource id (3.4)               | `import_rows.relationships.batch: type jsonb cannot carry a resource id`                                                      |
+| a `target` that is not a function (3.8)                                        | `meetings.relationships.organization_id.target: must be a function returning the target's declared resource`                  |
+| a scope whose column the table does not have (3.2)                             | `audit.changes.scope: scope organization names column organization_id, which audit.changes does not have`                     |
+| a codec that does not accept the column's type                                 | `contacts.fields.tags.codec: codec "phone" does not accept type text[]`                                                       |
+| a type without a wire form and no codec                                        | `meetings.fields.during: type tstzrange has no wire form; name a codec`                                                       |
+| an operator `@netvark/keyset-core` does not have                               | `contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core`                                           |
+| an operator the keyset type does not accept, or `isNull` on a non-null field   | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                                                |
+| empty or repeated operations, or `update` with no member writable on update    | `contacts.operations: update needs a field or relationship writable on update`                                                |
+| a sort entry that is not sortable                                              | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                            |
+| a search column that is not `tsvector`, or a config mismatch or omission       | `contacts.search.config: the column is generated with config "simple"`                                                        |
+| a page default above the max page size                                         | `contacts.page.default: 200 exceeds the max page size 100`                                                                    |
+| a CHECK without a rule over written columns and no validator (3.5)             | `meetings.rules.meetings_contact_or_notes: a CHECK without a rule needs a validator`                                          |
+| a validator on a CHECK with a rule, or on another constraint kind              | `contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already`                               |
+| a written field whose domain has an uncovered CHECK without a rule (3.6)       | `contacts.fields.email: domain email's CHECK email_check has no rule; give it a validator in createDeclareResource domains`   |
+| a relationship column without the `_id` suffix and no `as`                     | `contacts.relationships.owner: the column does not end in _id; set as`                                                        |
+| a name that is not a member name, is reserved, or collides                     | `contacts: fields "type" and the type member collide; set as`                                                                 |
+| a code that does not match `CODE_PATTERN`                                      | `contacts.rules.contacts_größe_check: code "CONTACTS_GRÖSSE_CHECK" is not A-Z, 0-9, _; set code`                              |
+| an `example` the field schema rejects                                          | `contacts.fields.name.example: the field schema rejects the example`                                                          |
+| registry conflicts (4.2)                                                       | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                                                   |
 
-Tests: one case per row in `declare-resource.test.ts` and `registry.test.ts`.
+Tests: one case per row in the `declare-*.test.ts` and `create-declare-resource.test.ts` files and
+`registry.test.ts`; `e2e/resource/fails/` holds each compile-time form, matched by its text.
 
 ---
 
@@ -1198,9 +1305,10 @@ different value. It runs on PGlite always, and on PostgreSQL 14 and 18 servers w
 
 A private workspace package, `@netvark/resource-e2e`, that consumes the built packages through
 `workspace:*` and never imports from `src/`. It holds its own fixture migrations (the contacts
-application of `e2e/catalog`, extended with a multi-column CHECK, a validator-covered CHECK, a codec
-column, and an exclusion constraint), the catalogs `@netvark/pg-catalog` extracts from them (checked
-with `extract --check`), and declarations over them. It proves: the declarations type-check, and a
+application of `e2e/catalog`, extended with a multi-column CHECK, a CHECK the rule translator does
+not cover, a domain CHECK without a rule, a codec column, an exclusion constraint, and two tables
+keyed by `jsonb`), the catalogs `@netvark/pg-catalog` extracts from them (checked with
+`extract --check`), and declarations over them. It proves: the declarations type-check, and a
 `fails/` directory of declarations fails `tsc` with the expected errors; the derived schemas, codes,
 metadata, and definitions; `constraintError` against real violations on PGlite and both servers;
 localized error documents; the package surface (every value export listed); and the runtime smoke
@@ -1212,6 +1320,23 @@ Before a release, declarations are compiled against real public catalogs: a prod
 (stern, about a hundred tables) and a slice of GitLab 17.11 (dozens of tables, many CHECKs). The
 pull request records `tsc --extendedDiagnostics` time and instantiations, the codes that needed
 `code` overrides, and any column that needed a codec.
+
+The first record covers sections 2 and 3. A script declared each table whose single-column primary
+key can carry a resource id, exposing every column 3.1 allows with the most permissive access the
+column takes. The declarations were compiled against the packed tarball installed by npm, with
+TypeScript 7.0.2 on one checker (`--checkers 1`):
+
+| Catalog            | Declarations | Fields | Relationships | Types  | Instantiations | Check time | Peak memory |
+| ------------------ | ------------ | ------ | ------------- | ------ | -------------- | ---------- | ----------- |
+| stern              | 111          | 1,183  | 184           | 30,068 | 350,651        | 0.14 s     | 112 MB      |
+| GitLab 17.11 slice | 60           | 1,461  | 26            | 40,294 | 420,912        | 0.20 s     | 140 MB      |
+
+Peak memory is the median of three runs. With the default 4 checkers the check took 0.15 s and 188
+MB for stern and 0.21 s and 233 MB for GitLab, since each checker recomputes the declarations its
+files reach. Only stern's `vector` columns and GitLab's `bytea` columns needed a codec; stern needed
+validators for 6 CHECKs without a rule and GitLab for 73. At runtime every declaration was accepted
+and every relationship target resolved to a declared resource. Before the measures of 3 ("How
+mistakes are reported"), the same stern check took 1.55 s and 874 MB.
 
 ### 15.6 The Zod floor
 
@@ -1237,17 +1362,18 @@ A CI job runs the package's unit tests with `zod` 4.5.0, the floor of the peer r
 
 ## 17. Constants
 
-| Name                        | Value                                                                                                        | Exported |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------ | -------- |
-| `SUPPORTED_CATALOG_FORMAT`  | 1                                                                                                            | no       |
-| `SEARCH_PARAMETER`          | `filter[q]`                                                                                                  | no       |
-| `CODE_PATTERN`              | `^[A-Z][A-Z0-9_]*$`                                                                                          | no       |
-| `ID_SUFFIX`                 | `_id`                                                                                                        | no       |
-| `NOT_NULL_SUFFIX`           | `_not_null`                                                                                                  | no       |
-| `ISSUE_KINDS`               | the thirteen kinds of 6.4, in that order                                                                     | yes      |
-| integer bounds              | `int2` [-32768, 32767], `int4` [-2147483648, 2147483647], `int8` [-9223372036854775808, 9223372036854775807] | no       |
-| `real` limit                | `Math.fround` finite and nonzero for a nonzero input                                                         | no       |
-| fraction digits of a second | at most 6                                                                                                    | no       |
-| date years                  | 0001 to 9999                                                                                                 | no       |
-| Standard Schema vendor      | `netvark`                                                                                                    | no       |
-| `QUOTA_EXCEEDED`            | 403, `Quota Exceeded`                                                                                        | no       |
+| Name                                         | Value                                                                                                        | Exported |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------- |
+| `CATALOG_FORMAT`                             | 1, from `@netvark/catalog-core`                                                                              | no       |
+| `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE` | 20 and 100, from `@netvark/keyset-core`                                                                      | no       |
+| `SEARCH_PARAMETER`                           | `filter[q]`                                                                                                  | no       |
+| `CODE_PATTERN`                               | `^[A-Z][A-Z0-9_]*$`                                                                                          | no       |
+| `ID_SUFFIX`                                  | `_id`                                                                                                        | no       |
+| `NOT_NULL_SUFFIX`                            | `_not_null`                                                                                                  | no       |
+| `ISSUE_KINDS`                                | the thirteen kinds of 6.4, in that order                                                                     | yes      |
+| integer bounds                               | `int2` [-32768, 32767], `int4` [-2147483648, 2147483647], `int8` [-9223372036854775808, 9223372036854775807] | no       |
+| `real` limit                                 | `Math.fround` finite and nonzero for a nonzero input                                                         | no       |
+| fraction digits of a second                  | at most 6                                                                                                    | no       |
+| date years                                   | 0001 to 9999                                                                                                 | no       |
+| Standard Schema vendor                       | `netvark`                                                                                                    | no       |
+| `QUOTA_EXCEEDED`                             | 403, `Quota Exceeded`                                                                                        | no       |
