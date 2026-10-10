@@ -13,7 +13,13 @@ function names(module: object): Array<string> {
   return Object.keys(module).toSorted();
 }
 
-const CORE = ['CATALOG_FORMAT', 'diffCatalogs', 'toPublicCatalog'].toSorted();
+const CORE = [
+  'CATALOG_FORMAT',
+  'diffCatalogs',
+  'toCamelCase',
+  'toPublicCatalog',
+  'toSnakeCase',
+].toSorted();
 
 const PG_CATALOG = [
   'PgCatalogError',
@@ -40,6 +46,8 @@ describe('package surface (SPEC 1)', () => {
     expect(pgCatalog.toPublicCatalog).toBe(core.toPublicCatalog);
     expect(pgCatalog.diffCatalogs).toBe(core.diffCatalogs);
     expect(pgCatalog.CATALOG_FORMAT).toBe(core.CATALOG_FORMAT);
+    expect(pgCatalog.toCamelCase).toBe(core.toCamelCase);
+    expect(pgCatalog.toSnakeCase).toBe(core.toSnakeCase);
   });
 
   it('resolves package.json through the exports maps', async () => {

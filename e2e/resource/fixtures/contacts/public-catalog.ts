@@ -799,6 +799,222 @@ export const publicCatalog = {
         }
       }
     },
+    "notes": {
+      "schema": "public",
+      "name": "notes",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": {
+            "literal": null
+          },
+          "identity": null,
+          "generated": null
+        },
+        "organization_id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "type": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "author": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "contact": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "contact_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "body": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "priorität": {
+          "type": "int2",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "smallint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp with time zone",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": {
+            "literal": null
+          },
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "notes_author_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "author"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          }
+        },
+        "notes_body_check": {
+          "kind": "check",
+          "columns": [
+            "body"
+          ],
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 2000
+          }
+        },
+        "notes_contact_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "contact_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          }
+        },
+        "notes_organization_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "organization_id"
+          ],
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ]
+          }
+        },
+        "notes_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        },
+        "notes_priorität_check": {
+          "kind": "check",
+          "columns": [
+            "priorität"
+          ],
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "3",
+              "inclusive": true
+            }
+          }
+        },
+        "notes_type_check": {
+          "kind": "check",
+          "columns": [
+            "type"
+          ],
+          "rule": {
+            "kind": "enum",
+            "values": [
+              "call",
+              "email",
+              "visit"
+            ]
+          }
+        }
+      }
+    },
     "organizations": {
       "schema": "public",
       "name": "organizations",

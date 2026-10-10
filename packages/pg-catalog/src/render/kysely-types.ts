@@ -8,13 +8,14 @@
  * @packageDocumentation
  */
 import type {
+  CamelCaseOptions,
   Catalog,
   CatalogColumn,
   CatalogDomain,
   CatalogTable,
 } from '@netvark/catalog-core';
 
-import type { CamelCaseOptions, TypeOverride } from '../config';
+import type { TypeOverride } from '../config';
 import type {
   Helper,
   MappingContext,
@@ -25,8 +26,8 @@ import type {
 
 import { PgCatalogError } from '../errors';
 import { compareCodeUnits } from '../internal/code-units';
-import { KeyNames } from './camel-case';
 import { FILE_HEADER } from './catalog-module';
+import { KeyNames } from './key-names';
 import { mapType } from './kysely-mapping';
 import { memberName, pascalCase, stringLiteral } from './kysely-names';
 

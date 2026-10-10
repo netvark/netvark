@@ -30,8 +30,12 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   option, as a `Requirement` or a message type (SPEC 3), never by intersecting two different literal
   types, which reduces the declaration to `never`. It builds error types only for an actual mistake:
   guard a mapped type of unknown members (`KnownMembers`), and give invalid keys their own mapped
-  type, built only when there is one (`FieldsCheck`). A check that changes shape is measured on the
-  real catalogs of SPEC 15.5 with `tsc --extendedDiagnostics --checkers 1`.
+  type, built only when there is one (`FieldsCheck`). Compute what depends on the catalog alone per
+  table, so TypeScript caches it (`TableNameRisk`); name every union of template literal types with
+  an alias, since TypeScript 7 instantiates an inline one in a conditional's `extends` clause on
+  every evaluation; and leave to the runtime a check whose type costs more than it catches (derived
+  codes, SPEC 4.2). A check that changes shape is measured on the real catalogs of SPEC 15.5 with
+  `tsc --extendedDiagnostics --checkers 1`.
 - The core knows no host. Nothing under `packages/resource-core/` imports Kysely, Hono, React, a
   driver, or a Node.js module; `server/` holds contracts, and adapters implement them (ADR 0008).
   The root and `openapi` entries never import from `server/`.
@@ -46,7 +50,7 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 - `declare/` the definer, `declareResource`, the declaration types and their checks
 - `catalog/` type-level and runtime lookups into the public catalog
-- `names/` derived names, reverse maps, and the type-level conversions with their case table
+- `names/` derived names and codes, reverse maps, and their type-level twins and checks
 - `wire/` and `schema/` the wire forms, exact decimals, value and object schemas, rules, issues, and
   the Standard Schema wrappers
 - `codecs/` `defineCodec`, `defineValidator`, `StorageCodecs`

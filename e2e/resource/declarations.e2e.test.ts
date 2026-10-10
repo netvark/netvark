@@ -3,49 +3,41 @@
  * 14), through the built package: each is a frozen copy keyed by the
  * table, targets resolve lazily to the declared resources, and JavaScript
  * callers get a `TypeError` naming the option for every mistake
- * `fails/` proves TypeScript refuses.
+ * `fails/` proves TypeScript refuses (those of `fails/names.ts` in
+ * `names.e2e.test.ts`).
  */
 import { describe, expect, it } from 'vitest';
-
-import { createDeclareResource } from '@netvark/resource-core';
 
 import { catalog } from './fixtures/contacts/catalog.ts';
 import { publicCatalog } from './fixtures/contacts/public-catalog.ts';
 import { Contacts } from './resources/contacts.ts';
-import { declareResource } from './resources/declare-resource.ts';
 import { Meetings } from './resources/meetings.ts';
+import { Notes } from './resources/notes.ts';
 import { Organizations } from './resources/organizations.ts';
+import {
+  configureUntyped,
+  declareUntyped,
+  typeErrorOf,
+} from './support/untyped.ts';
 
-/** `declareResource` with its types erased, as JavaScript calls it. */
-const declareUntyped = declareResource as unknown as (
-  table: unknown,
-  declaration: unknown,
-) => unknown;
-const configureUntyped = createDeclareResource as unknown as (
-  config: unknown,
-) => unknown;
-
-function typeErrorOf(run: () => unknown): string {
-  try {
-    run();
-  } catch (error) {
-    if (error instanceof TypeError) {
-      return error.message;
-    }
-    throw error;
-  }
-  throw new Error('expected a TypeError');
-}
+const RESOURCES = [Organizations, Contacts, Meetings, Notes];
 
 describe('the declared resources', () => {
-  it('hold their table and a frozen copy of the declaration', () => {
-    expect([Organizations.table, Contacts.table, Meetings.table]).toEqual([
+  it('hold their table, a frozen copy of the declaration, and their names', () => {
+    expect(RESOURCES.map((resource) => resource.table)).toEqual([
       'organizations',
       'contacts',
       'meetings',
+      'notes',
     ]);
-    for (const resource of [Organizations, Contacts, Meetings]) {
+    for (const resource of RESOURCES) {
+      expect(Object.keys(resource).toSorted()).toEqual([
+        'declaration',
+        'names',
+        'table',
+      ]);
       expect(Object.isFrozen(resource)).toBe(true);
+      expect(Object.isFrozen(resource.names)).toBe(true);
       expect(Object.isFrozen(resource.declaration)).toBe(true);
       expect(Object.isFrozen(resource.declaration.fields)).toBe(true);
     }
@@ -67,6 +59,7 @@ describe('the declared resources', () => {
     expect(Contacts.declaration.relationships.organization_id.target()).toBe(
       Organizations,
     );
+    expect(Notes.declaration.relationships.author.target()).toBe(Contacts);
   });
 });
 

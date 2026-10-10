@@ -7,9 +7,9 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 `TypeError` naming its path. Every rule is specified in
 [`docs/resource/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/resource/SPEC.md).
 
-Status: in development and unreleased. This line implements the definer and the declaration (SPEC
-sections 2 and 3). Derived names, Zod schemas, error codes, `defineCodec` and `defineValidator`,
-messages, the `server` subpath, and OpenAPI follow;
+Status: in development and unreleased. This line implements the definer, the declaration, and the
+public names and codes derived from it (SPEC sections 2 to 4). Zod schemas, the error catalog,
+`defineCodec` and `defineValidator`, messages, the `server` subpath, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -89,6 +89,7 @@ export const Contacts = declareResource('contacts', {
 
 Contacts.table; // 'contacts'
 Contacts.declaration.fields.name.sort; // true, frozen as given
+Contacts.names.fields.get('createdAt'); // 'created_at'
 ```
 
 Until `defineCodec` and `defineValidator` land, a codec is `{ types }`, the catalog types it
@@ -161,6 +162,55 @@ export const Meetings = declareResource('meetings', {
 Its declared return type is `void` on purpose: TypeScript then infers each declaration without first
 inferring its targets, which is what keeps mutual references free of TS7022 (SPEC 3.8).
 
+## Public names
+
+Declarations take database names, and the API speaks public names derived from them (SPEC 4):
+
+| Public name  | Derived from                              | Override                 | Example                                            |
+| ------------ | ----------------------------------------- | ------------------------ | -------------------------------------------------- |
+| type         | the table's name                          | `as` on the declaration  | `contact_phones`                                   |
+| field        | camelCase of the column                   | `as` on the field        | `created_at` is `createdAt`                        |
+| relationship | camelCase of the column without its `_id` | `as` on the relationship | `organization_id` is `organization`                |
+| error code   | the rule key, upper-cased                 | `code` on the rule       | `contacts_email_unique` is `CONTACTS_EMAIL_UNIQUE` |
+
+camelCase is the conversion of Kysely's `CamelCasePlugin` with its default options, so a field's
+public name is the key a camelCase Kysely row already has. Each declared resource holds both
+directions in `names`, as `ReadonlyMap`s, so a name from a request never reaches `Object.prototype`:
+
+```ts
+Notes.names.fields.get('kind'); // 'type': public name to column
+Notes.names.columns.get('contact_id'); // 'contact': column to public name
+Notes.names.codes.get('NOTE_PRIORITY_OUT_OF_RANGE'); // 'notes_priorität_check'
+```
+
+A derived name JSON:API refuses or two members share needs `as`, and a derived code outside A-Z,
+0-9, and `_` needs `code`:
+
+```ts
+export const Notes = declareResource('notes', {
+  operations: ['list', 'get', 'create', 'update'],
+  scope: 'organization',
+  fields: {
+    type: { access: 'immutable', as: 'kind' }, // every resource object has a type
+    contact: { access: 'readWrite', as: 'contactName' }, // contact_id derives contact
+    body: { access: 'readWrite' },
+    priorität: { access: 'readWrite' },
+  },
+  relationships: {
+    organization_id: { target: () => Organizations, access: 'read' },
+    author: { target: () => Contacts, access: 'immutable', as: 'author' }, // no _id to drop
+    contact_id: { target: () => Contacts, access: 'readWrite' },
+  },
+  rules: { notes_priorität_check: { code: 'NOTE_PRIORITY_OUT_OF_RANGE' } }, // Ä is not A-Z
+});
+```
+
+`tsc` checks the type, every member that gives `as` or whose column could derive a refused or shared
+name, and every given code. The other cases cost more to check in types than they catch, so only the
+declaration's runtime check, which runs when the module loads, reports them: a derived code outside
+the pattern or repeated, a column only a quoted identifier can name (`"suite-"`), and two columns a
+Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`). SPEC 4.2 lists both sides.
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -178,6 +228,14 @@ inferring its targets, which is what keeps mutual references free of TS7022 (SPE
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
   `jsonb` cannot, even though PostgreSQL accepts them as keys. Use `clientIds: true` with a key that
   accepts a client value, such as `uuid default gen_random_uuid()` or an identity `BY DEFAULT`.
+- **Name foreign keys `<thing>_id`.** The relationship is then `<thing>` without `as`. Keep `type`,
+  `id`, and `lid` for the members JSON:API gives them, and rename such a column with `as` (`kind`).
+- **Give codes to the errors clients handle.** A derived code follows the constraint's name, which
+  PostgreSQL generates from the columns unless the migration names it; `code: 'CONTACT_EMAIL_TAKEN'`
+  stays put when a migration renames the constraint. Name constraints in ASCII, or give `code`: a
+  CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z.
+- **Review names as API changes.** Snapshot `names` in a test, so a migration that renames a column
+  shows up in review as the public name it changes.
 - **Cover every CHECK without a rule.** Name the validator in the declaration's `rules`, and a
   domain's once in the definer's `domains`; prefer CHECKs `@netvark/pg-catalog` translates (length,
   range, `IN`, `IS NOT NULL`, simple patterns), which need no code at all.
@@ -185,13 +243,15 @@ inferring its targets, which is what keeps mutual references free of TS7022 (SPE
 ## Performance
 
 Measured with TypeScript 7.0.2 on declarations generated for every declarable table of two real
-schemas, each exposing every column it can, against the packed package (SPEC 15.5). Peak memory is
-the median of three runs:
+schemas, each exposing every column it can, against the packed package (SPEC 15.5). Times and peak
+memory are medians of at least five runs:
 
 | Catalog            | Declarations | Fields | Relationships | Check time | Peak memory, 1 checker | Peak memory, 4 checkers |
 | ------------------ | ------------ | ------ | ------------- | ---------- | ---------------------- | ----------------------- |
-| stern              | 111          | 1,183  | 184           | 0.14 s     | 112 MB                 | 188 MB                  |
-| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.20 s     | 140 MB                 | 233 MB                  |
+| stern              | 111          | 1,183  | 184           | 0.17 s     | 125 MB                 | 203 MB                  |
+| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.25 s     | 147 MB                 | 271 MB                  |
+
+The names checks account for about 15 percent of the stern check and 11 percent of the GitLab one.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in
@@ -204,7 +264,12 @@ the median of three runs:
   check take 1.55 s and 874 MB. Messages for keys that cannot be declared come from a separate
   mapped type built only when there is one (`FieldsCheck`): an error branch inside the per-key
   template costs types for every key even when no key takes it, and splitting it out cut the types
-  created by about three quarters. Re-run the real-catalog measurement when a check changes shape.
+  created by about three quarters. Compute what depends on the catalog alone per table, so
+  TypeScript caches it: the names check examines only the members a table's name risk holds, which
+  took its first version from 3 and 6.5 times the cost of the other checks to 15 and 9.5 percent
+  more instantiations. Name every union of template literal types with an alias: TypeScript 7
+  instantiates an inline union in a conditional's `extends` clause again on every evaluation, at 4
+  to 7 times the cost. Re-run the real-catalog measurement when a check changes shape.
 
 @ref https://devblogs.microsoft.com/typescript/announcing-typescript-7-0-rc/
 

@@ -1,15 +1,18 @@
 /**
- * The CamelCasePlugin port (SPEC 9.2) against Kysely's own plugin, and the
- * keys the Kysely types get with `camelCase`: the plugin's names where they
- * map back, `camel_case_mismatch` where they do not.
+ * The CamelCasePlugin port of `@netvark/catalog-core` (SPEC 9.2) against
+ * Kysely's own plugin, which a core cannot import, and the keys the Kysely
+ * types get with `camelCase`: the plugin's names where they map back,
+ * `camel_case_mismatch` where they do not.
  */
-import type { CamelCaseOptions } from '../config';
+import type { CamelCaseOptions } from '@netvark/catalog-core';
 
 import { CamelCasePlugin } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
+import { toCamelCase, toSnakeCase } from '@netvark/catalog-core';
+
 import { catalogOf, column, table } from '../test-support/kysely-catalog';
-import { KeyNames, toCamelCase, toSnakeCase } from './camel-case';
+import { KeyNames } from './key-names';
 import { renderKyselyTypes } from './kysely-types';
 
 /** The plugin's conversions, through the methods its documentation says to override. */

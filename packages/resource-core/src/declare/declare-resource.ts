@@ -1,13 +1,15 @@
 /**
- * `declareResource` at runtime (SPEC 3, 14): every check TypeScript makes,
- * made again for declarations written in JavaScript, plus those types
- * cannot express; each throws `TypeError` naming the option.
+ * `declareResource` at runtime (SPEC 3, 4, 14): every check TypeScript
+ * makes, made again for declarations written in JavaScript, plus those
+ * types cannot express; each throws `TypeError` naming the option. The
+ * result carries the derived names (`names/derive-names.ts`).
  * @packageDocumentation
  */
 import type { DefinerContext } from './check-config';
 import type { DeclaredResource } from './declared-resource';
 
 import { describe, ownValue } from '../internal/object';
+import { deriveNames } from '../names/derive-names';
 import { checkMembers } from './check-columns';
 import {
   checkClientIds,
@@ -53,7 +55,12 @@ export function declareResourceIn(
   checkSort(table, declaration);
   checkPage(context, table, declaration.page);
   checkRules(context, table, tableDef, declaration);
+  const names = deriveNames(table, tableDef, identity.id, declaration);
   return brandDeclared(
-    Object.freeze({ table, declaration: freezeDeclaration(declaration) }),
+    Object.freeze({
+      table,
+      declaration: freezeDeclaration(declaration),
+      names,
+    }),
   );
 }

@@ -1,4 +1,6 @@
-import type { CamelCaseOptions, ExtractionConfig } from '../config';
+import type { CamelCaseOptions } from '@netvark/catalog-core';
+
+import type { ExtractionConfig } from '../config';
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
