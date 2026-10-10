@@ -418,6 +418,9 @@ importers:
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8
+      '@netvark/catalog-core':
+        specifier: workspace:*
+        version: link:../../packages/catalog-core
       '@netvark/pg-catalog':
         specifier: workspace:*
         version: link:../../packages/pg-catalog
@@ -427,9 +430,15 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.4
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(oxc-resolver@11.24.2)(publint@0.3.25)(typescript@7.0.2)

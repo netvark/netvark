@@ -45,7 +45,7 @@ driver, or a Node.js module.
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
 | `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ```
 packages/resource-core/src/
@@ -266,6 +266,14 @@ JSON value has no string form to be one. PostgreSQL accepts a `jsonb` primary ke
 to it, since `jsonb` has a btree operator class, so the definer is what refuses them; the same rule
 holds for a relationship's foreign-key column, whose values are the target's ids.
 
+JSON:API ids are strings, so an id travels in its key's wire form when that form is a string
+(`text`, `uuid`, `int8`, `numeric`, a date, an enum label), and otherwise as one canonical text: an
+`int2` or `int4` key as integer text in `int8`'s spelling (5.1) within the type's range, a `real` or
+`double precision` key as JavaScript's shortest round-trip text (`String(value)`, what a server
+writes when it reads the column as a number), and a `bool` key as `true` or `false`. The key's rules
+apply to the value the text names. Other spellings PostgreSQL reads (`+1`, `01`, `1.0`, `1e3`, `-0`,
+` 1`, `t`, `TRUE`) are refused, so an id has one spelling and two ids compare as text.
+
 With `clientIds: true` a create MAY carry an `id`, validated by that form; without it a create that
 carries one is rejected by `@netvark/jsonapi-core` (403, JSON:API "Client-Generated IDs").
 `clientIds` requires a primary key that accepts a client value: a generated column and an identity
@@ -300,6 +308,21 @@ an array column, has that domain, directly or through a base domain, and it is a
 that has a rule, as in 3.5. TypeScript checks `domains` against the catalog and the validators
 (`DomainsCheck`) where the definer is created.
 
+A rule MAY give `code`, which replaces the CHECK's derived code, its constraint name upper-cased
+(4.1, `email_check` derives `EMAIL_CHECK`); a given or derived code MUST match `CODE_PATTERN`, so a
+constraint name outside A-Z, 0-9, and `_` needs one. The validator's issues carry that code (6.4) on
+every column of the domain, as a table CHECK's validator carries the table constraint's code.
+
+The validator receives every value the domain holds where it runs (7.2), so its input type MUST
+accept: the domain's value, the output type of its base type; the output of each codec whose `types`
+name the domain or a domain over it, up to the first array, since a codec field keeps its domains'
+validators (6.1); and `null`, unless the domain or a base domain is NOT NULL or has a `notNull`
+rule. The definer cannot see which columns use the domain, so a domain that a NOT NULL column alone
+uses still needs a validator that accepts `null`; with a nullable column the CHECK passes `NULL` and
+so does the validator. TypeScript checks the input where the definer is created
+(`validator: "strictEmail" does not accept every value of domain email`); nothing checks it at
+runtime, since an input type has no runtime form.
+
 ### 3.7 Search, sort, page
 
 - `search.column` MUST be a `tsvector` column of the table. When the column is generated and the
@@ -325,9 +348,12 @@ https://github.com/microsoft/TypeScript/wiki/FAQ#why-are-functions-returning-non
 The check that the target is a declared resource of the referenced table therefore runs where the
 targets are read: TypeScript checks it where a registry is assembled (4.2), and at runtime the first
 read of a target, and the registry, throw `TypeError`
-(`contacts.relationships.organization_id.target: the target is a resource of users; the foreign key references organizations`).
-Nothing reads a target while modules load, so a target declared later in the module graph is read
-after it exists.
+(`contacts.relationships.organization_id.target: the target is a resource of users; the foreign key references organizations`),
+and a target that returns anything but a declared resource throws
+`... .target: must return the declared resource of organizations`. Nothing reads a target while
+modules load, so a target declared later in the module graph is read after it exists: the first read
+of `linkage` or `write` (6.2), which reads every target, is where a wrong target fails, and a failed
+read throws again on the next.
 
 Tests: `declare-resource.test.ts`, `declare-fields.test.ts`, `declare-relationships.test.ts`, and
 `declare-options.test.ts` (every `TypeError` of 14 a declaration can throw);
@@ -455,24 +481,24 @@ two tables whose names cannot be a type.
 A column's wire form is chosen by its catalog `type` (the element type for an array) and `typeKind`.
 Reads produce exactly the read form; writes accept exactly the values in the "Write" column.
 
-| `type`                                              | Wire            | Write accepts                                                                                                          | Read form                                                  | JSON Schema                                              |
-| --------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
-| `text`, `varchar`, `bpchar`, `citext`               | string          | a well-formed string (no unpaired surrogate) without U+0000; with `maxLength` n, at most n code points                 | as stored; `bpchar(n)` padded to n as PostgreSQL prints it | `{ type: 'string', maxLength }`                          |
-| `int2`                                              | number          | an integer in [-32768, 32767]                                                                                          | the number                                                 | `{ type: 'integer', format: 'int16', minimum, maximum }` |
-| `int4`                                              | number          | an integer in [-2147483648, 2147483647]                                                                                | the number                                                 | `{ type: 'integer', format: 'int32', minimum, maximum }` |
-| `int8`                                              | string          | `^-?(0\|[1-9][0-9]*)$` within [-9223372036854775808, 9223372036854775807]                                              | PostgreSQL's text                                          | `{ type: 'string', format: 'int64', pattern }`           |
-| `numeric`                                           | string          | `^-?(0\|[1-9][0-9]*)(\.[0-9]+)?$`; with `(p, s)`, at most s fraction digits and an absolute value below 10^(p-s)       | PostgreSQL's text (`numeric(5,2)` prints `1.00`)           | `{ type: 'string', format: 'decimal', pattern }`         |
-| `float4`                                            | number          | a finite number whose `Math.fround` is finite, and nonzero when the number is                                          | the number                                                 | `{ type: 'number', format: 'float' }`                    |
-| `float8`                                            | number          | a finite number                                                                                                        | the number                                                 | `{ type: 'number', format: 'double' }`                   |
-| `bool`                                              | boolean         | `true`, `false`                                                                                                        | the boolean                                                | `{ type: 'boolean' }`                                    |
-| `uuid`                                              | string          | 8-4-4-4-12 hexadecimal digits, either case                                                                             | lower case                                                 | `{ type: 'string', format: 'uuid' }`                     |
-| `date`                                              | string          | `YYYY-MM-DD` naming a real calendar day in the years 0001 to 9999                                                      | the same                                                   | `{ type: 'string', format: 'date' }`                     |
-| `timestamp`                                         | string          | RFC 3339 `full-date "T" full-time` without an offset: seconds required, at most six fraction digits, the date as above | the same, fraction as PostgreSQL prints it                 | `{ type: 'string', format: 'date-time-local' }`          |
-| `timestamptz`                                       | string          | RFC 3339 `date-time` with `Z` or `±HH:MM`: seconds required, at most six fraction digits, the date as above            | the instant in UTC with `Z`                                | `{ type: 'string', format: 'date-time' }`                |
-| `json`, `jsonb`                                     | any             | any JSON value; for `jsonb`, no U+0000 in any string                                                                   | the parsed value                                           | `{}`                                                     |
-| an enum (`typeKind: 'enum'`)                        | string          | one of the labels, in the catalog's order                                                                              | the label                                                  | `{ type: 'string', enum }`                               |
-| a domain (`typeKind: 'domain'`)                     | the base type's | the base type's form, then the domain's rules and NOT NULL                                                             | the base type's                                            | the base type's, with the rules' keywords                |
-| an array of any of the above but `json` and `jsonb` | array           | a one-dimensional array of non-null elements in the element's form                                                     | the same                                                   | `{ type: 'array', items }`                               |
+| `type`                                              | Wire            | Write accepts                                                                                                                                                   | Read form                                                  | JSON Schema                                              |
+| --------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| `text`, `varchar`, `bpchar`, `citext`               | string          | a well-formed string (no unpaired surrogate) without U+0000; with `maxLength` n, at most n code points                                                          | as stored; `bpchar(n)` padded to n as PostgreSQL prints it | `{ type: 'string', maxLength }`                          |
+| `int2`                                              | number          | an integer in [-32768, 32767]                                                                                                                                   | the number                                                 | `{ type: 'integer', format: 'int16', minimum, maximum }` |
+| `int4`                                              | number          | an integer in [-2147483648, 2147483647]                                                                                                                         | the number                                                 | `{ type: 'integer', format: 'int32', minimum, maximum }` |
+| `int8`                                              | string          | `^(0\|-?[1-9][0-9]*)$` (zero has no sign) within [-9223372036854775808, 9223372036854775807]                                                                    | PostgreSQL's text                                          | `{ type: 'string', format: 'int64', pattern }`           |
+| `numeric`                                           | string          | `^-?(0\|[1-9][0-9]*)(\.[0-9]+)?$` without a negative zero (`-0`, `-0.00`); with `(p, s)`, at most s fraction digits and an absolute value below 10^(p-s)        | PostgreSQL's text (`numeric(5,2)` prints `1.00`)           | `{ type: 'string', format: 'decimal', pattern }`         |
+| `float4`                                            | number          | a finite number whose `Math.fround` is finite, and nonzero when the number is                                                                                   | the number                                                 | `{ type: 'number', format: 'float' }`                    |
+| `float8`                                            | number          | a finite number                                                                                                                                                 | the number                                                 | `{ type: 'number', format: 'double' }`                   |
+| `bool`                                              | boolean         | `true`, `false`                                                                                                                                                 | the boolean                                                | `{ type: 'boolean' }`                                    |
+| `uuid`                                              | string          | 8-4-4-4-12 hexadecimal digits, either case                                                                                                                      | lower case                                                 | `{ type: 'string', format: 'uuid' }`                     |
+| `date`                                              | string          | `YYYY-MM-DD` naming a real calendar day in the years 0001 to 9999                                                                                               | the same                                                   | `{ type: 'string', format: 'date' }`                     |
+| `timestamp`                                         | string          | RFC 3339 `full-date "T" full-time` without an offset: seconds required, at most six fraction digits and only zeros past p for `timestamp(p)`, the date as above | the same, fraction as PostgreSQL prints it                 | `{ type: 'string', format: 'date-time-local' }`          |
+| `timestamptz`                                       | string          | RFC 3339 `date-time` with `Z` or `±HH:MM`: seconds required, at most six fraction digits and only zeros past p for `timestamptz(p)`, the date as above          | the instant in UTC with `Z`                                | `{ type: 'string', format: 'date-time' }`                |
+| `json`, `jsonb`                                     | any             | any JSON value; for `jsonb`, no U+0000 in any string                                                                                                            | the parsed value                                           | `{}`                                                     |
+| an enum (`typeKind: 'enum'`)                        | string          | one of the labels, in the catalog's order                                                                                                                       | the label                                                  | `{ type: 'string', enum }`                               |
+| a domain (`typeKind: 'domain'`)                     | the base type's | the base type's form, then the domain's rules and NOT NULL                                                                                                      | the base type's                                            | the base type's, with the rules' keywords                |
+| an array of any of the above but `json` and `jsonb` | array           | a one-dimensional array of non-null elements in the element's form                                                                                              | the same                                                   | `{ type: 'array', items }`                               |
 
 @ref https://www.postgresql.org/docs/18/datatype.html @ref
 https://www.rfc-editor.org/rfc/rfc3339#section-5.6 @ref https://spec.openapis.org/registry/format/
@@ -505,11 +531,19 @@ Each restriction is a place where PostgreSQL rejects the value or stores a diffe
 - `real` fails with 22003 on overflow (`3.5e38`) and on underflow (`1e-50`). JSON has no `NaN` or
   infinity, so neither float type admits them.
 - `bigint` and `numeric` exceed JavaScript's exact integers, so they travel as strings in one
-  canonical spelling (PostgreSQL also accepts `+5`, `007`, and surrounding spaces).
+  canonical spelling (PostgreSQL also accepts `+5`, `007`, surrounding spaces, and `-0`, which it
+  stores and prints as `0`).
 - `timestamptz` rounds to microseconds and accepts minute precision; `timestamp` silently ignores an
   offset (`'2020-01-01T06:15:00+02:00'::timestamp` is `06:15:00`); `date` accepts years beyond 9999,
   BC dates, and `infinity`, which RFC 3339 cannot express. @ref
   https://www.postgresql.org/docs/18/datatype-datetime.html
+- `timestamp(p)` and `timestamptz(p)` round to p fraction digits, possibly into the next day or year
+  (`'9999-12-31 23:59:59.999999'::timestamp(3)` is `10000-01-01 00:00:00`), so a non-zero digit past
+  p is refused; zeros past p keep the instant (`12:00:00.000Z`, what `Date.prototype.toISOString`
+  writes, fits `timestamptz(0)`). The catalog records p as the column's or domain's `precision`, an
+  array column its element's (catalog SPEC 7.3); without one, six. Zod's
+  `z.iso.datetime({ precision })` also reports a wrong fraction as a format issue (6.4). @ref
+  https://zod.dev/api?id=iso-datetimes
 - `jsonb` fails with 22P05 on `\u0000`; `json` stores it.
 - `text[]` accepts `NULL` elements and values of any dimension; the wire form admits neither, and a
   column that needs them needs a codec.
@@ -526,12 +560,16 @@ Range rules and type bounds compare the value PostgreSQL would compare (ADR 0005
   (`wire/decimal.ts`), never through a JavaScript number.
 - `float4` values are compared after `Math.fround`, against the bound as a double: `0.1::real > 0.1`
   is true in PostgreSQL, because the comparison promotes the rounded `real` to `double precision`,
-  and `Math.fround(0.1) > 0.1` is true in JavaScript.
+  and `Math.fround(0.1) > 0.1` is true in JavaScript. The recognizer emits no rule for a `real`
+  column (catalog SPEC 8.1), so only a hand-written catalog reaches this comparison; `real`'s own
+  limits are its wire form's (5.2).
 - `float8`, `int2`, and `int4` values are compared as numbers against `Number(bound)`, the same
   correctly rounded conversion PostgreSQL applies to the numeric constant.
 
-Tests: `wire-forms.test.ts` holds, per row, the values the write form accepts and rejects; the
-oracle runs the same values and generated boundaries through PostgreSQL (15.3).
+Tests: `wire-forms.test.ts` and `wire-string-forms.test.ts` hold, per row, the values the write form
+accepts and rejects, `datetime-precision.test.ts` the fraction digits of `timestamp(p)` from a
+column, a domain, a domain over it, and an array element, and `decimal.test.ts` the exact
+comparison; the oracle runs the same values and generated boundaries through PostgreSQL (15.3).
 
 ---
 
@@ -582,8 +620,16 @@ by public names:
 | `update` | fields with `readWrite`, `write`              | none                                                 | rejected     |
 
 `linkage` holds the same three for relationships: each member is `{ type, id }` with the target's
-type as a literal and the id in the target id's wire form, or `null` when the foreign-key column is
+type as a literal and the id in the target id's form (3.4), or `null` when the foreign-key column is
 effectively nullable. A relationship is required on create when its column is required on insert.
+
+`write.create` and `write.update` are Standard Schema validators (6.5) of a create or an update as
+`@netvark/jsonapi-core` parses a resource object: `{ attributes, relationships }`, both members
+present (the parser gives `{}` for one the document leaves out), each relationship as its `data`.
+Each part is validated by its object schema, and the multi-column CHECKs that span a field and a
+relationship run there, the one place both are in view. Issue paths start with `attributes` or
+`relationships` (9.3). `schema` and `linkage` are Zod schemas, whose issues are Zod's; `validate`
+and `write` report `ResourceIssue`s (6.4).
 
 - `read` strips keys it does not know instead of rejecting them, so a client that validates
   responses keeps working when the server adds a field; a response with a sparse fieldset is
@@ -592,8 +638,11 @@ effectively nullable. A relationship is required on create when its column is re
   member whose value is `undefined` (ADR 0004).
 - No schema carries `.default()`, `.prefault()`, `.catch()`, or a transform that adds a member; a
   test walks every composed schema and fails on any of them.
-- Multi-column validators (3.5) run on the object schema after the members parse, only when every
-  column of the CHECK has its field present in the input; otherwise the database decides (9.5).
+- Multi-column validators (3.5) run after the members parse: on `schema` when every column of the
+  CHECK is a field, on `linkage` when every column is a relationship, and on `write` when they mix.
+  Each runs only when every member of its CHECK is present in the input; otherwise the database
+  decides (9.5). A relationship enters the validator as its id (7.2), and a refusal raises one issue
+  per member, each carrying the CHECK's code.
 - `Infer<typeof Contacts>` is `{ read, create, update, linkage: { read, create, update } }`, each
   the output type of the matching schema. A field whose catalog type is an enum, or whose CHECK is
   an `enum` rule, has the union of its values as its type.
@@ -638,18 +687,18 @@ type IssueKind =
   | 'additionalProperties';
 ```
 
-| Kind                                                         | Raised when                                                             | `expected`                                                                                                      |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `required`                                                   | a required member is missing, or `null` where the field is not nullable | absent                                                                                                          |
-| `type`                                                       | the JSON type is wrong                                                  | `string`, `integer`, `number`, `boolean`, `array`, `object`                                                     |
-| `format`                                                     | a string is not in its wire form                                        | `uuid`, `date`, `date-time`, `date-time-local`, `int64`, `decimal`, or `text` (U+0000 or an unpaired surrogate) |
-| `minLength`, `maxLength`                                     | a length rule or `varchar(n)` fails                                     | the bound                                                                                                       |
-| `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` | a range rule, a type bound, or `numeric(p, s)`'s integer digits fail    | the bound as a decimal                                                                                          |
-| `multipleOf`                                                 | more fraction digits than `numeric(p, s)`'s scale                       | `10^-s` as a decimal (`0.01`)                                                                                   |
-| `enum`                                                       | a value outside an enum or an `enum` rule                               | the values as a JSON array                                                                                      |
-| `pattern`                                                    | a `pattern` rule fails                                                  | the pattern's source                                                                                            |
-| `additionalProperties`                                       | a key the schema does not know, one issue per key                       | absent                                                                                                          |
-| a constraint code                                            | a validator rejects the value                                           | absent                                                                                                          |
+| Kind                                                         | Raised when                                                             | `expected`                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `required`                                                   | a required member is missing, or `null` where the field is not nullable | absent                                                                                                                                                                                                                                                                                       |
+| `type`                                                       | the JSON type is wrong                                                  | `string`, `integer`, `number`, `boolean`, `array`, `object`                                                                                                                                                                                                                                  |
+| `format`                                                     | a value is not in its wire form (5.1), a date-time's fraction included  | `uuid`, `date`, `date-time`, `date-time-local`, `int64`, `decimal`, `float` (beyond `real`), `json` (no JSON value), or `text` (U+0000 or an unpaired surrogate); for an id (3.4) also `int16`, `int32`, and `double`; for a codec field, the codec's name, at the path of the codec's issue |
+| `minLength`, `maxLength`                                     | a length rule or `varchar(n)` fails                                     | the bound                                                                                                                                                                                                                                                                                    |
+| `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` | a range rule, a type bound, or `numeric(p, s)`'s integer digits fail    | the bound as a decimal                                                                                                                                                                                                                                                                       |
+| `multipleOf`                                                 | more fraction digits than `numeric(p, s)`'s scale                       | `10^-s` as a decimal (`0.01`)                                                                                                                                                                                                                                                                |
+| `enum`                                                       | a value outside an enum or an `enum` rule                               | the values as a JSON array                                                                                                                                                                                                                                                                   |
+| `pattern`                                                    | a `pattern` rule fails                                                  | the pattern's source                                                                                                                                                                                                                                                                         |
+| `additionalProperties`                                       | a key the schema does not know, one issue per key                       | absent                                                                                                                                                                                                                                                                                       |
+| a constraint code                                            | a validator rejects the value                                           | absent                                                                                                                                                                                                                                                                                       |
 
 The kinds are the JSON Schema validation keywords that express the same constraint, so the OpenAPI
 document (13) and the issues name it the same way. Zod's own issue codes never reach a client: the
@@ -664,10 +713,14 @@ https://json-schema.org/draft/2020-12/json-schema-validation#section-6
 types. They are what the JSON:API definition validates attributes with (11.1). @ref
 https://standardschema.dev
 
-Tests: `compose.test.ts` (each step of 6.1 and each rule), `object-schemas.test.ts` (6.2, 6.3 over
-the contacts fixture), `issues.test.ts` (one case per row of 6.4), `no-defaults.test.ts` (the walk),
-`infer.test-d.ts` (`Infer` over the contacts fixture, enum narrowing, optional and nullable
-members).
+Tests: `compose.test.ts` (each step of 6.1 and each rule), `field-values.test.ts` (codec, domain,
+and validator members), `object-schemas.test.ts` and `required.test.ts` (6.2, 6.3 over the contacts
+fixture), `linkage-schemas.test.ts`, `id-schema.test.ts`, `multi-column.test.ts`, and
+`write-schemas.test.ts` (relationships, ids, and the CHECKs over several members), `issues.test.ts`
+(one case per row of 6.4), `length.test.ts` (code points under the Zod floor), `no-defaults.test.ts`
+(the walk), `examples.test.ts`, and `infer.test-d.ts` (`Infer` over the contacts fixture, enum
+narrowing, optional and nullable members); `e2e/resource/schemas.e2e.test.ts` runs the same
+contracts through the built package.
 
 ---
 
@@ -706,9 +759,16 @@ https://zod.dev/library-authors
 `types` is empty or holds a non-string
 (`defineCodec.types: must be a non-empty list of type names`), when `schema` is not a Zod 4 schema,
 when `fixtures` is empty, when the schema rejects a fixture
-(`defineCodec.fixtures[1]: the schema rejects this fixture`, with Zod's error as the `cause`), or
-when the schema parses asynchronously (`defineCodec.schema: must parse synchronously`). Without
-`fixtures`, or with an empty list or a fixture of another type, the call does not compile.
+(`defineCodec.fixtures[1]: the schema rejects this fixture`, with Zod's error as the `cause`), when
+the schema accepts `undefined` or `null`, or when the schema parses asynchronously
+(`defineCodec.schema: must parse synchronously`). A codec describes present, non-null values: the
+column's nullability decides `null` (6.1 step 4), and a member a client leaves out stays out (6.2),
+so a schema that accepts `undefined`, through `.optional()`, `.default()`, `.prefault()`, or
+`.catch()`, would put a value in place of an omitted member
+(`defineCodec.schema: must reject undefined, so a member a client leaves out stays out`), and one
+that accepts `null` would let `null` past a NOT NULL column
+(`defineCodec.schema: must reject null; the column's nullability decides null`). Without `fixtures`,
+or with an empty list or a fixture of another type, the call does not compile.
 
 ### 7.2 `defineValidator`
 
@@ -724,14 +784,25 @@ function defineValidator<TSchema extends $ZodType>(init: {
 ```
 
 A validator is the request-side twin of a CHECK the recognizer could not translate. Attached to a
-single-column CHECK, its input is the field's value (6.1 step 5); attached to a multi-column CHECK,
-its input is an object of the CHECK's members keyed by public name (6.2), a relationship as its
-linkage (`{ type, id }`, or `null`). Such CHECKs often span only foreign keys: all six of stern's
+single-column CHECK, its input is the member's value (6.1 step 5); attached to a multi-column CHECK,
+its input is an object of the CHECK's members keyed by public name (6.2). A relationship enters as
+its id, or `null`, the value the CHECK sees in the foreign-key column, never as its linkage: the
+validator then reads no target, and its fixtures are the values `pg-catalog rules --check`
+substitutes into the expression (7.3). Such CHECKs often span only foreign keys: all six of stern's
 CHECKs without a rule tie two relationships together (exactly one of a subject and an entity, or at
 least one of a workspace and an offering). A CHECK passes `NULL`, so the validator of a nullable
-member accepts `null`. The validator's input type MUST accept the field's output type, which `tsc`
-checks at the attachment. Its issues carry the CHECK's error code as their kind (6.4), whatever the
+member accepts `null`. Its issues carry the CHECK's error code as their kind (6.4), whatever the
 schema's own codes.
+
+The validator's input type MUST accept what it receives, which `tsc` checks where the rule attaches
+it (`AttachmentRequirement`): for a single-column CHECK, the field's output type, `null` included
+when the column is nullable, or a relationship's `string | null`; for a multi-column CHECK, an
+object of those keyed by public names, `as` respected. A CHECK with a column the declaration leaves
+out never runs (6.2), so it is not checked. The messages name the validator and what it misses:
+`validator: "lobbyOnly" does not accept every value of room` (the column) and
+`validator: "linkageOrNotes" does not accept every object of contact, notes` (the public names).
+Nothing checks the input at runtime, since an input type has no runtime form; a validator that
+refuses a value its CHECK holds refuses every write of it under the CHECK's code.
 
 `defineValidator` returns the validator frozen and throws `TypeError` when either list is empty,
 when the schema rejects an `accept` fixture or accepts a `reject` fixture, naming the list and index
@@ -851,6 +922,12 @@ renders them under `meta`:
   ]
 }
 ```
+
+An issue of `write.create` or `write.update` (6.2) has a path that starts with the part it belongs
+to, and the JSON:API definition (11.1) maps it into the document: `attributes/<name>/...` to
+`<pointer>/attributes/<name>/...`, and `relationships/<name>/...` to
+`<pointer>/relationships/<name>/data/...`, since a relationship object carries its linkage in
+`data`. A refused multi-column CHECK points at each of its members this way, one item per member.
 
 ### 9.4 Members an operation does not accept (`errors/forbidden-members.ts`)
 
@@ -1297,6 +1374,8 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a fixture the schema disagrees with (7)                                                          | `defineValidator.fixtures.reject[1]: the schema accepts this fixture`                                                                                       |
 | a schema that parses asynchronously (7)                                                          | `defineCodec.schema: must parse synchronously`                                                                                                              |
 | a domain rule for an unknown domain or CHECK, or for a CHECK with a rule (3.6)                   | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                                                           |
+| a domain rule's code, given or derived, that does not match `CODE_PATTERN` (3.6)                 | `createDeclareResource.domains.email.email_check.code: "Email" is not A-Z, 0-9, _`                                                                          |
+| a codec schema that accepts `undefined` or `null` (7.1)                                          | `defineCodec.schema: must reject null; the column's nullability decides null`                                                                               |
 | `links` or `page` that `@netvark/jsonapi-core`'s rules refuse                                    | `createDeclareResource.links.base must not end with "/"`                                                                                                    |
 | a table outside the public catalog                                                               | `declareResource: "accounts" is not a table of the public catalog`                                                                                          |
 | no single-column primary key                                                                     | `contact_phones: a resource needs a single-column primary key`                                                                                              |
@@ -1309,6 +1388,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a foreign key to anything but the primary key of a public table (3.1)                            | `people.relationships.team_slug: the foreign key references teams.slug, which is not its primary key`                                                       |
 | a foreign-key column whose type cannot carry a resource id (3.4)                                 | `import_rows.relationships.batch: type jsonb cannot carry a resource id`                                                                                    |
 | a `target` that is not a function (3.8)                                                          | `meetings.relationships.organization_id.target: must be a function returning the target's declared resource`                                                |
+| a `target` that returns no declared resource, or the resource of another table, on first read    | `contacts.relationships.organization_id.target: must return the declared resource of organizations`                                                         |
 | a scope whose column the table does not have (3.2)                                               | `audit.changes.scope: scope organization names column organization_id, which audit.changes does not have`                                                   |
 | a codec that does not accept the column's type                                                   | `contacts.fields.tags.codec: codec "phone" does not accept type text[]`                                                                                     |
 | a type without a wire form and no codec                                                          | `meetings.fields.during: type tstzrange has no wire form; name a codec`                                                                                     |
@@ -1330,6 +1410,13 @@ option, in the two forms of 3; its message names the option relative to the decl
 | `code` on a key without a code (9.1)                                                             | `notes.rules.notes_pkey.code: the key has no code, since clients cannot violate it`                                                                         |
 | an `example` the field schema rejects                                                            | `contacts.fields.name.example: the field schema rejects the example`                                                                                        |
 | registry conflicts (4.2)                                                                         | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                                                                                 |
+
+Two checks exist only in types, since a Zod schema's input type has no runtime form: a validator
+whose input does not accept what its CHECK holds (7.2), and a domain validator whose input does not
+accept every value of the domain (3.6). Their messages are
+`validator: "<name>" does not accept every value of <column>`,
+`validator: "<name>" does not accept every object of <public names>`, and
+`validator: "<name>" does not accept every value of domain <domain>`.
 
 Tests: one case per row in the `declare-*.test.ts`, `create-declare-resource.test.ts`,
 `derive-names-errors.test.ts`, `define-codec.test.ts`, `define-validator.test.ts`, and
@@ -1365,13 +1452,53 @@ The seed is printed on failure and fixed seeds run in CI. The generator adds no 
 
 ### 15.3 The oracle (`e2e/resource/oracle.e2e.test.ts`)
 
-For every row of 5.1 and every rule shape of 6.1, the boundary fixtures of `boundaryFixtures` (each
-bound and its neighbors, the type's limits, empty and astral strings, U+0000, an unpaired surrogate,
-the extra fraction digit, the date limits) run through the composed Zod schema and through
-PostgreSQL, `SELECT ($1::<type>)` and `SELECT (<check>)`, and the verdicts MUST agree except where
-5.2 documents a stricter wire form, in which case the test asserts that PostgreSQL would store a
-different value. It runs on PGlite always, and on PostgreSQL 14 and 18 servers when
-`RESOURCE_PG_URL` is set, as CI does.
+`boundaryFixtures(resource)`, from the `testing` entry, returns `{ fields, relationships }`: for
+each field with a wire form and each relationship, keyed by public name, a frozen list of
+`BoundaryFixture`s, `{ value, label }`, the wire values at or next to each limit of the member's
+folded value spec (6.1), each value once, the label naming the limit (`maxLength 3, plus one`,
+`upper bound 5`, `fraction digits 3, zeros past it`):
+
+- text: the empty string, one character, a trailing space, an astral character, U+0000, and an
+  unpaired surrogate; `maxLength` and `minLength` with their neighbors, in ASCII and in astral
+  characters; each option, in upper case and with a trailing space, and a value that is no option;
+- numbers: zero, a fraction, the type's limits and one past them (`real`'s overflow and underflow
+  included), and each bound with its neighbors, the next double or `real` for a float;
+- decimals: the spellings PostgreSQL reads and the wire form refuses (`-0`, `+1`, `01`, ` 1`, `.5`,
+  `1e3`), `int8`'s limits, `numeric`'s digit limits, half a step and a value that rounds past the
+  largest for `numeric(p, s)`, and one step on each side of each bound;
+- strings: a uuid in either case, with braces, without hyphens, and one digit short; the date limits
+  and leap days, a seventh fraction digit and, at a column's precision p, p digits, one more, zeros
+  past p, and the last instant; leap seconds, hour 24, and the offsets PostgreSQL drops or refuses;
+- enums: every label of the type, those an `enum` rule leaves out included, with near misses;
+  booleans: `true` and `false`; arrays: the empty array and each element fixture in an array of its
+  own; JSON: nested values and U+0000 and unpaired surrogates in strings and keys;
+- relationships: the target key's fixtures as id text (3.4), with the spellings the id form refuses.
+
+A codec field has no entry, since its codec's fixtures cover it (7.1), and any value
+`declareResource` did not return throws `TypeError`
+(`boundaryFixtures: the resource must be one declareResource returned`). `boundary-fixtures.test.ts`
+and `boundary-forms.test.ts` check, for every form and every key type that carries an id, that each
+list straddles its member's own schema: accepted on one side of each limit, refused on the other. A
+`bool` or `json` field has no limit inside its JSON type, so the schema accepts all its fixtures.
+
+The oracle declares a schema that covers every row of 5.1 and every rule shape of 6.1, and runs
+every fixture of every field through the field's schema and through PostgreSQL; the verdicts MUST
+agree. PostgreSQL's verdict comes from writing the value into its column,
+`INSERT ... RETURNING <column>::text` in a transaction that is rolled back, so the column's type,
+modifier, domains, and CHECKs judge it with assignment semantics, which an explicit cast would not
+(`'abcd'::varchar(3)` truncates silently). The session runs in UTC with ISO dates. A value the
+schema accepts MUST be stored as the same value: its read form (5.1) compared per type
+(`numeric(5,2)` prints `1.50`, `uuid` lower case, `timestamptz` in UTC, `bpchar` padded, `real` at
+single precision). A value the schema refuses MUST be refused, or stored as a value whose read form
+is outside 5.1 or differs from what was sent, the cases of 5.2. Relationship ids run through the
+linkage schema and into the target's key column.
+
+It runs on PGlite always, queried directly, since node-postgres behind PGlite's socket server lost
+protocol sync after a refused parameter, and on PostgreSQL 14 and 18 servers when `RESOURCE_PG_URL`
+is set, as CI does, each in a throwaway UTF-8 database. PGlite 0.5.8 never gives back the stack an
+error used and fails every statement after about 1,800 errors on one instance, so the oracle opens a
+fresh one after 1,000, and `oracle-database.e2e.test.ts` crosses that limit. @ref
+https://github.com/electric-sql/pglite/issues/1115
 
 ### 15.4 End-to-end suite (`e2e/resource/`)
 
@@ -1445,6 +1572,26 @@ fixtures and the 4 codec fixtures gave the same verdict, or the same value after
 through PostgreSQL 18.3 (PGlite with pgvector), as `rules --check` will run them. Zod's types added
 0.7 percent instantiations on stern and 0.2 percent on GitLab, and 10 MB and 13 MB of peak memory
 for parsing Zod's own declarations; check time did not change.
+
+The third record covers sections 5 and 6 and the `testing` entry. With the validators taking
+relationships as ids and the attachment checks of 3.6 and 7.2, the same declarations compiled with
+409,913 instantiations, 0.178 s, and 135 MB for stern, and 482,969, 0.246 s, and 156 MB for the
+GitLab slice, medians of five runs: 1.4 and 4.8 percent more instantiations than the second record.
+The checks fired on all six of stern's validators while they took linkages. At runtime, on Node.js
+24:
+
+| Catalog            | Declare | Build every schema | Boundary fixtures | Field fixtures | Id fixtures | Disagreements |
+| ------------------ | ------- | ------------------ | ----------------- | -------------- | ----------- | ------------- |
+| stern              | 103 ms  | 36 ms              | 6 ms              | 12,288         | 1,104       | 0             |
+| GitLab 17.11 slice | 214 ms  | 36 ms              | 30 ms             | 11,623         | 312         | 0             |
+
+Every fixture ran through its member's schema and was written, as 15.3 writes it, into a probe table
+holding the column's own type (its `format_type`, so modifiers and domains apply) and its
+single-column CHECKs that have a rule, on PostgreSQL 18.3 (PGlite) and on a PostgreSQL 14.19 server
+holding each schema; a CHECK without a rule is its validator's, whose fixtures `rules --check` runs
+(7.3). Neither schema has a `timestamp(p)` column among the declarations (GitLab 17.11 declares two
+`timestamp(6)` columns, outside the slice, and stern none), so the oracle's own `timestamp(3)` and
+`timestamptz(0)` columns are what found that the catalog lacked their precision.
 
 ### 15.6 The Zod floor
 

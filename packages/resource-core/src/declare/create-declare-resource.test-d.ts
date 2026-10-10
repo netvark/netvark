@@ -4,12 +4,51 @@ import type { DeclareResource } from './declare-resource-type';
 import type { DeclareContext } from './registries';
 
 import { describe, expectTypeOf, it } from 'vitest';
+import { z } from 'zod';
 
+import { defineCodec } from '../codecs/define-codec';
+import { defineValidator } from '../codecs/define-validator';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
 import { createDeclareResource } from './create-declare-resource';
 
 declare const fullCatalog: Catalog;
+
+const EMAIL = /^[^@ ]+@[^@ ]+$/u;
+/** The `email` domain's CHECK, but refusing `null`, which a nullable domain's columns hold. */
+const strictEmail = defineValidator({
+  schema: z.string().regex(EMAIL),
+  fixtures: { accept: ['ada@example.com'], reject: ['ada'] },
+});
+/** A codec that carries an email as its two parts: the domain's validators then receive the parts. */
+const emailParts = defineCodec({
+  types: ['work_email'],
+  schema: z.object({ local: z.string(), host: z.string() }),
+  fixtures: [{ local: 'ada', host: 'example.com' }],
+});
+const { email } = contactsCatalog.domains;
+/** The unit catalog with `email` NOT NULL, and a `work_email` domain over it. */
+const strictCatalog = {
+  ...contactsCatalog,
+  domains: {
+    ...contactsCatalog.domains,
+    email: { ...email, nullable: false },
+  },
+} as const;
+const layeredCatalog = {
+  ...contactsCatalog,
+  domains: {
+    ...contactsCatalog.domains,
+    work_email: {
+      ...email,
+      name: 'work_email',
+      type: 'email',
+      typeKind: 'domain',
+      sqlType: 'email',
+      constraints: {},
+    },
+  },
+} as const;
 
 describe('createDeclareResource', () => {
   it('binds declareResource to the catalog and the registries', () => {
@@ -97,6 +136,63 @@ describe('createDeclareResource', () => {
         email: {
           // @ts-expect-error phone is not a validator
           email_check: { validator: 'phone' },
+        },
+      },
+    });
+  });
+
+  it('holds a given domain CHECK code to the code pattern (SPEC 6.4)', () => {
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: {
+        email: { email_check: { validator: 'email', code: 'EMAIL_INVALID' } },
+      },
+    });
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: {
+        email: {
+          // @ts-expect-error a code is A-Z, 0-9, and _
+          email_check: { validator: 'email', code: 'email invalid' },
+        },
+      },
+    });
+  });
+
+  it("checks a domain validator's input against the domain's values (SPEC 3.6, 7.2)", () => {
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: { strictEmail },
+      domains: {
+        email: {
+          // @ts-expect-error email is nullable, and strictEmail refuses null
+          email_check: { validator: 'strictEmail' },
+        },
+      },
+    });
+    createDeclareResource({
+      catalog: strictCatalog,
+      validators: { strictEmail },
+      domains: { email: { email_check: { validator: 'strictEmail' } } },
+    });
+  });
+
+  it('checks a domain validator against the codecs over the domain', () => {
+    createDeclareResource({
+      catalog: layeredCatalog,
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: { email: { email_check: { validator: 'email' } } },
+    });
+    createDeclareResource({
+      catalog: layeredCatalog,
+      codecs: { emailParts },
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: {
+        email: {
+          // @ts-expect-error a work_email column with emailParts runs email_check on the parts
+          email_check: { validator: 'email' },
         },
       },
     });

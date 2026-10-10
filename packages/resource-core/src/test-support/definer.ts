@@ -4,8 +4,9 @@
  * over the unit-test catalog. Each validator mirrors its CHECK: `email`
  * the `email` domain's `value ~ '^[^@ ]+@[^@ ]+$'` on citext, `room`
  * `room ~ '^(?!x)'`, and `contactOrNotes`
- * `contact_id is not null or notes is not null`, over the public names. A
- * CHECK passes `NULL`, so a validator of a nullable column accepts `null`.
+ * `contact_id is not null or notes is not null`, over the public names,
+ * the relationship as its id (SPEC 7.2). A CHECK passes `NULL`, so a
+ * validator of a nullable column accepts `null`.
  * Not published with the package.
  * @packageDocumentation
  */
@@ -24,7 +25,7 @@ interface Period {
 }
 
 interface ContactOrNotes {
-  readonly contact?: unknown;
+  readonly contact: string | null;
   readonly notes: string | null;
 }
 
@@ -34,10 +35,11 @@ interface TestRegistries {
     readonly range: Codec<readonly ['tstzrange'], ZodType<Period>>;
     readonly phone: Codec<readonly ['text', 'varchar'], ZodType<string>>;
   };
+  /** Each schema typed by its input too: the declaration checks a validator's input where it attaches (SPEC 7.2). */
   readonly validators: {
-    readonly email: Validator<ZodType<string | null>>;
-    readonly room: Validator<ZodType<string>>;
-    readonly contactOrNotes: Validator<ZodType<ContactOrNotes>>;
+    readonly email: Validator<ZodType<string | null, string | null>>;
+    readonly room: Validator<ZodType<string, string>>;
+    readonly contactOrNotes: Validator<ZodType<ContactOrNotes, ContactOrNotes>>;
   };
   readonly scopes: {
     readonly organization: { readonly column: 'organization_id' };
@@ -82,11 +84,14 @@ export const TEST_REGISTRIES: TestRegistries = {
     }),
     contactOrNotes: defineValidator({
       schema: z
-        .object({ contact: z.unknown(), notes: z.string().nullable() })
-        .refine(({ contact, notes }) => contact != null || notes !== null),
+        .object({
+          contact: z.string().nullable(),
+          notes: z.string().nullable(),
+        })
+        .refine(({ contact, notes }) => contact !== null || notes !== null),
       fixtures: {
         accept: [
-          { contact: { type: 'contacts', id: '1' }, notes: null },
+          { contact: '7c1b0c6e-2a4b-4d0b-9f3a-1e2d3c4b5a69', notes: null },
           { contact: null, notes: 'Lobby' },
         ],
         reject: [{ contact: null, notes: null }],

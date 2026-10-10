@@ -42,6 +42,15 @@ export interface CodecInit<
 
 const CODECS = new WeakSet<object>();
 
+/** The values a codec's schema must reject, and why. */
+const ABSENT_VALUES: ReadonlyArray<readonly [unknown, string]> = [
+  [
+    undefined,
+    'must reject undefined, so a member a client leaves out stays out',
+  ],
+  [null, "must reject null; the column's nullability decides null"],
+];
+
 /** Whether a value was returned by `defineCodec`. */
 export function isCodec(value: unknown): value is Codec {
   return typeof value === 'object' && value !== null && CODECS.has(value);
@@ -60,10 +69,28 @@ function expectTypeNames(path: string, value: unknown): NonEmptyList<string> {
 }
 
 /**
+ * A codec describes present, non-null values: the column decides `null`
+ * (SPEC 6.1 step 4), and a member a client leaves out stays out (6.2). A
+ * schema that accepts `undefined`, through `.optional()`, `.default()`,
+ * `.prefault()`, or `.catch()`, would put a value in place of an omitted
+ * member, and one that accepts `null` would let `null` past a NOT NULL
+ * column.
+ */
+function expectPresentValues(schema: $ZodType): void {
+  const path = `${DEFINE_CODEC}.schema`;
+  for (const [value, reason] of ABSENT_VALUES) {
+    if (rejection(path, schema, value) === undefined) {
+      throw new TypeError(`${path}: ${reason}`);
+    }
+  }
+}
+
+/**
  * Declares a codec for a definer's `codecs`, returned frozen. Throws
  * `TypeError` when `types` is empty or holds a non-string, when `fixtures`
  * is empty, when the schema rejects a fixture (naming its index, with
- * Zod's error as the cause), or when the schema parses asynchronously.
+ * Zod's error as the cause), when the schema accepts `undefined` or
+ * `null`, or when the schema parses asynchronously.
  */
 export function defineCodec<
   const TTypes extends NonEmptyList<string>,
@@ -86,6 +113,7 @@ export function defineCodec<
       );
     }
   }
+  expectPresentValues(schema);
   const codec = Object.freeze({
     types: Object.freeze([...types]),
     schema,

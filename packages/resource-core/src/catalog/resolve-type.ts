@@ -49,10 +49,13 @@ type Follow<
       : never
   : ResolvedTypeOf<TType, TKind, TDepth['length'], TDomains>;
 
-/** A column's type, followed through its domains; `never` for a dangling domain. */
+/** The members of a column or a domain that name its type. */
+export type TypedRecord = Pick<PublicColumn, 'type' | 'typeKind' | 'array'>;
+
+/** A column's (or a domain's) type, followed through its domains; `never` for a dangling domain. */
 export type ResolveColumnType<
   TCatalog extends PublicCatalog,
-  TColumn extends PublicColumn,
+  TColumn extends TypedRecord,
 > = Follow<
   TCatalog,
   TColumn['type'],

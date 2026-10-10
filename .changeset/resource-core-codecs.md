@@ -8,7 +8,7 @@
   has no wire form, such as `tstzrange`, `bytea`, or pgvector's `vector`.
   `defineValidator({ schema, fixtures: { accept, reject }, description })` is the twin of a CHECK
   the catalog cannot translate; for a CHECK over several columns its input is an object of the
-  members by public name, each relationship as its linkage.
+  members by public name, each relationship as its id.
 - Fixtures are mandatory: without them, with an empty list, or with a value of another type the call
   does not compile. When the module loads, the schema must accept every fixture, and a validator's
   schema must reject every `reject` fixture; a disagreement throws a `TypeError` naming the fixture.

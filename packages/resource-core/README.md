@@ -7,9 +7,10 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 `TypeError` naming its path. Every rule is specified in
 [`docs/resource/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/resource/SPEC.md).
 
-Status: in development and unreleased. This line implements the definer, the declaration, and the
-public names and codes derived from it, and `defineCodec` and `defineValidator` (SPEC sections 2 to
-4 and 7). Zod schemas, the error catalog, messages, the `server` subpath, and OpenAPI follow;
+Status: in development and unreleased. This line implements the definer, the declaration, the public
+names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
+`defineValidator`, and the boundary fixtures of the `testing` entry (SPEC sections 2 to 7). Field
+metadata, the error catalog, messages, the `server` subpath, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -212,10 +213,7 @@ export const validators = {
   }),
   contactOrNotes: defineValidator({
     schema: z
-      .object({
-        contact: z.object({ type: z.literal('contacts'), id: z.uuid() }).nullable(),
-        notes: z.string().nullable(),
-      })
+      .object({ contact: z.uuid().nullable(), notes: z.string().nullable() })
       .refine(({ contact, notes }) => contact !== null || notes !== null),
     fixtures: {
       accept: [{ contact: null, notes: 'Bring the signed contract.' }],
@@ -224,6 +222,12 @@ export const validators = {
   }),
 };
 ```
+
+A validator's input is what its CHECK sees: the field's value, `null` included when the column is
+nullable, or for a CHECK over several columns an object of them by public name, each relationship as
+its id. `tsc` checks it where a rule names the validator; had `contactOrNotes` taken the contact as
+a linkage, `{ type, id }`, the rule would fail with
+`validator: "contactOrNotes" does not accept every object of contact, notes`.
 
 The storage adapter implements the other facet of each codec, typed by
 `StorageCodecs<typeof codecs>`: `read` and `write` between the parsed wire value and what the driver
@@ -278,6 +282,119 @@ declaration's runtime check, which runs when the module loads, reports them: a d
 the pattern or repeated, a column only a quoted identifier can name (`"suite-"`), and two columns a
 Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`). SPEC 4.2 lists both sides.
 
+## Schemas
+
+Every declared resource carries Zod schemas built from the catalog and the declaration, keyed by
+public names (SPEC 5 and 6). A field's schema is its column's wire form, narrowed by its domain, the
+CHECKs the catalog translates, its nullability, and its validators:
+
+| Member                                             | Validates                                                                               | Issues           |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------- |
+| `schema.read`, `schema.create`, `schema.update`    | the attributes of a response, a create, or an update                                    | Zod's            |
+| `linkage.read`, `linkage.create`, `linkage.update` | the relationships, each `{ type, id }`, or `null` where the foreign key is nullable     | Zod's            |
+| `validate.create`, `validate.update`               | the attributes, as Standard Schema validators                                           | `ResourceIssue`s |
+| `write.create`, `write.update`                     | a resource object as `@netvark/jsonapi-core` parses it, `{ attributes, relationships }` | `ResourceIssue`s |
+
+`create` requires exactly the columns PostgreSQL requires on insert, `update` requires none, and
+both reject unknown keys. `read` strips unknown keys, so a client that validates responses keeps
+working when the server adds a field. No schema fills in a default: defaults stay in the database.
+
+The wire forms refuse what PostgreSQL would refuse or store differently from what was sent: a
+decimal with more fraction digits than `numeric(p, s)` keeps, trailing spaces past `varchar(n)`, a
+date-time with nonzero digits past its column's precision, U+0000, and an unpaired surrogate. `int8`
+and `numeric` values travel as decimal strings, since they exceed JavaScript's exact integers (SPEC
+5.2).
+
+Only `write` sees attributes and relationships together, so a CHECK over a field and a foreign key
+runs there. With the validators of [Codecs and validators](#codecs-and-validators):
+
+```ts
+export const Meetings = declareResource('meetings', {
+  operations: ['get', 'create', 'update'],
+  scope: 'organization',
+  clientIds: true,
+  fields: {
+    room: { access: 'readWrite' },
+    during: { access: 'readWrite', codec: 'timeRange' },
+    notes: { access: 'readWrite' },
+  },
+  relationships: {
+    organization_id: { target: () => Organizations, access: 'read' },
+    contact_id: { target: () => Contacts, access: 'readWrite' },
+  },
+  rules: {
+    meetings_room_lowercase: {
+      validator: 'lowercase',
+      code: 'MEETING_ROOM_NOT_LOWERCASE',
+    },
+    meetings_contact_or_notes: {
+      validator: 'contactOrNotes',
+      code: 'MEETING_NEEDS_CONTACT_OR_NOTES',
+    },
+  },
+});
+
+const result = await Meetings.write.create['~standard'].validate({
+  attributes: { room: 'Lobby-2', notes: null },
+  relationships: { contact: null },
+});
+// result.issues, each with message 'The value violates a constraint.' or
+// 'A value is required.':
+// { path: ['attributes', 'room'], code: 'MEETING_ROOM_NOT_LOWERCASE' }
+// { path: ['attributes', 'during'], code: 'required' }
+// { path: ['relationships', 'contact'], code: 'MEETING_NEEDS_CONTACT_OR_NOTES' }
+// { path: ['attributes', 'notes'], code: 'MEETING_NEEDS_CONTACT_OR_NOTES' }
+```
+
+A `ResourceIssue` names a JSON Schema keyword (`required`, `maxLength`, `enum`, ...) or a
+constraint's code, carries the limit in `expected`, and has a constant English message that never
+repeats request data (SPEC 6.4). `Infer` gives the types of all six schemas:
+
+```ts
+import type { Infer } from '@netvark/resource-core';
+
+type NewContact = Infer<typeof Contacts>['create'];
+// kind?: 'person' | 'company', the enum's labels; name: string, required on insert
+
+type MeetingLinks = Infer<typeof Meetings>['linkage']['create'];
+// { contact?: { type: 'contacts'; id: string } | null }
+```
+
+## Testing at the limits
+
+`boundaryFixtures(resource)`, from `@netvark/resource-core/testing`, lists for each field and
+relationship the wire values at and next to each of its limits, each with a label: the empty string,
+`maxLength 200, plus one`, `upper bound 5`, an unpaired surrogate, a seventh fraction digit. They
+are what this package's oracle writes into PostgreSQL 14 and 18, whose verdicts the schemas match
+(SPEC 15.3). Snapshot the verdicts, so a migration that changes a limit shows up in review as the
+verdicts it flips:
+
+```ts
+import { expect, it } from 'vitest';
+
+import { boundaryFixtures } from '@netvark/resource-core/testing';
+
+import { Contacts } from './contacts';
+
+it('keeps the limits of contacts', () => {
+  const updatable = Contacts.schema.update.shape;
+  const limits = Object.entries(boundaryFixtures(Contacts).fields)
+    .filter(([field]) => Object.hasOwn(updatable, field))
+    .flatMap(([field, fixtures]) =>
+      fixtures.map(({ value, label }) => {
+        const { success } = Contacts.schema.update.safeParse({ [field]: value });
+        return `${field}: ${success ? 'accepts' : 'refuses'} ${label}`;
+      }),
+    );
+  expect(limits).toMatchSnapshot(); // 'name: refuses maxLength 200, plus one', ...
+});
+```
+
+In an integration test, write the accepted values through your storage adapter and read them back:
+each must come back as the same value, compared per type as SPEC 15.3 does, so a driver that changes
+a value fails at the fixture that shows it, such as a `timestamptz` parsed into a `Date`, which
+keeps only milliseconds.
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -310,11 +427,23 @@ Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`). SPEC 4
 - **Keep validators to what PostgreSQL agrees on.** `lower()` beyond ASCII follows the database's
   `LC_CTYPE`, and a regular expression's dialect differs in places; choose fixtures inside the
   shared ground, and prefer a CHECK the catalog translates.
-- **Name a multi-column validator's members by their public names.** Its input is an object of the
-  CHECK's members, each relationship as its linkage, so one CHECK over different columns needs its
-  own validator.
+- **Type a validator's input as what its CHECK sees.** The field's value, with `null` when the
+  column is nullable; for a CHECK over several columns, an object of them by public name, each
+  relationship as its id. One CHECK over different columns needs its own validator.
 - **Keep schemas synchronous.** A check that needs the database or another service belongs in server
   code, not in a validator.
+- **Validate a whole write with `write`.** On the server, pass the resource object
+  `@netvark/jsonapi-core` parsed to `write.create` or `write.update`: only they run the CHECKs over
+  a field and a relationship, and their issue paths start at `attributes` or `relationships`.
+- **Validate responses with `read`.** It strips members it does not know, so a deployed client keeps
+  working when the server adds one. For a sparse fieldset, validate with `schema.read.pick(...)` of
+  the requested members.
+- **Send date-times at the column's precision.** A `timestamp(3)` column refuses a fourth nonzero
+  fraction digit rather than let PostgreSQL round it, possibly into the next day; zeros past the
+  precision are accepted. `toISOString()` writes milliseconds, so clear them for a `timestamptz(0)`
+  column.
+- **Keep `int8` and `numeric` values as strings.** Parse them with `BigInt` or a decimal library
+  only to compute, and send the canonical spelling: `0.5`, not `.5`, `+0.5`, or `5e-1`.
 - **Cover every CHECK without a rule.** Name the validator in the declaration's `rules`, and a
   domain's once in the definer's `domains`; prefer CHECKs `@netvark/pg-catalog` translates (length,
   range, `IN`, `IS NOT NULL`, simple patterns), which need no code at all.
@@ -327,10 +456,12 @@ memory are medians of at least five runs:
 
 | Catalog            | Declarations | Fields | Relationships | Check time | Peak memory, 1 checker | Peak memory, 4 checkers |
 | ------------------ | ------------ | ------ | ------------- | ---------- | ---------------------- | ----------------------- |
-| stern              | 111          | 1,183  | 184           | 0.17 s     | 125 MB                 | 203 MB                  |
-| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.25 s     | 147 MB                 | 271 MB                  |
+| stern              | 111          | 1,183  | 184           | 0.18 s     | 135 MB                 | 223 MB                  |
+| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.25 s     | 156 MB                 | 280 MB                  |
 
-The names checks account for about 15 percent of the stern check and 11 percent of the GitLab one.
+The names checks account for about 15 percent of the stern check time and 11 percent of the GitLab
+one. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB of peak
+memory, most of it to parse Zod's own declarations.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in

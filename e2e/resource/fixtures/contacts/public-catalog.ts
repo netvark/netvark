@@ -103,27 +103,6 @@ export const publicCatalog = {
         }
       }
     },
-    "required_note": {
-      "schema": "public",
-      "name": "required_note",
-      "type": "text",
-      "typeKind": "base",
-      "array": false,
-      "sqlType": "text",
-      "maxLength": null,
-      "precision": null,
-      "scale": null,
-      "nullable": true,
-      "default": null,
-      "constraints": {
-        "required_note_check": {
-          "kind": "check",
-          "rule": {
-            "kind": "notNull"
-          }
-        }
-      }
-    },
     "short_text": {
       "schema": "public",
       "name": "short_text",
@@ -731,10 +710,10 @@ export const publicCatalog = {
           "generated": null
         },
         "notes": {
-          "type": "required_note",
-          "typeKind": "domain",
+          "type": "text",
+          "typeKind": "base",
           "array": false,
-          "sqlType": "required_note",
+          "sqlType": "text",
           "maxLength": null,
           "precision": null,
           "scale": null,

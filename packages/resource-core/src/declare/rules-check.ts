@@ -1,8 +1,8 @@
 /**
  * The type-level check of `rules` (SPEC 3.5), the twin of `check-rules.ts`:
  * keys are constraint names or NOT NULL keys, a validator covers exactly a
- * CHECK without a rule, and every such CHECK over a written column names
- * one.
+ * CHECK without a rule and accepts what that CHECK's members hold (SPEC
+ * 7.2), and every such CHECK over a written column names one.
  * @packageDocumentation
  */
 import type { PublicTable } from '@netvark/catalog-core';
@@ -12,6 +12,7 @@ import type {
   RuleKey,
   UntranslatedCheck,
 } from '../catalog/types';
+import type { AttachmentRequirement } from '../schema/validator-input';
 import type { WrittenColumn } from './members';
 import type { DeclareContext } from './registries';
 import type { KnownMembers, Requirement, RequireWhen } from './requirement';
@@ -30,12 +31,13 @@ type ValidatorName<TContext extends DeclareContext> =
 type ValidatorRequirement<
   TContext extends DeclareContext,
   TTableDef extends PublicTable,
+  TDecl extends Declaration,
   K,
   TValidator,
 > = TValidator extends string
   ? TValidator extends ValidatorName<TContext>
     ? K extends UntranslatedCheck<TTableDef>
-      ? unknown
+      ? AttachmentRequirement<TContext, TTableDef, TDecl, K, TValidator>
       : K extends ConstraintName<TTableDef>
         ? TTableDef['constraints'][K] extends { readonly kind: 'check' }
           ? Requirement<'validator: the CHECK has a rule, which enforces it already'>
@@ -60,6 +62,7 @@ type RuleMembersCheck<
         ValidatorRequirement<
           TContext,
           TTableDef,
+          TDecl,
           K,
           MemberOf<Rules<TDecl>[K], 'validator'>
         >

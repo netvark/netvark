@@ -76,7 +76,7 @@ export function createDeclareResource<
     TScopes,
     TDomains
   > &
-    DomainsCheck<TCatalog, TValidators, TDomains>,
+    DomainsCheck<TCatalog, TCodecs, TValidators, TDomains>,
 ): DeclareResource<
   DeclareContext<TCatalog, TCodecs, TValidators, TScopes, TDomains>
 > {

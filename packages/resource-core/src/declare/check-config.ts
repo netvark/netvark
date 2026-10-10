@@ -31,6 +31,7 @@ import {
   expectRegistry,
 } from '../internal/expect';
 import { describe, ownValue } from '../internal/object';
+import { deriveCode, isCode } from '../names/code';
 import { checkPageInit, mergePage } from './check-page';
 
 const DEFINER = 'createDeclareResource';
@@ -138,7 +139,7 @@ function checkDomainRule(
     );
   }
   const rule = expectRecord(path, value);
-  expectKnownKeys(path, rule, ['validator']);
+  expectKnownKeys(path, rule, ['validator', 'code']);
   const validator = rule['validator'];
   if (
     typeof validator !== 'string' ||
@@ -148,7 +149,28 @@ function checkDomainRule(
       `${path}.validator: ${describe(validator)} is not a validator of ${DEFINER}`,
     );
   }
-  return { validator };
+  return { validator, ...checkDomainCode(path, rule['code'], constraintName) };
+}
+
+/** A domain CHECK's code, given or derived from its name, must be a code (SPEC 4.2, 6.4). */
+function checkDomainCode(
+  path: string,
+  code: unknown,
+  constraintName: string,
+): Pick<DomainRule, 'code'> {
+  if (code === undefined) {
+    const derived = deriveCode(constraintName);
+    if (!isCode(derived)) {
+      throw new TypeError(
+        `${path}: code "${derived}" is not A-Z, 0-9, _; set code`,
+      );
+    }
+    return {};
+  }
+  if (typeof code !== 'string' || !isCode(code)) {
+    throw new TypeError(`${path}.code: ${describe(code)} is not A-Z, 0-9, _`);
+  }
+  return { code };
 }
 
 function checkDomains(

@@ -249,7 +249,7 @@ declared resources. `server/`, `openapi/`, and `testing/` are separate entry poi
 migrations ──pg-catalog──▶ public catalog (as const) ──┐
                                                       ├──▶ declareResource ──▶ DeclaredResource
 codecs, validators, scopes ──createDeclareResource──────┘        │
-                                                                 ├─ names, schema, linkage, validate, fields, errors
+                                                                 ├─ names, schema, linkage, validate, write, fields, errors
                                                                  ├─ resource (jsonapi-core), keyset (keyset-core)
                                                                  └─ registry: errorCatalog, defineMessages, openapi, surfaceOf
                                                                                 │

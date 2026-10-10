@@ -12,7 +12,7 @@ import { z } from 'zod';
  *   `value = lower(value)`. The fixtures keep to ASCII: beyond it
  *   PostgreSQL's `lower()` follows the database's `LC_CTYPE`.
  * - `contactOrNotes`: `contact_id is not null or notes is not null`, over
- *   the public names, the relationship as its linkage.
+ *   the public names, the relationship as its id.
  */
 import { defineValidator } from '@netvark/resource-core';
 
@@ -36,22 +36,11 @@ export const validators = {
   }),
   contactOrNotes: defineValidator({
     schema: z
-      .object({
-        contact: z
-          .object({ type: z.literal('contacts'), id: z.uuid() })
-          .nullable(),
-        notes: z.string().nullable(),
-      })
+      .object({ contact: z.uuid().nullable(), notes: z.string().nullable() })
       .refine(({ contact, notes }) => contact !== null || notes !== null),
     fixtures: {
       accept: [
-        {
-          contact: {
-            type: 'contacts',
-            id: '0e2f7c64-8d43-4b6e-9a51-2f3c8b9d1a07',
-          },
-          notes: null,
-        },
+        { contact: '0e2f7c64-8d43-4b6e-9a51-2f3c8b9d1a07', notes: null },
         { contact: null, notes: 'Bring the signed contract.' },
       ],
       reject: [{ contact: null, notes: null }],

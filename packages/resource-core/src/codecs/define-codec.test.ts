@@ -109,6 +109,27 @@ describe('defineCodec (SPEC 7.1)', () => {
     );
   });
 
+  it('refuses a schema that accepts undefined or null, which the column decides (SPEC 6.1, 6.2)', () => {
+    for (const schema of [
+      z.string().optional(),
+      z.string().default('P1D'),
+      z.string().prefault('P1D'),
+      z.string().catch('P1D'),
+      zm.optional(zm.string()),
+    ]) {
+      expect(typeErrorOf(() => defineUntyped({ ...valid, schema }))).toBe(
+        'defineCodec.schema: must reject undefined, so a member a client leaves out stays out',
+      );
+    }
+    expect(
+      typeErrorOf(() =>
+        defineUntyped({ ...valid, schema: z.string().nullable() }),
+      ),
+    ).toBe(
+      "defineCodec.schema: must reject null; the column's nullability decides null",
+    );
+  });
+
   it('lets an error the schema itself throws pass through', () => {
     const failing = new RangeError('the refinement failed');
     const schema = z.string().refine(() => {
