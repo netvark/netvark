@@ -18,18 +18,26 @@ import { citext } from '@electric-sql/pglite/contrib/citext';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import pg from 'pg';
 
-import { MIGRATIONS_DIR } from './contacts';
+import { MIGRATIONS_DIR } from './contacts.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Pool } = pg` for ESM
 const { Client, Pool } = pg;
 
 const VERSIONED = /^V(\d+)__.+\.sql$/u;
 const REPEATABLE = /^R__.+\.sql$/u;
-const PORT_BASE = 30_000;
-const PORT_RANGE = 20_000;
 const NAME_BYTES = 8;
+/**
+ * The pool's connection and one more for drift. The socket server
+ * multiplexes its connections over PGlite's one session, so the tests
+ * never use both at once.
+ */
+const PGLITE_CONNECTIONS = 2;
 
 export interface LiveDatabase {
+  /** The URL of the database, as its owner. */
+  readonly url: string;
+  /** The database's name. */
+  readonly name: string;
   /** A node-postgres pool with the default type parsers; `close` ends it. */
   readonly pool: pg.Pool;
   close(): Promise<void>;
@@ -53,48 +61,47 @@ async function migrations(): Promise<ReadonlyArray<string>> {
   );
 }
 
-async function migrate(
-  pool: pg.Pool,
-  close: () => Promise<void>,
-): Promise<LiveDatabase> {
+async function migrate(database: LiveDatabase): Promise<LiveDatabase> {
   try {
     for (const sql of await migrations()) {
-      await pool.query(sql);
+      await database.pool.query(sql);
     }
   } catch (error) {
-    await close();
+    await database.close();
     throw error;
   }
-  return { pool, close };
+  return database;
 }
 
 /** PGlite (PostgreSQL 18) with the contrib extensions the migrations create, behind a socket server. */
-async function openPgliteDatabase(): Promise<LiveDatabase> {
+export async function openPgliteDatabase(): Promise<LiveDatabase> {
   const pglite = await PGlite.create({
     extensions: { btree_gist, citext, pg_trgm },
   });
-  const port = PORT_BASE + Math.floor(Math.random() * PORT_RANGE);
+  // Port 0 lets the system pick a free port, which getServerConn reports.
   const server = new PGLiteSocketServer({
     db: pglite,
-    port,
+    port: 0,
     host: '127.0.0.1',
+    maxConnections: PGLITE_CONNECTIONS,
   });
   await server.start();
-  const pool = new Pool({
-    host: '127.0.0.1',
-    port,
-    user: 'postgres',
-    database: 'postgres',
-    max: 1,
-  });
-  return migrate(pool, async () => {
-    await pool.end();
-    await server.stop();
-    await pglite.close();
+  const url = `postgres://postgres@${server.getServerConn()}/postgres`;
+  const pool = new Pool({ connectionString: url, max: 1 });
+  return migrate({
+    url,
+    name: 'postgres',
+    pool,
+    close: async () => {
+      await pool.end();
+      await server.stop();
+      await pglite.close();
+    },
   });
 }
 
-async function onServer(url: string, statement: string): Promise<void> {
+/** Runs one statement on the server the URL names, on a connection of its own. */
+export async function onServer(url: string, statement: string): Promise<void> {
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
@@ -105,7 +112,7 @@ async function onServer(url: string, statement: string): Promise<void> {
 }
 
 /** A database of its own on the server, created from `template0` and dropped by `close`. */
-async function openServerDatabase(url: string): Promise<LiveDatabase> {
+export async function openServerDatabase(url: string): Promise<LiveDatabase> {
   const name = `catalog_e2e_${randomBytes(NAME_BYTES).toString('hex')}`;
   await onServer(
     url,
@@ -114,9 +121,14 @@ async function openServerDatabase(url: string): Promise<LiveDatabase> {
   const target = new URL(url);
   target.pathname = `/${name}`;
   const pool = new Pool({ connectionString: target.toString(), max: 2 });
-  return migrate(pool, async () => {
-    await pool.end();
-    await onServer(url, `drop database ${name} with (force)`);
+  return migrate({
+    url: target.toString(),
+    name,
+    pool,
+    close: async () => {
+      await pool.end();
+      await onServer(url, `drop database ${name} with (force)`);
+    },
   });
 }
 

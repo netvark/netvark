@@ -1,7 +1,6 @@
 /**
  * The configuration types (SPEC 11.1). `defineExtraction`, which validates
- * a configuration eagerly, and the drift options arrive with the commands
- * that read them.
+ * a configuration eagerly, arrives with the CLI.
  * @packageDocumentation
  */
 import type { MigrationSource } from './migrations/load';
@@ -75,6 +74,15 @@ export interface OutputConfig {
   readonly types?: string | TypesConfig;
 }
 
+/**
+ * A live database `drift` compares with the committed catalog. The URL is
+ * meant for a read-only role with `CONNECT` and `USAGE` on the configured
+ * schemas; a function is called only when drift runs for this environment.
+ */
+export interface DriftEnvironment {
+  readonly url: string | (() => string | undefined);
+}
+
 /** An extraction: the migrations, where they replay, which schemas to read, and the files to write. */
 export interface ExtractionConfig {
   /** A directory of `.sql` files, or a function returning the migrations in order. */
@@ -84,6 +92,8 @@ export interface ExtractionConfig {
   /** Default `['public']`; the first is the default schema, whose objects are named without a prefix. */
   readonly schemas?: ReadonlyArray<string>;
   readonly out: OutputConfig;
+  /** The live databases `drift` can compare, by environment name. */
+  readonly drift?: Readonly<Record<string, DriftEnvironment>>;
 }
 
 /** The schemas read when the configuration names none (SPEC 15). */

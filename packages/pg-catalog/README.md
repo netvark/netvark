@@ -4,7 +4,8 @@ Your PostgreSQL schema as committed TypeScript. It replays your SQL migrations i
 (PGlite in-process, or a throwaway database on a server), reads PostgreSQL's own catalog, and writes
 it as an `as const` module: every table, column, constraint, index, row security policy, enum, and
 domain, written deterministically so the file is reviewed with the migration that changed it. From
-the same catalog it writes your Kysely types. Every choice is specified in
+the same catalog it writes your Kysely types, and `drift` compares a live database with it. Every
+choice is specified in
 [`docs/catalog/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/catalog/SPEC.md).
 
 ## Install
@@ -276,26 +277,87 @@ Extraction creates `netvark_catalog_<random>` from `template0` with UTF-8 encodi
 reads it, and drops it, even when a migration fails, so the role needs `CREATEDB`. A function is
 called only when the URL is needed.
 
+## Drift
+
+`drift` compares a live database with the committed catalog. It connects to the environment's URL,
+reads the catalog with the queries `extract` uses inside a `REPEATABLE READ READ ONLY` transaction,
+rolls back, and diffs the result against `out.catalog`. It replays nothing and cannot write, even
+through a privileged role.
+
+```ts
+// scripts/drift.ts: run on a schedule against production
+import { drift, formatDiff } from '@netvark/pg-catalog';
+
+const report = await drift(
+  {
+    migrations: 'db/migrations',
+    schemas: ['public', 'audit'],
+    out: { catalog: 'src/generated/catalog.ts' },
+    drift: { production: { url: () => process.env['PRODUCTION_READONLY_URL'] } },
+  },
+  'production',
+);
+console.log(formatDiff(report.diff));
+process.exitCode = report.diff.changes.length === 0 ? 0 : 1;
+```
+
+After a hotfix outside the migrations, the repository's contacts application reports:
+
+```text
+3 objects differ: 1 added, 1 removed, 1 changed
+
+Columns
+  + contacts.fax
+
+Constraints
+  ~ organizations.organizations_seats_check
+      expression: expected "(seats > 0)", actual "(seats >= 0)"
+      rule.min.inclusive: expected false, actual true
+      definition: expected "CHECK ((seats > 0))", actual "CHECK ((seats >= 0))"
+
+Policies
+  - meetings.meetings_tenant_isolation
+```
+
+`+` marks an object only the live database has, `-` one only the committed catalog has, and `~` one
+that differs. The text is for people and may change between minor versions; `report.diff`, the
+`CatalogDiff` of `diffCatalogs`, is the stable format for machines.
+`introspectCatalog({ url, schemas })` returns the live catalog itself.
+
+The URL is meant for a role of its own that can only connect and read names:
+
+```sql
+create role catalog_drift login password '...';
+grant connect on database app to catalog_drift;
+grant usage on schema public, audit to catalog_drift;
+```
+
+Without `USAGE` on a configured schema, PostgreSQL leaves that schema out of the role's search path
+and qualifies every name in it, so `drift` stops with `schema_usage` instead of reporting false
+drift. Unknown environments, URL functions that return nothing, and an unreadable committed catalog
+fail before any connection is made.
+
 ## Errors
 
 Every failure is a `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a message naming
 the object or file, and PostgreSQL's error as `cause` where there is one:
 
-| `code`                 | When                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| `config_invalid`       | a database URL function returned nothing, or a contrib extension name is malformed            |
-| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown   |
-| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                   |
-| `migration_failed`     | a migration fails during replay                                                               |
-| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails               |
-| `unsupported_server`   | the server is older than PostgreSQL 14                                                        |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                         |
-| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`          |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                   |
-| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`           |
-| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed |
-| `catalog_unreadable`   | `parseCatalogModule` was given a file that is not a catalog module                            |
-| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                            |
+| `code`                 | When                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `config_invalid`       | a URL function returned nothing, a drift environment is unknown, or a contrib extension name is malformed        |
+| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                      |
+| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                                      |
+| `migration_failed`     | a migration fails during replay                                                                                  |
+| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails                                  |
+| `unsupported_server`   | the server is older than PostgreSQL 14                                                                           |
+| `schema_usage`         | the role `drift` connects as lacks `USAGE` on a configured schema                                                |
+| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                            |
+| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                             |
+| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                      |
+| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                              |
+| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                    |
+| `catalog_unreadable`   | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module |
+| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                                               |
 
 ## Best practices
 
@@ -344,6 +406,10 @@ the object or file, and PostgreSQL's error as `cause` where there is one:
   of a NOT NULL domain can still read as null, so its select type keeps `| null`.
 - **Read every schema your tables use.** A domain from a schema outside `schemas` types its columns
   as `unknown`.
+- **Compare production with the catalog of the release it runs.** Run `drift` from the deployed
+  commit, so a migration that is merged but not yet deployed does not show up as drift.
+- **Give drift a role of its own.** `CONNECT` and `USAGE` on the configured schemas are all it
+  needs; it never requires the application's role or one that can write.
 - **Keep JSON keys as written under CamelCasePlugin.** The plugin also camelCases the keys of
   objects inside the `json` and `jsonb` values it reads, while values you write keep their keys.
   Pass `new CamelCasePlugin({ maintainNestedObjectKeys: true })` so JSON reads back as it was

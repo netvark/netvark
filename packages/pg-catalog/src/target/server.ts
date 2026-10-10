@@ -1,9 +1,9 @@
 import type { SqlSession } from './session';
 
 /**
- * The server target (SPEC 6.2, ADR 0003): a throwaway database on a
- * PostgreSQL server, created from `template0` with UTF-8 encoding and
- * dropped afterwards.
+ * Sessions on a PostgreSQL server: the server target (SPEC 6.2, ADR 0003),
+ * a throwaway database created from `template0` with UTF-8 encoding and
+ * dropped afterwards, and the live database drift reads (SPEC 10.2).
  * @ref https://www.postgresql.org/docs/18/sql-createdatabase.html
  * @ref https://www.postgresql.org/docs/18/sql-dropdatabase.html
  * @packageDocumentation
@@ -31,8 +31,8 @@ export function throwawayName(): string {
   );
 }
 
-/** The URL with its database replaced; it must be a `postgres://` or `postgresql://` URL. */
-export function withDatabase(url: string, database: string): string {
+/** The parsed URL; messages never echo it, since it may hold a password. */
+function postgresUrl(url: string): URL {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -51,6 +51,12 @@ export function withDatabase(url: string, database: string): string {
       'the database URL must start with postgres:// or postgresql://',
     );
   }
+  return parsed;
+}
+
+/** The URL with its database replaced; it must be a `postgres://` or `postgresql://` URL. */
+export function withDatabase(url: string, database: string): string {
+  const parsed = postgresUrl(url);
   parsed.pathname = `/${database}`;
   return parsed.toString();
 }
@@ -145,4 +151,19 @@ export async function openThrowawayDatabase(url: string): Promise<SqlSession> {
     throw error;
   }
   return clientSession(client, async () => dropDatabase(admin, name));
+}
+
+async function disconnected(): Promise<void> {
+  // A live database is left as it was: closing only ends the connection.
+}
+
+/**
+ * A session on the database the URL names, as it is; closing it ends the
+ * connection. Fails with `config_invalid` for a URL that is not a
+ * `postgres://` or `postgresql://` URL and `connection_failed` when the
+ * server refuses the connection.
+ */
+export async function openLiveDatabase(url: string): Promise<SqlSession> {
+  postgresUrl(url);
+  return clientSession(await connect(url), disconnected);
 }

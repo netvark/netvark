@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "smoke:bun": "bun run smoke/run.ts",
-    "smoke:deno": "deno run --allow-read --allow-env smoke/run.ts",
+    "smoke:deno": "deno run --allow-read --allow-env --allow-net=127.0.0.1 smoke/run.ts",
     "smoke:workerd": "node --experimental-strip-types smoke/workerd.ts",
     "test": "vitest run",
     "test:watch": "vitest",
