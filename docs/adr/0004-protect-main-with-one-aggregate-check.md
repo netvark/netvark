@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-10-10
+- Amended: 2026-10-10, admin bypass removed after #63 merged before its checks finished
 
 ## Context
 
@@ -18,6 +19,10 @@ job it needs failed may not block a merge; required checks that depend on other 
 `needs.<job_id>.result` is one of `success`, `failure`, `cancelled`, or `skipped`
 ([contexts reference](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#needs-context)).
 
+A bypass actor with `bypass_mode: pull_request` may merge a pull request that does not satisfy the
+rules, and the merge API applies the bypass without asking: `gh pr merge` merged #63 while its
+checks were still running, because the merging account is an organization admin.
+
 The release workflow opens the "Version Packages" pull request with the repository `GITHUB_TOKEN`.
 The workflow runs for that pull request are created in the `action_required` state and wait for a
 maintainer to approve them in the Actions tab.
@@ -30,8 +35,9 @@ maintainer to approve them in the Actions tab.
 - `CI passed` is the last job of `.github/workflows/ci.yml`. It needs every other job, runs with
   `if: always()`, and fails when any of them failed or was cancelled. A change that adds a CI job
   adds it to that `needs` list.
-- Organization admins can bypass the ruleset only through a pull request, for release housekeeping.
-  Nobody pushes to `main` directly.
+- The ruleset has no bypass actors, so the required check holds for admins and for tools acting as
+  them. Nobody pushes to `main` directly. In an emergency an admin disables the ruleset, merges, and
+  enables it again.
 - To release, approve the held runs of the "Version Packages" pull request, wait for `CI passed`,
   then merge it.
 
