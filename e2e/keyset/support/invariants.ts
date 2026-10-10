@@ -139,7 +139,15 @@ export function runInvariants(
           expect(ids(back)).toEqual(ids(first));
           expect(back.hasPrev).toBe(false);
           expect(back.hasNext).toBe(true);
-          expect(back.next).toBe(first.next);
+          // `back.next` and `first.next` mark the same position but carry
+          // their own issue time, so the strings differ when the clock
+          // ticks between the two requests. Equivalence is behavioral: both
+          // resume on the same second page.
+          const again = await fetch(sort, {
+            size: 4,
+            after: back.next ?? '',
+          });
+          expect(ids(again)).toEqual(ids(second));
         });
       },
     );

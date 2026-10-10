@@ -54,11 +54,14 @@ if (URL === undefined) {
         },
         { total: true },
       );
+      // Two emails each for Carol and Mallory, one each for Ivan and Dan;
+      // within a tie the insensitive last name ascends with nulls last, so
+      // Dan (no last name) closes the page.
       expect(page.rows.map((row) => row.first_name)).toEqual([
         'Carol',
         'Mallory',
-        'Dan',
         'Ivan',
+        'Dan',
       ]);
       expect(page.total).toBe(4);
     });
