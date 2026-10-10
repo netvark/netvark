@@ -18,6 +18,7 @@ import {
   contactsConfig,
   EXPECTED_CATALOG,
   EXPECTED_PUBLIC,
+  EXPECTED_TYPES,
 } from './support/contacts';
 import { createProject } from './support/project';
 
@@ -61,6 +62,7 @@ describe.skipIf(url === undefined)('extract on a PostgreSQL server', () => {
     expect(report.files.map((file) => file.status)).toEqual([
       'written',
       'written',
+      'written',
     ]);
     expect(
       (await readFile(join(project.dir, 'src/db/catalog.ts'))).equals(
@@ -70,6 +72,11 @@ describe.skipIf(url === undefined)('extract on a PostgreSQL server', () => {
     expect(
       (await readFile(join(project.dir, 'src/db/public-catalog.ts'))).equals(
         await readFile(EXPECTED_PUBLIC),
+      ),
+    ).toBe(true);
+    expect(
+      (await readFile(join(project.dir, 'src/db/db.ts'))).equals(
+        await readFile(EXPECTED_TYPES),
       ),
     ).toBe(true);
     expect(

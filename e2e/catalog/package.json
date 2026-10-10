@@ -14,10 +14,12 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@electric-sql/pglite-socket": "catalog:",
     "@netvark/catalog-core": "workspace:*",
     "@netvark/pg-catalog": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "kysely": "catalog:",
     "miniflare": "catalog:",
     "pg": "catalog:",
     "tsdown": "catalog:",

@@ -16,8 +16,10 @@
       // Consumer packages: every test file is an entry (vitest plugin);
       // `support/` is reached from them. `smoke/run.ts` and `smoke/workerd.ts`
       // are found through the package.json scripts; `worker.ts` is a tsdown
-      // entry named as a string inside `workerd.ts`, so it is listed.
-      "entry": ["smoke/worker.ts"],
+      // entry named as a string inside `workerd.ts`, so it is listed. The
+      // generated files under `fixtures/*/expected/` are modules an
+      // application imports, so all of their exports are public.
+      "entry": ["smoke/worker.ts", "fixtures/*/expected/*.ts"],
       "project": ["**/*.ts"]
     }
   }

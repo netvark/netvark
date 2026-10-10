@@ -216,10 +216,12 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      # The package's own server tests (the throwaway database target, and
-      # catalogs read from the server equal to PGlite's), then the e2e suite,
-      # whose server file extracts the contacts application on this major
-      # and compares the bytes with the reviewed files PGlite produced.
+      # The package's own server tests (the throwaway database target,
+      # catalogs read from the server equal to PGlite's, and the Kysely type
+      # table held against node-postgres), then the e2e suite, which
+      # extracts the contacts application on this major and compares the
+      # bytes with the reviewed files PGlite produced, and reads every table
+      # back through Kysely with the generated types.
       - run: pnpm --filter @netvark/pg-catalog run test
       - run: pnpm --filter @netvark/catalog-e2e run test
 

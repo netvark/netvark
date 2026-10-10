@@ -231,7 +231,8 @@ export const catalog = {
 
 The public catalog keeps what a form needs and drops expressions, indexes, comments, and policies.
 The Kysely types follow the driver's parsers: `created_at` is a `Date` the database supplies, so it
-is optional on insert, and `tags` has a default, so it is too.
+is optional on insert, and `tags` has a default, so it is too, and takes PostgreSQL's array text as
+well as an array.
 
 ```ts
 export interface ContactsTable {
@@ -241,7 +242,7 @@ export interface ContactsTable {
   kind: ContactKind;
   email: string | null;
   phone: string | null;
-  tags: Generated<Array<string>>;
+  tags: ColumnType<Array<string>, Array<string> | string | undefined, Array<string> | string>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 ```

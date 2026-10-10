@@ -19,6 +19,7 @@ export type PgCatalogErrorCode =
   | 'duplicate_key'
   | 'public_table_unknown'
   | 'name_collision'
+  | 'camel_case_mismatch'
   | 'catalog_unreadable'
   | 'catalog_format';
 
