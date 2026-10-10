@@ -174,11 +174,12 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      # The same suite as the PGlite files, against a real server: NULLS
-      # LAST ordering, tsquery search, and microsecond casts are proven on
-      # the planner and executor that production uses. The file skips
-      # itself when the variable is unset.
-      - run: pnpm --filter @netvark/keyset-e2e exec vitest run postgres
+      # Every e2e file, with a real server: postgres.e2e.test.ts runs the
+      # invariants there (NULLS LAST ordering, tsquery search, microsecond
+      # casts on the planner and executor production uses), and the feature
+      # files that take their databases from databases() add the server to
+      # PGlite. Without the variable those files run on PGlite alone.
+      - run: pnpm --filter @netvark/keyset-e2e exec vitest run
         env:
           KEYSET_PG_URL: postgres://postgres:postgres@localhost:5432/postgres
 
