@@ -9,6 +9,7 @@ import type {
   ColumnGenerated,
   Constraint,
   Policy,
+  Rule,
 } from '@netvark/catalog-core';
 
 import type {
@@ -20,6 +21,7 @@ import type {
 } from './rows';
 
 import { compareCodeUnits } from '../internal/code-units';
+import { recognizeCheck } from '../recognize/recognize';
 import {
   GENERATED_KINDS,
   IDENTITIES,
@@ -31,6 +33,7 @@ import {
 import { orderedRecord, referenceName, sortedRecord } from './names';
 import { searchConfig } from './search-config';
 import {
+  checkSubject,
   defaultMember,
   isBuiltin,
   modifierMembers,
@@ -108,9 +111,27 @@ function buildForeignKey(
   };
 }
 
+/** A table CHECK is a candidate for a rule when it is enforced and names exactly one column (SPEC 8.1). */
+function checkRule(
+  row: ConstraintRow,
+  expression: string,
+  columns: ReadonlyMap<string, ColumnRow>,
+): Rule | null {
+  const [name, ...others] = row.columns;
+  if (!row.enforced || name === undefined || others.length > 0) {
+    return null;
+  }
+  const column = present(
+    columns.get(name) ?? null,
+    `column ${name} of ${row.name}`,
+  );
+  return recognizeCheck(expression, checkSubject(column, name));
+}
+
 function buildConstraint(
   row: ConstraintRow,
   defaultSchema: string,
+  columns: ReadonlyMap<string, ColumnRow>,
 ): Constraint {
   switch (row.type) {
     case 'p': {
@@ -132,11 +153,12 @@ function buildConstraint(
       return buildForeignKey(row, defaultSchema);
     }
     case 'c': {
+      const expression = present(row.expression, `expression of ${row.name}`);
       return {
         kind: 'check',
         columns: row.columns,
-        expression: present(row.expression, `expression of ${row.name}`),
-        rule: null,
+        expression,
+        rule: checkRule(row, expression, columns),
         validated: row.validated,
         enforced: row.enforced,
         definition: row.definition,
@@ -178,9 +200,15 @@ function buildPolicy(row: PolicyRow): Policy {
 /** The table's model; `defaultSchema` names referenced tables and types (SPEC 2.1). */
 export function buildTable(row: TableRow, defaultSchema: string): CatalogTable {
   const owner = `table ${referenceName(row.schema, row.name, defaultSchema)}`;
+  const columnRows = new Map(
+    row.columns.map((column) => [column.name, column]),
+  );
   const constraints = row.constraints.map(
     (constraint) =>
-      [constraint.name, buildConstraint(constraint, defaultSchema)] as const,
+      [
+        constraint.name,
+        buildConstraint(constraint, defaultSchema, columnRows),
+      ] as const,
   );
   const primaryKey = constraints.find(
     ([, constraint]) => constraint.kind === 'primaryKey',

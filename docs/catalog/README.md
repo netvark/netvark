@@ -154,6 +154,9 @@ object kind, or as JSON with `--json`), and 2 when it could not run.
   Functions (`btrim(name) <> ''`), case-insensitive matches (`~*`), multi-column checks, and the
   regular expression features outside the subset (`\d`, `\w`, lookahead) stay `null`; cover them
   with a validator. SPEC section 8 lists every shape.
+- **Enforce rules the way PostgreSQL does.** Count code points, compare bounds as exact decimals,
+  keep a pattern's flags, and let null through; `@netvark/catalog-core`'s README has a function that
+  does all four.
 - **Use `now()`, never `'now'`.** A `'now'` default is converted to a constant when the migration
   runs, so every replay writes a different catalog (and production stores the deployment time).
 - **Create roles idempotently.** Roles belong to the server, not the database, so a throwaway

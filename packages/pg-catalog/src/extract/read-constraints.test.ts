@@ -38,7 +38,7 @@ describe('readCatalog: constraints (SPEC 2.5)', () => {
         kind: 'check',
         columns: ['name'],
         expression: '((char_length(name) >= 1) AND (char_length(name) <= 200))',
-        rule: null,
+        rule: { kind: 'length', min: 1, max: 200 },
         validated: true,
         enforced: true,
         definition:

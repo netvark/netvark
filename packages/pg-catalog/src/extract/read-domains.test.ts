@@ -51,14 +51,22 @@ describe('readCatalog: domains (SPEC 2.8)', () => {
         amount_cap: {
           kind: 'check',
           expression: '(VALUE < (1000000)::numeric)',
-          rule: null,
+          rule: {
+            kind: 'range',
+            min: null,
+            max: { value: '1000000', inclusive: false },
+          },
           validated: false,
           definition: 'CHECK ((VALUE < (1000000)::numeric)) NOT VALID',
         },
         amount_check: {
           kind: 'check',
           expression: '(VALUE > (0)::numeric)',
-          rule: null,
+          rule: {
+            kind: 'range',
+            min: { value: '0', inclusive: false },
+            max: null,
+          },
           validated: true,
           definition: 'CHECK ((VALUE > (0)::numeric))',
         },

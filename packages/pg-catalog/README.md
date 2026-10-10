@@ -70,6 +70,35 @@ catalog.tables.contacts.constraints.contacts_organization_id_fkey.references;
 Both are JSON under `as const`, with keys in a fixed order (code-unit order, columns in table
 order), so the same migrations give the same bytes on every machine, and on PostgreSQL 14 to 18.
 
+## Rules from CHECK constraints
+
+Each CHECK constraint, on a table or a domain, carries a `rule` when its expression can be read
+exactly: the length, range, set of values, not-null test, or pattern it states, which agrees with
+PostgreSQL's verdict on every value. Anything else is `null`, which tells your API layer that a
+validator must cover it. From the repository's test schema:
+
+| CHECK                                             | `rule`                                                                                          |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `char_length(name) between 1 and 200`             | `{ kind: 'length', min: 1, max: 200 }`                                                          |
+| `nickname <> ''`                                  | `{ kind: 'length', min: 1, max: null }`                                                         |
+| `seats > 0`                                       | `{ kind: 'range', min: { value: '0', inclusive: false }, max: null }`                           |
+| `priority between 1 and 5`                        | `{ kind: 'range', min: { value: '1', inclusive: true }, max: { value: '5', inclusive: true } }` |
+| `status in ('active', 'archived')`                | `{ kind: 'enum', values: ['active', 'archived'] }`                                              |
+| `website is null or website ~ '^https://'`        | `{ kind: 'pattern', source: '^https://', flags: 'su' }`                                         |
+| `value is not null`, on a domain                  | `{ kind: 'notNull' }`                                                                           |
+| `value ~ '^[^@ ]+@[^@ ]+$'`, on a `citext` domain | `null`: `citext` compares case-insensitively                                                    |
+
+- A CHECK becomes a rule when it tests one column, or a domain's `VALUE`, in a shape SPEC section 8
+  lists. The recognizer reads PostgreSQL's deparsed text, so `between`, `in`, and an `is null or`
+  guard all qualify.
+- A NOT VALID CHECK keeps its rule, since PostgreSQL checks every new row; its `validated: false`
+  says older rows may break it. A NOT ENFORCED CHECK (PostgreSQL 18) has none.
+- Columns under a nondeterministic (case- or accent-insensitive) collation, and `citext`, `char(n)`,
+  and `real` columns, get no rule but `notNull`: their comparisons are not the ones a rule
+  describes. A domain's CHECK compares under the collation of the type the domain is declared over.
+- To enforce a rule in your application exactly as PostgreSQL does, follow
+  [`@netvark/catalog-core`'s README](https://github.com/netvark/netvark/tree/main/packages/catalog-core#enforcing-a-rule).
+
 ## Migrations
 
 `migrations` is a directory, relative to `cwd`, or a function returning `{ name, sql }` entries in
@@ -139,6 +168,16 @@ the object or file, and PostgreSQL's error as `cause` where there is one:
   `missing` when a migration changed and the files were not extracted again.
 - **Name every constraint.** `constraint contacts_name_length check (...)` gives the catalog and its
   diffs a stable key; generated names change when a column is renamed.
+- **One rule per CHECK.** `check (char_length(slug) <= 63)` and `check (slug ~ '^[a-z0-9-]+$')`
+  become two rules, each under its own name; one CHECK joining them with `and` becomes none.
+- **Write sets with `in` and ranges with `between` or two comparisons.** Both become rules;
+  `not in`, `<> all (...)`, and functions such as `btrim(name) <> ''` or `lower(code) = code` do
+  not, so validate those in the application.
+- **Keep patterns in the shared subset.** Write `[0-9]` rather than `\d`, and `[A-Za-z0-9_]` rather
+  than `\w`; `\b`, lookahead, `(?i)`, POSIX classes such as `[[:alpha:]]`, and `~*` leave the rule
+  `null`. A literal `-` goes first or last in a bracket, as in `^[a-z0-9-]+$`.
+- **Validate case-insensitive columns yourself.** A `citext` column, or one under a nondeterministic
+  collation, compares in ways no rule describes, so its CHECKs stay `null`.
 - **Use `now()`, never `'now'`.** A `'now'` default becomes a constant when the migration runs, so
   every replay writes a different catalog.
 - **Create roles idempotently.** Roles belong to the server, so a throwaway database on a shared

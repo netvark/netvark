@@ -23,29 +23,41 @@ https://tc39.es/ecma262/#sec-regexp-regular-expression-objects
 
 ## Decision
 
-- The recognizer reads the deparsed expression of a single-column CHECK, or of a domain CHECK over
-  `VALUE`, and returns a rule only for these shapes, after removing redundant parentheses and an
-  `<column> IS NULL OR` guard: character length bounds (`char_length`, `character_length`, `length`
-  of a text column compared with integer literals, or `<> ''`); numeric bounds (a numeric column
-  compared with numeric literals, with their inclusiveness); membership (`= ANY (ARRAY[...])` of
-  string literals); `IS NOT NULL`; and a pattern (`~` with a string literal in the subset below). An
-  `AND` of two rules of the same kind merges into one; any other combination, function, operator,
-  column, or literal form yields `null`.
+- The recognizer reads the deparsed expression of an enforced single-column CHECK, NOT VALID ones
+  included since PostgreSQL applies them to every new row, or of a domain CHECK over `VALUE`, and
+  returns a rule only for these shapes, after removing redundant parentheses and any
+  `<subject> IS NULL OR` guard, at the top or inside an `AND`: character length bounds
+  (`char_length`, `character_length`, `length` of a text column compared with integer literals, or
+  `<> ''`); numeric bounds (a numeric column compared with literals of its own numeric family, with
+  their inclusiveness); membership (`= ANY (ARRAY[...])` of string literals, or `=` with one);
+  `IS NOT NULL`; and a pattern (`~` with a string literal in the subset below). A guard around
+  `IS NOT NULL` makes the CHECK true for every value, so it yields `null`, never `notNull`. An `AND`
+  of length rules, or of range rules, merges into one when no bound repeats; any other combination,
+  function, operator, column, or literal form yields `null`. A NOT ENFORCED CHECK (PostgreSQL 18)
+  yields no rule, since the database never applies it.
 - A pattern is translated only when it uses literal characters, escapes of JavaScript syntax
   characters, `.`, `^`, `$`, groups and non-capturing groups, alternation, the quantifiers `*`, `+`,
-  `?`, `{m}`, `{m,}`, `{m,n}` and their lazy forms, and bracket expressions of literal characters,
-  escaped syntax characters, and ASCII ranges (`0-9`, `a-z`, `A-Z` and their sub-ranges). Class
-  escapes, constraint escapes, back references, lookaround, POSIX classes, embedded options, and
-  `~*` are never translated. A translated pattern carries the flags `su`, and must compile in
-  JavaScript with them.
-- Columns with a nondeterministic collation get no rules except `notNull`, and so do `bpchar`
-  columns (their comparisons and `char_length` ignore trailing spaces), `float4` columns for ranges
-  (values round to single precision before the CHECK runs), and types such as `citext` whose
+  `?`, `{m}`, `{m,}`, `{m,n}` up to PostgreSQL's limit of 255 and their lazy forms, and bracket
+  expressions of literal characters, escaped syntax characters, ASCII ranges (`0-9`, `a-z`, `A-Z`
+  and their sub-ranges), and a `-` first or last, which both engines read as itself. Class escapes,
+  constraint escapes, back references, lookaround, POSIX classes, embedded options, a `]` first in a
+  bracket, and `~*` are never translated. A translated pattern carries the flags `su`, and the
+  subset admits only constructs that compile in JavaScript with them.
+- A text rule needs a deterministic collation where the CHECK compares: the column's own for a table
+  CHECK, and for a domain CHECK that of the type the domain is declared over, which is the collation
+  PostgreSQL gives `VALUE`. @ref
+  https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/commands/typecmds.c
+  (`domainAddCheckConstraint`) Under a nondeterministic collation only `notNull` remains, and the
+  same holds for `bpchar` (its comparisons and `char_length` ignore trailing spaces), for `float4`
+  (values round to single precision before the CHECK runs), and for types such as `citext` whose
   operators are not the text operators the rules describe.
 - A rule speaks of the column's values after PostgreSQL's input conversion and type modifier
-  coercion, and a range rule of finite numbers only.
-- Every shape has a table-driven test with the exact text PostgreSQL 14 and 18 deparse, and the
-  oracle (`rules --check`) runs generated boundary values through the rule and through the database.
+  coercion, and a range rule of finite numbers only. A bound compares in the column's type: exactly
+  for the integer types and `numeric`, as the nearest double for `float8`.
+- Every shape has a table-driven test with the exact text PostgreSQL 14 and 18 deparse. An oracle
+  test runs values around every bound through the rule and through the database, and every accepted
+  pattern through both engines' matchers; `rules --check` (#19) will run the same comparison over an
+  application's own schema.
 
 ## Consequences
 

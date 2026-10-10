@@ -5,6 +5,7 @@
  */
 import type { ColumnDefault, TypeKind } from '@netvark/catalog-core';
 
+import type { CheckSubject } from '../recognize/subject';
 import type { TypeModifiers } from './modifiers';
 import type { TypeFactsRow } from './rows';
 
@@ -64,5 +65,26 @@ export function defaultMember(row: TypeFactsRow): ColumnDefault | null {
   return {
     expression: row.default,
     literal: defaultLiteral(row.default, base),
+  };
+}
+
+/**
+ * The subject of a CHECK over `row`'s type (SPEC 8.1): `column` names the
+ * column of a table CHECK, and `null` stands for a domain's `VALUE`, whose
+ * own type is the one the domain is declared over.
+ */
+export function checkSubject(
+  row: TypeFactsRow,
+  column: string | null,
+): CheckSubject {
+  return {
+    column,
+    domain: row.typeType === 'd',
+    array: row.array,
+    baseSchema: row.baseSchema,
+    baseName: row.baseName,
+    baseType: row.baseType,
+    baseSpelling: row.baseSpelling,
+    deterministic: row.deterministic,
   };
 }

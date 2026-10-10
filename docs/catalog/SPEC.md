@@ -78,11 +78,17 @@ packages/pg-catalog/src/
   extract/search-config.ts     searchConfig() (7.3)
   extract/rows.ts              the row shapes the queries return (7.2)
   extract/codes.ts             the pg_catalog code tables (2.4 to 2.8)
-  extract/type-facts.ts        the type, modifier, and default members of columns and domains (2.4, 2.8)
+  extract/type-facts.ts        the type, modifier, default, and CHECK-subject members of columns and domains (2.4, 2.8, 8.1)
   extract/build-table.ts       buildTable() (2.3 to 2.7)
   sql/tokenize.ts              tokenize() over deparsed SQL (8.2)
   sql/parse.ts                 parseExpression() (8.2)
-  recognize/recognize.ts       recognizeCheck() (8.1, 8.3)
+  sql/nodes.ts                 the expression tree (8.2)
+  sql/cursor.ts                TokenCursor, Unparsable (8.2)
+  sql/type-name.ts             readTypeName() (8.2)
+  recognize/recognize.ts       recognizeCheck(): guards and conjunctions (8.3)
+  recognize/terms.ts           the single-term shapes (8.3)
+  recognize/subject.ts         CheckSubject, the subject and applicability (8.1, 8.3)
+  recognize/constants.ts       N, L, and string constants (8.3)
   recognize/pattern.ts         translatePattern() (8.4)
   render/catalog-module.ts     renderCatalogModule(), renderPublicCatalogModule(), parseCatalogModule() (9.1)
   render/kysely-mapping.ts     the type table (9.2)
@@ -364,7 +370,10 @@ codec that accepts other representations must apply the same conversion before t
 domain a rule is true exactly when the CHECK is, with two stated limits: a range rule speaks of
 finite numbers only (PostgreSQL orders `NaN` above every number and JSON carries neither `NaN` nor
 infinities), and every rule assumes a UTF-8 database, which replay always creates (6.2). Range bound
-values stay decimal strings so that `numeric` and `int8` bounds keep every digit.
+values stay decimal strings so that `numeric` and `int8` bounds keep every digit. A bound compares
+in the column's type: exactly as a decimal for the integer types and `numeric`, and for `float8` as
+the nearest double, which `Number(value)` gives. A length counts code points, which
+`Array.from(value).length` gives and `value.length` does not.
 
 ### 2.10 Order and serialization
 
@@ -632,8 +641,9 @@ generation expression must be. @ref https://www.postgresql.org/docs/18/textsearc
 ### 8.1 Applicability
 
 A table CHECK is a candidate when it is enforced and its `conkey` names exactly one column; a domain
-CHECK always is. The subject is that column (written as its name) or the domain's `VALUE`. Its
-**base type** is the column's or domain's type resolved through domains.
+CHECK always is. A NOT VALID CHECK is a candidate too, since it checks every new row. The subject is
+that column (written as its name) or the domain's `VALUE`. Its **base type** is the column's or
+domain's type resolved through domains.
 
 | Rule kind | Base types                                  | Further conditions                             |
 | --------- | ------------------------------------------- | ---------------------------------------------- |
@@ -643,42 +653,82 @@ CHECK always is. The subject is that column (written as its name) or the domain'
 | range     | `int2`, `int4`, `int8`, `numeric`, `float8` | not an array                                   |
 | notNull   | any                                         |                                                |
 
+The collation is the one the CHECK compares under: the column's own for a table CHECK, and for a
+domain CHECK that of the type the domain is declared over, because PostgreSQL gives `VALUE` that
+type's collation rather than the domain's. A domain over `text` declared with a nondeterministic
+collation therefore still gets rules, while a domain over such a domain gets none, whatever its own
+collation. @ref
+https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/commands/typecmds.c
+(`domainAddCheckConstraint`)
+
 `bpchar` is excluded because its comparisons, `char_length`, and casts to `text` ignore trailing
 spaces; `float4` because values round to single precision before the CHECK; `citext` and other types
 because their operators are not the text operators the rules describe.
 
-### 8.2 Expressions (`sql/tokenize.ts`, `sql/parse.ts`)
+Operators and functions are read by name. The deparser prints a name unqualified only when it
+resolves to the same object in the session's search path, where `pg_catalog` comes first; the
+recognizer accepts a `pg_catalog.` qualifier on a function and no other, a qualified operator fails
+the parse, and 8.3 requires the operand types PostgreSQL's own operators take. A schema that defines
+one of these operators for the exact argument types involved, such as its own `=` on an enum, is
+beyond what the deparsed text shows.
+
+### 8.2 Expressions (`sql/`)
 
 The tokenizer reads the deparsed text: words (`[A-Za-z_][A-Za-z0-9_$]*`, case kept: the deparser
 prints keywords in upper case and identifiers in lower case), quoted identifiers (`"..."` with `""`
-escapes), string constants (`'...'` with `''` escapes; an `E'...'` or `U&'...'` constant fails the
-parse), unsigned numbers, and operators and punctuation. The parser builds a tree of `OR`, `AND`,
-comparisons (`=`, `<>`, `<`, `<=`, `>`, `>=`, `~`, `~*`, `!~`, `!~*`), `= ANY (...)`,
-`IS [NOT] NULL`, function calls, casts (`::` followed by a type name: a word or quoted identifier,
-optionally schema-qualified, with the multiword spellings `format_type` prints such as
-`character varying`, `double precision`, and `timestamp(3) with time zone`, an optional modifier,
-and `[]` suffixes), `ARRAY[...]`, parentheses, the subject, and constants. Any other input fails the
-parse, and a failed parse gives `null`.
+escapes), string constants (`'...'` with `''` escapes; a prefixed constant such as `E'...'`,
+`X'...'`, or `U&'...'` fails the parse), unsigned numbers, and operators and punctuation. The parser
+builds a tree of `OR`, `AND`, comparisons (`=`, `<>`, `<`, `<=`, `>`, `>=`, `~`, `~*`, `!~`, `!~*`),
+`= ANY (...)`, `IS [NOT] NULL`, function calls, casts (`::` followed by a type name: a word or
+quoted identifier, optionally schema-qualified, with the multiword spellings `format_type` prints
+such as `character varying`, `double precision`, and `timestamp(3) with time zone`, an optional
+modifier, and `[]` suffixes), `ARRAY[...]`, parentheses, identifiers, and constants. It follows
+PostgreSQL's precedence (the `~` family binds tighter than the comparisons, comparisons do not
+associate, `IS` binds looser), flattens nested `AND`s and `OR`s, which are associative in
+three-valued logic too, and matches keywords in any case. `NOT`, `TRUE`, `FALSE`, `NULL`, `ALL`,
+`SOME`, a bare `ARRAY`, and any other input fail the parse, and a failed parse gives `null`. Nesting
+stops at 64 levels, so hostile input cannot exhaust the stack. @ref
+https://www.postgresql.org/docs/18/sql-syntax-lexical.html#SQL-PRECEDENCE
 
-### 8.3 Shapes (`recognize/recognize.ts`)
+### 8.3 Shapes (`recognize/recognize.ts`, `terms.ts`, `subject.ts`, `constants.ts`)
 
-`S` is the subject, optionally wrapped in casts to `text` or `character varying` without a modifier
-(how the deparser prints a `varchar` column given to a text function or operator). `N` is an
-unsigned integer constant. `L` is a numeric constant: unsigned digits with an optional fraction, a
-quoted signed number cast to `smallint`, `integer`, `bigint`, or `numeric`, or such a constant in
-parentheses cast again to one of those types or `double precision`; a cast to an integer type
-requires an integral value, so no cast in the chain changes the number.
+`S` is the subject: the column's name, matched exactly when quoted and, when bare, only if the name
+needs no quoting (lower-case ASCII letters, digits, and `_`, as `quote_identifier` decides), or the
+bare keyword `VALUE`. `S` may stand under casts to `text` or `character varying` without a modifier
+(how the deparser shows a `varchar` given to a text function or operator) and, when the subject's
+own type is a domain, to the base type's spelling. The type an operator or function receives `S` as
+is the outermost cast, or the subject's own type when uncast. PostgreSQL's own operators always
+receive a domain through a cast, and no built-in operator takes `varchar`, so an uncast domain or
+`varchar` subject means an operator of the schema's own and gives `null`. The text shapes need that
+type to be `text`; the enum and range shapes need the base type.
 
-1. **Guard.** `S IS NULL OR X` and `X OR S IS NULL` reduce to `X`: a CHECK passes on null anyway.
+`N` is an unsigned integer constant. `L` is a numeric constant: unsigned digits with an optional
+fraction, typed as PostgreSQL types it (`integer` when it fits int4, `bigint` when it fits int8,
+`numeric` otherwise or with a fraction); a quoted signed decimal cast to `smallint`, `integer`,
+`bigint`, `numeric`, or `double precision`; or such a constant cast again to one of those types. No
+cast in the chain may change the number or fail on every row: a cast to an integer type needs an
+integral value in the type's range, a cast to `double precision` needs a finite value that does not
+underflow to zero, and nothing leaves `double precision`, since `float8` to `numeric` keeps 15
+significant digits. `L` must belong to the subject's family, which is what PostgreSQL's comparison
+operators take without casting the subject: an integer type for `int2`, `int4`, and `int8`;
+`numeric` for `numeric`; `double precision` for `float8`.
+
+1. **Guard.** `S IS NULL OR X` and `X OR S IS NULL`, at the top or inside a conjunction, reduce to
+   `X`: a CHECK passes on null anyway. When `X` is `S IS NOT NULL` the guard makes the CHECK true
+   for every value, so it gives `null`.
 2. **Length.** `F(S) op N` or `N op F(S)` with `F` one of `char_length`, `character_length`, and
-   `length`, and `op` one of `>=`, `>`, `<=`, `<`, `=`. Strict bounds become inclusive (`> 0` is
-   `min: 1`); `=` sets both bounds; a bound below zero gives `null`. `S <> ''::text` is `min: 1`.
+   `length`, unqualified or in `pg_catalog`, with one argument, and `op` one of `>=`, `>`, `<=`,
+   `<`, `=`. Strict bounds become inclusive (`> 0` is `min: 1`); `=` sets both bounds; a bound below
+   zero gives `null`. `S <> ''` in either order, with `''` cast to `text` or `character varying`, is
+   `min: 1`.
 3. **Range.** `S op L` or `L op S` with `op` one of `>=`, `>`, `<=`, `<`; the bound keeps its
-   inclusiveness and its value as decimal text (`'-10'::integer` is `"-10"`).
+   inclusiveness and its value as decimal text (`'-10'::integer` is `"-10"`, `(5.0)::integer` is
+   `"5"`).
 4. **Membership.** `S = ANY (ARRAY[c1, ..., cn])` and
-   `(S)::text = ANY ((ARRAY[c1, ..., cn])::text[])` with every `ci` a string constant cast to the
-   subject's type (`text`, `character varying`, or the enum's spelling); `S = c` is membership in
-   one value (how the deparser prints `IN` with one element).
+   `(S)::text = ANY ((ARRAY[c1, ..., cn])::text[])` with every `ci` a string constant cast to `text`
+   or `character varying` for a text subject, or to the enum's spelling for an enum; `S = c` in
+   either order is membership in one value (how the deparser prints `IN` with one element). The
+   values keep the CHECK's order without repeats.
 5. **Not null.** `S IS NOT NULL`.
 6. **Pattern.** `S ~ '<pattern>'::text` when 8.4 accepts the pattern.
 7. **Conjunction.** An `AND` of length terms, or of range terms, merges into one rule when no bound
@@ -688,8 +738,9 @@ requires an integral value, so no cast in the chain changes the number.
 
 `translatePattern(pattern)` returns the pattern unchanged as the rule's `source` when it parses
 entirely within this grammar, on which PostgreSQL's advanced regular expressions and JavaScript
-regular expressions with the flags `su` agree, and when `new RegExp(source, 'su')` compiles;
-otherwise `null`.
+regular expressions with the flags `su` agree; otherwise `null`. Every construct the grammar admits
+is valid JavaScript with `su`, so an accepted pattern always compiles; the tests compile each
+accepted pattern and run it through PostgreSQL 14 and 18 and through JavaScript on the same input.
 
 ```
 pattern      = branch ( "|" branch )*
@@ -698,7 +749,7 @@ piece        = atom quantifier?
 quantifier   = ( "*" | "+" | "?" | "{" m "}" | "{" m ",}" | "{" m "," n "}" ) "?"?   ; m <= n <= 255
 atom         = literal | "." | "^" | "$" | "(" pattern ")" | "(?:" pattern ")" | bracket
 literal      = any character but  ^ $ \ . * + ? ( ) [ ] { } |  ; or "\" followed by one of them or "/"
-bracket      = "[" "^"? item+ "]"
+bracket      = "[" "^"? "-"? item* "-"? "]"   ; at least one "-" or item
 item         = range | class-literal
 range        = "0".."9" "-" "0".."9" | "a".."z" "-" "a".."z" | "A".."Z" "-" "A".."Z"  ; low <= high
 class-literal = any character but  \ ] [ - ^  ; or "\" followed by one of  ^ $ \ . * + ? ( ) [ ] { } | / -
@@ -711,11 +762,15 @@ class-literal = any character but  \ ] [ - ^  ; or "\" followed by one of  ^ $ \
   match code points with the `u` flag as PostgreSQL does in a UTF-8 database.
 - A bracket's ranges are code point ranges in PostgreSQL's implementation; restricting them to ASCII
   digits and letters keeps them independent of any collation.
+- A `-` first or last in a bracket stands for itself in both, as in `^[a-z0-9-]+$`. Anywhere else
+  outside a range PostgreSQL rejects it (`[a-z-0]` is an invalid character range), so the grammar
+  does too.
+- Groups nest at most 64 levels deep.
 - Rejected: escapes of letters and digits (class escapes such as `\d`, constraint escapes such as
   `\b` and `\m`, back references, `\x` and `\u` escapes), lookaround, POSIX classes and collating
-  elements inside brackets, embedded options such as `(?i)`, the `***` directors, a `]` or `-` at
-  the start of a bracket, unbalanced `]`, `{`, or `}`, bounds above PostgreSQL's limit of 255, and
-  every case-insensitive operator. @ref
+  elements inside brackets, embedded options such as `(?i)`, the `***` directors, a `]` at the start
+  of a bracket (a literal in PostgreSQL, an empty class in JavaScript), unbalanced `]`, `{`, or `}`,
+  bounds above PostgreSQL's limit of 255, and every case-insensitive operator. @ref
   https://www.postgresql.org/docs/18/functions-matching.html#POSIX-SYNTAX-DETAILS @ref
   https://tc39.es/ecma262/#sec-regexp-regular-expression-objects
 
@@ -950,15 +1005,15 @@ thresholds of 90% over `packages/*/src/`. Every test names the rule or choice it
 database code, so `@netvark/pg-catalog`'s own tests run it against PGlite in-process, a real
 PostgreSQL 18; nothing is mocked.
 
-| Area                  | Files                                                                                                                                                                                       | What is pinned                                                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                         | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model |
-| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                             | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                      |
-| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                           | typmod decoding on both encodings, every default form, hidden casts, keys                                                                             |
-| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize.test.ts`, `pattern.test.ts`                                                                                                                 | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape                                                                   |
-| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions                                                |
-| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-mapping.test.ts`                                                                                                                  | exact output text, parse round trip, every mapping row, overrides, names                                                                              |
-| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                 | statuses, writes only on change, every validation, exit codes                                                                                         |
+| Area                  | Files                                                                                                                                                                                                                                     | What is pinned                                                                                                                                                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                       | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                         |
+| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                           | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                              |
+| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                         | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                     |
+| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                      | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                        |
+| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server |
+| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-mapping.test.ts`                                                                                                                                                                | exact output text, parse round trip, every mapping row, overrides, names                                                                                                                                                                                      |
+| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                                                               | statuses, writes only on change, every validation, exit codes                                                                                                                                                                                                 |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -977,6 +1032,7 @@ constraint, row security with forced policies, and comments), and `expected/` ho
 | `drift.e2e.test.ts`           | a live database built from the migrations shows no drift; after a column is added, a policy dropped, and a CHECK changed, exactly those three changes; on PGlite over a socket and on the server                   |
 | `kysely.e2e.test.ts`          | the generated types compile against real Kysely queries, and rows read through `pg` have the runtime types the mapping states, for every row of 9.2                                                                |
 | `consumer.e2e.test.ts`        | the generated modules imported as TypeScript: assignable to the model with literal types, the public module equal to `toPublicCatalog` of the catalog, and `parseCatalogModule` reading the file back with no diff |
+| `rules.e2e.test.ts`           | the public catalog's rules enforced as a client would: each value's verdict equals the database's evaluation of the recorded CHECK, for tables and domains, and the rules are literal types                        |
 | `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                                               |
 
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `toPublicCatalog` and
