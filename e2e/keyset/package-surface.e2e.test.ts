@@ -32,6 +32,7 @@ const CORE = [
   'UnsupportedSortError',
   'checkScalar',
   'createCursorCodec',
+  'createDefineKeyset',
   'createPlanner',
   'defineKeyset',
   'escapeLike',
@@ -46,7 +47,10 @@ const CORE = [
   'sortSignature',
 ].toSorted();
 
-/** SPEC 10: the adapter's own values, on top of the core's. */
+/**
+ * SPEC 10: the adapter's own values, on top of the core's. Its
+ * `createDefineKeyset` replaces the core's export of the same name.
+ */
 const ADAPTER = [
   'createDefineKeyset',
   'paginate',
@@ -60,8 +64,11 @@ describe('package surface', () => {
   });
 
   it('@netvark/kysely-keyset re-exports the core and adds the adapter', () => {
-    expect(names(kysely)).toEqual([...CORE, ...ADAPTER].toSorted());
+    expect(names(kysely)).toEqual(
+      [...new Set([...CORE, ...ADAPTER])].toSorted(),
+    );
     expect(kysely.defineKeyset).toBe(core.defineKeyset);
+    expect(kysely.createDefineKeyset).not.toBe(core.createDefineKeyset);
     expect(kysely.InvalidCursorError).toBe(core.InvalidCursorError);
   });
 

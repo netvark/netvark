@@ -1,14 +1,16 @@
 import type { CamelDB, DB } from './db.ts';
 
 /**
- * The keysets under test, defined through the typed definer against the
- * snake_case `DB` and the camelCase `CamelDB`.
+ * The keysets under test, defined the way an application would: one
+ * configured definer per database interface (the snake_case `DB` and the
+ * camelCase `CamelDB`) carries the cursor secret, and each definition
+ * adds only what differs.
  */
 import { createDefineKeyset } from '@netvark/kysely-keyset';
 
 export const SECRET = 'e2e-secret-with-at-least-32-bytes-in-it';
 
-const defineKeyset = createDefineKeyset<DB>();
+const defineKeyset = createDefineKeyset<DB>({ cursor: { secret: SECRET } });
 
 export const COLUMN_FIELDS = {
   id: { column: 'id', type: 'uuid' },
@@ -68,7 +70,6 @@ export const contacts = defineKeyset({
   relations: RELATIONS,
   search: { mode: 'like', columns: ['first_name', 'last_name'] },
   page: { default: 5, max: 50, range: true },
-  cursor: { secret: SECRET },
 });
 
 /** Text search over the generated `tsvector` column; no range requests. */
@@ -79,7 +80,6 @@ export const searchable = defineKeyset({
   relations: RELATIONS,
   search: { vector: 'search_vector', config: 'simple' },
   page: { default: 5, max: 50 },
-  cursor: { secret: SECRET },
 });
 
 /** Text search computed over columns, phrase mode, with the English configuration. */
@@ -88,7 +88,6 @@ export const phrased = defineKeyset({
   key: ['id'],
   fields: COLUMN_FIELDS,
   search: { columns: ['first_name', 'bio'], mode: 'phrase', config: 'english' },
-  cursor: { secret: SECRET },
 });
 
 /** A composite key: the sort is total only with both columns. */
@@ -99,18 +98,17 @@ export const composite = defineKeyset({
   relations: RELATIONS,
   sort: { default: ['-createdAt', '-id'] },
   page: { default: 4, max: 50, range: true },
-  cursor: { secret: SECRET },
 });
 
-/** Cursors that expire after a second. */
+/** Cursors that expire after a second; the secret still comes from the definer. */
 export const expiring = defineKeyset({
   table: 'contacts',
   key: ['id'],
   fields: COLUMN_FIELDS,
-  cursor: { secret: SECRET, ttl: 1 },
+  cursor: { ttl: 1 },
 });
 
-const defineCamel = createDefineKeyset<CamelDB>();
+const defineCamel = createDefineKeyset<CamelDB>({ cursor: { secret: SECRET } });
 
 /** The same definition against the camelCase interface of a `CamelCasePlugin` application. */
 export const camelContacts = defineCamel({
@@ -141,5 +139,4 @@ export const camelContacts = defineCamel({
   },
   search: { mode: 'like', columns: ['firstName', 'lastName'] },
   page: { default: 5, max: 50, range: true },
-  cursor: { secret: SECRET },
 });

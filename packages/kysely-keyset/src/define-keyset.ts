@@ -12,7 +12,9 @@ import type {
   AggregateFieldInit,
   ColumnFieldInit,
   CursorInit,
-  KeysetInit,
+  DefaultedKeysetInit,
+  DefineDefaultedKeyset as DefineCoreDefaultedKeyset,
+  KeysetDefaults,
   NoRelations,
   PageInit,
   SortInit,
@@ -21,7 +23,7 @@ import type {
 
 import type { KyselyKeyset } from './types';
 
-import { defineKeyset } from '@netvark/keyset-core';
+import { createDefineKeyset as createCoreDefineKeyset } from '@netvark/keyset-core';
 
 import { paginate } from './paginate';
 
@@ -151,6 +153,23 @@ export interface TypedKeysetInit<
   readonly cursor: CursorInit;
 }
 
+/**
+ * A typed definition for a definer whose defaults carry a cursor (SPEC
+ * 10.1): its own `cursor` is optional, and the members it sets replace the
+ * default's.
+ */
+export interface DefaultedTypedKeysetInit<
+  TDatabase,
+  TTable extends TableOf<TDatabase>,
+  TFields extends TypedFieldsInit<TDatabase, TTable, TRelations>,
+  TRelations extends TypedRelationsInit<TDatabase, TTable>,
+> extends Omit<
+  TypedKeysetInit<TDatabase, TTable, TFields, TRelations>,
+  'cursor'
+> {
+  readonly cursor?: Partial<CursorInit> | undefined;
+}
+
 /** The `defineKeyset` of one database type. */
 export type DefineKeyset<TDatabase> = <
   TTable extends TableOf<TDatabase>,
@@ -160,31 +179,61 @@ export type DefineKeyset<TDatabase> = <
   init: TypedKeysetInit<TDatabase, TTable, TFields, TRelations>,
 ) => KyselyKeyset<TFields, RelationsOf<TRelations>>;
 
+/** The `defineKeyset` of one database type, configured with a default cursor. */
+export type DefineDefaultedKeyset<TDatabase> = <
+  TTable extends TableOf<TDatabase>,
+  const TFields extends TypedFieldsInit<TDatabase, TTable, TRelations>,
+  const TRelations extends TypedRelationsInit<TDatabase, TTable> = NoRelations,
+>(
+  init: DefaultedTypedKeysetInit<TDatabase, TTable, TFields, TRelations>,
+) => KyselyKeyset<TFields, RelationsOf<TRelations>>;
+
 /**
- * Binds `defineKeyset` to the application's `DB` interface. Call it once,
- * export the result, and define keysets with it:
+ * Binds `defineKeyset` to the application's `DB` interface, with the
+ * defaults every definition shares merged under each one, member by member
+ * (SPEC 3.6). Call it once, export the result, and define keysets with it:
  *
  * ```ts
- * export const defineKeyset = createDefineKeyset<DB>();
+ * export const defineKeyset = createDefineKeyset<DB>({
+ *   cursor: { secret: env.CURSOR_SECRET },
+ *   page: { default: 25, max: 100 },
+ * });
  * ```
+ *
+ * Defaults that hold a cursor make each definition's `cursor` optional; a
+ * default the definitions cannot use throws `TypeError` here, at startup.
  */
-export function createDefineKeyset<TDatabase>(): DefineKeyset<TDatabase> {
+export function createDefineKeyset<TDatabase>(
+  defaults: KeysetDefaults & { readonly cursor: CursorInit },
+): DefineDefaultedKeyset<TDatabase>;
+export function createDefineKeyset<TDatabase>(
+  defaults?: KeysetDefaults,
+): DefineKeyset<TDatabase>;
+export function createDefineKeyset<TDatabase>(
+  defaults?: KeysetDefaults,
+): DefineDefaultedKeyset<TDatabase> {
+  // Both overloads of the core's definer return the same function, which
+  // takes a definition with or without its cursor and checks the merged
+  // secret at definition time (SPEC 3.6); the overloads above keep the
+  // static guarantee for the application.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: the core's overloads differ only in the static type of one runtime function
+  const define = createCoreDefineKeyset(defaults) as DefineCoreDefaultedKeyset;
   return <
     TTable extends TableOf<TDatabase>,
     const TFields extends TypedFieldsInit<TDatabase, TTable, TRelations>,
     const TRelations extends TypedRelationsInit<TDatabase, TTable> =
       NoRelations,
   >(
-    init: TypedKeysetInit<TDatabase, TTable, TFields, TRelations>,
+    init: DefaultedTypedKeysetInit<TDatabase, TTable, TFields, TRelations>,
   ): KyselyKeyset<TFields, RelationsOf<TRelations>> => {
     // The typed `on` (a partial map over the related table's columns) is
     // the core's `Record<string, string>` at runtime; nothing else differs.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: TypedRelationInit.on narrows RelationInit.on's keys per table; the runtime shape is identical
-    const coreInit = init as unknown as KeysetInit<
+    const coreInit = init as unknown as DefaultedKeysetInit<
       TFields,
       RelationsOf<TRelations>
     >;
-    const keyset = defineKeyset(coreInit);
+    const keyset = define(coreInit);
     return {
       ...keyset,
       paginate: async (query, request, options) =>

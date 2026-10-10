@@ -2,6 +2,7 @@ import type { Selectable } from 'kysely';
 
 import type { Page } from '@netvark/keyset-core';
 
+import type { DefineDefaultedKeyset, DefineKeyset } from './define-keyset';
 import type { Contacts, DB } from './test-support/db';
 
 import { describe, expectTypeOf, it } from 'vitest';
@@ -158,6 +159,41 @@ describe('createDefineKeyset types', () => {
     void keyset.paginate(query, {
       // @ts-expect-error unknown relation
       filter: { field: 'phones.number', op: 'eq', value: 1 },
+    });
+  });
+});
+
+describe('createDefineKeyset with defaults types', () => {
+  it('makes the cursor optional when the defaults carry one and still checks names', () => {
+    const define = createDefineKeyset<DB>({ cursor: { secret: SECRET } });
+    expectTypeOf(define).toEqualTypeOf<DefineDefaultedKeyset<DB>>();
+    define({
+      table: 'contacts',
+      key: ['id'],
+      fields: { id: { column: 'id', type: 'uuid' } },
+    });
+    define({
+      table: 'contacts',
+      key: ['id'],
+      fields: { id: { column: 'id', type: 'uuid' } },
+      cursor: { ttl: 60 },
+    });
+    define({
+      table: 'contacts',
+      key: ['id'],
+      // @ts-expect-error not a column of contacts
+      fields: { id: { column: 'uuid', type: 'uuid' } },
+    });
+  });
+
+  it('keeps the cursor required when the defaults carry none', () => {
+    const define = createDefineKeyset<DB>({ page: { max: 50 } });
+    expectTypeOf(define).toEqualTypeOf<DefineKeyset<DB>>();
+    // @ts-expect-error the definition must name its cursor
+    define({
+      table: 'contacts',
+      key: ['id'],
+      fields: { id: { column: 'id', type: 'uuid' } },
     });
   });
 });
