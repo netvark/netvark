@@ -176,6 +176,11 @@ describe('the typed members of a declared resource', () => {
     >();
   });
 
+  it('takes only a declared resource', () => {
+    // @ts-expect-error a declaration is not a resource
+    expectTypeOf<Infer<typeof Contacts.declaration>>().toBeNever();
+  });
+
   it('stays assignable to the wide DeclaredResource', () => {
     expectTypeOf(Contacts).toExtend<DeclaredResource>();
     expectTypeOf(Meetings).toExtend<DeclaredResource>();

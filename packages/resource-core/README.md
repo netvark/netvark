@@ -523,7 +523,7 @@ The names checks account for about 15 percent of the stern check time and 11 per
 one. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB of peak
 memory, most of it to parse Zod's own declarations. A resource's codes are typed only where code
 reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the check
-from 0.19 s and 129 MB to 0.49 s and 165 MB.
+from 0.17 s and 129 MB to 0.36 s and 143 MB.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in
@@ -531,6 +531,12 @@ from 0.19 s and 129 MB to 0.49 s and 165 MB.
   percent less memory, so a memory-constrained CI runner can pass `--checkers 1`. Pin the same count
   locally and in CI, as the TypeScript team advises, since a different count can in rare cases
   surface order-dependent results. Measure your own project with `tsc --extendedDiagnostics`.
+- **Type helpers.** Constrain a type parameter that takes a resource by `AnyDeclaredResource`, as
+  `Infer` and `ErrorCatalog` do, never by the wide `DeclaredResource`. TypeScript checks a type
+  argument's constraint with error reporting on, and against the wide type it recomputes a failed
+  check of the definer context on every reference: 20 `Infer<typeof X>` aliases cost 1.05 s and 577
+  MB on stern that way, against 0.19 s and 130 MB. Annotating a value with `DeclaredResource` stays
+  cheap.
 - **For contributors.** Keep the valid path free of error types. A mapped type over unknown members
   is built only when a member is unknown (`KnownMembers`): built for every field, it made the stern
   check take 1.55 s and 874 MB. Messages for keys that cannot be declared come from a separate

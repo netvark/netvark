@@ -114,6 +114,13 @@ describe('errorCatalog in types (SPEC 9.2)', () => {
     }>();
   });
 
+  it('takes only declared resources', () => {
+    // @ts-expect-error a declaration is not a resource
+    expectTypeOf<ErrorCatalog<[typeof Contacts.declaration]>>().toBeObject();
+    // @ts-expect-error a declaration is not a resource
+    errorCatalog([Contacts.declaration]);
+  });
+
   it('refuses an application entry that is not an error definition', () => {
     // @ts-expect-error a status outside 4xx and 5xx
     errorCatalog(RESOURCES, { MOVED: { status: 301 } });

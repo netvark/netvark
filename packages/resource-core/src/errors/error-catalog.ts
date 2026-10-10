@@ -11,7 +11,7 @@
  */
 import type { Catalog, EmptyCatalog } from '@netvark/ban-core';
 
-import type { DeclaredResource } from '../declare/declared-resource';
+import type { AnyDeclaredResource } from '../declare/declared-resource';
 import type { RegistryCheck } from '../registry/registry-check';
 import type { ErrorEntry } from './error-entry';
 import type { QuotaExceededCatalog } from './quota-exceeded';
@@ -42,7 +42,7 @@ type Simplify<TValue> = { readonly [K in keyof TValue]: TValue[K] };
 
 /** The catalog fragment `errorCatalog` returns for `TResources` and `TApp`. */
 export type ErrorCatalog<
-  TResources extends ReadonlyArray<DeclaredResource>,
+  TResources extends ReadonlyArray<AnyDeclaredResource>,
   TApp extends Catalog = EmptyCatalog,
 > = Simplify<
   Intersect<ResourceCatalog<TResources[number]>> & QuotaExceededCatalog & TApp
@@ -57,7 +57,7 @@ export type ErrorCatalog<
  * not listed.
  */
 export function errorCatalog<
-  const TResources extends ReadonlyArray<DeclaredResource>,
+  const TResources extends ReadonlyArray<AnyDeclaredResource>,
   const TApp extends Catalog = EmptyCatalog,
 >(
   resources: TResources & RegistryCheck<TResources>,

@@ -10,7 +10,10 @@ export type { Codec, Validator } from './codecs/types';
 export type { DeclarationCheck } from './declare/declaration-check';
 export type { DeclareResourceConfig } from './declare/create-declare-resource';
 export type { DeclareResource } from './declare/declare-resource-type';
-export type { DeclaredResource } from './declare/declared-resource';
+export type {
+  AnyDeclaredResource,
+  DeclaredResource,
+} from './declare/declared-resource';
 export type {
   CodecRegistry,
   CodecTypes,
