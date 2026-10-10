@@ -304,6 +304,7 @@
     "coverage/**",
     "node_modules/**",
     "**/*.min.js",
-    "**/*.d.ts"
+    "**/*.d.ts",
+    "e2e/catalog/fixtures/*/expected/**"
   ]
 }

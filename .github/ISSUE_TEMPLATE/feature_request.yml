@@ -10,6 +10,8 @@ body:
         [
           '@netvark/ban-core',
           '@netvark/hono-ban',
+          '@netvark/catalog-core',
+          '@netvark/pg-catalog',
           '@netvark/jsonapi-core',
           '@netvark/hono-jsonapi',
           '@netvark/keyset-core',

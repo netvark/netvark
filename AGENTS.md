@@ -34,7 +34,10 @@ and e2e directory imports; read the family's file before changing that family.
   goes through the family's prototype-safe helpers, and error messages are constant: request data
   goes into structured fields, never into `message`.
 - No `process.env` at module scope, no Node-only APIs in `src/` (web standards only), no enums or
-  parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis.
+  parameter properties (`erasableSyntaxOnly`), no `any`, no `T[]`, no emojis. The one exception to
+  web standards only is `@netvark/pg-catalog`, a build-time tool that reads files and drives
+  PostgreSQL (`docs/catalog/adr/0002-a-database-free-core-and-a-postgresql-binding.md`); it still
+  reads no environment at module scope.
 - A dependency that two or more workspace packages declare takes its version from the default
   catalog in `pnpm-workspace.yaml` (`"zod": "catalog:"`); peer ranges stay in each package
   (`docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md`).
@@ -49,11 +52,12 @@ and e2e directory imports; read the family's file before changing that family.
 
 ## Repository map
 
-A pnpm workspace of three families:
+A pnpm workspace of four families:
 
 | Family  | Core                    | Binding                  | Docs           | E2E           |
 | ------- | ----------------------- | ------------------------ | -------------- | ------------- |
 | ban     | `packages/ban-core`     | `packages/hono-ban`      | `docs/ban`     | `e2e/ban`     |
+| catalog | `packages/catalog-core` | `packages/pg-catalog`    | `docs/catalog` | `e2e/catalog` |
 | jsonapi | `packages/jsonapi-core` | `packages/hono-jsonapi`  | `docs/jsonapi` | `e2e/jsonapi` |
 | keyset  | `packages/keyset-core`  | `packages/kysely-keyset` | `docs/keyset`  | `e2e/keyset`  |
 

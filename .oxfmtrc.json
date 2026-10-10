@@ -67,7 +67,8 @@
     "**/*.min.css",
     "**/*.snap",
     "CHANGELOG.md",
-    "pnpm-lock.yaml"
+    "pnpm-lock.yaml",
+    "e2e/catalog/fixtures/*/expected/**"
   ],
 
   "overrides": [

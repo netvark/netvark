@@ -1,0 +1,27 @@
+{
+  "name": "@netvark/catalog-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end tests: a consumer of the built @netvark/catalog-core and @netvark/pg-catalog packages, extracting a realistic application's migrations on PGlite and PostgreSQL servers.",
+  "type": "module",
+  "scripts": {
+    "smoke:bun": "bun run smoke/run.ts",
+    "smoke:deno": "deno run --allow-read --allow-env smoke/run.ts",
+    "smoke:workerd": "node --experimental-strip-types smoke/workerd.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@netvark/catalog-core": "workspace:*",
+    "@netvark/pg-catalog": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "miniflare": "catalog:",
+    "pg": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

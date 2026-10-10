@@ -53,7 +53,8 @@ packages/catalog-core/src/
   index.ts                     root entry
   model.ts                     the catalog model types, CATALOG_FORMAT (2)
   rules.ts                     the rule types (2.9)
-  public.ts                    toPublicCatalog(), the public types (3)
+  public.ts                    toPublicCatalog() (3)
+  public-types.ts              the public types (3)
   diff.ts                      diffCatalogs(), CatalogDiff, CatalogChange (4)
   internal/json.ts             JsonValue, isPlainObject(), jsonEqual() (4)
 packages/pg-catalog/src/
@@ -64,16 +65,21 @@ packages/pg-catalog/src/
   config-file.ts               findConfigFile(), loadConfigFile() (11.1)
   migrations/order.ts          orderMigrations(), naturalCompare() (5)
   migrations/load.ts           loadMigrations() (5)
-  target/session.ts            SqlSession, SESSION_SETTINGS (6, 7.1)
+  internal/code-units.ts       compareCodeUnits(), the order of every key (2.10)
+  target/session.ts            SqlSession, SESSION_SETTINGS, useSession() (6, 7.1)
   target/pglite.ts             openPglite() (6.1)
   target/server.ts             openThrowawayDatabase(), openLiveDatabase() (6.2, 10.2)
-  replay.ts                    replay() (6.3)
-  extract/names.ts             referenceName(), assertSafeKey() (2.1)
+  replay.ts                    replay(), lineAndColumn() (6.3)
+  extract/names.ts             referenceName(), assertSafeKey(), sortedRecord() (2.1, 2.10)
   extract/queries.ts           the extraction SQL by server version (7.2)
   extract/read-catalog.ts      readCatalog() (7)
   extract/modifiers.ts         typeModifiers() (7.3)
   extract/defaults.ts          defaultLiteral() (7.3)
   extract/search-config.ts     searchConfig() (7.3)
+  extract/rows.ts              the row shapes the queries return (7.2)
+  extract/codes.ts             the pg_catalog code tables (2.4 to 2.8)
+  extract/type-facts.ts        the type, modifier, and default members of columns and domains (2.4, 2.8)
+  extract/build-table.ts       buildTable() (2.3 to 2.7)
   sql/tokenize.ts              tokenize() over deparsed SQL (8.2)
   sql/parse.ts                 parseExpression() (8.2)
   recognize/recognize.ts       recognizeCheck() (8.1, 8.3)
@@ -466,8 +472,8 @@ A directory is walked recursively; names are paths relative to it with `/` separ
    first, ordered by version, and `R__<description>.sql` files run after them, ordered by
    description; `U<version>__<description>.sql` undo files never run. A version is digit groups
    separated by `.` or `_`, compared group by group as numbers (`V1_10` after `V1_9`); two files
-   with the same version fail with `migrations_invalid`. @ref
-   https://documentation.red-gate.com/fd/migrations-271585107.html
+   with the same version, or two repeatable files with the same description, fail with
+   `migrations_invalid`. @ref https://documentation.red-gate.com/fd/migrations-271585107.html
 3. Otherwise every remaining file except `U<version>__*.sql` runs in natural order of its name: runs
    of digits compare as numbers, everything else by UTF-16 code units, and names that compare equal
    that way (`01_a.sql`, `1_a.sql`) fall back to plain code unit order.
@@ -505,9 +511,9 @@ With `database.url`, extraction connects with `pg` to the URL (a `postgres://` o
 URL), creates `netvark_catalog_<16 hex digits>` with
 `CREATE DATABASE ... TEMPLATE template0 ENCODING 'UTF8'`, connects to it by replacing the URL's
 path, replays and extracts, then closes that connection and drops the database in a `finally` block.
-A failed drop is reported after the primary outcome, never instead of it. The role needs `CREATEDB`.
-Roles are cluster-wide, so a migration that creates a role must do so idempotently. @ref
-https://www.postgresql.org/docs/18/sql-createdatabase.html
+A failed drop fails an otherwise successful extraction; when the extraction itself failed, its error
+is the one reported. The role needs `CREATEDB`. Roles are cluster-wide, so a migration that creates
+a role must do so idempotently. @ref https://www.postgresql.org/docs/18/sql-createdatabase.html
 
 ### 6.3 Replay (`replay.ts`)
 
@@ -545,10 +551,11 @@ https://www.postgresql.org/docs/18/runtime-config-client.html
 
 ### 7.2 Queries (`extract/queries.ts`)
 
-One query per object kind, each returning a single `json_agg(...)::text` value parsed with
-`JSON.parse`, so PGlite and `pg` hand back identical data whatever their type parsers do. The
-queries read `pg_catalog` only: `information_schema` hides objects the current role has no privilege
-on, which would make a read-only drift role see a different catalog.
+One query per kind of top-level object, each returning a single `json_agg(...)::text` value parsed
+with `JSON.parse`, so PGlite and `pg` hand back identical data whatever their type parsers do; a
+table's columns, constraints, indexes, and policies (6 to 9) are nested in its row of the tables
+query (5). The queries read `pg_catalog` only: `information_schema` hides objects the current role
+has no privilege on, which would make a read-only drift role see a different catalog.
 
 1. `current_setting('server_version_num')::int`; below 140000 the extraction fails with
    `unsupported_server`. The version selects two fragments: `indnullsnotdistinct` from 150000 and
@@ -557,13 +564,14 @@ on, which would make a read-only drift role see a different catalog.
 3. Enums: `pg_type` with `typtype = 'e'` in the configured schemas and not owned by an extension,
    with labels from `pg_enum`.
 4. Domains: `pg_type` with `typtype = 'd'`, same filters, with the base type's `typname`, `typtype`,
-   category, element type, `format_type(typbasetype, typtypmod)` and
-   `format_type(typbasetype, NULL)`, `typtypmod`, `typnotnull`, `pg_get_expr(typdefaultbin, 0)`, the
-   collation, the comment, and the `pg_constraint` rows with `contypid` set and `contype = 'c'`.
+   category, element type, `format_type(typbasetype, typtypmod)`, the base type resolved through
+   domains with its `format_type(base, -1)`, `typtypmod`, `typnotnull`,
+   `pg_get_expr(typdefaultbin, 0)`, the collation, the comment, and the `pg_constraint` rows with
+   `contypid` set and `contype = 'c'`.
 5. Tables: `pg_class` with `relkind in ('r', 'p')`, `not relispartition`, same filters, with
    `relrowsecurity`, `relforcerowsecurity`, and `obj_description(oid, 'pg_class')`.
 6. Columns: `pg_attribute` with `attnum > 0 and not attisdropped`, with the type facts as for
-   domains, `format_type(atttypid, NULL)`, `attnotnull`, `attidentity`, `attgenerated`,
+   domains, `format_type(atttypid, atttypmod)`, `attnotnull`, `attidentity`, `attgenerated`,
    `pg_get_expr(adbin, adrelid)` from `pg_attrdef`, the collation name and `collisdeterministic`
    when `attcollation` differs from the type's `typcollation`, and `col_description`.
 7. Constraints: `pg_constraint` with `conrelid` in the tables and
@@ -578,11 +586,12 @@ on, which would make a read-only drift role see a different catalog.
 
 ### 7.3 Normalization
 
-**Type modifiers** (`modifiers.ts`). For `varchar` and `bpchar` a modifier above 0 is the length
-plus 4 (`VARHDRSZ`). For `numeric` a modifier of 4 or more encodes precision and scale:
-`p = ((typmod - 4) >> 16) & 0xffff` and `s = (((typmod - 4) & 0x7ff) ^ 1024) - 1024`, the
-sign-extended 11-bit scale PostgreSQL 15 introduced, which decodes PostgreSQL 14's non-negative
-scales the same way. Every other type gives `null` for all three. @ref
+**Type modifiers** (`modifiers.ts`). For `varchar` and `bpchar` a modifier above 4 (`VARHDRSZ`) is
+the length plus 4, as `anychar_typmodout` decodes it. For `numeric` a modifier of 4 or more encodes
+precision and scale: `p = ((typmod - 4) >> 16) & 0xffff` and
+`s = (((typmod - 4) & 0x7ff) ^ 1024) - 1024`, the sign-extended 11-bit scale PostgreSQL 15
+introduced, which decodes PostgreSQL 14's non-negative scales the same way. Every other type gives
+`null` for all three. @ref
 https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/numeric.c
 
 **Default literals** (`defaults.ts`). `literal` is set only when converting it with the column
@@ -592,10 +601,14 @@ is the column's type, or for a domain the domain's base type, resolved through n
 
 | Deparsed default                                                                                          | Accepted when the base type is                        | `literal`          |
 | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------ |
-| `'<text>'::<T>` with `<T>` the base type spelled by `format_type(type, NULL)`                             | any                                                   | `<text>` unescaped |
+| `'<text>'::<T>` with `<T>` the base type spelled by `format_type(type, -1)`                               | any                                                   | `<text>` unescaped |
 | `true`, `false`                                                                                           | `bool`                                                | `true`, `false`    |
 | an integral number: unsigned digits, or `'[-]<digits>'::<T>` with `<T>` `integer`, `bigint`, or `numeric` | `int2`, `int4`, `int8`, `numeric`, `float4`, `float8` | the number         |
 | a fractional number: `<digits>.<digits>`, or `'[-]<digits>.<digits>'::numeric`                            | `numeric`, `float4`, `float8`                         | the number         |
+
+`format_type(type, -1)` is how `get_const_expr` labels a constant: `bpchar` and `"bit"`, where
+`format_type(type, NULL)` says `character` and `bit`. A constant whose label carries a modifier
+(`'1 day'::interval day`) does not match and gives `null`.
 
 Everything else (function calls, operators, `CURRENT_TIMESTAMP`, `nextval(...)`, explicit casts of
 expressions, `NULL`) gives `null`. The deparse rules behind the table are those of `get_const_expr`
@@ -727,8 +740,9 @@ export const catalog = {
 does the same with the binding `publicCatalog`. A consumer names the types with `typeof catalog` and
 `typeof publicCatalog`. `parseCatalogModule(text)` takes the text between the first `= ` and the
 final ` as const;`, parses it with `JSON.parse`, and returns it as a `Catalog` when it is an object
-whose `format` equals `CATALOG_FORMAT`; otherwise it throws `catalog_unreadable` or
-`catalog_format`.
+whose `format` equals `CATALOG_FORMAT` and whose `schemas`, `extensions`, `enums`, `domains`, and
+`tables` have the model's shapes; another format throws `catalog_format`, anything else
+`catalog_unreadable`.
 
 ### 9.2 Kysely types (`render/kysely-types.ts`, `render/kysely-mapping.ts`, ADR 0007)
 
@@ -911,21 +925,21 @@ Commands throw `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a
 object or file involved, and the PostgreSQL error as `cause` where there is one. The CLI exits 2 on
 all of them. `defineExtraction` and `toPublicCatalog` throw `TypeError` for programming mistakes.
 
-| `code`                 | Raised when                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `config_invalid`       | no configuration file, a file that fails to load or validate, an unknown environment, or a URL function returning nothing |
-| `pglite_missing`       | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist         |
-| `migrations_invalid`   | the directory is missing or holds no migrations, or two Flyway migrations share a version                                 |
-| `migration_failed`     | a migration fails during replay                                                                                           |
-| `connection_failed`    | connecting, creating, or dropping a database fails                                                                        |
-| `unsupported_server`   | the server is older than PostgreSQL 14                                                                                    |
-| `schema_usage`         | the drift role lacks `USAGE` on a configured schema                                                                       |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                     |
-| `duplicate_key`        | two objects map to the same reference name                                                                                |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                               |
-| `name_collision`       | two objects map to the same TypeScript name                                                                               |
-| `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                             |
-| `catalog_format`       | the committed catalog was written in another `format`                                                                     |
+| `code`                 | Raised when                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config_invalid`       | no configuration file, a file that fails to load or validate, an unknown environment, a URL function returning nothing, or a malformed contrib extension name |
+| `pglite_missing`       | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist                                             |
+| `migrations_invalid`   | the directory is missing or holds no migrations, or two Flyway migrations share a version or a repeatable description                                         |
+| `migration_failed`     | a migration fails during replay                                                                                                                               |
+| `connection_failed`    | connecting, creating, or dropping a database fails                                                                                                            |
+| `unsupported_server`   | the server is older than PostgreSQL 14, or returns a catalog code this version does not know                                                                  |
+| `schema_usage`         | the drift role lacks `USAGE` on a configured schema                                                                                                           |
+| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                         |
+| `duplicate_key`        | two objects map to the same reference name                                                                                                                    |
+| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                   |
+| `name_collision`       | two objects map to the same TypeScript name                                                                                                                   |
+| `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                                                                 |
+| `catalog_format`       | the committed catalog was written in another `format`                                                                                                         |
 
 ---
 
@@ -936,15 +950,15 @@ thresholds of 90% over `packages/*/src/`. Every test names the rule or choice it
 database code, so `@netvark/pg-catalog`'s own tests run it against PGlite in-process, a real
 PostgreSQL 18; nothing is mocked.
 
-| Area                  | Files                                                                                       | What is pinned                                                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                         | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model |
-| Migrations            | `order.test.ts`, `load.test.ts`                                                             | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                      |
-| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`           | typmod decoding on both encodings, every default form, hidden casts, keys                                                                             |
-| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize.test.ts`, `pattern.test.ts`                 | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape                                                                   |
-| Extraction            | `read-catalog.test.ts`, `replay.test.ts`, `pglite.test.ts`                                  | every model member against a PGlite schema, extension-owned objects, settings, failures with positions                                                |
-| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-mapping.test.ts`                  | exact output text, parse round trip, every mapping row, overrides, names                                                                              |
-| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts` | statuses, writes only on change, every validation, exit codes                                                                                         |
+| Area                  | Files                                                                                                                                                                                       | What is pinned                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                         | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model |
+| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                             | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                      |
+| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                           | typmod decoding on both encodings, every default form, hidden casts, keys                                                                             |
+| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize.test.ts`, `pattern.test.ts`                                                                                                                 | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape                                                                   |
+| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions                                                |
+| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-mapping.test.ts`                                                                                                                  | exact output text, parse round trip, every mapping row, overrides, names                                                                              |
+| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                 | statuses, writes only on change, every validation, exit codes                                                                                         |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -955,14 +969,15 @@ shape, a generated `tsvector`, identity, foreign keys, partial and expression in
 constraint, row security with forced policies, and comments), and `expected/` holds the three files
 `extract` must produce for them, reviewed by hand.
 
-| File                          | Covers                                                                                                                                                                                           |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package-surface.e2e.test.ts` | the exact export lists, and that `@netvark/pg-catalog` re-exports the core's own bindings                                                                                                        |
-| `extract.e2e.test.ts`         | the three files equal `expected/` byte for byte, on two runs; `--check` passes, then fails after a migration changes                                                                             |
-| `server.e2e.test.ts`          | when `CATALOG_PG_URL` is set: the server target produces the same bytes as PGlite, and drops its database                                                                                        |
-| `drift.e2e.test.ts`           | a live database built from the migrations shows no drift; after a column is added, a policy dropped, and a CHECK changed, exactly those three changes; on PGlite over a socket and on the server |
-| `kysely.e2e.test.ts`          | the generated types compile against real Kysely queries, and rows read through `pg` have the runtime types the mapping states, for every row of 9.2                                              |
-| `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                             |
+| File                          | Covers                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package-surface.e2e.test.ts` | the exact export lists, and that `@netvark/pg-catalog` re-exports the core's own bindings                                                                                                                          |
+| `extract.e2e.test.ts`         | the three files equal `expected/` byte for byte, on two runs; `--check` passes, then fails after a migration changes                                                                                               |
+| `server.e2e.test.ts`          | when `CATALOG_PG_URL` is set: the server target produces the same bytes as PGlite, and drops its database                                                                                                          |
+| `drift.e2e.test.ts`           | a live database built from the migrations shows no drift; after a column is added, a policy dropped, and a CHECK changed, exactly those three changes; on PGlite over a socket and on the server                   |
+| `kysely.e2e.test.ts`          | the generated types compile against real Kysely queries, and rows read through `pg` have the runtime types the mapping states, for every row of 9.2                                                                |
+| `consumer.e2e.test.ts`        | the generated modules imported as TypeScript: assignable to the model with literal types, the public module equal to `toPublicCatalog` of the catalog, and `parseCatalogModule` reading the file back with no diff |
+| `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                                               |
 
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `toPublicCatalog` and
 `diffCatalogs` in workerd. CI runs the suite on Node.js 22 and 24, and `server.e2e.test.ts` and

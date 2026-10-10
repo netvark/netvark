@@ -34,7 +34,9 @@ catalog:
   kysely: 0.29.6
   miniflare: 4.20260730.0
   '@opentelemetry/api': 1.9.1
-  pg: 8.23.1
+  # A runtime dependency of @netvark/pg-catalog, so a caret range: `pnpm publish`
+  # writes the entry as it stands, and applications share one copy of pg.
+  pg: ^8.23.1
   postgres: 3.4.9
   tsdown: 0.23.0
   '@types/node': 26.6.4
