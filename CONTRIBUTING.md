@@ -58,7 +58,9 @@ else, `e2e/*` included, resolves `dist/`.
 
 CI runs the same commands, plus `@netvark/kysely-keyset`'s unit tests on Kysely 0.28.17 (the floor
 of its peer range) and the keyset e2e file for a PostgreSQL server. A pull request must be green on
-all of them. To work on one package or family, filter by name:
+all of them: the last CI job, `CI passed`, needs every other job and is the one check `main`
+requires ([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI job goes
+into its `needs` list. To work on one package or family, filter by name:
 
 ```bash
 pnpm --filter @netvark/keyset-core test

@@ -233,3 +233,31 @@ jobs:
           else
             pnpm changeset status --since=origin/${{ github.base_ref }}
           fi
+
+  # The one status check the `protect main` ruleset requires
+  # (docs/adr/0004-protect-main-with-one-aggregate-check.md). It needs every
+  # job above and fails when any of them failed or was cancelled; a job skipped
+  # by its own condition (the changeset check outside pull requests) counts as
+  # passed. `always()` keeps this job from being skipped when a dependency
+  # fails, because a skipped required check would not block the merge. A new
+  # job goes into `needs` in the same change.
+  # @ref https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/troubleshooting-required-status-checks
+  # @ref https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#needs-context
+  passed:
+    name: CI passed
+    if: always()
+    needs:
+      - quality
+      - test
+      - test-kysely-floor
+      - build
+      - e2e
+      - e2e-postgres
+      - runtimes
+      - changeset
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail when a required job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
