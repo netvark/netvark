@@ -264,4 +264,34 @@ describe('deriveNames: codes (SPEC 4.2, 9.1, 14)', () => {
     })();
     expect(resource.names.codes.get('NOTE_EXISTS')).toBe('notes_pkey');
   });
+
+  it('refuses a code on a foreign key over the scope column alone, which the server writes, and accepts it without a scope', () => {
+    const contacts = untypedDeclare();
+    const relationships = { organization_id: { target, access: 'read' } };
+    const rules = {
+      contacts_organization_id_fkey: { code: 'CONTACT_ORGANIZATION_MISSING' },
+    };
+    expect(
+      typeErrorOf(() =>
+        contacts('contacts', {
+          operations: ['get'],
+          scope: 'organization',
+          fields: {},
+          relationships,
+          rules,
+        }),
+      ),
+    ).toBe(
+      'contacts.rules.contacts_organization_id_fkey.code: the key has no code, since clients cannot violate it',
+    );
+    const unscoped = contacts('contacts', {
+      operations: ['get'],
+      fields: {},
+      relationships,
+      rules,
+    });
+    expect(unscoped.names.codes.get('CONTACT_ORGANIZATION_MISSING')).toBe(
+      'contacts_organization_id_fkey',
+    );
+  });
 });

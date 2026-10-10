@@ -40,12 +40,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ```
 packages/resource-core/src/
@@ -58,6 +58,7 @@ packages/resource-core/src/
   codecs/                   defineCodec, defineValidator, StorageCodecs (7)
   meta/                     field metadata (8)
   errors/                   derived codes, errorCatalog, forbiddenMembers (9)
+  registry/                 the checks of every list of resources: types, codes, targets (4.2)
   messages/                 defineMessages, defaultMessages, templates, localizeErrors, negotiateLanguage (10)
   jsonapi/                  the JSON:API resource definition and the keyset definition (11)
   server/                   the server subpath (12)
@@ -313,6 +314,10 @@ A rule MAY give `code`, which replaces the CHECK's derived code, its constraint 
 constraint name outside A-Z, 0-9, and `_` needs one. The validator's issues carry that code (6.4) on
 every column of the domain, as a table CHECK's validator carries the table constraint's code.
 
+A CHECK that has a rule takes no entry, so its code is always its name upper-cased.
+`declareResource` refuses a resource where that code is not A-Z, 0-9, and `_`, or repeats another
+code of the resource (9.1), and renaming the constraint in a migration is then the only fix.
+
 The validator receives every value the domain holds where it runs (7.2), so its input type MUST
 accept: the domain's value, the output type of its base type; the output of each codec whose `types`
 name the domain or a domain over it, up to the first array, since a codec field keeps its domains'
@@ -346,8 +351,9 @@ the function, and with it the target's type, for `Infer` and the linkage schemas
 https://github.com/microsoft/TypeScript/wiki/FAQ#why-are-functions-returning-non-void-assignable-to-function-returning-void
 
 The check that the target is a declared resource of the referenced table therefore runs where the
-targets are read: TypeScript checks it where a registry is assembled (4.2), and at runtime the first
-read of a target, and the registry, throw `TypeError`
+targets are read: TypeScript checks it where a registry is assembled, at the listed resource whose
+relationship fails (4.2), and at runtime the first read of a target, and the registry, throw
+`TypeError`
 (`contacts.relationships.organization_id.target: the target is a resource of users; the foreign key references organizations`),
 and a target that returns anything but a declared resource throws
 `... .target: must return the declared resource of organizations`. Nothing reads a target while
@@ -405,11 +411,13 @@ REQUIRED.
   and the codes of one resource MUST be distinct. `code` is accepted only on a key that has a code
   (9.1): a key clients cannot violate has none.
 - Across a registry (every place that takes a list of resources: `errorCatalog`, `defineMessages`,
-  `openapi`, the server runtime), types are unique, and codes are unique and distinct from the
-  application's own codes, `@netvark/jsonapi-core`'s `ERROR_CODES`, and `@netvark/ban-core`'s
-  built-in keys (a derived `CONFLICT` would replace the built-in entry), and every relationship's
-  target is a declared resource of the table its foreign key references and is in the registry
-  (3.8).
+  `openapi`, the server runtime), each resource is listed once and types are unique; every
+  relationship's target is a declared resource of the table its foreign key references and is in the
+  registry (3.8); and each code comes from one constraint and is distinct from the application's own
+  codes, `@netvark/jsonapi-core`'s `ERROR_CODES`, `@netvark/ban-core`'s built-in keys (a derived
+  `CONFLICT` would replace the built-in entry), and resource-core's `QUOTA_EXCEEDED`. A code that
+  several resources derive from one constraint, a domain they share or a table two of them declare,
+  is one code. The application's codes cannot replace `QUOTA_EXCEEDED`.
 
 `declareResource` makes every check of one resource at runtime (`names/derive-names.ts`). TypeScript
 makes those it can afford at the declaration (`names/names-check.ts`, `names/codes-check.ts`):
@@ -437,8 +445,20 @@ the catalog alone, so TypeScript computes it once per table. Only the runtime re
   from the catalog alone, and checking every rule key of a real catalog in types cost about as much
   as all the other checks together (15.5).
 
-The registry checks run where the registry is assembled and throw `TypeError` listing every
-conflict.
+The registry checks (`registry/check-registry.ts`) run where the registry is assembled. A list that
+is not an array of resources `declareResource` returned, or application codes that are not
+`@netvark/ban-core` error definitions, throw at once. Every conflict is then collected into one
+`TypeError`, in the registry's public names:
+
+```
+errorCatalog: contacts is listed twice; appErrors.QUOTA_EXCEEDED replaces resource-core's own code; relationship contacts.organization targets organizations, which is not listed
+```
+
+A duplicate code names each constraint behind it, so the message says where `code` goes:
+`code SHORT_TEXT_CHECK is derived by organizations from domain short_text.short_text_check and by contacts from contacts.contacts_name_check, so all but one need a code`.
+TypeScript makes the target checks where the list is passed (`registry/registry-check.ts`), with the
+runtime's message at the listed resource whose relationship fails, and skips a resource whose table
+it does not know. Code conflicts are runtime-only, like the derived codes they compare.
 
 ### 4.3 Reverse maps
 
@@ -866,38 +886,86 @@ Tests: `field-meta.test.ts` (the contacts fixture, the folds), `field-meta.test-
 
 ### 9.1 Derived codes
 
-A declared resource has one code per constraint a client can cause and see: a constraint with at
-least one column that is a public field or relationship, the primary key when `clientIds` is true,
-and the NOT NULL key (3.5) of each public member writable by an operation. The code is the rule key
-upper-cased, or its `code` (4.1).
+A declared resource has one code per constraint a client can cause and see:
 
-| Constraint  | Status | Title                      | Items point at                  | Detail (English, constant)               |
-| ----------- | ------ | -------------------------- | ------------------------------- | ---------------------------------------- |
-| CHECK       | 422    | Invalid Attribute          | each public member of `columns` | The value violates a constraint.         |
-| NOT NULL    | 422    | Invalid Attribute          | the member                      | A value is required.                     |
-| UNIQUE      | 409    | Conflict                   | each public member of `columns` | Another record already has this value.   |
-| PRIMARY KEY | 409    | Conflict                   | `id`                            | A record with this id already exists.    |
-| EXCLUDE     | 409    | Conflict                   | each public member of `columns` | The value conflicts with another record. |
-| FOREIGN KEY | 404    | Related Resource Not Found | the relationship                | The related resource does not exist.     |
+- each constraint of the table with a column, other than the scope column, that is a public field or
+  relationship, whatever its access;
+- the primary key, when `clientIds` is true;
+- the NOT NULL key (3.5) of each public member writable by an operation;
+- each CHECK of each domain a member's type passes, directly, through a base domain, or as the
+  element of an array.
 
-The scope column is never a public member, so a UNIQUE over `(organization_id, email)` points at
-`email` alone. JSON:API requires 404 for a request that references a related resource that does not
-exist and 409 for a client-generated id that exists, and allows 409 for a uniqueness violation on
-update; 422 with a pointer is the form its examples use for an invalid attribute. @ref
+A table constraint's code is its rule key upper-cased, or its `code` (4.1). A domain CHECK's code is
+its constraint name upper-cased, or the `code` of the definer's domain rule (3.6). `declareResource`
+refuses a resource whose codes are not distinct or not A-Z, 0-9, and `_`, naming the constraints
+behind them (14).
+
+| Constraint   | Kind         | Status | Title                      | Items point at                           | Detail (English, constant)               |
+| ------------ | ------------ | ------ | -------------------------- | ---------------------------------------- | ---------------------------------------- |
+| CHECK        | `check`      | 422    | Invalid Attribute          | each public member of `columns`          | The value violates a constraint.         |
+| domain CHECK | `check`      | 422    | Invalid Attribute          | each member whose type passes the domain | The value violates a constraint.         |
+| NOT NULL     | `notNull`    | 422    | Invalid Attribute          | the member                               | A value is required.                     |
+| UNIQUE       | `unique`     | 409    | Conflict                   | each public member of `columns`          | Another record already has this value.   |
+| PRIMARY KEY  | `primaryKey` | 409    | Conflict                   | `id`                                     | A record with this id already exists.    |
+| EXCLUDE      | `exclusion`  | 409    | Conflict                   | each public member of `columns`          | The value conflicts with another record. |
+| FOREIGN KEY  | `foreignKey` | 404    | Related Resource Not Found | the relationship                         | The related resource does not exist.     |
+
+The scope column (3.2) makes no code and no item: the server writes it from the scope, so a client
+never sets it. A UNIQUE over `(organization_id, email)` points at `email` alone, and the scope's own
+foreign key has no code, so `code` on it is refused as on any key without one. A constraint over the
+scope column alone has no code either: stern's `business_profiles_organization_id_key`, one profile
+per organization, is violated only by a second create in the same organization, which falls back to
+the ban's own mapping, `CONFLICT` for 23505 (9.5). Without a scope the column is a member like any
+other. A unique index that no constraint backs has no code yet, since the public catalog does not
+carry indexes, and takes the same fallback.
+
+JSON:API requires 404 for a request that references a related resource that does not exist and 409
+for a client-generated id that exists, and allows 409 for a uniqueness violation on update; 422 with
+a pointer is the form its examples use for an invalid attribute. @ref
 https://jsonapi.org/format/1.1/#crud-creating-responses @ref
 https://jsonapi.org/format/1.1/#crud-updating-responses @ref
 https://jsonapi.org/examples/#error-objects
 
-`errors` on a declared resource maps each code to `{ status, title, fields }`, with literal types,
-for messages, OpenAPI, and clients.
+`errors` on a declared resource maps each code to a frozen `{ status, title, kind, fields }` with
+literal types, for messages, OpenAPI, clients, and `constraintError`. `kind` is the
+`ConstraintKind`: `check`, `notNull`, `unique`, `primaryKey`, `exclusion`, or `foreignKey`. `fields`
+lists the public names the items point at, in column order. The codes come in a fixed order: the
+table's constraints in catalog order, its NOT NULL keys in column order, then the domain CHECKs,
+each domain in the order of its first member and a chain outermost first. A resource whose table
+TypeScript does not know has `errors` typed `Readonly<Record<string, ErrorEntry>>`.
 
-### 9.2 `errorCatalog(resources)`
+Tests: `derive-errors.test.ts` and `domain-codes.test.ts` (each row above, the scope column, the
+order, given codes, and the refusals), `error-types.test-d.ts` (the literal types of each entry),
+and `e2e/resource/errors.e2e.test.ts` (15.4).
 
-Returns the codes of every listed resource, plus resource-core's own `QUOTA_EXCEEDED` (12.6), as a
-`@netvark/ban-core` catalog fragment, `{ [code]: { status, title } }`, to spread into
-`createBan({ errors })` next to `ERROR_CATALOG` from `@netvark/jsonapi-core`. It runs the registry
-checks of 4.2 and throws one `TypeError` listing every conflict. Its type keeps each key, so
-`ban.error('CONTACTS_EMAIL_UNIQUE')` type-checks.
+### 9.2 `errorCatalog(resources, appErrors?)`
+
+Returns one frozen `@netvark/ban-core` catalog fragment, `{ [code]: { status, title } }`: the codes
+of every listed resource, in list order, each entry frozen; then resource-core's own
+`QUOTA_EXCEEDED` (403, Quota Exceeded; 12.6); then `appErrors`, the application's own codes, as
+given. A code several resources derive from one constraint appears once. It is spread into
+`createBan({ errors })` next to `ERROR_CATALOG` from `@netvark/jsonapi-core`:
+
+```ts
+const catalog = errorCatalog([Organizations, Contacts, Meetings], {
+  SEAT_LIMIT: { status: 402, title: 'Seat Limit' },
+});
+const ban = createBan({ errors: { ...ERROR_CATALOG, ...catalog } });
+```
+
+It runs the registry checks of 4.2 and throws one `TypeError` listing every conflict, so the list it
+takes is the registry the application serves. Its type, `ErrorCatalog<TResources, TApp>`, keeps each
+code with its literal status and title, so `ban.error('CONTACTS_EMAIL_UNIQUE')` type-checks; a
+module compiled with `isolatedDeclarations` annotates the export with it. A resource whose table
+TypeScript does not know gives the type an index signature and no codes, and an object spread keeps
+an index signature only when every spread object has one, so next to `ERROR_CATALOG`, `ban.error`
+knows the codes of typed resources only; the catalog holds every code at runtime. @ref
+https://jsonapi.org/format/1.1/#crud-creating-responses-403 @ref
+https://github.com/microsoft/typescript-go/blob/typescript/v7.0.2/internal/checker/checker.go
+(`getSpreadType` keeps `getUnionIndexInfos([left, right])`)
+
+Tests: `error-catalog.test.ts`, `error-catalog.test-d.ts`, `check-registry.test.ts`,
+`registry-check.test-d.ts`, and `e2e/resource/fails/errors.ts`.
 
 ### 9.3 Schema issues on the wire
 
@@ -944,24 +1012,38 @@ check on the request document before validation, so such a member is a 403 and n
 error raised inside an operation into the declared error, or returns `undefined`:
 
 1. Recognize the driver error with `findPostgresError` and read
-   `{ sqlstate, constraint, table, schema, column }` with `readPostgresFields`
-   (`@netvark/ban-core/postgresql`), so node-postgres, PGlite, postgres.js, and Bun are covered
-   without a driver import.
+   `{ sqlstate, constraint, table, schema, column, dataType }` with `readPostgresFields`
+   (`@netvark/ban-core/postgresql`, which gains `dataType`), so node-postgres, PGlite, postgres.js,
+   and Bun are covered without a driver import.
 2. 23503 (foreign key) during `remove`: the referencing row belongs to another table, so return the
    built-in `CONFLICT` (409) with the detail "The resource is still referenced." and no items.
 3. 23502 (not null) carries no constraint name on any supported major: find the NOT NULL key of
-   `(table, column)`. Other integrity errors (23505, 23P01, 23514, 23503 on a write): find the rule
-   key of `(table, constraint)`. The table is matched by schema and name, so two schemas' tables of
-   one name stay apart.
-4. Found: build the error from 9.1 with one item per public member, each with `path` under `pointer`
-   (`/data/attributes/<field>`, `/data/relationships/<name>`, `/data/id`), and the driver error as
-   `cause`. Not found: return `undefined`, and the ban's own `map` (typically `postgresMapper()`)
-   handles it with its SQLSTATE table.
+   `(table, column)`. A domain's CHECK (23514) names the domain in `dataType` and no table: find the
+   code of `(schema, dataType, constraint)` among the operation resource's domain CHECKs. Other
+   integrity errors (23505, 23P01, 23514, 23503 on a write): find the rule key of
+   `(table, constraint)`. Tables and domains are matched by schema and name, so two schemas' objects
+   of one name stay apart.
+4. Found: build the error from 9.1 with one item per member of the entry's `fields`, each with
+   `path` under `pointer` (`/data/attributes/<field>`, `/data/relationships/<name>`, `/data/id`),
+   and the driver error as `cause`. Not found: return `undefined`, and the ban's own `map`
+   (typically `postgresMapper()`) handles it with its SQLSTATE table.
 
 It runs inside the operation because only there are the operation and the document's base known;
 inside Atomic Operations the base is the operation's own `data` (ADR 0007). Tests:
 `constraint-error.test.ts` with errors captured from node-postgres, PGlite, and postgres.js, and the
 end-to-end suite against real violations (15.4).
+
+What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
+`e2e/resource/errors.e2e.test.ts` for every derived code of the contacts application:
+
+| Violation                                              | SQLSTATE                          | Names                                                                      |
+| ------------------------------------------------------ | --------------------------------- | -------------------------------------------------------------------------- |
+| NOT NULL column                                        | 23502                             | the table and the column; no constraint, though PostgreSQL 18 catalogs one |
+| table CHECK, UNIQUE, PRIMARY KEY, EXCLUDE, FOREIGN KEY | 23514, 23505, 23505, 23P01, 23503 | the table and the constraint                                               |
+| domain CHECK                                           | 23514                             | the domain as `dataType`, and the constraint; no table or column           |
+
+A unique index counts as a constraint in these fields, and a NOT NULL domain's 23502 names only the
+domain, which has no code (9.1). @ref https://www.postgresql.org/docs/18/protocol-error-fields.html
 
 ---
 
@@ -1409,7 +1491,9 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a code that does not match `CODE_PATTERN`, or that another code repeats                          | `notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code`                                                              |
 | `code` on a key without a code (9.1)                                                             | `notes.rules.notes_pkey.code: the key has no code, since clients cannot violate it`                                                                         |
 | an `example` the field schema rejects                                                            | `contacts.fields.name.example: the field schema rejects the example`                                                                                        |
-| registry conflicts (4.2)                                                                         | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                                                                                 |
+| a domain CHECK code that is not A-Z, 0-9, `_`, or that another code repeats (3.6, 9.1)           | `meetings: domain inner's CHECK value_check derives code VALUE_CHECK, which domain outer's CHECK value_check also takes`                                    |
+| a registry list or `appErrors` of the wrong shape (4.2)                                          | `errorCatalog.resources[1]: must be a resource declareResource returned`                                                                                    |
+| registry conflicts (4.2)                                                                         | `errorCatalog: relationship contacts.organization targets organizations, which is not listed`                                                               |
 
 Two checks exist only in types, since a Zod schema's input type has no runtime form: a validator
 whose input does not accept what its CHECK holds (7.2), and a domain validator whose input does not
@@ -1419,8 +1503,9 @@ accept every value of the domain (3.6). Their messages are
 `validator: "<name>" does not accept every value of domain <domain>`.
 
 Tests: one case per row in the `declare-*.test.ts`, `create-declare-resource.test.ts`,
-`derive-names-errors.test.ts`, `define-codec.test.ts`, `define-validator.test.ts`, and
-`registry.test.ts` files; `e2e/resource/fails/` holds each compile-time form, matched by its text.
+`derive-names-errors.test.ts`, `define-codec.test.ts`, `define-validator.test.ts`,
+`derive-errors.test.ts`, `domain-codes.test.ts`, and `check-registry.test.ts` files;
+`e2e/resource/fails/` holds each compile-time form, matched by its text.
 
 ---
 
@@ -1511,9 +1596,12 @@ by `jsonb`, and a `notes` table whose columns need `as` and `code`), the catalog
 them. It proves: the declarations type-check, and a `fails/` directory of declarations fails `tsc`
 with the expected errors; the derived names, recorded in a reviewed snapshot
 (`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
-codes, metadata, and definitions; `constraintError` against real violations on PGlite and both
-servers; localized error documents; the package surface (every value export listed); and the runtime
-smoke test on Bun, Deno, and workerd for the root and `openapi` entries.
+metadata, and definitions; the derived error codes, recorded in a reviewed snapshot
+(`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
+both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
+them, rendered by `createBan`; `constraintError` against the same violations; localized error
+documents; the package surface (every value export listed); and the runtime smoke test on Bun, Deno,
+and workerd for the root and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -1592,6 +1680,34 @@ holding each schema; a CHECK without a rule is its validator's, whose fixtures `
 (7.3). Neither schema has a `timestamp(p)` column among the declarations (GitLab 17.11 declares two
 `timestamp(6)` columns, outside the slice, and stern none), so the oracle's own `timestamp(3)` and
 `timestamptz(0)` columns are what found that the catalog lacked their precision.
+
+The fourth record covers section 9. At runtime every declaration derived its codes, and
+`errorCatalog` assembled each catalog's declarations into one fragment that rendered through
+`createBan` and the JSON:API format, on Node.js 24:
+
+| Catalog            | Codes | CHECK | NOT NULL | UNIQUE | FOREIGN KEY | `errorCatalog` |
+| ------------------ | ----- | ----- | -------- | ------ | ----------- | -------------- |
+| stern              | 739   | 6     | 571      | 29     | 133         | 2.6 ms         |
+| GitLab 17.11 slice | 1,248 | 448   | 774      | 0      | 26          | 4.2 ms         |
+
+No declared column of either schema passes a domain with a CHECK, and the GitLab slice enforces
+uniqueness with 62 unique indexes, which the public catalog does not carry (9.1); stern has 7 such
+indexes besides its 29 codes. The run changed section 9 twice. stern scopes 52 of its declarations
+by organization, and the first version gave each scope foreign key a code whose items pointed at
+nothing; the scope column now makes no code. And the GitLab slice repeats CHECK names across tables
+(`push_rules` and `organization_push_rules`, `application_settings` and `namespace_settings`), so
+six codes were derived twice; the registry check named both constraints of each, and `code` on the
+six rules of the second table of each pair resolved them.
+
+In types, with those six codes, as medians of five runs; the declarations alone took 0.4 and 2.1
+percent more instantiations than the third record:
+
+| Catalog            | File                                         | Instantiations | Check time | Peak memory |
+| ------------------ | -------------------------------------------- | -------------- | ---------- | ----------- |
+| stern              | the declarations                             | 411,362        | 0.186 s    | 129 MB      |
+| stern              | plus `errorCatalog` over all and `createBan` | 1,029,864      | 0.488 s    | 165 MB      |
+| GitLab 17.11 slice | the declarations                             | 493,287        | 0.273 s    | 144 MB      |
+| GitLab 17.11 slice | plus `errorCatalog` over all and `createBan` | 1,219,669      | 0.538 s    | 184 MB      |
 
 ### 15.6 The Zod floor
 

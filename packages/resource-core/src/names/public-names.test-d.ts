@@ -1,5 +1,6 @@
 import type { PublicTable } from '@netvark/catalog-core';
 
+import type { ScopeColumnOf } from '../declare/declaration-check';
 import type { ContactsCatalog } from '../test-support/contacts';
 import type { NamesCatalog } from '../test-support/names';
 import type { CodeNames } from './coded-keys';
@@ -36,7 +37,14 @@ type Derived<TCase extends Case> = {
   type: TypeNameOf<TableDefOf<TCase>, TCase['declaration']>;
   fields: FieldNames<TCase['declaration']>;
   relationships: RelationshipNames<TCase['declaration']>;
-  codes: CodeNames<TableDefOf<TCase>, TCase['declaration']>;
+  codes: CodeNames<
+    TableDefOf<TCase>,
+    TCase['declaration'],
+    ScopeColumnOf<
+      typeof TEST_REGISTRIES & { catalog: ContactsCatalog },
+      TCase['declaration']
+    >
+  >;
 };
 type Expected<TCase extends Case> = {
   type: TCase['names']['type'];

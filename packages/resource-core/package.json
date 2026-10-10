@@ -59,6 +59,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@netvark/ban-core": "workspace:^",
     "@netvark/catalog-core": "workspace:^",
     "@netvark/jsonapi-core": "workspace:^",
     "@netvark/keyset-core": "workspace:^"

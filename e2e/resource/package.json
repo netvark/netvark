@@ -14,7 +14,9 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@netvark/ban-core": "workspace:*",
     "@netvark/catalog-core": "workspace:*",
+    "@netvark/jsonapi-core": "workspace:*",
     "@netvark/pg-catalog": "workspace:*",
     "@netvark/resource-core": "workspace:*",
     "@types/node": "catalog:",

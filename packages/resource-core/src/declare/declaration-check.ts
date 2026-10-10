@@ -95,7 +95,7 @@ type OperationsCheck<TDecl extends Declaration> =
           : unknown;
 
 /** The column of the declaration's scope, if it names one the definer has. */
-type ScopeColumnOf<
+export type ScopeColumnOf<
   TContext extends DeclareContext,
   TDecl extends Declaration,
 > = TDecl['scope'] extends keyof TContext['scopes']
@@ -258,7 +258,7 @@ type DeclarationCheckOf<
   AtMember<'sort', SortCheck<TDecl>> &
   RulesCheck<TContext, TTable, TTableDef, TDecl> &
   NamesCheck<TTableDef, TDecl> &
-  CodesCheck<TTableDef, TDecl> & {
+  CodesCheck<TTableDef, TDecl, TScopeColumn> & {
     readonly fields: FieldsCheck<
       TContext,
       TTable,

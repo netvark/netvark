@@ -1,0 +1,226 @@
+{
+  "organizations": {
+    "ORGANIZATION_HANDLE_TAKEN": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "unique",
+      "fields": ["handle"]
+    },
+    "ORGANIZATIONS_SEATS_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["seats"]
+    },
+    "ORGANIZATIONS_SLUG_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["slug"]
+    },
+    "ORGANIZATION_SLUG_TAKEN": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "unique",
+      "fields": ["slug"]
+    },
+    "ORGANIZATIONS_NAME_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["name"]
+    },
+    "ORGANIZATIONS_SLUG_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["slug"]
+    },
+    "ORGANIZATIONS_SEATS_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["seats"]
+    },
+    "SHORT_TEXT_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["name"]
+    },
+    "COUNTRY_CODE_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["country"]
+    },
+    "HANDLE_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["handle"]
+    }
+  },
+  "contacts": {
+    "CONTACT_EMAIL_TAKEN": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "unique",
+      "fields": ["email"]
+    },
+    "CONTACTS_NAME_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["name"]
+    },
+    "CONTACTS_NICKNAME_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["nickname"]
+    },
+    "CONTACTS_PRIORITY_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["priority"]
+    },
+    "CONTACTS_STATUS_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["status"]
+    },
+    "CONTACTS_WEBSITE_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["website"]
+    },
+    "CONTACTS_KIND_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["kind"]
+    },
+    "CONTACT_NAME_REQUIRED": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["name"]
+    },
+    "CONTACTS_STATUS_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["status"]
+    },
+    "CONTACTS_TAGS_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["tags"]
+    },
+    "EMAIL_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["email"]
+    },
+    "PERCENTAGE_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["discount"]
+    }
+  },
+  "meetings": {
+    "MEETINGS_CONTACT_ID_FKEY": {
+      "status": 404,
+      "title": "Related Resource Not Found",
+      "kind": "foreignKey",
+      "fields": ["contact"]
+    },
+    "MEETING_NEEDS_CONTACT_OR_NOTES": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["contact", "notes"]
+    },
+    "MEETING_ROOM_DOUBLE_BOOKED": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "exclusion",
+      "fields": ["room", "during"]
+    },
+    "MEETINGS_PKEY": {
+      "status": 409,
+      "title": "Conflict",
+      "kind": "primaryKey",
+      "fields": ["id"]
+    },
+    "MEETING_ROOM_NOT_LOWERCASE": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["room"]
+    },
+    "MEETINGS_ROOM_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["room"]
+    },
+    "MEETINGS_DURING_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["during"]
+    }
+  },
+  "notes": {
+    "NOTES_AUTHOR_FKEY": {
+      "status": 404,
+      "title": "Related Resource Not Found",
+      "kind": "foreignKey",
+      "fields": ["author"]
+    },
+    "NOTES_BODY_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["body"]
+    },
+    "NOTES_CONTACT_ID_FKEY": {
+      "status": 404,
+      "title": "Related Resource Not Found",
+      "kind": "foreignKey",
+      "fields": ["contact"]
+    },
+    "NOTE_PRIORITY_OUT_OF_RANGE": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["priorität"]
+    },
+    "NOTES_TYPE_CHECK": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "check",
+      "fields": ["kind"]
+    },
+    "NOTES_TYPE_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["kind"]
+    },
+    "NOTES_BODY_NOT_NULL": {
+      "status": 422,
+      "title": "Invalid Attribute",
+      "kind": "notNull",
+      "fields": ["body"]
+    }
+  }
+}

@@ -13,7 +13,7 @@
 export const NAME_CASES = [
   {
     title:
-      'contacts: camelCase fields, a relationship without _id, and the codes clients can cause',
+      'contacts: camelCase fields, a relationship without _id, and the codes clients can cause, none for the scope column alone',
     catalog: 'contacts',
     table: 'contacts',
     declaration: {
@@ -42,7 +42,6 @@ export const NAME_CASES = [
       codes: [
         ['CONTACT_EMAIL_TAKEN', 'contacts_email_unique'],
         ['CONTACTS_NAME_CHECK', 'contacts_name_check'],
-        ['CONTACTS_ORGANIZATION_ID_FKEY', 'contacts_organization_id_fkey'],
         ['CONTACTS_KIND_NOT_NULL', 'contacts_kind_not_null'],
         ['CONTACTS_NAME_NOT_NULL', 'contacts_name_not_null'],
       ],

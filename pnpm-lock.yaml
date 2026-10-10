@@ -418,9 +418,15 @@ importers:
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8
+      '@netvark/ban-core':
+        specifier: workspace:*
+        version: link:../../packages/ban-core
       '@netvark/catalog-core':
         specifier: workspace:*
         version: link:../../packages/catalog-core
+      '@netvark/jsonapi-core':
+        specifier: workspace:*
+        version: link:../../packages/jsonapi-core
       '@netvark/pg-catalog':
         specifier: workspace:*
         version: link:../../packages/pg-catalog
@@ -574,6 +580,9 @@ importers:
 
   packages/resource-core:
     dependencies:
+      '@netvark/ban-core':
+        specifier: workspace:^
+        version: link:../ban-core
       '@netvark/catalog-core':
         specifier: workspace:^
         version: link:../catalog-core

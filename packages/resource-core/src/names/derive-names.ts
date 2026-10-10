@@ -129,8 +129,9 @@ function codeNames(
   table: string,
   tableDef: PublicTable,
   declaration: Declaration,
+  scopeColumn: string | undefined,
 ): CodeNames {
-  const keys = codedKeys(tableDef, declaration);
+  const keys = codedKeys(tableDef, declaration, scopeColumn);
   const declared = declaration.rules ?? {};
   for (const [key, rule] of Object.entries(declared)) {
     if (rule.code !== undefined && !keys.includes(key)) {
@@ -169,13 +170,17 @@ function codeNames(
 
 /**
  * The names of a resource over `table` (SPEC 4.3), whose primary key
- * column is `id`. Runs after the declaration checks, so every member names
- * a column of the right kind.
+ * column is `id` and whose scope, if any, names `scopeColumn`. Runs after
+ * the declaration checks, so every member names a column of the right
+ * kind.
  */
 export function deriveNames(
   table: string,
   tableDef: PublicTable,
-  id: string,
+  {
+    id,
+    scopeColumn,
+  }: { readonly id: string; readonly scopeColumn: string | undefined },
   declaration: Declaration,
 ): ResourceNames {
   return Object.freeze({
@@ -183,6 +188,6 @@ export function deriveNames(
     table,
     id,
     ...memberNames(table, declaration),
-    ...codeNames(table, tableDef, declaration),
+    ...codeNames(table, tableDef, declaration, scopeColumn),
   });
 }

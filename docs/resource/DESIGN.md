@@ -240,8 +240,9 @@ definitions and the error model this family derives.
 `declare/` checks a declaration against the catalog and assembles the declared resource from
 `names/` (public names and reverse maps), `wire/` and `schema/` (wire forms, value schemas, object
 schemas, issues), `codecs/` (codecs and validators), `meta/` (field metadata), `errors/` (codes and
-`forbiddenMembers`), and `jsonapi/` (the two derived definitions). `messages/` works on lists of
-declared resources. `server/`, `openapi/`, and `testing/` are separate entry points.
+`forbiddenMembers`), and `jsonapi/` (the two derived definitions). `registry/` checks a list of
+declared resources as one registry, and `errorCatalog` and `messages/` work on such lists.
+`server/`, `openapi/`, and `testing/` are separate entry points.
 
 ### 4.3 Data flow
 
