@@ -42,12 +42,28 @@ describe('typeModifiers (SPEC 7.3)', () => {
     });
   });
 
-  it('gives null for no modifier (-1) and for every other type', () => {
+  it.each(['timestamp', 'timestamptz', 'time', 'timetz'])(
+    'decodes the precision of %s(p), 0 included, as the modifier itself',
+    (type) => {
+      expect(typeModifiers(type, 3)).toEqual({
+        maxLength: null,
+        precision: 3,
+        scale: null,
+      });
+      expect(typeModifiers(type, 0)).toEqual({
+        maxLength: null,
+        precision: 0,
+        scale: null,
+      });
+    },
+  );
+
+  it('gives null for no modifier (-1), for interval, and for every other type', () => {
     const none = { maxLength: null, precision: null, scale: null };
     expect(typeModifiers('varchar', -1)).toEqual(none);
     expect(typeModifiers('numeric', -1)).toEqual(none);
-    expect(typeModifiers('timestamptz', 3)).toEqual(none);
-    expect(typeModifiers('interval', 589_823)).toEqual(none);
+    expect(typeModifiers('timestamptz', -1)).toEqual(none);
+    expect(typeModifiers('interval', 268_435_458)).toEqual(none);
     expect(typeModifiers('text', -1)).toEqual(none);
   });
 });

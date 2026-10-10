@@ -57,7 +57,10 @@ export interface CatalogColumn {
   readonly sqlType: string;
   /** `n` of `varchar(n)` and `char(n)`. */
   readonly maxLength: number | null;
-  /** `p` of `numeric(p)` and `numeric(p, s)`. */
+  /**
+   * `p` of `numeric(p)` and `numeric(p, s)`, and the fraction digits of a
+   * second of `timestamp(p)`, `timestamptz(p)`, `time(p)`, and `timetz(p)`.
+   */
   readonly precision: number | null;
   /** `s` of `numeric(p, s)`; `0` for `numeric(p)`. */
   readonly scale: number | null;
