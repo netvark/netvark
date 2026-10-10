@@ -23,7 +23,7 @@ import {
 const RESOURCES = [Organizations, Contacts, Meetings, Notes];
 
 describe('the declared resources', () => {
-  it('hold their table, a frozen copy of the declaration, their names, and their codes', () => {
+  it('hold their table, a frozen copy of the declaration, their names, their codes, and their field metadata', () => {
     expect(RESOURCES.map((resource) => resource.table)).toEqual([
       'organizations',
       'contacts',
@@ -34,6 +34,7 @@ describe('the declared resources', () => {
       expect(Object.keys(resource).toSorted()).toEqual([
         'declaration',
         'errors',
+        'fields',
         'linkage',
         'names',
         'schema',
@@ -44,6 +45,7 @@ describe('the declared resources', () => {
       expect(Object.isFrozen(resource)).toBe(true);
       expect(Object.isFrozen(resource.names)).toBe(true);
       expect(Object.isFrozen(resource.errors)).toBe(true);
+      expect(Object.isFrozen(resource.fields)).toBe(true);
       expect(Object.isFrozen(resource.declaration)).toBe(true);
       expect(Object.isFrozen(resource.declaration.fields)).toBe(true);
     }

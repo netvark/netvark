@@ -160,9 +160,9 @@ the foreign key `organization_id` under `fields` fails `tsc` at the line that sa
   follow: `Infer<typeof Contacts>['create']['status']` is `'active' | 'archived' | undefined`.
 - **Exactness.** `name` rejects 201 code points and accepts 200 emoji; `discount` rejects `'1.005'`
   instead of letting PostgreSQL round it; `priority` rejects 6; `website` rejects `http://`.
-- **Metadata.** `Contacts.fields` gives a form each member's label key, limits (`maxLength: 200`),
-  options (`['active', 'archived']`), requiredness, and the default literal to show as a
-  placeholder.
+- **Metadata.** `Contacts.fields` gives a form each member's public name, which keys its label in
+  the messages, its wire type and format, limits (`maxLength: 200`), options
+  (`['active', 'archived']`), requiredness, and the default literal to show as a placeholder.
 - **Errors.** A duplicate email in the organization is a 409 `CONTACT_EMAIL_TAKEN` pointing at
   `/data/attributes/email`; a too-long name sent anyway is a 422 `VALIDATION_FAILED` item with
   `meta.code` `"maxLength"` and `meta.expected` `"200"`.

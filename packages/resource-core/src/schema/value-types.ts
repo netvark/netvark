@@ -142,6 +142,64 @@ export type ColumnValue<
         >
     : unknown;
 
+/** A scalar's options: an enum's labels, or the rules' values; `null` when any value of its type goes. */
+type ScalarOptions<
+  TCatalog extends PublicCatalog,
+  TType extends string,
+  TKind,
+  TRuleValues,
+> = TKind extends 'enum'
+  ? ReadonlyArray<
+      TType extends keyof TCatalog['enums']
+        ? TCatalog['enums'][TType][number]
+        : string
+    >
+  : [TRuleValues] extends [never]
+    ? null
+    : ReadonlyArray<TRuleValues>;
+
+/**
+ * The options of a column's value (SPEC 8), the type-level twin of
+ * `ValueSpec.options`: a scalar's, or an array's elements' with `array`
+ * set. As in `ColumnValue`, the rules' values are a union where the
+ * runtime keeps their intersection, so the type admits every option the
+ * runtime lists.
+ */
+export type ColumnOptions<
+  TCatalog extends PublicCatalog,
+  TColumn extends TypedRecord,
+  TColumnRules = never,
+> =
+  ResolveColumnType<TCatalog, TColumn> extends {
+    readonly type: infer TType extends string;
+    readonly typeKind: infer TKind;
+    readonly depth: infer TDepth;
+    readonly domains: infer TDomains extends ReadonlyArray<string>;
+  }
+    ? TDepth extends 0
+      ? {
+          readonly array: false;
+          readonly options: ScalarOptions<
+            TCatalog,
+            TType,
+            TKind,
+            DomainEnumValues<TCatalog, TDomains> | TColumnRules
+          >;
+        }
+      : {
+          readonly array: true;
+          readonly options: ScalarOptions<
+            TCatalog,
+            TType,
+            TKind,
+            DomainEnumValues<TCatalog, TDomains>
+          >;
+        }
+    : {
+        readonly array: boolean;
+        readonly options: ReadonlyArray<string> | null;
+      };
+
 /** A codec's value: its schema's output (SPEC 7.1). */
 export type CodecValue<TCodec> = TCodec extends {
   readonly schema: infer TSchema extends $ZodType;

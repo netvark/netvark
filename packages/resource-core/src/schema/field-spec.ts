@@ -8,6 +8,7 @@
 import type {
   PublicCheckConstraint,
   PublicColumn,
+  PublicColumnDefault,
   PublicTable,
 } from '@netvark/catalog-core';
 
@@ -23,7 +24,7 @@ import { domainCode } from './domain-code';
 import { NO_LIMITS } from './limits';
 import { levelOf, withRule } from './value-spec';
 
-/** What every member of a declared table needs: its value, nullability, and requirement. */
+/** What every member of a declared table needs: its value, nullability, default, and requirement. */
 export interface MemberSpec {
   readonly name: string;
   readonly column: string;
@@ -31,6 +32,8 @@ export interface MemberSpec {
   readonly value: ValueSpec;
   /** Effectively nullable (SPEC 6.1 step 4). */
   readonly nullable: boolean;
+  /** The default PostgreSQL applies: the column's, else the nearest domain's above the first array. */
+  readonly default: PublicColumnDefault | null;
   /** Required on insert (SPEC 6.3). */
   readonly required: boolean;
 }
@@ -131,7 +134,7 @@ function withColumnChecks(
   return {
     spec: { ...spec, validators: [...spec.validators, ...validators] },
     notNull,
-    hasDefault: level.hasDefault,
+    default: level.default,
   };
 }
 
@@ -156,17 +159,17 @@ function codecLevel(
       validators: facts.validators,
     },
     notNull: facts.notNull,
-    hasDefault: facts.hasDefault,
+    default: facts.default,
   };
 }
 
 interface DomainFacts {
   readonly notNull: boolean;
-  readonly hasDefault: boolean;
+  readonly default: PublicColumnDefault | null;
   readonly validators: ReadonlyArray<ValidatorUse>;
 }
 
-/** NOT NULL, defaults, and validators of the domains above a column's first array. */
+/** NOT NULL, the nearest default, and the validators of the domains above a column's first array. */
 function domainFacts(
   context: DefinerContext,
   column: PublicColumn,
@@ -174,7 +177,7 @@ function domainFacts(
   const lookup = specContext(context);
   const validators: Array<ValidatorUse> = [];
   let notNull = false;
-  let hasDefault = false;
+  let nearest: PublicColumnDefault | null = null;
   let record: Pick<PublicColumn, 'type' | 'typeKind' | 'array'> = column;
   while (!record.array && record.typeKind === 'domain') {
     const name = record.type;
@@ -183,7 +186,7 @@ function domainFacts(
       break;
     }
     notNull ||= !domain.nullable;
-    hasDefault ||= domain.default !== null;
+    nearest ??= domain.default;
     for (const [constraint, { rule }] of Object.entries(domain.constraints)) {
       notNull ||= rule?.kind === 'notNull';
       const use =
@@ -194,7 +197,7 @@ function domainFacts(
     }
     record = domain;
   }
-  return { notNull, hasDefault, validators };
+  return { notNull, default: nearest, validators };
 }
 
 /** The spec of one member column, read by fields and relationships alike. */
@@ -223,14 +226,15 @@ export function memberSpec(
     codec !== undefined,
   );
   const nullable = columnDef.nullable && !level.notNull;
+  const applied = columnDef.default ?? level.default;
   return {
     ...member,
     value: level.spec,
     nullable,
+    default: applied,
     required:
       !nullable &&
-      !level.hasDefault &&
-      columnDef.default === null &&
+      applied === null &&
       columnDef.identity === null &&
       columnDef.generated === null,
   };

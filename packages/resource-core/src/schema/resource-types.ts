@@ -23,7 +23,8 @@ import type { ResourceValidator } from './validate';
 import type { CodecValue, ColumnEnumValues, ColumnValue } from './value-types';
 
 type Readable = 'read' | 'readWrite' | 'immutable';
-type Creatable = 'readWrite' | 'immutable' | 'write';
+/** The accesses `create` takes (SPEC 3.1), the twin of `schemaHolds('create', access)`. */
+export type Creatable = 'readWrite' | 'immutable' | 'write';
 type Updatable = 'readWrite' | 'write';
 
 type Fields<TDecl extends Declaration> = TDecl['fields'];
@@ -33,7 +34,7 @@ type Relationships<TDecl extends Declaration> = DeclaredMembers<
 >;
 
 /** A table's definition in the context's catalog. */
-type TableDefOf<
+export type TableDefOf<
   TContext extends DeclareContext,
   TTable extends string,
 > = TContext['catalog']['tables'][TTable] extends infer TTableDef extends
@@ -46,7 +47,8 @@ type Simplify<TValue> = { [K in keyof TValue]: TValue[K] };
 /** `null` when a member is nullable. */
 export type NullWhen<TNullable> = TNullable extends true ? null : never;
 
-type ColumnRules<
+/** The values of a column's own `enum` rules, `never` when it has none. */
+export type ColumnRules<
   TTableDef extends PublicTable,
   TColumn,
 > = TColumn extends keyof ColumnEnumValues<TTableDef>
@@ -75,7 +77,7 @@ export type FieldOut<
   | NullWhen<IsNullable<TContext['catalog'], TTableDef, TColumn>>;
 
 /** The public type of a relationship's target, read from its declared resource's type. */
-type TargetType<TRelationship> = TRelationship extends {
+export type TargetType<TRelationship> = TRelationship extends {
   readonly target: () => infer TTarget;
 }
   ? TTarget extends {

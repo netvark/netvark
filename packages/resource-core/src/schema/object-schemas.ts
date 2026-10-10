@@ -53,8 +53,8 @@ const ACCESSES: { readonly [K in SchemaName]: ReadonlySet<Access> } = {
   update: new Set<Access>(['readWrite', 'write']),
 };
 
-/** Whether a member with `access` belongs in the schema `name`. */
-function holds(name: SchemaName, access: Access): boolean {
+/** Whether a member with `access` belongs in the schema `name` (SPEC 3.1). */
+export function schemaHolds(name: SchemaName, access: Access): boolean {
   return ACCESSES[name].has(access);
 }
 
@@ -64,7 +64,7 @@ function shapeOf(
 ): Record<string, z.ZodType> {
   return Object.fromEntries(
     members
-      .filter((member) => holds(name, member.access))
+      .filter((member) => schemaHolds(name, member.access))
       .map((member) => {
         const value = member.value(name !== 'read');
         const required =

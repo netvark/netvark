@@ -3,8 +3,9 @@
  * makes, made again for declarations written in JavaScript, plus those
  * types cannot express; each throws `TypeError` naming the option. The
  * result carries the derived names (`names/derive-names.ts`), the derived
- * error codes (`errors/derive-errors.ts`), and the schemas (SPEC 6), whose
- * specs are computed here and whose Zod schemas are built on first read.
+ * error codes (`errors/derive-errors.ts`), the schemas (SPEC 6), and the
+ * field metadata (SPEC 8), whose specs are computed here and whose Zod
+ * schemas and metadata are built on first read.
  * @packageDocumentation
  */
 import type { DefinerContext } from './check-config';
@@ -13,6 +14,7 @@ import type { DeclaredResource } from './declared-resource';
 import { deriveErrors } from '../errors/derive-errors';
 import { lazy } from '../internal/lazy';
 import { describe, ownValue } from '../internal/object';
+import { fieldMetas } from '../meta/field-meta';
 import { deriveNames } from '../names/derive-names';
 import {
   attributeSchemas,
@@ -94,6 +96,9 @@ export function declareResourceIn(
   const validate = lazy(() => attributeValidators(specs.fields, schema()));
   const linkage = lazy(() => linkageSchemas(specs.relationships, specs.checks));
   const write = lazy(() => writeValidators(specs, schema(), linkage()));
+  const fields = lazy(() =>
+    fieldMetas(frozen, specs.fields, specs.relationships),
+  );
   return brandDeclared(
     Object.freeze({
       table,
@@ -111,6 +116,9 @@ export function declareResourceIn(
       },
       get write() {
         return write();
+      },
+      get fields() {
+        return fields();
       },
     }),
     { specs, catalog: context.catalog, errorOrigins: origins },
