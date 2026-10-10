@@ -3,8 +3,11 @@
 pre-commit:
   parallel: true
   jobs:
+    # oxfmt exits non-zero when every path it gets is ignored (CHANGELOG.md,
+    # pnpm-lock.yaml); a commit of only those files is still a valid commit.
+    # @ref https://oxc.rs/docs/guide/usage/formatter/cli.html#runtime-options
     - name: format
-      run: pnpm exec oxfmt {staged_files}
+      run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
       glob: '*.{ts,js,json,jsonc,md,yml,yaml}'
     - name: lint
