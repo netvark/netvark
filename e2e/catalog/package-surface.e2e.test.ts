@@ -22,6 +22,7 @@ const PG_CATALOG = [
   'isPgCatalogError',
   'parseCatalogModule',
   'renderCatalogModule',
+  'renderKyselyTypes',
   'renderPublicCatalogModule',
 ].toSorted();
 

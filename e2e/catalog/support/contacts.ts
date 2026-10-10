@@ -16,6 +16,9 @@ function fixture(path: string): string {
 export const MIGRATIONS_DIR: string = fixture('migrations/');
 export const EXPECTED_CATALOG: string = fixture('expected/catalog.ts');
 export const EXPECTED_PUBLIC: string = fixture('expected/public-catalog.ts');
+export const EXPECTED_TYPES: string = fixture('expected/db.ts');
+/** The types rendered with `camelCase: true`, for applications that use CamelCasePlugin. */
+export const EXPECTED_CAMEL_TYPES: string = fixture('expected/db-camel.ts');
 
 export const PUBLIC_TABLES: ReadonlyArray<string> = [
   'contacts',
@@ -36,5 +39,6 @@ export const contactsConfig: ExtractionConfig = {
   out: {
     catalog: 'src/db/catalog.ts',
     public: { file: 'src/db/public-catalog.ts', tables: PUBLIC_TABLES },
+    types: 'src/db/db.ts',
   },
 };

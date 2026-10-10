@@ -1,7 +1,7 @@
 /**
  * The configuration types (SPEC 11.1). `defineExtraction`, which validates
- * a configuration eagerly, and the drift and Kysely options arrive with the
- * commands that read them.
+ * a configuration eagerly, and the drift options arrive with the commands
+ * that read them.
  * @packageDocumentation
  */
 import type { MigrationSource } from './migrations/load';
@@ -23,8 +23,48 @@ export type DatabaseConfig =
   | { readonly url: string | (() => string | undefined) };
 
 /**
+ * A TypeScript type for a column type in Kysely's select, insert, and
+ * update positions; a missing position takes `select`'s type.
+ */
+export interface TypeOverride {
+  readonly select: string;
+  readonly insert?: string;
+  readonly update?: string;
+}
+
+/**
+ * The options of Kysely's `CamelCasePlugin` that change names; give the
+ * ones the application gives the plugin.
+ * @ref https://kysely-org.github.io/kysely-apidoc/interfaces/CamelCasePluginOptions.html
+ */
+export interface CamelCaseOptions {
+  readonly upperCase?: boolean;
+  readonly underscoreBeforeDigits?: boolean;
+  readonly underscoreBetweenUppercaseLetters?: boolean;
+}
+
+/** The Kysely types file and how it maps types (SPEC 9.2). */
+export interface TypesConfig {
+  readonly file: string;
+  /**
+   * Types keyed by a column's `type` (or `<type>[]` for its arrays), for
+   * applications that register their own parsers or use another driver: a
+   * TypeScript type for all three positions, or one per position.
+   */
+  readonly overrides?: Readonly<Record<string, string | TypeOverride>>;
+  /** Import statements written verbatim after Kysely's, for the types overrides name. */
+  readonly imports?: ReadonlyArray<string>;
+  /**
+   * Table and column keys as Kysely's `CamelCasePlugin` names them, for
+   * applications that use it: `true`, or the plugin's options.
+   */
+  readonly camelCase?: boolean | CamelCaseOptions;
+}
+
+/**
  * The files `extract` writes, relative to the configuration file (or the
- * `cwd` option). `public` writes the slice of `tables` a browser may see.
+ * `cwd` option). `public` writes the slice of `tables` a browser may see;
+ * `types` writes the Kysely types, as a path or with options.
  */
 export interface OutputConfig {
   readonly catalog: string;
@@ -32,6 +72,7 @@ export interface OutputConfig {
     readonly file: string;
     readonly tables: ReadonlyArray<string>;
   };
+  readonly types?: string | TypesConfig;
 }
 
 /** An extraction: the migrations, where they replay, which schemas to read, and the files to write. */

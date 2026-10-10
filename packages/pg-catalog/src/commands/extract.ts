@@ -5,7 +5,7 @@
  */
 import type { Catalog } from '@netvark/catalog-core';
 
-import type { DatabaseConfig, ExtractionConfig } from '../config';
+import type { DatabaseConfig, ExtractionConfig, TypesConfig } from '../config';
 import type { MigrationSource } from '../migrations/load';
 import type { SqlSession } from '../target/session';
 
@@ -23,6 +23,7 @@ import {
   renderCatalogModule,
   renderPublicCatalogModule,
 } from '../render/catalog-module';
+import { renderKyselyTypes } from '../render/kysely-types';
 import { replay } from '../replay';
 import { openPglite } from '../target/pglite';
 import { openThrowawayDatabase } from '../target/server';
@@ -45,7 +46,7 @@ export interface ExtractOptions {
 
 /** One generated file and what `extract` did with it. */
 export interface ExtractedFile {
-  readonly kind: 'catalog' | 'public';
+  readonly kind: 'catalog' | 'public' | 'types';
   /** The absolute path. */
   readonly path: string;
   readonly status: 'written' | 'unchanged' | 'stale' | 'missing';
@@ -53,7 +54,7 @@ export interface ExtractedFile {
 
 export interface ExtractReport {
   readonly catalog: Catalog;
-  /** In the order catalog, public. */
+  /** In the order catalog, public, types. */
   readonly files: ReadonlyArray<ExtractedFile>;
 }
 
@@ -139,12 +140,18 @@ async function settle(
   return { kind, path, status: 'written' };
 }
 
+function typesConfig(types: string | TypesConfig): TypesConfig {
+  return typeof types === 'string' ? { file: types } : types;
+}
+
 /**
  * Extracts the catalog of `config` and settles the configured files: the
- * catalog module, and the public module when `out.public` is set. Without
- * `check` it writes the files whose bytes differ (creating directories);
- * with `check` it writes nothing. A public table the catalog does not hold
- * fails with `public_table_unknown`.
+ * catalog module, the public module when `out.public` is set, and the
+ * Kysely types when `out.types` is set. Without `check` it writes the files
+ * whose bytes differ (creating directories); with `check` it writes
+ * nothing. A public table the catalog does not hold fails with
+ * `public_table_unknown`, and two objects with one TypeScript name with
+ * `name_collision`, before any file is written.
  */
 export async function extract(
   config: ExtractionConfig,
@@ -161,6 +168,14 @@ export async function extract(
       'public',
       resolve(cwd, config.out.public.file),
       publicModule(catalog, config.out.public.tables),
+    ]);
+  }
+  if (config.out.types !== undefined) {
+    const types = typesConfig(config.out.types);
+    outputs.push([
+      'types',
+      resolve(cwd, types.file),
+      renderKyselyTypes(catalog, types),
     ]);
   }
   const files: Array<ExtractedFile> = [];

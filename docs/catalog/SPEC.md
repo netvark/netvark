@@ -39,7 +39,7 @@ it) and on `pg`, and takes `@electric-sql/pglite` as an optional peer dependency
 | Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `CATALOG_FORMAT`; and the types of sections 2 to 4 (`Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`) |
-| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `PgCatalogErrorCode`; and the `pg-catalog` bin                                                                                                                                  |
+| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `TypesConfig`, `TypeOverride`, `CamelCaseOptions`, `DriftEnvironment`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `PgCatalogErrorCode`; and the `pg-catalog` bin                                                                                                              |
 
 `e2e/catalog/package-surface.e2e.test.ts` asserts the exact value export lists against the built
 packages and that the re-exports are the core's own bindings.
@@ -91,7 +91,9 @@ packages/pg-catalog/src/
   recognize/constants.ts       N, L, and string constants (8.3)
   recognize/pattern.ts         translatePattern() (8.4)
   render/catalog-module.ts     renderCatalogModule(), renderPublicCatalogModule(), parseCatalogModule() (9.1)
-  render/kysely-mapping.ts     the type table (9.2)
+  render/kysely-mapping.ts     mapType(), the type table (9.2)
+  render/kysely-names.ts       pascalCase(), memberName(), stringLiteral() (9.2)
+  render/camel-case.ts         toCamelCase(), toSnakeCase(), KeyNames: CamelCasePlugin's names (9.2)
   render/kysely-types.ts       renderKyselyTypes() (9.2)
   commands/extract.ts          extractCatalog(), extract() (10.1)
   commands/drift.ts            introspectCatalog(), drift() (10.2)
@@ -804,56 +806,91 @@ whose `format` equals `CATALOG_FORMAT` and whose `schemas`, `extensions`, `enums
 `tables` have the model's shapes; another format throws `catalog_format`, anything else
 `catalog_unreadable`.
 
-### 9.2 Kysely types (`render/kysely-types.ts`, `render/kysely-mapping.ts`, ADR 0007)
+### 9.2 Kysely types (`render/kysely-types.ts`, `render/kysely-mapping.ts`, `render/kysely-names.ts`, `render/camel-case.ts`, ADR 0007)
 
-`renderKyselyTypes(catalog, options)` writes, in order: the header line;
-`import type { ... } from 'kysely';` with the helpers the file uses, sorted; the configured
-`imports`, verbatim; the helper types the file uses (`JsonValue`, `PostgresInterval`, `Point`,
-`Circle`); one `export type <Name> = '<label>' | ...;` per enum, by key; one
-`export interface <Name>Table` per table, by key, with its columns in order; and
-`export interface DB` mapping each table key to its interface.
+`renderKyselyTypes(catalog, options)` writes, in order and separated by blank lines: the header
+line, `import type { ... } from 'kysely';` naming the Kysely types the file uses, sorted, and the
+configured `imports`, verbatim; the helper types the file uses, in the order `JsonValue`,
+`PostgresInterval`, `Point`, `Circle`; one `export type <Name> = '<label>' | ...;` per enum, by key
+(`never` for an enum without labels); one `export interface <Name>Table` per table, by key, with its
+columns in order; and `export interface DB` mapping each table key to its interface. An interface
+without members is written `{}`.
 
-The select, insert, and update types of a column follow node-postgres's default parsers (pg-types
-2.x). PostgreSQL reports a domain column with its base type's OID, so a domain maps as its base
-type. @ref https://github.com/brianc/node-pg-types/blob/master/lib/textParsers.js @ref
+The select type is what node-postgres's default parsers (pg-types 2.x) return. The insert and update
+types are the values node-postgres serializes into text PostgreSQL accepts: it sends a JavaScript
+array as a PostgreSQL array literal and any other object without `toPostgres` as JSON, so neither a
+parsed point or circle nor a JSON array or string can be sent back, and those types are written as
+text. PostgreSQL reports a domain column with its base type's OID, so a domain maps as its base
+type; an array of a domain has an array type of its own, which pg-types does not parse. @ref
+https://github.com/brianc/node-pg-types/blob/v2.2.0/lib/textParsers.js @ref
+https://github.com/brianc/node-postgres/blob/master/packages/pg/lib/utils.js (prepareValue) @ref
 https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/common/printtup.c
 
-| `type`                                                                                                             | Select             | Insert and update            |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------ | ---------------------------- |
-| `int2`, `int4`, `oid`, `float4`, `float8`                                                                          | `number`           | `number`                     |
-| `int8`                                                                                                             | `string`           | `string \| number \| bigint` |
-| `numeric`                                                                                                          | `string`           | `string \| number`           |
-| `bool`                                                                                                             | `boolean`          | `boolean`                    |
-| `date`, `timestamp`, `timestamptz`                                                                                 | `Date`             | `Date \| string`             |
-| `interval`                                                                                                         | `PostgresInterval` | `PostgresInterval \| string` |
-| `bytea`                                                                                                            | `Buffer`           | `Buffer`                     |
-| `json`, `jsonb`                                                                                                    | `JsonValue`        | `string` (JSON text)         |
-| `point`                                                                                                            | `Point`            | `Point \| string`            |
-| `circle`                                                                                                           | `Circle`           | `Circle \| string`           |
-| an enum                                                                                                            | the label union    | the label union              |
-| every other type (`text`, `varchar`, `bpchar`, `uuid`, `citext`, `time`, `inet`, `money`, `tsvector`, ranges, ...) | `string`           | `string`                     |
+| `type`                                                                                                                         | Select             | Insert and update            |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ---------------------------- |
+| `int2`, `int4`, `oid`, `float4`, `float8`                                                                                      | `number`           | `number`                     |
+| `int8`                                                                                                                         | `string`           | `string \| number \| bigint` |
+| `numeric`                                                                                                                      | `string`           | `string \| number`           |
+| `bool`                                                                                                                         | `boolean`          | `boolean`                    |
+| `date`, `timestamp`, `timestamptz`                                                                                             | `Date`             | `Date \| string`             |
+| `interval`                                                                                                                     | `PostgresInterval` | `PostgresInterval \| string` |
+| `bytea`                                                                                                                        | `Buffer`           | `Buffer`                     |
+| `json`, `jsonb`                                                                                                                | `JsonValue`        | `string` (JSON text)         |
+| `point`                                                                                                                        | `Point`            | `string`                     |
+| `circle`                                                                                                                       | `Circle`           | `string`                     |
+| an enum                                                                                                                        | the label union    | the label union              |
+| every other type (`text`, `varchar`, `bpchar`, `uuid`, `citext`, `time`, `inet`, `money`, `tsvector`, composites, ranges, ...) | `string`           | `string`                     |
 
 - **Arrays.** pg-types parses the arrays of `bool`, `int2`, `int4`, `oid`, `int8` (strings),
-  `float4`, `float8`, `numeric` (parsed as floats, so `Array<number>`), `bpchar`, `varchar`, `text`,
-  `uuid`, `inet`, `cidr`, `macaddr`, `money`, `time`, `timetz`, `numrange`, `date`, `timestamp`,
-  `timestamptz`, `interval`, `bytea`, `json`, `jsonb`, and `point`; their select type is
-  `Array<element>`, and insert and update take `Array<element insert type> | string`. Every other
-  array, enum arrays included, is returned as PostgreSQL's array text: `string` on select, and
-  `Array<element> | string` on insert and update.
-- **Nullability.** A nullable column whose domains are all nullable adds `| null` to all three
-  types.
-- **Defaults.** A column with a default or `identity: 'byDefault'` is optional on insert:
-  `Generated<S>` when the three types are equal, otherwise `ColumnType<S, I | undefined, U>`. An
-  `identity: 'always'` or generated column is `GeneratedAlways<S>`. A column with equal types and no
-  default is written as the bare type.
-- **Overrides.** `types.overrides` keys are a `type` (or `<type>[]` for its arrays) and values a
+  `float4`, `float8`, `numeric` (as floats, so `Array<number>`), `bpchar`, `varchar`, `text`,
+  `regproc`, `uuid`, `inet`, `cidr`, `macaddr`, `money`, `time`, `timetz`, `numrange`, `date`,
+  `timestamp`, `timestamptz`, `interval`, `bytea`, `json`, `jsonb`, and `point`: the select type is
+  `Array<element select type>`, and insert and update take `Array<element insert type> | string`.
+  Every other array, arrays of enums and of domains included, comes back as PostgreSQL's array text:
+  `string` on select, `Array<element insert type> | string` on insert and update. A domain over an
+  array maps as that array. The types assume one-dimensional arrays without null elements; pg-types
+  returns nested arrays and `null` elements as they are.
+- **Nullability.** A nullable column adds `| null` to its select type. Its insert and update types
+  add it only when every domain its type passes through is nullable as well: PostgreSQL refuses null
+  for a NOT NULL domain on write, yet a column of one can read as null, since an empty scalar
+  sub-select stores one unchecked. `unknown` takes no `| null`. Types follow NOT NULL markers only;
+  a `CHECK (x IS NOT NULL)` becomes a rule (2.9). @ref
+  https://www.postgresql.org/docs/18/sql-createdomain.html (Notes)
+- **Defaults.** A column with a default, `identity: 'byDefault'`, or a domain with a default along
+  its chain is optional on insert: `Generated<S>` when its three types are equal, otherwise
+  `ColumnType<S, I | undefined, U>`. An `identity: 'always'` or generated column is
+  `GeneratedAlways<S>`. Any other column is its type when the three are equal, otherwise
+  `ColumnType<S, I, U>`.
+- **Types outside the catalog.** A domain defined outside the configured schemas maps to `unknown`
+  in all three positions, since its base type is not known, and an enum defined outside them to
+  `string`.
+- **Overrides.** `types.overrides` keys are a `type`, or `<type>[]` for its arrays, and values a
   TypeScript type for all three positions or `{ select, insert?, update? }`, the missing positions
-  taking `select`'s type. They replace the mapping for applications that register their own parsers
-  or use another driver.
+  taking `select`'s type. The override of a column's own type wins; otherwise a domain resolves
+  toward its base type and the nearest override along the chain wins. pg-types registers each array
+  parser under the array type's OID, so an override of `<type>` leaves a parsed array of it to the
+  table; an array returned as text takes the element's insert type, overrides included. An override
+  names no helper, so the types it mentions come from `imports`. @ref
+  https://github.com/brianc/node-pg-types/blob/v2.2.0/lib/textParsers.js (init)
 - **Names.** `<Name>` is the reference name in PascalCase: split at every character outside
-  `[A-Za-z0-9]`, upper-case each part's first character, join, and prefix `_` when the result starts
-  with a digit. Two objects with the same name, or a name equal to a helper, fail with
-  `name_collision`. Member names that are not identifiers are written as string literals.
+  `[A-Za-z0-9]`, upper-case the first character of each part, join, and prefix `_` when the result
+  is empty or starts with a digit. Two objects with the same name, or an object named like a helper,
+  `ColumnType`, `Generated`, `GeneratedAlways`, or `DB`, fail with `name_collision`. Member names
+  that are not identifiers, and enum labels, are written as single-quoted literals with `\`, `'`,
+  the line terminators (U+2028 and U+2029 included), and every other control character escaped.
+- **camelCase.** With `types.camelCase`, table and column keys are the names Kysely's
+  `CamelCasePlugin` gives them, so `contact_phones.phone_number` is written
+  `contactPhones.phoneNumber`; type names do not change. The schema and the table of a
+  `schema.table` key convert separately, as the plugin converts each identifier. The options are the
+  plugin's `upperCase`, `underscoreBeforeDigits`, and `underscoreBetweenUppercaseLetters`, and must
+  match the application's. In queries the plugin turns each key back with its snake-case conversion,
+  so a key works only when that gives the database name again: `line_1` becomes `line1`, which turns
+  back into `line1`. Every name that does not survive the round trip is listed in one
+  `camel_case_mismatch`. The conversions are a port of the plugin's, tested against it. Unless
+  `maintainNestedObjectKeys` is set, the plugin also camelCases the keys of objects inside parsed
+  `json` and `jsonb` values, while values written keep their keys. @ref
+  https://github.com/kysely-org/kysely/blob/v0.28.17/src/plugin/camel-case/camel-case.ts @ref
+  https://kysely.dev/docs/plugins#camel-case-plugin
 
 ---
 
@@ -932,11 +969,17 @@ interface TypesConfig {
   readonly file: string;
   readonly overrides?: Readonly<Record<string, string | TypeOverride>>;
   readonly imports?: ReadonlyArray<string>;
+  readonly camelCase?: boolean | CamelCaseOptions; // default false
 }
 interface TypeOverride {
   readonly select: string;
   readonly insert?: string;
   readonly update?: string;
+}
+interface CamelCaseOptions {
+  readonly upperCase?: boolean;
+  readonly underscoreBeforeDigits?: boolean;
+  readonly underscoreBetweenUppercaseLetters?: boolean;
 }
 interface DriftEnvironment {
   readonly url: string | (() => string | undefined);
@@ -998,6 +1041,7 @@ all of them. `defineExtraction` and `toPublicCatalog` throw `TypeError` for prog
 | `duplicate_key`        | two objects map to the same reference name                                                                                                                    |
 | `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                   |
 | `name_collision`       | two objects map to the same TypeScript name                                                                                                                   |
+| `camel_case_mismatch`  | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                         |
 | `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                                                                 |
 | `catalog_format`       | the committed catalog was written in another `format`                                                                                                         |
 
@@ -1010,15 +1054,15 @@ thresholds of 90% over `packages/*/src/`. Every test names the rule or choice it
 database code, so `@netvark/pg-catalog`'s own tests run it against PGlite in-process, a real
 PostgreSQL 18; nothing is mocked.
 
-| Area                  | Files                                                                                                                                                                                                                                     | What is pinned                                                                                                                                                                                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                       | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                         |
-| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                           | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                              |
-| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                         | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                     |
-| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                      | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                        |
-| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server |
-| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-mapping.test.ts`                                                                                                                                                                | exact output text, parse round trip, every mapping row, overrides, names                                                                                                                                                                                      |
-| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                                                               | statuses, writes only on change, every validation, exit codes                                                                                                                                                                                                 |
+| Area                  | Files                                                                                                                                                                                                                                     | What is pinned                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core                  | `public.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                       | every kept and dropped member, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                                                                                                                                              |
+| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                           | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                                                                                                                                                   |
+| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                         | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                                                                                                                                          |
+| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                      | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                             |
+| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                      |
+| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                            | exact output text, parse round trip, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out |
+| Commands, config, CLI | `extract.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `main.test.ts`                                                                                                                                               | statuses, writes only on change, every validation, exit codes                                                                                                                                                                                                                                                                                                                      |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -1028,22 +1072,23 @@ Flyway naming (extensions, organizations, contacts with enums, domains, checks o
 shape, a generated `tsvector`, identity, foreign keys, a partitioned table that a foreign key
 references, partial and expression indexes, an exclusion constraint, row security with forced
 policies, and comments), and `expected/` holds the three files `extract` must produce for them,
-reviewed by hand.
+reviewed by hand, and `db-camel.ts`, the types rendered with `camelCase: true`.
 
-| File                          | Covers                                                                                                                                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package-surface.e2e.test.ts` | the exact export lists, and that `@netvark/pg-catalog` re-exports the core's own bindings                                                                                                                          |
-| `extract.e2e.test.ts`         | the three files equal `expected/` byte for byte, on two runs; `--check` passes, then fails after a migration changes                                                                                               |
-| `server.e2e.test.ts`          | when `CATALOG_PG_URL` is set: the server target produces the same bytes as PGlite, and drops its database                                                                                                          |
-| `drift.e2e.test.ts`           | a live database built from the migrations shows no drift; after a column is added, a policy dropped, and a CHECK changed, exactly those three changes; on PGlite over a socket and on the server                   |
-| `kysely.e2e.test.ts`          | the generated types compile against real Kysely queries, and rows read through `pg` have the runtime types the mapping states, for every row of 9.2                                                                |
-| `consumer.e2e.test.ts`        | the generated modules imported as TypeScript: assignable to the model with literal types, the public module equal to `toPublicCatalog` of the catalog, and `parseCatalogModule` reading the file back with no diff |
-| `rules.e2e.test.ts`           | the public catalog's rules enforced as a client would: each value's verdict equals the database's evaluation of the recorded CHECK, for tables and domains, and the rules are literal types                        |
-| `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                                               |
+| File                          | Covers                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts` | the exact export lists, and that `@netvark/pg-catalog` re-exports the core's own bindings                                                                                                                                                                                                                                                                                             |
+| `extract.e2e.test.ts`         | the three files equal `expected/` byte for byte, on two runs; `--check` passes, then fails after a migration changes                                                                                                                                                                                                                                                                  |
+| `server.e2e.test.ts`          | when `CATALOG_PG_URL` is set: the server target produces the same bytes as PGlite, and drops its database                                                                                                                                                                                                                                                                             |
+| `drift.e2e.test.ts`           | a live database built from the migrations shows no drift; after a column is added, a policy dropped, and a CHECK changed, exactly those three changes; on PGlite over a socket and on the server                                                                                                                                                                                      |
+| `kysely.e2e.test.ts`          | the contacts application writing and reading every table through Kysely with the generated `DB`: query results have the types the test states and the refused inserts fail to compile (the typecheck script), and every value node-postgres reads back has the declared select type; the same through `CamelCasePlugin` with `db-camel.ts`; on PGlite over a socket and on the server |
+| `consumer.e2e.test.ts`        | the generated modules imported as TypeScript: assignable to the model with literal types, the public module equal to `toPublicCatalog` of the catalog, and `parseCatalogModule` reading the file back with no diff                                                                                                                                                                    |
+| `rules.e2e.test.ts`           | the public catalog's rules enforced as a client would: each value's verdict equals the database's evaluation of the recorded CHECK, for tables and domains, and the rules are literal types                                                                                                                                                                                           |
+| `cli.e2e.test.ts`             | the bin in a temporary project: `extract`, `extract --check`, and `drift` exit codes and output, usage errors, `--help`, `--version`                                                                                                                                                                                                                                                  |
 
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `toPublicCatalog` and
-`diffCatalogs` in workerd. CI runs the suite on Node.js 22 and 24, and `server.e2e.test.ts` and
-`drift.e2e.test.ts` against PostgreSQL 14 and 18 services.
+`diffCatalogs` in workerd. CI runs the suite on Node.js 22 and 24, and again with `CATALOG_PG_URL`
+against PostgreSQL 14 and 18 services, where `server.e2e.test.ts`, `kysely.e2e.test.ts`, and
+`drift.e2e.test.ts` reach the server.
 
 ---
 

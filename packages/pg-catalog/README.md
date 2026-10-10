@@ -3,8 +3,8 @@
 Your PostgreSQL schema as committed TypeScript. It replays your SQL migrations into a fresh database
 (PGlite in-process, or a throwaway database on a server), reads PostgreSQL's own catalog, and writes
 it as an `as const` module: every table, column, constraint, index, row security policy, enum, and
-domain, written deterministically so the file is reviewed with the migration that changed it. Every
-choice is specified in
+domain, written deterministically so the file is reviewed with the migration that changed it. From
+the same catalog it writes your Kysely types. Every choice is specified in
 [`docs/catalog/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/catalog/SPEC.md).
 
 ## Install
@@ -33,6 +33,7 @@ const report = await extract(
     out: {
       catalog: 'src/generated/catalog.ts',
       public: { file: 'src/generated/public-catalog.ts', tables: ['contacts', 'organizations'] },
+      types: 'src/generated/db.ts',
     },
   },
   { check: process.argv.includes('--check') },
@@ -66,9 +67,143 @@ catalog.tables.contacts.constraints.contacts_organization_id_fkey.references;
   and partitions are left out.
 - **`public-catalog.ts`** (with `out.public`): `export const publicCatalog`, the slice of the tables
   you list that a browser may see, without expressions, policies, indexes, or comments.
+- **`db.ts`** (with `out.types`): the Kysely types, one interface per table and the `DB` interface
+  that collects them. It imports only types from `kysely`.
 
-Both are JSON under `as const`, with keys in a fixed order (code-unit order, columns in table
-order), so the same migrations give the same bytes on every machine, and on PostgreSQL 14 to 18.
+The catalog modules are JSON under `as const`, with keys in a fixed order (code-unit order, columns
+in table order). Every file is rendered the same way from the same catalog, so the same migrations
+give the same bytes on every machine, and on PostgreSQL 14 to 18.
+
+## Kysely types
+
+A column's select type is what node-postgres returns for it, and its insert and update types are the
+values node-postgres can send, so the types match the rows of a `PostgresDialect` application. From
+the repository's contacts application:
+
+```ts
+export type ContactKind = 'person' | 'company';
+
+export interface ContactsTable {
+  id: Generated<string>;
+  organization_id: ColumnType<string, string | number | bigint, string | number | bigint>;
+  kind: Generated<ContactKind>;
+  name: string;
+  email: string | null;
+  discount: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  tags: ColumnType<Array<string>, Array<string> | string | undefined, Array<string> | string>;
+  search: GeneratedAlways<string | null>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+```
+
+```ts
+import type { DB } from './generated/db';
+
+import { Kysely, PostgresDialect } from 'kysely';
+import pg from 'pg';
+
+const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new pg.Pool() }) });
+
+const contact = await db
+  .selectFrom('contacts')
+  .select(['id', 'kind', 'tags', 'created_at'])
+  .executeTakeFirstOrThrow();
+// { id: string; kind: ContactKind; tags: Array<string>; created_at: Date }
+```
+
+| PostgreSQL                                       | Select             | Insert and update            |
+| ------------------------------------------------ | ------------------ | ---------------------------- |
+| `int2`, `int4`, `float4`, `float8`, `oid`        | `number`           | `number`                     |
+| `int8`                                           | `string`           | `string \| number \| bigint` |
+| `numeric`                                        | `string`           | `string \| number`           |
+| `bool`                                           | `boolean`          | `boolean`                    |
+| `date`, `timestamp`, `timestamptz`               | `Date`             | `Date \| string`             |
+| `interval`                                       | `PostgresInterval` | `PostgresInterval \| string` |
+| `bytea`                                          | `Buffer`           | `Buffer`                     |
+| `json`, `jsonb`                                  | `JsonValue`        | `string`, the JSON text      |
+| `point`, `circle`                                | `Point`, `Circle`  | `string`                     |
+| an enum                                          | its labels         | its labels                   |
+| `text`, `uuid`, `citext`, ranges, and all others | `string`           | `string`                     |
+
+- **Nullability and defaults.** A nullable column adds `| null`. A default, the column's or its
+  domain's, or an identity `BY DEFAULT` makes a column optional on insert; an identity `ALWAYS` or a
+  generated column is `GeneratedAlways`, which Kysely never writes.
+- **Arrays.** Arrays of the common built-in types come back parsed, such as `Array<number>` or
+  `Array<Date>`; arrays of enums, domains, and other types come back as PostgreSQL's array text, so
+  their select type is `string`. Every array column accepts a JavaScript array or array text.
+- **Domains** map as the type they are declared over. A domain from a schema outside `schemas` maps
+  to `unknown`, and an enum from one to `string`.
+- **Helpers.** `JsonValue`, `PostgresInterval`, `Point`, and `Circle` are declared in the file when
+  a column uses them.
+
+SPEC section 9.2 lists every type. A test holds the whole table against node-postgres on PostgreSQL
+14 and 18: a value of every insert type goes in, and what comes back has the select type.
+
+### Overrides
+
+When your application registers its own parsers, or a column holds a shape TypeScript should know,
+override the mapping per type, with one type for all three positions or one per position:
+
+```ts
+// The parsers the application registers before it creates its pool:
+pg.types.setTypeParser(20, BigInt); // int8
+pg.types.setTypeParser(1082, (text) => text); // date, as 'YYYY-MM-DD'
+```
+
+```ts
+types: {
+  file: 'src/generated/db.ts',
+  overrides: {
+    // Mirror the parsers above. int8[] and date[] keep parsers of their own.
+    int8: 'bigint',
+    date: { select: 'string', insert: 'Date | string', update: 'Date | string' },
+    // A domain names a JSON object: `create domain settings as jsonb;`
+    settings: 'Settings',
+  },
+  imports: ["import type { Settings } from '../settings';"],
+},
+```
+
+A key is a type as the catalog names it (`int8`, `settings`, `audit.level`), or `<type>[]` for its
+arrays. The override of a column's own type wins over those of the domains under it. A missing
+`insert` or `update` takes the `select` type, as in Kysely's `ColumnType`, and `imports` are written
+verbatim after Kysely's.
+
+The mapping follows node-postgres, the driver of Kysely's `PostgresDialect`. Another driver needs an
+override for every type it returns differently: PGlite's own parsers, behind `PGliteDialect`, return
+`int8` as `bigint` and `bytea` as `Uint8Array`, for example.
+
+### camelCase
+
+An application that uses Kysely's `CamelCasePlugin` writes `contactPhones.contactId` for the column
+`contact_phones.contact_id`. With `camelCase`, the types use those keys, and type names stay the
+same:
+
+```ts
+types: { file: 'src/generated/db.ts', camelCase: true },
+```
+
+```ts
+import { CamelCasePlugin, Kysely, PostgresDialect } from 'kysely';
+
+const db = new Kysely<DB>({
+  dialect: new PostgresDialect({ pool: new pg.Pool() }),
+  plugins: [new CamelCasePlugin()],
+});
+
+const phone = await db
+  .selectFrom('contactPhones')
+  .select(['contactId', 'number'])
+  .executeTakeFirstOrThrow();
+// { contactId: string; number: string }
+```
+
+Give `camelCase` the options the plugin gets: `{ underscoreBeforeDigits: true }` for
+`new CamelCasePlugin({ underscoreBeforeDigits: true })`. In queries the plugin turns each key back
+into snake_case, and some names do not survive the trip: with the default options, `line_1` becomes
+`line1`, which turns back into `line1`. Rather than write keys whose queries would fail, `extract`
+stops with `camel_case_mismatch` and lists every such name. Rename those columns, or pick the
+options under which all of them survive.
 
 ## Rules from CHECK constraints
 
@@ -146,19 +281,21 @@ called only when the URL is needed.
 Every failure is a `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a message naming
 the object or file, and PostgreSQL's error as `cause` where there is one:
 
-| `code`                 | When                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------- |
-| `config_invalid`       | a database URL function returned nothing, or a contrib extension name is malformed          |
-| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown |
-| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                 |
-| `migration_failed`     | a migration fails during replay                                                             |
-| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails             |
-| `unsupported_server`   | the server is older than PostgreSQL 14                                                      |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                       |
-| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`        |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                 |
-| `catalog_unreadable`   | `parseCatalogModule` was given a file that is not a catalog module                          |
-| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                          |
+| `code`                 | When                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `config_invalid`       | a database URL function returned nothing, or a contrib extension name is malformed            |
+| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown   |
+| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                   |
+| `migration_failed`     | a migration fails during replay                                                               |
+| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails               |
+| `unsupported_server`   | the server is older than PostgreSQL 14                                                        |
+| `unsafe_name`          | an object to be written as a key is named `__proto__`                                         |
+| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`          |
+| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                   |
+| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`           |
+| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed |
+| `catalog_unreadable`   | `parseCatalogModule` was given a file that is not a catalog module                            |
+| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                            |
 
 ## Best practices
 
@@ -187,6 +324,30 @@ the object or file, and PostgreSQL's error as `cause` where there is one:
   cannot run, and `CREATE INDEX CONCURRENTLY` must be alone in its file.
 - **Review the public catalog's diff.** Adding a table to `public.tables` shows its structure to
   every browser; the diff of `public-catalog.ts` is where reviewers see it.
+- **Mirror the parsers you register.** Every parser your application registers needs the same
+  override, and an array type has a parser of its own: registering one for `int8` leaves `int8[]` as
+  strings.
+- **Write JSON as text.** Pass `JSON.stringify(value)` for `json` and `jsonb`. node-postgres sends
+  an object as JSON, but an array as a PostgreSQL array and a string as raw text, so the types take
+  only text.
+- **Name JSON shapes with domains.** `create domain settings as jsonb` with the override
+  `settings: 'Settings'` types those columns and leaves every other `jsonb` column alone. Since
+  node-postgres sends an object as JSON, a `Settings` object can be written as it is.
+- **Mind `numeric[]`.** node-postgres returns `numeric` as a string but `numeric[]` as floats, which
+  round. When the digits matter, register a parser for its OID (1231) and override `numeric[]`.
+- **Keep nulls and nesting out of arrays.** The types say `Array<string>`, but any `text[]` stores
+  `{a,NULL}` and `{{a},{b}}`; `check (array_position(tags, null) is null)` refuses both.
+- **Keep infinite dates out.** node-postgres returns `infinity` dates and timestamps as the number
+  `Infinity`. Refuse them with `check (isfinite(starts_at))`, or override the type to admit
+  `number`.
+- **Put NOT NULL on the column, not the domain.** It is PostgreSQL's own advice: a nullable column
+  of a NOT NULL domain can still read as null, so its select type keeps `| null`.
+- **Read every schema your tables use.** A domain from a schema outside `schemas` types its columns
+  as `unknown`.
+- **Keep JSON keys as written under CamelCasePlugin.** The plugin also camelCases the keys of
+  objects inside the `json` and `jsonb` values it reads, while values you write keep their keys.
+  Pass `new CamelCasePlugin({ maintainNestedObjectKeys: true })` so JSON reads back as it was
+  written, which a JSON shape override relies on.
 
 ## License
 

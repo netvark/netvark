@@ -1,4 +1,4 @@
-import type { ExtractionConfig } from '../config';
+import type { CamelCaseOptions, ExtractionConfig } from '../config';
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { renderCatalogModule } from '../render/catalog-module';
+import { renderKyselyTypes } from '../render/kysely-types';
 import { extract, extractCatalog } from './extract';
 
 const MIGRATION = `create type mood as enum ('happy', 'sad');
@@ -31,6 +32,14 @@ const config: ExtractionConfig = {
     public: { file: 'generated/public-catalog.ts', tables: ['people'] },
   },
 };
+
+/** Writes only the catalog and the Kysely types, with `camelCase`. */
+function camelConfig(camelCase: boolean | CamelCaseOptions): ExtractionConfig {
+  return {
+    migrations: '.',
+    out: { catalog: 'c.ts', types: { file: 'db.ts', camelCase } },
+  };
+}
 
 describe('extract (SPEC 10.1)', () => {
   it('writes the catalog and public modules, creating directories, and reports each as written', async () => {
@@ -130,6 +139,89 @@ describe('extract (SPEC 10.1)', () => {
           'out.public.tables: public table "ghosts" is not in the catalog',
       }),
     );
+  });
+});
+
+describe('extract with out.types (SPEC 9.2, 10.1)', () => {
+  it('writes the Kysely types last, from a path alone', async () => {
+    const report = await extract(
+      { ...config, out: { ...config.out, types: 'generated/db.ts' } },
+      { cwd: directory },
+    );
+    expect(report.files.map((file) => [file.kind, file.status])).toEqual([
+      ['catalog', 'written'],
+      ['public', 'written'],
+      ['types', 'written'],
+    ]);
+    const types = await readFile(join(directory, 'generated/db.ts'), 'utf8');
+    expect(types).toBe(renderKyselyTypes(report.catalog));
+    expect(types).toContain("export type Mood = 'happy' | 'sad';");
+  });
+
+  it('passes overrides and imports through, and checks the file like the others', async () => {
+    const types = {
+      file: 'db.ts',
+      overrides: { int4: 'Id' },
+      imports: ["import type { Id } from './ids';"],
+    };
+    const withTypes = { migrations: '.', out: { catalog: 'c.ts', types } };
+    const report = await extract(withTypes, { cwd: directory });
+    const text = await readFile(join(directory, 'db.ts'), 'utf8');
+    expect(text).toBe(renderKyselyTypes(report.catalog, types));
+    expect(text).toContain('  id: Id;');
+    expect(
+      (await extract(withTypes, { cwd: directory, check: true })).files.map(
+        (file) => [file.kind, file.status],
+      ),
+    ).toEqual([
+      ['catalog', 'unchanged'],
+      ['types', 'unchanged'],
+    ]);
+  });
+
+  it('fails with name_collision before writing any file', async () => {
+    await writeFile(
+      join(directory, 'V2__twin.sql'),
+      'create table "people!" (id int);',
+    );
+    await expect(
+      extract(
+        { migrations: '.', out: { catalog: 'c.ts', types: 'db.ts' } },
+        { cwd: directory },
+      ),
+    ).rejects.toThrow(
+      expect.objectContaining({
+        code: 'name_collision',
+        message:
+          'table people! and table people map to the same TypeScript name PeopleTable',
+      }),
+    );
+    await expect(readFile(join(directory, 'c.ts'))).rejects.toThrow();
+  });
+
+  it('passes camelCase through, failing with camel_case_mismatch before writing any file', async () => {
+    await writeFile(
+      join(directory, 'V2__lines.sql'),
+      'create table order_lines (unit_price int, line_1 text);',
+    );
+    await expect(
+      extract(camelConfig(true), { cwd: directory }),
+    ).rejects.toThrow(
+      expect.objectContaining({
+        code: 'camel_case_mismatch',
+        message:
+          'column order_lines.line_1 becomes line1 in camelCase, which CamelCasePlugin turns back into line1',
+      }),
+    );
+    await expect(readFile(join(directory, 'c.ts'))).rejects.toThrow();
+    await extract(camelConfig({ underscoreBeforeDigits: true }), {
+      cwd: directory,
+    });
+    const text = await readFile(join(directory, 'db.ts'), 'utf8');
+    expect(text).toContain(
+      'export interface OrderLinesTable {\n  unitPrice: number | null;\n  line1: string | null;\n}',
+    );
+    expect(text).toContain('  orderLines: OrderLinesTable;');
   });
 });
 

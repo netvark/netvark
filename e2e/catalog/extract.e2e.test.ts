@@ -1,8 +1,8 @@
 /**
  * `extract` on a realistic application (SPEC 10.1, 13.1): the contacts
  * fixture's Flyway migrations replay into PGlite through the built package,
- * and the two generated files must equal `fixtures/contacts/expected/` byte
- * for byte, on every run.
+ * and the three generated files must equal `fixtures/contacts/expected/`
+ * byte for byte, on every run.
  */
 import type { Project } from './support/project';
 
@@ -17,6 +17,7 @@ import {
   contactsConfig,
   EXPECTED_CATALOG,
   EXPECTED_PUBLIC,
+  EXPECTED_TYPES,
 } from './support/contacts';
 import { createProject } from './support/project';
 
@@ -35,11 +36,12 @@ async function generated(path: string): Promise<Buffer> {
 }
 
 describe('extract on the contacts application', () => {
-  it('writes catalog.ts and public-catalog.ts equal to the reviewed files, byte for byte', async () => {
+  it('writes catalog.ts, public-catalog.ts, and db.ts equal to the reviewed files, byte for byte', async () => {
     const report = await extract(contactsConfig, { cwd: project.dir });
     expect(report.files.map((file) => [file.kind, file.status])).toEqual([
       ['catalog', 'written'],
       ['public', 'written'],
+      ['types', 'written'],
     ]);
     expect(
       (await generated('src/db/catalog.ts')).equals(
@@ -51,6 +53,9 @@ describe('extract on the contacts application', () => {
         await readFile(EXPECTED_PUBLIC),
       ),
     ).toBe(true);
+    expect(
+      (await generated('src/db/db.ts')).equals(await readFile(EXPECTED_TYPES)),
+    ).toBe(true);
   });
 
   it('produces the same bytes on a second run in a fresh database, and leaves the files untouched', async () => {
@@ -58,6 +63,7 @@ describe('extract on the contacts application', () => {
     const first = await generated('src/db/catalog.ts');
     const report = await extract(contactsConfig, { cwd: project.dir });
     expect(report.files.map((file) => file.status)).toEqual([
+      'unchanged',
       'unchanged',
       'unchanged',
     ]);
@@ -73,9 +79,10 @@ describe('extract on the contacts application', () => {
     expect(current.files.map((file) => file.status)).toEqual([
       'unchanged',
       'unchanged',
+      'unchanged',
     ]);
 
-    // audit.changes is not a public table, so only catalog.ts goes stale.
+    // audit.changes is not a public table, so public-catalog.ts stays current.
     await writeFile(
       join(project.dir, 'migrations/V9__actor.sql'),
       'alter table audit.changes add column actor text;',
@@ -87,6 +94,7 @@ describe('extract on the contacts application', () => {
     expect(stale.files.map((file) => file.status)).toEqual([
       'stale',
       'unchanged',
+      'stale',
     ]);
     expect(
       stale.catalog.tables['audit.changes']?.columns['actor']?.nullable,
@@ -105,6 +113,7 @@ describe('extract on the contacts application', () => {
       check: true,
     });
     expect(report.files.map((file) => file.status)).toEqual([
+      'missing',
       'missing',
       'missing',
     ]);

@@ -59,7 +59,8 @@
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "catalog:"
+    "@types/pg": "catalog:",
+    "kysely": "catalog:"
   },
   "peerDependencies": {
     "@electric-sql/pglite": "^0.5.0"

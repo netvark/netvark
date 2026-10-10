@@ -304,6 +304,9 @@ importers:
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8
+      '@electric-sql/pglite-socket':
+        specifier: 'catalog:'
+        version: 0.2.11(@electric-sql/pglite-age@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_hashids@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_ivm@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_textsearch@0.0.10(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_uuidv7@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pgtap@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pgvector@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite@0.5.8)
       '@netvark/catalog-core':
         specifier: workspace:*
         version: link:../../packages/catalog-core
@@ -316,6 +319,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0
@@ -520,6 +526,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
 
 packages:
 

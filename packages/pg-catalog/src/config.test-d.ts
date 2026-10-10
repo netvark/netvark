@@ -1,5 +1,10 @@
 import type { ExtractedFile, ExtractReport } from './commands/extract';
-import type { DatabaseConfig, ExtractionConfig } from './config';
+import type {
+  DatabaseConfig,
+  ExtractionConfig,
+  OutputConfig,
+  TypeOverride,
+} from './config';
 import type { PgliteExtension } from './target/pglite';
 
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
@@ -36,6 +41,41 @@ describe('configuration types (SPEC 11.1)', () => {
     }>().toExtend<ExtractionConfig>();
     expectTypeOf<{ migrations: 'db' }>().not.toExtend<ExtractionConfig>();
   });
+
+  it('takes the Kysely types file as a path, or with overrides by position and imports', () => {
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: 'db.ts';
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: {
+        file: 'db.ts';
+        overrides: {
+          int8: 'bigint';
+          jsonb: { select: 'Doc'; insert: 'string' };
+        };
+        imports: ["import type { Doc } from './doc';"];
+      };
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { file: 'db.ts'; camelCase: true };
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { file: 'db.ts'; camelCase: { underscoreBeforeDigits: true } };
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { file: 'db.ts'; camelCase: 'yes' };
+    }>().not.toExtend<OutputConfig>();
+    expectTypeOf<{ insert: 'string' }>().not.toExtend<TypeOverride>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { overrides: { int8: 'bigint' } };
+    }>().not.toExtend<OutputConfig>();
+  });
 });
 
 describe('command types (SPEC 10.1)', () => {
@@ -44,7 +84,9 @@ describe('command types (SPEC 10.1)', () => {
     expectTypeOf<ExtractedFile['status']>().toEqualTypeOf<
       'written' | 'unchanged' | 'stale' | 'missing'
     >();
-    expectTypeOf<ExtractedFile['kind']>().toEqualTypeOf<'catalog' | 'public'>();
+    expectTypeOf<ExtractedFile['kind']>().toEqualTypeOf<
+      'catalog' | 'public' | 'types'
+    >();
   });
 
   it('accepts an extraction config where extractCatalog options are expected', () => {
