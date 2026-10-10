@@ -14,10 +14,13 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@netvark/catalog-core": "workspace:*",
     "@netvark/pg-catalog": "workspace:*",
     "@netvark/resource-core": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "miniflare": "catalog:",
+    "pg": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

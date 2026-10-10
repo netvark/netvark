@@ -9,6 +9,10 @@ export const PACKAGE_DIR: string = fileURLToPath(
 export const CONTACTS_DIR: string = fileURLToPath(
   new URL('../fixtures/contacts/', import.meta.url),
 );
+/** The oracle's schema (SPEC 15.3): its migrations, extraction config, and the two catalogs. */
+export const ORACLE_DIR: string = fileURLToPath(
+  new URL('../fixtures/oracle/', import.meta.url),
+);
 /** Declarations that must not compile, each error marked by a `// error:` line above it. */
 export const FAILS_DIR: string = fileURLToPath(
   new URL('../fails/', import.meta.url),

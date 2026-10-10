@@ -1434,10 +1434,10 @@ export const catalog = {
           "comment": null
         },
         "notes": {
-          "type": "required_note",
-          "typeKind": "domain",
+          "type": "text",
+          "typeKind": "base",
           "array": false,
-          "sqlType": "required_note",
+          "sqlType": "text",
           "maxLength": null,
           "precision": null,
           "scale": null,

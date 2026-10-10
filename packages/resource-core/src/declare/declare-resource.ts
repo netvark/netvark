@@ -2,14 +2,25 @@
  * `declareResource` at runtime (SPEC 3, 4, 14): every check TypeScript
  * makes, made again for declarations written in JavaScript, plus those
  * types cannot express; each throws `TypeError` naming the option. The
- * result carries the derived names (`names/derive-names.ts`).
+ * result carries the derived names (`names/derive-names.ts`) and the
+ * schemas (SPEC 6), whose specs are computed here and whose Zod schemas are
+ * built on first read.
  * @packageDocumentation
  */
 import type { DefinerContext } from './check-config';
 import type { DeclaredResource } from './declared-resource';
 
+import { lazy } from '../internal/lazy';
 import { describe, ownValue } from '../internal/object';
 import { deriveNames } from '../names/derive-names';
+import {
+  attributeSchemas,
+  attributeValidators,
+} from '../schema/attribute-schemas';
+import { checkExamples } from '../schema/examples';
+import { linkageSchemas } from '../schema/linkage-schemas';
+import { resourceSpecs } from '../schema/resource-specs';
+import { writeValidators } from '../schema/write-schemas';
 import { checkMembers } from './check-columns';
 import {
   checkClientIds,
@@ -56,11 +67,37 @@ export function declareResourceIn(
   checkPage(context, table, declaration.page);
   checkRules(context, table, tableDef, declaration);
   const names = deriveNames(table, tableDef, identity.id, declaration);
+  const frozen = freezeDeclaration(declaration);
+  const specs = resourceSpecs({
+    context,
+    table,
+    tableDef,
+    declaration: frozen,
+    names,
+  });
+  checkExamples(table, frozen, specs.fields);
+  const schema = lazy(() => attributeSchemas(specs.fields, specs.checks));
+  const validate = lazy(() => attributeValidators(specs.fields, schema()));
+  const linkage = lazy(() => linkageSchemas(specs.relationships, specs.checks));
+  const write = lazy(() => writeValidators(specs, schema(), linkage()));
   return brandDeclared(
     Object.freeze({
       table,
-      declaration: freezeDeclaration(declaration),
+      declaration: frozen,
       names,
+      get schema() {
+        return schema();
+      },
+      get validate() {
+        return validate();
+      },
+      get linkage() {
+        return linkage();
+      },
+      get write() {
+        return write();
+      },
     }),
+    { specs, catalog: context.catalog },
   );
 }

@@ -33,8 +33,12 @@ describe('the declared resources', () => {
     for (const resource of RESOURCES) {
       expect(Object.keys(resource).toSorted()).toEqual([
         'declaration',
+        'linkage',
         'names',
+        'schema',
         'table',
+        'validate',
+        'write',
       ]);
       expect(Object.isFrozen(resource)).toBe(true);
       expect(Object.isFrozen(resource.names)).toBe(true);

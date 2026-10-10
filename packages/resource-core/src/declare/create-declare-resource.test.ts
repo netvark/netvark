@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { catalogOf, domain } from '../test-support/catalog-builder';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
 import { typeErrorOf } from '../test-support/failure';
@@ -13,6 +14,13 @@ const configure = createDeclareResource as unknown as (
 const failure = (config: unknown) => typeErrorOf(() => configure(config));
 
 const valid = { catalog: contactsCatalog, ...TEST_REGISTRIES };
+
+/** The failure of a definer whose email domain CHECK gives `code`. */
+const withCode = (code: unknown) =>
+  failure({
+    ...valid,
+    domains: { email: { email_check: { validator: 'email', code } } },
+  });
 
 describe('createDeclareResource: the catalog (SPEC 2)', () => {
   it('accepts the public catalog with every registry', () => {
@@ -139,6 +147,43 @@ describe('createDeclareResource: the registries (SPEC 2, 3.6)', () => {
     ).toBe(
       'createDeclareResource.domains.email.email_check: unknown member "validators"',
     );
+  });
+
+  it('holds a domain CHECK code, given or derived, to the code pattern (SPEC 4.2, 6.4)', () => {
+    expect(withCode('bad code')).toBe(
+      'createDeclareResource.domains.email.email_check.code: "bad code" is not A-Z, 0-9, _',
+    );
+    expect(withCode(5)).toBe(
+      'createDeclareResource.domains.email.email_check.code: 5 is not A-Z, 0-9, _',
+    );
+    const catalog = catalogOf(
+      {},
+      {
+        prüfung: domain('prüfung', {
+          constraints: { prüfung_check: { kind: 'check', rule: null } },
+        }),
+      },
+    );
+    const derived = (rule: object) =>
+      typeErrorOf(() =>
+        configure({
+          catalog,
+          validators: TEST_REGISTRIES.validators,
+          domains: { prüfung: { prüfung_check: rule } },
+        }),
+      );
+    expect(derived({ validator: 'room' })).toBe(
+      'createDeclareResource.domains.prüfung.prüfung_check: code "PRÜFUNG_CHECK" is not A-Z, 0-9, _; set code',
+    );
+    expect(() =>
+      configure({
+        catalog,
+        validators: TEST_REGISTRIES.validators,
+        domains: {
+          prüfung: { prüfung_check: { validator: 'room', code: 'PRUEFUNG' } },
+        },
+      }),
+    ).not.toThrow();
   });
 });
 

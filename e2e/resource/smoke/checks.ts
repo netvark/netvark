@@ -2,8 +2,8 @@
  * Runtime-neutral checks (resource SPEC 15.4, 16) over the built
  * `@netvark/resource-core`: the contacts application's declarations load,
  * resolve, and derive their public names, the codecs and validators parse
- * their fixtures with the application's Zod, and mistakes throw the
- * documented `TypeError`s. Codes are upper-cased by the runtime's
+ * their fixtures with the application's Zod, the composed schemas parse
+ * and report issues, and mistakes throw the documented `TypeError`s. Codes are upper-cased by the runtime's
  * `String.prototype.toUpperCase`, so each runtime derives them here. No
  * Node.js API, so the same module runs on Bun, Deno, and workerd.
  */
@@ -97,6 +97,35 @@ export const neutralChecks: Checks = {
       message ===
         'meetings.rules.meetings_room_lowercase: a CHECK without a rule needs a validator',
       message,
+    );
+  },
+  'parses a create and reports issues on public names': () => {
+    const ok = Contacts.validate.create['~standard'].validate({ name: 'Ada' });
+    check(!('issues' in ok && ok.issues !== undefined), 'Ada refused');
+    const refused = Contacts.validate.create['~standard'].validate({
+      name: 'Ada',
+      priority: 9,
+    });
+    const issue = 'issues' in refused ? refused.issues?.[0] : undefined;
+    check(
+      issue?.code === 'maximum' &&
+        issue.path.join('/') === 'priority' &&
+        issue.expected === '5',
+      JSON.stringify(issue),
+    );
+  },
+  'runs a CHECK spanning a field and a relationship': () => {
+    const result = Meetings.write.update['~standard'].validate({
+      attributes: { notes: null },
+      relationships: { contact: null },
+    });
+    const codes =
+      'issues' in result
+        ? (result.issues ?? []).map((issue) => issue.code).join(',')
+        : '';
+    check(
+      codes === 'MEETING_NEEDS_CONTACT_OR_NOTES,MEETING_NEEDS_CONTACT_OR_NOTES',
+      codes,
     );
   },
   'refuses the full catalog': () => {

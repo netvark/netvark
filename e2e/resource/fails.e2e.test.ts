@@ -37,6 +37,7 @@ const FILES = [
   'relationships.ts',
   'rules.ts',
   'tables.ts',
+  'validators.ts',
 ];
 
 describe('fails/: declarations TypeScript refuses', () => {

@@ -31,6 +31,8 @@ export type ScopeRegistry = Readonly<Record<string, ScopeColumn>>;
 /** The validator covering one domain CHECK without a rule (SPEC 3.6). */
 export interface DomainRule {
   readonly validator: string;
+  /** The error code its issues carry, in place of the constraint name upper-cased (SPEC 6.4). */
+  readonly code?: string | undefined;
 }
 
 /** Validators for domain CHECKs, by domain reference name and constraint name. */
