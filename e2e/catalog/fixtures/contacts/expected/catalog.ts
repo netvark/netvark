@@ -169,6 +169,277 @@ export const catalog = {
     }
   },
   "tables": {
+    "activities": {
+      "schema": "public",
+      "name": "activities",
+      "comment": null,
+      "primaryKey": [
+        "id",
+        "occurred_on"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "gen_random_uuid()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "contact_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "occurred_on": {
+          "type": "date",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "date",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "summary": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "activities_contact_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "contact_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "cascade",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE"
+        },
+        "activities_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id",
+            "occurred_on"
+          ],
+          "definition": "PRIMARY KEY (id, occurred_on)"
+        },
+        "activities_summary_check": {
+          "kind": "check",
+          "columns": [
+            "summary"
+          ],
+          "expression": "((char_length(summary) >= 1) AND (char_length(summary) <= 500))",
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 500
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK (((char_length(summary) >= 1) AND (char_length(summary) <= 500)))"
+        }
+      },
+      "indexes": {
+        "activities_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id",
+            "occurred_on"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX activities_pkey ON ONLY public.activities USING btree (id, occurred_on)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "activity_attachments": {
+      "schema": "public",
+      "name": "activity_attachments",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "gen_random_uuid()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "activity_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "occurred_on": {
+          "type": "date",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "date",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "file_name": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "activity_attachments_activity_fk": {
+          "kind": "foreignKey",
+          "columns": [
+            "activity_id",
+            "occurred_on"
+          ],
+          "references": {
+            "table": "activities",
+            "columns": [
+              "id",
+              "occurred_on"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "cascade",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (activity_id, occurred_on) REFERENCES activities(id, occurred_on) ON DELETE CASCADE"
+        },
+        "activity_attachments_file_name_check": {
+          "kind": "check",
+          "columns": [
+            "file_name"
+          ],
+          "expression": "((char_length(file_name) >= 1) AND (char_length(file_name) <= 255))",
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 255
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK (((char_length(file_name) >= 1) AND (char_length(file_name) <= 255)))"
+        },
+        "activity_attachments_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "activity_attachments_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX activity_attachments_pkey ON public.activity_attachments USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "audit.changes": {
       "schema": "audit",
       "name": "changes",

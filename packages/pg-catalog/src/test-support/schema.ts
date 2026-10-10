@@ -91,6 +91,16 @@ alter table audit.events add constraint events_contact_fk foreign key (contact_i
   references contacts (id) on update restrict on delete set null not valid;
 create table measurements (city text, logdate date not null) partition by range (logdate);
 create table measurements_2024 partition of measurements for values from ('2024-01-01') to ('2025-01-01');
+create table readings (sensor_id integer, taken_on date, primary key (sensor_id, taken_on))
+  partition by range (taken_on);
+create table readings_2024 partition of readings for values from ('2024-01-01') to ('2025-01-01');
+create table readings_2025 partition of readings for values from ('2025-01-01') to ('2026-01-01');
+create table reading_notes (
+  id integer primary key,
+  sensor_id integer,
+  taken_on date,
+  constraint reading_notes_reading_fk foreign key (sensor_id, taken_on) references readings
+);
 create view contact_names as select name from contacts;
 create sequence standalone;`,
   },

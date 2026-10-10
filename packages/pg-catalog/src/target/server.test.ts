@@ -57,7 +57,6 @@ describe.skipIf(SERVER === undefined)(
     }
 
     it('creates a UTF-8 database from template0, connects to it, and drops it on close', async () => {
-      const before = await databases();
       const facts = await useSession(
         await openThrowawayDatabase(url),
         async (session) => {
@@ -71,17 +70,23 @@ describe.skipIf(SERVER === undefined)(
       expect(row?.encoding).toBe('UTF8');
       expect(row?.db).toMatch(/^netvark_catalog_[0-9a-f]{16}$/u);
       expect(facts.during).toContain(row?.db);
-      expect(await databases()).toEqual(before);
+      // Other test files may hold throwaway databases of their own meanwhile.
+      expect(await databases()).not.toContain(row?.db);
     });
 
     it('drops the database when the work fails', async () => {
-      const before = await databases();
+      let created = '';
       await expect(
         useSession(await openThrowawayDatabase(url), async (session) => {
+          const [row] = await session.query<{ db: string }>(
+            'select current_database() as db',
+          );
+          created = row?.db ?? '';
           await session.exec('select * from missing_table');
         }),
       ).rejects.toThrow('relation "missing_table" does not exist');
-      expect(await databases()).toEqual(before);
+      expect(created).toMatch(/^netvark_catalog_[0-9a-f]{16}$/u);
+      expect(await databases()).not.toContain(created);
     });
 
     it('fails with connection_failed when the server refuses the connection', async () => {

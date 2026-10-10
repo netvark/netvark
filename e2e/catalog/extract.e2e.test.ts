@@ -77,7 +77,7 @@ describe('extract on the contacts application', () => {
 
     // audit.changes is not a public table, so only catalog.ts goes stale.
     await writeFile(
-      join(project.dir, 'migrations/V8__actor.sql'),
+      join(project.dir, 'migrations/V9__actor.sql'),
       'alter table audit.changes add column actor text;',
     );
     const stale = await extract(contactsConfig, {
@@ -113,14 +113,14 @@ describe('extract on the contacts application', () => {
 
   it('names the failing migration, line, and column when a migration breaks', async () => {
     await writeFile(
-      join(project.dir, 'migrations/V8__broken.sql'),
+      join(project.dir, 'migrations/V9__broken.sql'),
       'alter table contacts\n  add column notes txt;',
     );
     await expect(extract(contactsConfig, { cwd: project.dir })).rejects.toThrow(
       expect.objectContaining({
         code: 'migration_failed',
         message:
-          'migration V8__broken.sql failed at line 2, column 20: type "txt" does not exist (SQLSTATE 42704)',
+          'migration V9__broken.sql failed at line 2, column 20: type "txt" does not exist (SQLSTATE 42704)',
       }),
     );
   });
