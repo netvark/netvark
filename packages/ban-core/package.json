@@ -127,8 +127,8 @@
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "postgres": "3.4.9",
-    "valibot": "1.4.2",
-    "zod": "4.5.4"
+    "valibot": "1.5.0",
+    "zod": "4.6.5"
   },
   "engines": {
     "node": ">=22.12.0"

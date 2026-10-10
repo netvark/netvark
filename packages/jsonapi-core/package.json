@@ -62,7 +62,7 @@
   "devDependencies": {
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "zod": "4.5.4"
+    "zod": "4.6.5"
   },
   "engines": {
     "node": ">=22.12.0"
