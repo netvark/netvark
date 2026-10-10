@@ -70,6 +70,7 @@ service, or a test can build and render the same errors, and so that other adapt
 
 ```ts
 import { Hono } from 'hono';
+
 import { createBan } from '@netvark/hono-ban';
 
 const ban = createBan();
@@ -201,8 +202,8 @@ adds its own for, say, a fetch wrapper's error that carries an upstream status.
 ```ts
 import { googleApi } from '@netvark/ban-core/formats/google-api';
 import { jsonApi } from '@netvark/ban-core/formats/json-api';
-import { problemDetails } from '@netvark/ban-core/formats/problem-details';
 import { plain } from '@netvark/ban-core/formats/plain';
+import { problemDetails } from '@netvark/ban-core/formats/problem-details';
 import { stripe } from '@netvark/ban-core/formats/stripe';
 
 createBan({ format: jsonApi() });
@@ -215,8 +216,9 @@ createBan({ format: plain() }); // { status, code, title, detail, id, meta }
 A custom format with a schema:
 
 ```ts
-import { defineFormat } from '@netvark/ban-core';
 import { z } from 'zod';
+
+import { defineFormat } from '@netvark/ban-core';
 
 const legacy = defineFormat({
   name: 'legacy-envelope',
@@ -239,6 +241,7 @@ const ban = createBan({ format: legacy });
 
 ```ts
 import { OpenAPIHono } from '@hono/zod-openapi';
+
 import { defaultHook } from '@netvark/hono-ban/zod';
 
 const app = new OpenAPIHono({ defaultHook: defaultHook(ban) });
@@ -246,6 +249,7 @@ const app = new OpenAPIHono({ defaultHook: defaultHook(ban) });
 
 ```ts
 import { zValidator } from '@hono/zod-validator';
+
 import { hook } from '@netvark/hono-ban/zod';
 
 app.post('/users', zValidator('json', UserSchema, hook(ban)), handler);
@@ -253,6 +257,7 @@ app.post('/users', zValidator('json', UserSchema, hook(ban)), handler);
 
 ```ts
 import { sValidator } from '@hono/standard-validator';
+
 import { hook } from '@netvark/hono-ban/standard-schema';
 
 app.post('/users', sValidator('json', UserSchema, hook(ban)), handler);
@@ -270,6 +275,7 @@ object and need nothing from Hono.
 
 ```ts
 import { createRoute } from '@hono/zod-openapi';
+
 import { errorResponse, errorResponses } from '@netvark/ban-core/openapi';
 
 createRoute({

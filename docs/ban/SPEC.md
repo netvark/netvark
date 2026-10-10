@@ -1247,13 +1247,17 @@ https://spec.openapis.org/oas/v3.0.3#schema-object
 
 ```ts
 export type StripeErrorType =
-  'api_error' | 'card_error' | 'idempotency_error' | 'invalid_request_error';
+  | 'api_error'
+  | 'card_error'
+  | 'idempotency_error'
+  | 'invalid_request_error';
 
 export interface StripeOptions {
   readonly docUrlBaseUrl?: string | undefined; // base for doc_url; wins over docsBaseUrl
   readonly types?: Readonly<Record<string, StripeErrorType>> | undefined; // `type` per catalog code
   readonly requestLogUrl?:
-    ((error: BanError, ctx: RenderContext) => string | undefined) | undefined;
+    | ((error: BanError, ctx: RenderContext) => string | undefined)
+    | undefined;
 }
 ```
 

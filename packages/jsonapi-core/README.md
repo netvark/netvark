@@ -391,6 +391,7 @@ rejected `run` rolls everything back. Whatever you hand the processor per reques
 
 ```ts
 import type { ResourceHandlers } from '@netvark/jsonapi-core/atomic';
+
 import { assertOperationsContentType, operationsProcessor } from '@netvark/jsonapi-core/atomic';
 
 const articleHandlers: ResourceHandlers<typeof Articles, Transaction, Request> = {

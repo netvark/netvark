@@ -29,9 +29,9 @@ on Bun, Deno, and workerd.
 ## Quick start
 
 ```ts
-import { createDefineKeyset } from '@netvark/kysely-keyset';
-
 import type { DB } from './db'; // your Kysely database interface
+
+import { createDefineKeyset } from '@netvark/kysely-keyset';
 
 // keysets/define.ts: one definer for the whole application.
 export const defineKeyset = createDefineKeyset<DB>();

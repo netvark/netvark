@@ -16,6 +16,7 @@ export interface Factory {
 }
 
 export type Catalog = Readonly<Record<string, ErrorDefinition>>;
+// oxlint-disable-next-line typescript/no-generated-empty-object-type -- reason: the default catalog must have no keys at all, so `ErrorKey` adds nothing to the built-ins; a `Record<string, never>` would admit every string
 export type EmptyCatalog = Record<never, never>;
 
 /** Every key a `Ban` instance knows: built-ins plus the custom catalog. */

@@ -434,6 +434,7 @@ Pass `{ dialect: 'openapi-3.0' }` for 3.0 documents, which predate `const`.
 
 ```ts
 import { trace } from '@opentelemetry/api';
+
 import { traceIdFromOtel } from '@netvark/ban-core/otel';
 
 interface RequestContext {

@@ -36,6 +36,7 @@ export const DEFAULT_MAX_PAGE_SIZE = 100;
 const SEARCH_CONFIG = /^[a-z_][a-z0-9_]{0,62}$/u;
 
 /** The relations type of a definition without relations. */
+// oxlint-disable-next-line typescript/no-generated-empty-object-type -- reason: the default must have no relation names at all, so no relation field path exists; a `Record<string, never>` would admit every string
 export type NoRelations = Readonly<Record<never, never>>;
 
 /** The request a keyset with these fields and relations accepts. */

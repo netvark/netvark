@@ -26,8 +26,10 @@ without importing any of them.
 ## Quick start with Hono
 
 ```ts
-import { Hono } from 'hono';
 import type { JsonApiEnv } from '@netvark/hono-jsonapi';
+
+import { Hono } from 'hono';
+
 import {
   defineResource,
   errorHandler,
