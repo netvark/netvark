@@ -154,7 +154,7 @@ export async function paginate<
   request: KeysetRequestOf<TFields, TRelations>,
   options: PaginateOptions = {},
 ): Promise<Page<TRow>> {
-  const plan = await keyset.plan(request);
+  const plan = await keyset.plan(request, { context: options.context });
   const context: RenderContext = { table: plan.table };
   // The caller's DB and table types do not matter to rendering: every
   // name the plan carries is a validated identifier of the definition.

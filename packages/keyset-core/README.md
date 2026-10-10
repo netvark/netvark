@@ -207,9 +207,9 @@ the `i` forms are `ILIKE`, and on an `insensitive` field every pattern is. `betw
 
 ### The plan
 
-`plan(request)` validates the request (sort, filter, search, page size, then cursors) and returns a
-`QueryPlan` an adapter renders without re-checking anything: every name in it is a validated
-identifier from the definition and every value a validated request value.
+`plan(request, options?)` validates the request (sort, filter, search, page size, then cursors) and
+returns a `QueryPlan` an adapter renders without re-checking anything: every name in it is a
+validated identifier from the definition and every value a validated request value.
 
 ```ts
 plan.keys; // [{ alias: 'keyset0', field: 'emailCount', target, direction: 'desc', nulls: 'last' }, ...]
@@ -289,9 +289,27 @@ Best practices:
   a session rarely needs one.
 - **A cursor is signed, not encrypted.** Anyone holding it can read the sort-key values of the row
   it points at. Do not offer a sort over a column the client must not learn.
+- **Bind cursors to the tenant** in a multi-tenant API: pass the scope your query applies as
+  `context` on every request (see Binding cursors to a scope).
 - **Share one secret across the keysets of one API**, through the definer's defaults (see Shared
   defaults), so a cursor from one endpoint is never accepted by another by accident: the context
   already binds it to its sort, filter, and search, and the secret binds it to your service.
+
+#### Binding cursors to a scope
+
+A request does not say which tenant it runs for; your query's `where` clause does. Pass the same
+values to `plan` as `context`, and the cursors are bound to them along with the sort, filter, and
+search:
+
+```ts
+const plan = await contacts.plan(request, { context: { org: org.id } });
+```
+
+A cursor issued under `{ org: 'acme' }` is rejected under `{ org: 'globex' }`, and under no context,
+with `InvalidCursorError` (reason `context`). Without a context, two tenants sending the same
+request share cursors, and a cursor from one seeks with the other's values. The values are named
+strings, finite numbers, bigints, booleans, or `null`, in any member order; anything else is a
+`TypeError`. An empty context binds nothing, so requests without one behave exactly as before.
 
 `createCursorCodec(options)` is exported for callers who want to inspect or issue cursors outside a
 keyset; `decode(cursor, context, length)` never throws and reports why a cursor was rejected

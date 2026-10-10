@@ -150,6 +150,32 @@ const CHECKS: Readonly<Record<string, Check>> = {
     check(sql.includes('asc nulls last'), `null placement: ${sql}`);
     check(sql.includes('limit $'), `limit: ${sql}`);
   },
+  'binds cursors to the caller context': async () => {
+    const acme = { context: { tenant: 'acme' } };
+    const plan = await contacts.plan({ page: { size: 1 } }, acme);
+    const page = await contacts.page(
+      plan,
+      [
+        { id: 'a', keyset0: 'a' },
+        { id: 'b', keyset0: 'b' },
+      ],
+      (row) => [row.keyset0],
+    );
+    check(typeof page.next === 'string', 'next cursor');
+    const resumed = await contacts.plan({ page: { after: page.next } }, acme);
+    equal(resumed.seek?.kind, 'or', 'resumes under the same context');
+    try {
+      await contacts.plan(
+        { page: { after: page.next } },
+        { context: { tenant: 'globex' } },
+      );
+    } catch (error) {
+      check(error instanceof InvalidCursorError, 'InvalidCursorError');
+      equal(error.reason, 'context', 'reason');
+      return;
+    }
+    check(false, 'expected a rejection under another context');
+  },
   'throws typed errors for bad cursors': async () => {
     try {
       await contacts.plan({ page: { after: 'nope' } });

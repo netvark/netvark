@@ -245,6 +245,29 @@ describe('paginate', () => {
     ).rejects.toThrow('paginate expects object rows');
   });
 
+  it('binds cursors to the context and rejects a foreign one before querying (SPEC 6.1)', async () => {
+    const { db, recorded } = canned([[row(1), row(2), row(3)]]);
+    const scoped = () =>
+      db.selectFrom('contacts').where('id', '<>', 'x').selectAll();
+    const first = await typedContacts.paginate(
+      scoped(),
+      { page: { size: 2 } },
+      { context: { tenant: 'acme' } },
+    );
+    const after = first.next ?? '';
+    await expect(
+      typedContacts.paginate(
+        scoped(),
+        { page: { after } },
+        { context: { tenant: 'globex' } },
+      ),
+    ).rejects.toMatchObject({ parameter: 'after', reason: 'context' });
+    await expect(
+      typedContacts.paginate(scoped(), { page: { after } }),
+    ).rejects.toMatchObject({ reason: 'context' });
+    expect(recorded.queries).toHaveLength(1);
+  });
+
   it('compiles against a dummy driver with no rows', async () => {
     const page = await paginate(
       contacts,

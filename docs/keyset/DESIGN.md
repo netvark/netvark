@@ -60,13 +60,14 @@ It is a library for teams who paginate large tables and want the hard cases hand
 2. **Spec-driven.** The profile fixes the page semantics; PostgreSQL's documentation fixes ordering,
    pattern matching, arrays, and text search; RFCs fix HMAC, base64url, and canonical JSON. Each
    behavior is a cited clause, and the test names the rule. Where a choice is the library's, it is
-   an ADR (ADR-0005 to ADR-0009, ADR-0012 to ADR-0014).
+   an ADR (ADR-0005 to ADR-0009, ADR-0012 to ADR-0015).
 3. **Every identifier from the definition, every value a parameter.** No request data reaches SQL
    except as a bound parameter. The one literal, the text search configuration, is validated against
    `regconfig`'s name syntax at definition time.
 4. **A cursor is a signed claim, checked before it is read.** Verify, then parse; then version,
    expiry, context. A cursor issued for one sort, filter, or search is rejected under another, so
-   the values in it can never be compared against columns they were not read from.
+   the values in it can never be compared against columns they were not read from; with a caller
+   context, one issued inside one tenant is rejected inside another (ADR-0015).
 5. **The order is total.** The key is appended to every sort, `NULL`s have a fixed place, and the
    seek predicate is built so that walking forward and backward visits the same rows in the same
    order (ADR-0008). The e2e suite proves it over sorts with ties and nulls on three databases.
@@ -205,6 +206,11 @@ An adapter renders `plan.filter` and `plan.seek` (thirteen predicate kinds over 
 SPEC 6), selects each key cast to text under its alias, orders by the keys with the stated null
 placement, and limits. The planner validated everything: an adapter renders without re-checking.
 
+What scopes the rows outside the request, such as the tenant in the query's `where`, scopes the
+cursors through the second argument: `plan(request, { context: { tenant: org.id } })`, or the same
+option on `paginate`. The context joins the hash, so a cursor resumes only inside the scope that
+issued it; without a context the hash is what it always was (ADR-0015, SPEC 6.1).
+
 ### 3.5 The page
 
 ```ts
@@ -327,3 +333,4 @@ the caller's query, so `Page<TRow>` is the selection's row type.
 | 0012 | Totals are an opt-in second query; the base query must be a plain selection                                 |
 | 0013 | Page size bounds, defaults, and range requests                                                              |
 | 0014 | Definer defaults are merged member by member                                                                |
+| 0015 | Cursors can be bound to a caller-supplied context                                                           |

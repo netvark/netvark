@@ -36,10 +36,10 @@ beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter:
 typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its only
 peer dependency.
 
-| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/keyset-core`   | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
-| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/keyset-core`   | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PlanOptions`, `CursorContext`, `CursorContextValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
+| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 `e2e/keyset/package-surface.e2e.test.ts` asserts the exact value export list of both packages
 against the built packages, that the adapter's re-exports are the core's own bindings, and that its
@@ -78,6 +78,7 @@ packages/keyset-core/src/
   plan/
     types.ts                   QueryPlan, PlanKey, Predicate, Target, CursorValue (6)
     plan.ts                    createPlanner(), keyAlias(), KeysetRequest (6.1)
+    context.ts                 PlanOptions, CursorContext, bindingContext() (6.1)
     seek.ts                    seekPredicate() (6.2)
   page/
     page-request.ts            resolvePage(), PageInput, ResolvedPage (7.1)
@@ -251,7 +252,7 @@ request's sort would be (5), so an unknown or unsortable field is a `TypeError` 
 `UnsupportedSortError` as `cause`. The normalized `KeysetDefinition` is
 `{ table, key, fields: ReadonlyMap, relations: ReadonlyMap, search, sort: { default }, page: { default, max, range }, cursor: { ttl } }`.
 
-Returns `Keyset<TFields, TRelations>`: `definition`; `plan(request)` (6.1); and
+Returns `Keyset<TFields, TRelations>`: `definition`; `plan(request, options?)` (6.1); and
 `page(plan, rows, values, options?)` (7.2). The literal types of the field and relation names are
 inferred (`const` type parameters) and carried on the result: `KeysetRequestOf<TFields, TRelations>`
 accepts in `sort` only the sortable fields (`SortableFieldOf`: not `array`, not `sortable: false`),
@@ -406,9 +407,9 @@ Tests: `resolve-sort.test.ts`.
 
 ## 6. The query plan (`plan/`)
 
-`QueryPlan` is what `plan(request)` hands an adapter. Every name in it is a validated identifier
-from the definition and every value a validated request value, so an adapter renders it without
-re-checking anything.
+`QueryPlan` is what `plan(request, options?)` hands an adapter. Every name in it is a validated
+identifier from the definition and every value a validated request value, so an adapter renders it
+without re-checking anything.
 
 | Member            | Meaning                                                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------- |
@@ -451,9 +452,13 @@ Predicates, with the SQL the adapter renders (10.2):
 
 ### 6.1 The planner (`plan.ts`)
 
-`createPlanner(definition, codec)` returns `plan(request)`; `KeysetRequest` is
-`{ sort?, filter?, search?, page? }`. Validation runs in the order a client would want to hear about
-problems:
+`createPlanner(definition, codec)` returns `plan(request, options?)`; `KeysetRequest` is
+`{ sort?, filter?, search?, page? }`, the client's, and `PlanOptions` is `{ context? }`, the
+server's (ADR 0015). `context` is checked first, since a bad one is the caller's bug whatever the
+client asked for: when present it MUST be a plain object (prototype `Object.prototype` or `null`)
+whose own members are strings, finite numbers, bigints, booleans, or `null`, under names that are
+not prototype keys (2.3); anything else is a `TypeError` naming the member. A context without
+members binds nothing. Then validation runs in the order a client would want to hear about problems:
 
 1. the sort (5);
 2. the filter (4);
@@ -463,10 +468,12 @@ problems:
    `textSearch` node. The filter and the search are joined with `and` (a single one stays as is);
 4. the page (7.1);
 5. the context:
-   `sha256Base64Url(canonicalJson({ sort: sortSignature(sort), filter: request.filter ?? null, search: <trimmed term> }))`.
+   `sha256Base64Url(canonicalJson({ sort: sortSignature(sort), filter: request.filter ?? null, search: <trimmed term>, context: <the caller's context, or undefined without members> }))`.
    It binds to what the request asked for, not to its spelling: `['-createdAt']` and
-   `[{ field: 'createdAt', direction: 'desc' }]` share a context, and so do filters whose members
-   were written in another order; a different filter value does not;
+   `[{ field: 'createdAt', direction: 'desc' }]` share a context, and so do filters or caller
+   contexts whose members were written in another order; a different value does not. Canonical JSON
+   drops the undefined `context` member, so a request without a caller context hashes exactly as
+   before contexts existed, and a bigint binds as its decimal text (2.4);
 6. the cursors, `after` then `before`, decoded with the codec against the context and the number of
    sort keys (8); a rejection is `InvalidCursorError(parameter, reason)`;
 7. the seek: `seekPredicate` for `after`, for `before`, both joined with `and` when both are present
@@ -477,7 +484,10 @@ problems:
 
 `limit` is `size + 1`.
 
-Tests: `plan.test.ts`, `plan-cursors.test.ts`.
+Tests: `plan.test.ts`, `plan-cursors.test.ts` (including the caller context: resuming under the same
+context in any member order, rejection under another or none, the unchanged binding without a
+context, bigint and number binding, the context checked before the request), `context.test.ts`
+(every accepted and rejected context).
 
 ### 6.2 The seek predicate (`seek.ts`, ADR 0008)
 
@@ -554,8 +564,9 @@ Tests: `finish.test.ts`.
 
 A cursor is `base64url(payload) "." base64url(tag)`, no padding (2.1). The payload is the JSON
 `{ v, k, c, t }`: `v` the format version (`CURSOR_VERSION`, 1), `k` the sort-key values (strings or
-`null`, one per sort key), `c` the context (6.1), `t` the issue time in seconds since the epoch. The
-tag is HMAC-SHA256 over the payload bytes under the current secret (2.2).
+`null`, one per sort key), `c` the context (6.1, including the caller's context when there is one;
+the format did not change for it, ADR 0015), `t` the issue time in seconds since the epoch. The tag
+is HMAC-SHA256 over the payload bytes under the current secret (2.2).
 
 `createCursorCodec(options)` validates the options now and throws `TypeError` naming the one at
 fault:
@@ -661,7 +672,7 @@ Tests: `target.test.ts`, `predicate.test.ts` (exact SQL and parameters).
 
 ### 10.3 `paginate(keyset, query, request, options?)` (`paginate.ts`, ADR 0007, ADR 0012)
 
-1. `plan = await keyset.plan(request)`.
+1. `plan = await keyset.plan(request, { context: options.context })`.
 2. The filter: `query.where(renderPredicate(plan.filter))` when there is one.
 3. The total, when `options.total` is `true`: the filtered query with its selection, `order by`,
    `limit`, and `offset` cleared and `count(*) as "total"` selected, run first; the result is
@@ -673,12 +684,14 @@ Tests: `target.test.ts`, `predicate.test.ts` (exact SQL and parameters).
    non-string is `null`) and removed, and the remaining members are the caller's row.
 6. `keyset.page(plan, rows, values, { total })`.
 
-`PaginateOptions` is `{ total?, onQuery? }`; `onQuery(event)` is called after each statement with
-`QueryEvent` `{ kind: 'page' | 'total', sql, parameters, durationMs, rowCount }` (the statement is
-compiled only when `onQuery` is set). `query` MUST be a plain selection of the definition's table as
-ADR 0012 states: its `order by`, `limit`, and `offset` are replaced, its `where` is kept, and the
-alias names `keyset0`, `keyset1`, ... are reserved. The SQL of a first page over `selectAll()` with
-the key `id`:
+`PaginateOptions` is `{ total?, onQuery?, context? }`; `context` binds the cursors as in 6.1, and a
+cursor issued under another context is rejected before any statement runs. `onQuery(event)` is
+called after each statement with `QueryEvent`
+`{ kind: 'page' | 'total', sql, parameters, durationMs, rowCount }` (the statement is compiled only
+when `onQuery` is set). `query` MUST be a plain selection of the definition's table as ADR 0012
+states: its `order by`, `limit`, and `offset` are replaced, its `where` is kept, and the alias names
+`keyset0`, `keyset1`, ... are reserved. The SQL of a first page over `selectAll()` with the key
+`id`:
 
 ```sql
 select *, cast("contacts"."id" as text) as "keyset0" from "contacts"
@@ -686,7 +699,8 @@ order by "contacts"."id" asc nulls last limit $1
 ```
 
 Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, backward, and camelCase pages;
-the base query's clauses; row splitting; the dummy driver).
+the base query's clauses; row splitting; the context rejecting a foreign cursor before querying; the
+dummy driver).
 
 ---
 
@@ -699,14 +713,14 @@ its `*.test-d.ts`; `@netvark/kysely-keyset`'s project resolves `@netvark/keyset-
 pins. The adapter's tests run against a compile-only Kysely (`DummyDriver`) and a driver that
 answers canned rows while recording the compiled queries; no module of the packages is mocked.
 
-| Area                               | Files                                                                                                                                                                                                                                        | What is pinned                                                                                              |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Internal                           | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                                                                                                 | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                              |
-| Definition                         | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`, `create-define-keyset.test.ts`, `create-define-keyset.test-d.ts` | every definition-time rejection and default, definer defaults and their merge, inference                    |
-| Filter                             | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                              |
-| Sort, plan, page, cursor           | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                                    | tie-breaking, the context, inversion, every seek case, page bounds, links, the cursor format and its checks |
-| Errors                             | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                             |
-| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                                                | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB` |
+| Area                               | Files                                                                                                                                                                                                                                        | What is pinned                                                                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal                           | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                                                                                                 | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                                                       |
+| Definition                         | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`, `create-define-keyset.test.ts`, `create-define-keyset.test-d.ts` | every definition-time rejection and default, definer defaults and their merge, inference                                             |
+| Filter                             | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                                                       |
+| Sort, plan, page, cursor           | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks |
+| Errors                             | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                      |
+| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                                                | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                          |
 
 ### 11.1 End-to-end suite and invariants (`e2e/keyset/`)
 
@@ -728,19 +742,20 @@ first page; walking backward from the last page visits the same rows in the same
 own cursor resumes right after it (and right before it); and `next` then `prev` returns to the page
 it came from.
 
-| File                          | Covers                                                                                                                                                                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package-surface.e2e.test.ts` | the exact export lists of both packages, and that `@netvark/kysely-keyset` re-exports the core's own bindings                                                                                                                              |
-| `paginate.e2e.test.ts`        | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps                                                                                                                           |
-| `filters.e2e.test.ts`         | every operator of every type against real rows, combinators, rejections before querying, totals                                                                                                                                            |
-| `relations.e2e.test.ts`       | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging                                                                                                                       |
-| `search.e2e.test.ts`          | `like` search, websearch over the stored vector (words, negation, phrases), phrase search over columns, rejection                                                                                                                          |
-| `range.e2e.test.ts`           | the rows between two cursors, the max size default, `rangeTruncated`, empty ranges, rejection                                                                                                                                              |
-| `cursors.e2e.test.ts`         | foreign context, tampering, foreign secrets, malformed input, expiry, rotation, opacity and URL safety                                                                                                                                     |
-| `camel-case.e2e.test.ts`      | a `CamelCasePlugin` application end to end, and cursor interchange with the snake_case definition                                                                                                                                          |
-| `defaults.e2e.test.ts`        | a configured definer: the default page size and max, every row walked with the default secret, the default text-search configuration (English stemming) against a definition's own; on PGlite and, when `KEYSET_PG_URL` is set, the server |
-| `pg-driver.e2e.test.ts`       | section 11.2                                                                                                                                                                                                                               |
-| `postgres.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                               |
+| File                          | Covers                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts` | the exact export lists of both packages, and that `@netvark/kysely-keyset` re-exports the core's own bindings                                                                                                                                                                                            |
+| `paginate.e2e.test.ts`        | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps                                                                                                                                                                                         |
+| `filters.e2e.test.ts`         | every operator of every type against real rows, combinators, rejections before querying, totals                                                                                                                                                                                                          |
+| `relations.e2e.test.ts`       | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging                                                                                                                                                                                     |
+| `search.e2e.test.ts`          | `like` search, websearch over the stored vector (words, negation, phrases), phrase search over columns, rejection                                                                                                                                                                                        |
+| `range.e2e.test.ts`           | the rows between two cursors, the max size default, `rangeTruncated`, empty ranges, rejection                                                                                                                                                                                                            |
+| `cursors.e2e.test.ts`         | foreign context, tampering, foreign secrets, malformed input, expiry, rotation, opacity and URL safety                                                                                                                                                                                                   |
+| `camel-case.e2e.test.ts`      | a `CamelCasePlugin` application end to end, and cursor interchange with the snake_case definition                                                                                                                                                                                                        |
+| `context.e2e.test.ts`         | an organization-scoped table: every row of one organization walked with cursors bound to it, a cursor rejected inside another organization before any query, failing closed without a context, and the cross-scope seek an unbound cursor allows; on PGlite and, when `KEYSET_PG_URL` is set, the server |
+| `defaults.e2e.test.ts`        | a configured definer: the default page size and max, every row walked with the default secret, the default text-search configuration (English stemming) against a definition's own; on PGlite and, when `KEYSET_PG_URL` is set, the server                                                               |
+| `pg-driver.e2e.test.ts`       | section 11.2                                                                                                                                                                                                                                                                                             |
+| `postgres.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
 
 ### 11.2 node-postgres (`pg-driver.e2e.test.ts`)
 
@@ -753,18 +768,18 @@ instants), and the caller's own columns keep the driver's parsing (`Date`, numer
 ### 11.3 A PostgreSQL server (`postgres.e2e.test.ts`)
 
 The invariants, filters, relations, search, and range requests on the planner and executor
-production uses; `defaults.e2e.test.ts` runs there too. The file runs only when `KEYSET_PG_URL`
-names a server and skips itself otherwise; it creates a throwaway schema, scopes its connections to
-it with `search_path`, and drops it. CI provides PostgreSQL 14 and 18.
+production uses; `defaults.e2e.test.ts` and `context.e2e.test.ts` run there too. The file runs only
+when `KEYSET_PG_URL` names a server and skips itself otherwise; it creates a throwaway schema,
+scopes its connections to it with `search_path`, and drops it. CI provides PostgreSQL 14 and 18.
 
 ### 11.4 Runtime smoke test (`e2e/keyset/smoke/`)
 
 `checks.ts` holds runtime-neutral checks over the built packages: define a keyset through a
-configured definer, plan a request, sign and verify cursors with the runtime's Web Crypto, render
-SQL through Kysely's PostgreSQL compiler over `DummyDriver`, and get the typed errors. `run.ts`
-drives it in-process on Bun and Deno; `worker.ts` is the Workers module and `workerd.ts` bundles it
-with tsdown (`platform: 'neutral'`) and runs it in Miniflare's workerd. `pnpm test:runtimes` runs
-all three; CI runs them on every push.
+configured definer, plan a request, bind cursors to a caller context, sign and verify cursors with
+the runtime's Web Crypto, render SQL through Kysely's PostgreSQL compiler over `DummyDriver`, and
+get the typed errors. `run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers
+module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's
+workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
 
 ---
 

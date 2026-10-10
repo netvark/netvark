@@ -6,6 +6,7 @@
  * @packageDocumentation
  */
 import type { Page } from '../page/finish';
+import type { PlanOptions } from '../plan/context';
 import type { KeysetRequest } from '../plan/plan';
 import type { CursorValue, QueryPlan } from '../plan/types';
 import type {
@@ -54,8 +55,14 @@ export interface Keyset<
   TRelations extends RelationsInit = RelationsInit,
 > {
   readonly definition: KeysetDefinition;
-  /** Validates the request and decodes its cursors into a plan. */
-  plan(request: KeysetRequestOf<TFields, TRelations>): Promise<QueryPlan>;
+  /**
+   * Validates the request and decodes its cursors into a plan; cursors are
+   * bound to the request and to `options.context` (SPEC 6.1).
+   */
+  plan(
+    request: KeysetRequestOf<TFields, TRelations>,
+    options?: PlanOptions,
+  ): Promise<QueryPlan>;
   /**
    * Assembles the page from the rows an adapter fetched with the plan;
    * `values(row)` reads the row's sort-key values in `plan.keys` order.
