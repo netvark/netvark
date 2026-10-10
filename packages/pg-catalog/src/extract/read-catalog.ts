@@ -12,6 +12,7 @@ import { CATALOG_FORMAT } from '@netvark/catalog-core';
 
 import { PgCatalogError } from '../errors';
 import { compareCodeUnits } from '../internal/code-units';
+import { recognizeCheck } from '../recognize/recognize';
 import { SESSION_SETTINGS } from '../target/session';
 import { buildTable } from './build-table';
 import { referenceName, sortedRecord } from './names';
@@ -23,7 +24,12 @@ import {
   VERSION_QUERY,
   tablesQuery,
 } from './queries';
-import { defaultMember, modifierMembers, typeMembers } from './type-facts';
+import {
+  checkSubject,
+  defaultMember,
+  modifierMembers,
+  typeMembers,
+} from './type-facts';
 
 /** PostgreSQL 14, the oldest supported major (SPEC 15). */
 const MINIMUM_SERVER_VERSION = 140_000;
@@ -60,6 +66,8 @@ async function queryJson<TRow>(
 
 function buildDomain(row: DomainRow, defaultSchema: string): CatalogDomain {
   const name = referenceName(row.schema, row.name, defaultSchema);
+  // Every domain CHECK is a candidate for a rule (SPEC 8.1).
+  const subject = checkSubject(row, null);
   return {
     schema: row.schema,
     name: row.name,
@@ -77,7 +85,7 @@ function buildDomain(row: DomainRow, defaultSchema: string): CatalogDomain {
             {
               kind: 'check',
               expression: constraint.expression,
-              rule: null,
+              rule: recognizeCheck(constraint.expression, subject),
               validated: constraint.validated,
               definition: constraint.definition,
             },

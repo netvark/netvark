@@ -44,7 +44,11 @@ export const catalog = {
         "country_code_check": {
           "kind": "check",
           "expression": "(VALUE ~ '^[A-Z]{2}$'::text)",
-          "rule": null,
+          "rule": {
+            "kind": "pattern",
+            "source": "^[A-Z]{2}$",
+            "flags": "su"
+          },
           "validated": true,
           "definition": "CHECK ((VALUE ~ '^[A-Z]{2}$'::text))"
         }
@@ -92,7 +96,17 @@ export const catalog = {
         "percentage_check": {
           "kind": "check",
           "expression": "((VALUE >= (0)::numeric) AND (VALUE <= (100)::numeric))",
-          "rule": null,
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": true
+            },
+            "max": {
+              "value": "100",
+              "inclusive": true
+            }
+          },
           "validated": true,
           "definition": "CHECK (((VALUE >= (0)::numeric) AND (VALUE <= (100)::numeric)))"
         }
@@ -116,7 +130,9 @@ export const catalog = {
         "required_note_check": {
           "kind": "check",
           "expression": "(VALUE IS NOT NULL)",
-          "rule": null,
+          "rule": {
+            "kind": "notNull"
+          },
           "validated": true,
           "definition": "CHECK ((VALUE IS NOT NULL))"
         }
@@ -140,7 +156,11 @@ export const catalog = {
         "short_text_check": {
           "kind": "check",
           "expression": "((char_length((VALUE)::text) >= 1) AND (char_length((VALUE)::text) <= 120))",
-          "rule": null,
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 120
+          },
           "validated": true,
           "definition": "CHECK (((char_length((VALUE)::text) >= 1) AND (char_length((VALUE)::text) <= 120)))"
         }
@@ -380,7 +400,11 @@ export const catalog = {
             "number"
           ],
           "expression": "((number)::text ~ '^\\+?[0-9 ]+$'::text)",
-          "rule": null,
+          "rule": {
+            "kind": "pattern",
+            "source": "^\\+?[0-9 ]+$",
+            "flags": "su"
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK (((number)::text ~ '^\\+?[0-9 ]+$'::text))"
@@ -399,7 +423,14 @@ export const catalog = {
             "position"
           ],
           "expression": "(\"position\" >= 0)",
-          "rule": null,
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": true
+            },
+            "max": null
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK ((\"position\" >= 0))"
@@ -668,7 +699,11 @@ export const catalog = {
             "name"
           ],
           "expression": "((char_length(name) >= 1) AND (char_length(name) <= 200))",
-          "rule": null,
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 200
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK (((char_length(name) >= 1) AND (char_length(name) <= 200)))"
@@ -679,7 +714,11 @@ export const catalog = {
             "nickname"
           ],
           "expression": "(nickname <> ''::text)",
-          "rule": null,
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": null
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK ((nickname <> ''::text))"
@@ -714,7 +753,17 @@ export const catalog = {
             "priority"
           ],
           "expression": "((priority >= 1) AND (priority <= 5))",
-          "rule": null,
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "5",
+              "inclusive": true
+            }
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK (((priority >= 1) AND (priority <= 5)))"
@@ -725,7 +774,13 @@ export const catalog = {
             "status"
           ],
           "expression": "(status = ANY (ARRAY['active'::text, 'archived'::text]))",
-          "rule": null,
+          "rule": {
+            "kind": "enum",
+            "values": [
+              "active",
+              "archived"
+            ]
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])))"
@@ -736,7 +791,11 @@ export const catalog = {
             "website"
           ],
           "expression": "((website IS NULL) OR (website ~ '^https://'::text))",
-          "rule": null,
+          "rule": {
+            "kind": "pattern",
+            "source": "^https://",
+            "flags": "su"
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK (((website IS NULL) OR (website ~ '^https://'::text)))"
@@ -1134,7 +1193,14 @@ export const catalog = {
             "seats"
           ],
           "expression": "(seats > 0)",
-          "rule": null,
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": false
+            },
+            "max": null
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK ((seats > 0))"
@@ -1145,7 +1211,11 @@ export const catalog = {
             "slug"
           ],
           "expression": "((slug)::text ~ '^[a-z0-9-]+$'::text)",
-          "rule": null,
+          "rule": {
+            "kind": "pattern",
+            "source": "^[a-z0-9-]+$",
+            "flags": "su"
+          },
           "validated": true,
           "enforced": true,
           "definition": "CHECK (((slug)::text ~ '^[a-z0-9-]+$'::text))"

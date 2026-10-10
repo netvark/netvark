@@ -28,7 +28,11 @@ export const publicCatalog = {
       "constraints": {
         "country_code_check": {
           "kind": "check",
-          "rule": null
+          "rule": {
+            "kind": "pattern",
+            "source": "^[A-Z]{2}$",
+            "flags": "su"
+          }
         }
       }
     },
@@ -66,7 +70,17 @@ export const publicCatalog = {
       "constraints": {
         "percentage_check": {
           "kind": "check",
-          "rule": null
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": true
+            },
+            "max": {
+              "value": "100",
+              "inclusive": true
+            }
+          }
         }
       }
     },
@@ -85,7 +99,11 @@ export const publicCatalog = {
       "constraints": {
         "short_text_check": {
           "kind": "check",
-          "rule": null
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 120
+          }
         }
       }
     }
@@ -172,7 +190,11 @@ export const publicCatalog = {
           "columns": [
             "number"
           ],
-          "rule": null
+          "rule": {
+            "kind": "pattern",
+            "source": "^\\+?[0-9 ]+$",
+            "flags": "su"
+          }
         },
         "contact_phones_pkey": {
           "kind": "primaryKey",
@@ -186,7 +208,14 @@ export const publicCatalog = {
           "columns": [
             "position"
           ],
-          "rule": null
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": true
+            },
+            "max": null
+          }
         }
       }
     },
@@ -396,14 +425,22 @@ export const publicCatalog = {
           "columns": [
             "name"
           ],
-          "rule": null
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 200
+          }
         },
         "contacts_nickname_check": {
           "kind": "check",
           "columns": [
             "nickname"
           ],
-          "rule": null
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": null
+          }
         },
         "contacts_organization_id_fkey": {
           "kind": "foreignKey",
@@ -428,21 +465,41 @@ export const publicCatalog = {
           "columns": [
             "priority"
           ],
-          "rule": null
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "5",
+              "inclusive": true
+            }
+          }
         },
         "contacts_status_check": {
           "kind": "check",
           "columns": [
             "status"
           ],
-          "rule": null
+          "rule": {
+            "kind": "enum",
+            "values": [
+              "active",
+              "archived"
+            ]
+          }
         },
         "contacts_website_check": {
           "kind": "check",
           "columns": [
             "website"
           ],
-          "rule": null
+          "rule": {
+            "kind": "pattern",
+            "source": "^https://",
+            "flags": "su"
+          }
         }
       }
     },
@@ -548,14 +605,25 @@ export const publicCatalog = {
           "columns": [
             "seats"
           ],
-          "rule": null
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": false
+            },
+            "max": null
+          }
         },
         "organizations_slug_check": {
           "kind": "check",
           "columns": [
             "slug"
           ],
-          "rule": null
+          "rule": {
+            "kind": "pattern",
+            "source": "^[a-z0-9-]+$",
+            "flags": "su"
+          }
         },
         "organizations_slug_key": {
           "kind": "unique",

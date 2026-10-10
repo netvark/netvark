@@ -23,7 +23,11 @@ export interface TypeFactsRow {
   readonly sqlType: string;
   readonly typmod: number;
   readonly collation: string | null;
-  /** `collisdeterministic` of the collation in effect, `null` for a type without one; the recognizer reads it. */
+  /**
+   * `collisdeterministic` of the collation a CHECK on this column or domain
+   * compares under: the column's own, or for a domain that of the type it is
+   * declared over. `null` for a type without a collation.
+   */
   readonly deterministic: boolean | null;
   readonly default: string | null;
   readonly comment: string | null;

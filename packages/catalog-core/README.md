@@ -58,6 +58,78 @@ A **reference name** is the object's name in the default schema (the first confi
 definitions, and defaults are PostgreSQL's deparsed text, and a default whose constant a client can
 send as text also carries it as `literal` (`'active'::text` has the literal `active`).
 
+## Enforcing a rule
+
+A check constraint's `rule`, on a table or a domain, states what the CHECK accepts in a form a
+client can test before it sends a request; `null` means the CHECK could not be read exactly, so a
+validator of your own must cover it. A table's rules sit on its check constraints, each naming its
+one column in `columns`; a domain's apply to every column of that type, through domains over
+domains. Enforced like this, a rule gives PostgreSQL's verdict on every value:
+
+```ts
+import type { RangeBound, Rule } from '@netvark/catalog-core';
+
+/** Exact comparison of decimal strings such as `-12.50`: negative, zero, or positive. */
+function compareDecimals(left: string, right: string): number {
+  const [leftWhole = '', leftFraction = ''] = left.split('.');
+  const [rightWhole = '', rightFraction = ''] = right.split('.');
+  const scale = Math.max(leftFraction.length, rightFraction.length);
+  const scaled = (whole: string, fraction: string): bigint => {
+    const digits = BigInt(whole.replace('-', '') + fraction.padEnd(scale, '0'));
+    return whole.startsWith('-') ? -digits : digits;
+  };
+  return Math.sign(Number(scaled(leftWhole, leftFraction) - scaled(rightWhole, rightFraction)));
+}
+
+function satisfies(order: number, bound: RangeBound): boolean {
+  return bound.inclusive ? order >= 0 : order > 0;
+}
+
+/**
+ * Whether the CHECK behind `rule` accepts `value`, given as the text you send to PostgreSQL.
+ * `float` says the column (or its domain's base type) is `float8`.
+ */
+export function accepts(rule: Rule, value: string | null, float = false): boolean {
+  if (value === null) {
+    return rule.kind !== 'notNull'; // a CHECK passes on null
+  }
+  switch (rule.kind) {
+    case 'notNull':
+      return true;
+    case 'length': {
+      const length = Array.from(value).length; // code points, as char_length counts
+      return (rule.min === null || length >= rule.min) && (rule.max === null || length <= rule.max);
+    }
+    case 'range': {
+      const compare = (a: string, b: string): number =>
+        float ? Math.sign(Number(a) - Number(b)) : compareDecimals(a, b);
+      return (
+        (rule.min === null || satisfies(compare(value, rule.min.value), rule.min)) &&
+        (rule.max === null || satisfies(compare(rule.max.value, value), rule.max))
+      );
+    }
+    case 'enum':
+      return rule.values.includes(value);
+    case 'pattern':
+      return new RegExp(rule.source, rule.flags).test(value);
+  }
+}
+```
+
+- **Count code points.** `char_length` counts code points, which `Array.from(value).length` gives;
+  `value.length` counts UTF-16 units, so an emoji counts twice.
+- **Compare bounds exactly.** Bounds are decimal strings so that `int8` and `numeric` bounds keep
+  every digit, and `Number('9007199254740993')` is off by one. Only for a `float8` column does
+  PostgreSQL compare doubles, and there `Number(bound.value)` is the double it compares with.
+- **Keep the pattern's flags.** Without `s`, `.` stops at a newline where PostgreSQL's does not;
+  without `u`, an emoji counts as two characters. Like PostgreSQL's `~`, a pattern matches anywhere
+  in the value unless `^` and `$` anchor it.
+- **Let null through.** A CHECK passes when its expression is null, so every rule but `notNull`
+  accepts a missing value; whether the column takes null is its `nullable`.
+- **Test the value PostgreSQL will store.** Rules apply after input conversion and type modifiers: a
+  `numeric(5, 2)` column stores `99.995` as `100.00` before its CHECK runs, so round to the column's
+  `scale` before testing a range.
+
 ## `toPublicCatalog(catalog, tables)`
 
 Returns the slice a browser may see: only the listed tables, and of them only what a form needs:

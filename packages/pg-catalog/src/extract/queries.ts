@@ -91,6 +91,12 @@ from pg_type t
 join pg_namespace n on n.oid = t.typnamespace
 where t.typtype = 'e' and n.nspname = any($1::text[]) and ${notExtensionMember('pg_type', 't.oid')}`;
 
+/**
+ * Domains with their CHECK constraints. `deterministic` reads the collation
+ * of the type the domain is declared over, not the domain's own: PostgreSQL
+ * gives `VALUE` that type's collation, so a domain's CHECKs compare under it.
+ * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/commands/typecmds.c (domainAddCheckConstraint: domVal->collation)
+ */
 export const DOMAINS_QUERY: string = `${DOMAIN_BASES}
 select coalesce(json_agg(json_build_object(
   'schema', n.nspname,
@@ -102,7 +108,7 @@ select coalesce(json_agg(json_build_object(
   'notNull', t.typnotnull,
   'default', pg_get_expr(t.typdefaultbin, 0),
   'collation', case when t.typcollation <> 0 and t.typcollation <> b.typcollation then co.collname end,
-  'deterministic', co.collisdeterministic,
+  'deterministic', bco.collisdeterministic,
   'comment', obj_description(t.oid, 'pg_type'),
   'constraints', (select coalesce(json_agg(json_build_object(
       'name', k.conname,
@@ -116,6 +122,7 @@ from pg_type t
 join pg_namespace n on n.oid = t.typnamespace
 join pg_type b on b.oid = t.typbasetype
 left join pg_collation co on co.oid = t.typcollation
+left join pg_collation bco on bco.oid = b.typcollation
 cross join lateral (${typeFacts('t.typbasetype')}) f
 where t.typtype = 'd' and n.nspname = any($1::text[]) and ${notExtensionMember('pg_type', 't.oid')}`;
 
