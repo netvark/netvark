@@ -1,0 +1,145 @@
+{
+  "name": "hono-ban",
+  "version": "1.3.0",
+  "description": "Structured, extensible HTTP errors for Hono, built on ban-kit. One API, any wire format: RFC 9457 Problem Details, JSON:API, Google API (AIP-193), Stripe, or your own.",
+  "keywords": [
+    "aip-193",
+    "boom",
+    "error",
+    "error-handling",
+    "errors",
+    "google-api",
+    "hono",
+    "http-errors",
+    "json-api",
+    "jsonapi",
+    "middleware",
+    "openapi",
+    "postgres",
+    "postgresql",
+    "problem-details",
+    "rfc7807",
+    "rfc9457",
+    "sqlstate",
+    "stripe",
+    "zod"
+  ],
+  "homepage": "https://github.com/ali-issa/ban-kit/tree/main/packages/hono-ban#readme",
+  "bugs": "https://github.com/ali-issa/ban-kit/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ali-issa/ban-kit.git",
+    "directory": "packages/hono-ban"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./formats/google-api": {
+      "source": "./src/formats/google-api.ts",
+      "default": "./dist/formats/google-api.js"
+    },
+    "./formats/json-api": {
+      "source": "./src/formats/json-api.ts",
+      "default": "./dist/formats/json-api.js"
+    },
+    "./formats/plain": {
+      "source": "./src/formats/plain.ts",
+      "default": "./dist/formats/plain.js"
+    },
+    "./formats/problem-details": {
+      "source": "./src/formats/problem-details.ts",
+      "default": "./dist/formats/problem-details.js"
+    },
+    "./formats/stripe": {
+      "source": "./src/formats/stripe.ts",
+      "default": "./dist/formats/stripe.js"
+    },
+    "./openapi": {
+      "source": "./src/openapi.ts",
+      "default": "./dist/openapi.js"
+    },
+    "./otel": {
+      "source": "./src/otel.ts",
+      "default": "./dist/otel.js"
+    },
+    "./postgresql": {
+      "source": "./src/postgresql.ts",
+      "default": "./dist/postgresql.js"
+    },
+    "./standard-schema": {
+      "source": "./src/standard-schema.ts",
+      "default": "./dist/standard-schema.js"
+    },
+    "./testing": {
+      "source": "./src/testing.ts",
+      "default": "./dist/testing.js"
+    },
+    "./valibot": {
+      "source": "./src/valibot.ts",
+      "default": "./dist/valibot.js"
+    },
+    "./zod": {
+      "source": "./src/zod.ts",
+      "default": "./dist/zod.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./formats/google-api": "./dist/formats/google-api.js",
+      "./formats/json-api": "./dist/formats/json-api.js",
+      "./formats/plain": "./dist/formats/plain.js",
+      "./formats/problem-details": "./dist/formats/problem-details.js",
+      "./formats/stripe": "./dist/formats/stripe.js",
+      "./openapi": "./dist/openapi.js",
+      "./otel": "./dist/otel.js",
+      "./postgresql": "./dist/postgresql.js",
+      "./standard-schema": "./dist/standard-schema.js",
+      "./testing": "./dist/testing.js",
+      "./valibot": "./dist/valibot.js",
+      "./zod": "./dist/zod.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ban-kit": "workspace:^"
+  },
+  "devDependencies": {
+    "@hono/standard-validator": "0.4.0",
+    "@hono/valibot-validator": "0.6.1",
+    "@hono/zod-openapi": "1.6.3",
+    "@hono/zod-validator": "0.9.1",
+    "hono": "4.13.7",
+    "valibot": "1.4.2",
+    "zod": "4.5.4"
+  },
+  "peerDependencies": {
+    "hono": ">=4.12.34"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
