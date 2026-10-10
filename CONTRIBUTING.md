@@ -138,7 +138,12 @@ first so the scope is settled before code exists, then:
 - Use conventional commit subjects with the family or package as the scope:
   `feat(keyset): add the overlaps operator`, `fix(hono-ban): preserve HTTPException headers`. Types:
   `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`.
-- Keep pull requests focused. Describe the why in the body; link the issue.
+- Keep pull requests focused: one epic, or a few related issues, per pull request, with one commit
+  per issue. Each commit passes `pnpm check`, `pnpm test`, and the family's e2e suite on its own,
+  carries its own changeset, and ends with `Closes #<issue>`. Describe the why in the body.
+- Merge a multi-commit pull request with **Rebase and merge** so `main` keeps one commit per issue;
+  a single-commit pull request may squash. Auto-merge is on: `gh pr merge --auto --rebase` merges
+  once `CI passed` succeeds (`docs/adr/0004-protect-main-with-one-aggregate-check.md`).
 - Every user-visible change needs a changeset (next section). CI fails without one on
   `packages/*/src` changes. A source change users cannot see, such as a comment, a lint directive,
   or a test, takes an empty one: `pnpm changeset add --empty`.
@@ -153,7 +158,8 @@ Releases are automated with [Changesets](https://github.com/changesets/changeset
    passes through needs no entry for the binding (Changesets bumps its dependency range on its own).
 2. Commit the generated file under `.changeset/`.
 3. When your PR merges, the release workflow opens or updates a "Version Packages" PR that bumps
-   each affected package's `package.json` and `CHANGELOG.md`.
+   each affected package's `package.json` and `CHANGELOG.md`. The workflow is disabled until the
+   first releases (#51); `gh workflow enable release.yml` turns it back on.
 4. Merging that PR publishes the bumped packages to npm through trusted publishing (OIDC, with
    provenance) and creates a GitHub release per package.
 
