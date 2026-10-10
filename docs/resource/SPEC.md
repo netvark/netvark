@@ -40,12 +40,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodecs`, `Messages`, `MessagesFor` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorEntry`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ```
 packages/resource-core/src/
@@ -107,9 +107,12 @@ type-level check reads.
   `catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`,
   and the runtime check tests the same member.
 - Registries map a name to a value made by `defineCodec`, `defineValidator`, or
-  `{ column: string }`. A codec or validator value that the define function did not produce throws
-  `TypeError` (they carry a private brand). Scope names are internal and unconstrained; a scope's
-  `column` is checked per declaration (3.2).
+  `{ column: string }`. A codec or validator value that the define function did not produce, a copy
+  included, fails `tsc` (the values carry a type-only mark, so the error reads
+  `Property '[madeByDefineCodec]' is missing`) and throws `TypeError`
+  (`createDeclareResource.codecs.phone: must be made by defineCodec`), since the runtime brand is a
+  `WeakSet` membership. Scope names are internal and unconstrained; a scope's `column` is checked
+  per declaration (3.2).
 - An omitted registry is empty. A registry, or any other optional member, that is present MUST hold
   a value of its kind: `null` is refused
   (`createDeclareResource.codecs: must be an object, received null`), since only `undefined` means
@@ -673,10 +676,14 @@ members).
 ### 7.1 `defineCodec`
 
 ```ts
-function defineCodec<const TTypes extends ReadonlyArray<string>, TSchema extends ZodType>(init: {
+import type { $ZodType, input, output } from 'zod/v4/core';
+
+type NonEmptyList<T> = readonly [T, ...Array<T>];
+
+function defineCodec<const TTypes extends NonEmptyList<string>, TSchema extends $ZodType>(init: {
   readonly types: TTypes; // type reference names it attaches to: base types, enums, domains, `<type>[]`
   readonly schema: TSchema; // the public schema: what the wire carries
-  readonly fixtures: readonly [input<TSchema>, ...Array<input<TSchema>>]; // round-trip values
+  readonly fixtures: NonEmptyList<input<TSchema>>; // round-trip values
   readonly description?: string | undefined;
 }): Codec<TTypes, TSchema>;
 ```
@@ -685,21 +692,32 @@ A codec is the public facet of a value type. A field may name a codec only when 
 (`type`, with `[]` appended for an array column) is in `types`. The storage facet, which converts
 between the wire value and what the driver reads and writes, lives in the storage adapter, keyed by
 the same names: `StorageCodecs<typeof codecs, TStored>` is
-`{ readonly [K in keyof TCodecs]: { read(stored: TStored): output<schema>; write(value: output<schema>): TStored } }`,
-so the two facets cannot disagree on the key set.
+`{ readonly [K in keyof TCodecs]: StorageCodec<output<TCodecs[K]['schema']>, TStored> }`, where
+`StorageCodec<TValue, TStored>` is
+`{ read(stored: TStored): TValue; write(value: TValue): TStored }`, so the two facets cannot
+disagree on the key set.
 
-`defineCodec` throws `TypeError` when `types` is empty or holds a non-string, when `fixtures` is
-empty, or when the schema rejects a fixture (naming its index). Without `fixtures` the call does not
-compile.
+The schema is any Zod 4 schema, from `zod` or `zod/mini`: the package depends on Zod Core
+(`zod/v4/core`), the surface both share, tests a schema with `instanceof $ZodType`, and parses with
+Core's `safeParse`. It MUST parse synchronously, as the composed schemas do (6). @ref
+https://zod.dev/library-authors
+
+`defineCodec` returns the codec frozen, with copies of its lists, and throws `TypeError` when
+`types` is empty or holds a non-string
+(`defineCodec.types: must be a non-empty list of type names`), when `schema` is not a Zod 4 schema,
+when `fixtures` is empty, when the schema rejects a fixture
+(`defineCodec.fixtures[1]: the schema rejects this fixture`, with Zod's error as the `cause`), or
+when the schema parses asynchronously (`defineCodec.schema: must parse synchronously`). Without
+`fixtures`, or with an empty list or a fixture of another type, the call does not compile.
 
 ### 7.2 `defineValidator`
 
 ```ts
-function defineValidator<TSchema extends ZodType>(init: {
-  readonly schema: TSchema; // input: the field's value, or an object of the CHECK's fields by public name
+function defineValidator<TSchema extends $ZodType>(init: {
+  readonly schema: TSchema; // input: the field's value, or an object of the CHECK's members by public name
   readonly fixtures: {
-    readonly accept: readonly [input<TSchema>, ...Array<input<TSchema>>];
-    readonly reject: readonly [input<TSchema>, ...Array<input<TSchema>>];
+    readonly accept: NonEmptyList<input<TSchema>>;
+    readonly reject: NonEmptyList<input<TSchema>>;
   };
   readonly description?: string | undefined;
 }): Validator<TSchema>;
@@ -707,12 +725,18 @@ function defineValidator<TSchema extends ZodType>(init: {
 
 A validator is the request-side twin of a CHECK the recognizer could not translate. Attached to a
 single-column CHECK, its input is the field's value (6.1 step 5); attached to a multi-column CHECK,
-its input is an object of the CHECK's fields keyed by public name (6.2). The validator's input type
-MUST accept the field's output type, which `tsc` checks at the attachment. Its issues carry the
-CHECK's error code as their kind (6.4), whatever the schema's own codes.
+its input is an object of the CHECK's members keyed by public name (6.2), a relationship as its
+linkage (`{ type, id }`, or `null`). Such CHECKs often span only foreign keys: all six of stern's
+CHECKs without a rule tie two relationships together (exactly one of a subject and an entity, or at
+least one of a workspace and an offering). A CHECK passes `NULL`, so the validator of a nullable
+member accepts `null`. The validator's input type MUST accept the field's output type, which `tsc`
+checks at the attachment. Its issues carry the CHECK's error code as their kind (6.4), whatever the
+schema's own codes.
 
-`defineValidator` throws `TypeError` when either list is empty, when the schema rejects an `accept`
-fixture, or when it accepts a `reject` fixture (naming the list and index).
+`defineValidator` returns the validator frozen and throws `TypeError` when either list is empty,
+when the schema rejects an `accept` fixture or accepts a `reject` fixture, naming the list and index
+(`defineValidator.fixtures.reject[1]: the schema accepts this fixture`), or for the schema mistakes
+of 7.1.
 
 ### 7.3 The oracle's inputs
 
@@ -723,8 +747,10 @@ fixture, or when it accepts a `reject` fixture (naming the list and index).
 - a validator fixture is substituted into the CHECK expression, `SELECT (<expression>)`, and the
   database's verdict (true or null accepts, false rejects) must match the list it is in.
 
-This package only stores, types, and self-checks them. Tests: `define-codec.test.ts`,
-`define-validator.test.ts`, `storage-codecs.test-d.ts`.
+This package only stores, types, and self-checks them. Tests: `define-codec.test.ts` and
+`define-validator.test.ts` (every runtime rule, Zod Mini schemas), `define-codec.test-d.ts` and
+`define-validator.test-d.ts` (the fixtures a call needs, typed by the schema's input),
+`storage-codecs.test-d.ts`.
 
 ---
 
@@ -1254,57 +1280,60 @@ case per row.
 
 ## 14. Declaration errors
 
-Mistakes TypeScript cannot see, and every mistake made from JavaScript, throw `TypeError` when the
-definer or the declaration runs, at startup. The message starts with the path, uses database names
-for declaration paths and public names for registry conflicts, and never contains request data.
-TypeScript reports the mistakes it can see at compile time, at the offending option, in the two
-forms of 3; its message names the option relative to the declaration
+Mistakes TypeScript cannot see, and every mistake made from JavaScript, throw `TypeError` when a
+define function, the definer, or the declaration runs, at startup. The message starts with the path,
+uses database names for declaration paths and public names for registry conflicts, and never
+contains request data. TypeScript reports the mistakes it can see at compile time, at the offending
+option, in the two forms of 3; its message names the option relative to the declaration
 (`access: immutable needs the create operation`) and states the same reason as the runtime check.
 
-| Condition                                                                      | Message (example)                                                                                                                                           |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| an unknown configuration or declaration member, or a member of the wrong kind  | `contacts.fields.name: unknown member "sortable"`                                                                                                           |
-| a catalog of another format                                                    | `createDeclareResource.catalog: format 2 is not supported (expected 1)`                                                                                     |
-| the full catalog (2)                                                           | `createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`                               |
-| a registry entry of the wrong shape, or `null` for a registry                  | `createDeclareResource.codecs.phone.types: must be a non-empty list of type names`                                                                          |
-| a domain rule for an unknown domain or CHECK, or for a CHECK with a rule (3.6) | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                                                           |
-| `links` or `page` that `@netvark/jsonapi-core`'s rules refuse                  | `createDeclareResource.links.base must not end with "/"`                                                                                                    |
-| a table outside the public catalog                                             | `declareResource: "accounts" is not a table of the public catalog`                                                                                          |
-| no single-column primary key                                                   | `contact_phones: a resource needs a single-column primary key`                                                                                              |
-| a primary key whose type cannot carry a resource id (3.4)                      | `import_batches: the primary key's type jsonb cannot carry a resource id`                                                                                   |
-| `clientIds` on a primary key that takes no client value (3.4)                  | `organizations.clientIds: the primary key is an identity column generated always, which takes no client value`                                              |
-| an unknown column, foreign key, constraint, scope, codec, or validator         | `contacts.fields.nick: "nick" is not a column of contacts`                                                                                                  |
-| a column declared against 3.1                                                  | `contacts.fields.organization_id: a foreign-key column is declared under relationships`                                                                     |
-| an access the column does not allow                                            | `meetings.fields.duration_minutes.access: a generated column is read-only`                                                                                  |
-| an access no declared operation writes (3.3)                                   | `contacts.fields.kind.access: immutable needs the create operation`                                                                                         |
-| a foreign key to anything but the primary key of a public table (3.1)          | `people.relationships.team_slug: the foreign key references teams.slug, which is not its primary key`                                                       |
-| a foreign-key column whose type cannot carry a resource id (3.4)               | `import_rows.relationships.batch: type jsonb cannot carry a resource id`                                                                                    |
-| a `target` that is not a function (3.8)                                        | `meetings.relationships.organization_id.target: must be a function returning the target's declared resource`                                                |
-| a scope whose column the table does not have (3.2)                             | `audit.changes.scope: scope organization names column organization_id, which audit.changes does not have`                                                   |
-| a codec that does not accept the column's type                                 | `contacts.fields.tags.codec: codec "phone" does not accept type text[]`                                                                                     |
-| a type without a wire form and no codec                                        | `meetings.fields.during: type tstzrange has no wire form; name a codec`                                                                                     |
-| an operator `@netvark/keyset-core` does not have                               | `contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core`                                                                         |
-| an operator the keyset type does not accept, or `isNull` on a non-null field   | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                                                                              |
-| empty or repeated operations, or `update` with no member writable on update    | `contacts.operations: update needs a field or relationship writable on update`                                                                              |
-| a sort entry that is not sortable                                              | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                                                          |
-| a search column that is not `tsvector`, or a config mismatch or omission       | `contacts.search.config: the column is generated with config "simple"`                                                                                      |
-| a page default above the max page size                                         | `contacts.page.default: 200 exceeds the max page size 100`                                                                                                  |
-| a CHECK without a rule over written columns and no validator (3.5)             | `meetings.rules.meetings_contact_or_notes: a CHECK without a rule needs a validator`                                                                        |
-| a validator on a CHECK with a rule, or on another constraint kind              | `contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already`                                                             |
-| a written field whose domain has an uncovered CHECK without a rule (3.6)       | `contacts.fields.email: domain email's CHECK email_check has no rule; give it a validator in createDeclareResource domains`                                 |
-| a relationship column without the `_id` suffix and no `as`                     | `notes.relationships.author: the column does not end in _id; set as`                                                                                        |
-| a derived name that is not a member name, is reserved, or collides (4.2)       | `notes.fields.type: public name "type" is a member of every resource object; set as`                                                                        |
-| a name given with `as` that is not a member name, is reserved, or collides     | `notes.fields.contact.as: "body" collides with fields.body`                                                                                                 |
-| a type that is not a member name or is a member of `Object.prototype`          | `notes.as: "notes.v2" is not a JSON:API member name`                                                                                                        |
-| a cased letter outside the Basic Multilingual Plane after `_` (4.1)            | `notes.fields.x_𐐨: a letter outside the Basic Multilingual Plane follows _, which Kysely's CamelCasePlugin leaves as is and TypeScript upper-cases; set as` |
-| a code that does not match `CODE_PATTERN`, or that another code repeats        | `notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code`                                                              |
-| `code` on a key without a code (9.1)                                           | `notes.rules.notes_pkey.code: the key has no code, since clients cannot violate it`                                                                         |
-| an `example` the field schema rejects                                          | `contacts.fields.name.example: the field schema rejects the example`                                                                                        |
-| registry conflicts (4.2)                                                       | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                                                                                 |
+| Condition                                                                                        | Message (example)                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| an unknown configuration or declaration member, or a member of the wrong kind                    | `contacts.fields.name: unknown member "sortable"`                                                                                                           |
+| a catalog of another format                                                                      | `createDeclareResource.catalog: format 2 is not supported (expected 1)`                                                                                     |
+| the full catalog (2)                                                                             | `createDeclareResource.catalog: a full catalog; pass the public catalog (toPublicCatalog), since declarations reach browsers`                               |
+| a registry entry `defineCodec` or `defineValidator` did not make, or `null` for a registry       | `createDeclareResource.codecs.phone: must be made by defineCodec`                                                                                           |
+| `types`, `fixtures`, or a fixture list that is empty, or a schema that is not a Zod 4 schema (7) | `defineCodec.types: must be a non-empty list of type names`                                                                                                 |
+| a fixture the schema disagrees with (7)                                                          | `defineValidator.fixtures.reject[1]: the schema accepts this fixture`                                                                                       |
+| a schema that parses asynchronously (7)                                                          | `defineCodec.schema: must parse synchronously`                                                                                                              |
+| a domain rule for an unknown domain or CHECK, or for a CHECK with a rule (3.6)                   | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                                                           |
+| `links` or `page` that `@netvark/jsonapi-core`'s rules refuse                                    | `createDeclareResource.links.base must not end with "/"`                                                                                                    |
+| a table outside the public catalog                                                               | `declareResource: "accounts" is not a table of the public catalog`                                                                                          |
+| no single-column primary key                                                                     | `contact_phones: a resource needs a single-column primary key`                                                                                              |
+| a primary key whose type cannot carry a resource id (3.4)                                        | `import_batches: the primary key's type jsonb cannot carry a resource id`                                                                                   |
+| `clientIds` on a primary key that takes no client value (3.4)                                    | `organizations.clientIds: the primary key is an identity column generated always, which takes no client value`                                              |
+| an unknown column, foreign key, constraint, scope, codec, or validator                           | `contacts.fields.nick: "nick" is not a column of contacts`                                                                                                  |
+| a column declared against 3.1                                                                    | `contacts.fields.organization_id: a foreign-key column is declared under relationships`                                                                     |
+| an access the column does not allow                                                              | `meetings.fields.duration_minutes.access: a generated column is read-only`                                                                                  |
+| an access no declared operation writes (3.3)                                                     | `contacts.fields.kind.access: immutable needs the create operation`                                                                                         |
+| a foreign key to anything but the primary key of a public table (3.1)                            | `people.relationships.team_slug: the foreign key references teams.slug, which is not its primary key`                                                       |
+| a foreign-key column whose type cannot carry a resource id (3.4)                                 | `import_rows.relationships.batch: type jsonb cannot carry a resource id`                                                                                    |
+| a `target` that is not a function (3.8)                                                          | `meetings.relationships.organization_id.target: must be a function returning the target's declared resource`                                                |
+| a scope whose column the table does not have (3.2)                                               | `audit.changes.scope: scope organization names column organization_id, which audit.changes does not have`                                                   |
+| a codec that does not accept the column's type                                                   | `contacts.fields.tags.codec: codec "phone" does not accept type text[]`                                                                                     |
+| a type without a wire form and no codec                                                          | `meetings.fields.during: type tstzrange has no wire form; name a codec`                                                                                     |
+| an operator `@netvark/keyset-core` does not have                                                 | `contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core`                                                                         |
+| an operator the keyset type does not accept, or `isNull` on a non-null field                     | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                                                                              |
+| empty or repeated operations, or `update` with no member writable on update                      | `contacts.operations: update needs a field or relationship writable on update`                                                                              |
+| a sort entry that is not sortable                                                                | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                                                          |
+| a search column that is not `tsvector`, or a config mismatch or omission                         | `contacts.search.config: the column is generated with config "simple"`                                                                                      |
+| a page default above the max page size                                                           | `contacts.page.default: 200 exceeds the max page size 100`                                                                                                  |
+| a CHECK without a rule over written columns and no validator (3.5)                               | `meetings.rules.meetings_contact_or_notes: a CHECK without a rule needs a validator`                                                                        |
+| a validator on a CHECK with a rule, or on another constraint kind                                | `contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already`                                                             |
+| a written field whose domain has an uncovered CHECK without a rule (3.6)                         | `contacts.fields.email: domain email's CHECK email_check has no rule; give it a validator in createDeclareResource domains`                                 |
+| a relationship column without the `_id` suffix and no `as`                                       | `notes.relationships.author: the column does not end in _id; set as`                                                                                        |
+| a derived name that is not a member name, is reserved, or collides (4.2)                         | `notes.fields.type: public name "type" is a member of every resource object; set as`                                                                        |
+| a name given with `as` that is not a member name, is reserved, or collides                       | `notes.fields.contact.as: "body" collides with fields.body`                                                                                                 |
+| a type that is not a member name or is a member of `Object.prototype`                            | `notes.as: "notes.v2" is not a JSON:API member name`                                                                                                        |
+| a cased letter outside the Basic Multilingual Plane after `_` (4.1)                              | `notes.fields.x_𐐨: a letter outside the Basic Multilingual Plane follows _, which Kysely's CamelCasePlugin leaves as is and TypeScript upper-cases; set as` |
+| a code that does not match `CODE_PATTERN`, or that another code repeats                          | `notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code`                                                              |
+| `code` on a key without a code (9.1)                                                             | `notes.rules.notes_pkey.code: the key has no code, since clients cannot violate it`                                                                         |
+| an `example` the field schema rejects                                                            | `contacts.fields.name.example: the field schema rejects the example`                                                                                        |
+| registry conflicts (4.2)                                                                         | `errorCatalog: code CONTACTS_EMAIL_UNIQUE is derived by contacts and users`                                                                                 |
 
 Tests: one case per row in the `declare-*.test.ts`, `create-declare-resource.test.ts`,
-`derive-names-errors.test.ts`, and `registry.test.ts` files; `e2e/resource/fails/` holds each
-compile-time form, matched by its text.
+`derive-names-errors.test.ts`, `define-codec.test.ts`, `define-validator.test.ts`, and
+`registry.test.ts` files; `e2e/resource/fails/` holds each compile-time form, matched by its text.
 
 ---
 
@@ -1407,6 +1436,15 @@ stern and 2.76 million on GitLab, 3 and 6.5 times the baseline. Four measures br
 - Unions of template literal types are named with an alias (`NotAMemberName`, `RiskyName`):
   TypeScript 7 instantiates an inline union in a conditional's `extends` clause again on every
   evaluation, which cost 4 to 7 times as much.
+
+With section 7, the same declarations take real codecs and validators. stern's `vector` codec
+carries numbers as a JSON array, and its six CHECKs without a rule share three validators over pairs
+of relationships; the GitLab slice's `bytea` codec carries base64, and one stand-in validator covers
+its 73 CHECKs. Every fixture passed its own schema at startup, and every one of stern's 12 validator
+fixtures and the 4 codec fixtures gave the same verdict, or the same value after a round trip,
+through PostgreSQL 18.3 (PGlite with pgvector), as `rules --check` will run them. Zod's types added
+0.7 percent instantiations on stern and 0.2 percent on GitLab, and 10 MB and 13 MB of peak memory
+for parsing Zod's own declarations; check time did not change.
 
 ### 15.6 The Zod floor
 

@@ -8,11 +8,13 @@
 import { createDeclareResource } from '@netvark/resource-core';
 
 import { publicCatalog } from '../fixtures/contacts/public-catalog.ts';
+import { codecs } from './codecs.ts';
+import { validators } from './validators.ts';
 
 export const declareResource = createDeclareResource({
   catalog: publicCatalog,
-  codecs: { timeRange: { types: ['tstzrange'] } },
-  validators: { email: {}, lowercase: {}, contactOrNotes: {} },
+  codecs,
+  validators,
   scopes: { organization: { column: 'organization_id' } },
   domains: {
     email: { email_check: { validator: 'email' } },

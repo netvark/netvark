@@ -8,17 +8,20 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 [`docs/resource/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/resource/SPEC.md).
 
 Status: in development and unreleased. This line implements the definer, the declaration, and the
-public names and codes derived from it (SPEC sections 2 to 4). Zod schemas, the error catalog,
-`defineCodec` and `defineValidator`, messages, the `server` subpath, and OpenAPI follow;
+public names and codes derived from it, and `defineCodec` and `defineValidator` (SPEC sections 2 to
+4 and 7). Zod schemas, the error catalog, messages, the `server` subpath, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
 ## Install
 
 ```bash
-pnpm add @netvark/resource-core
+pnpm add @netvark/resource-core zod
 pnpm add -D @netvark/pg-catalog @electric-sql/pglite
 ```
+
+`zod` 4.5 or later is a peer dependency: the first 4.x release whose `.max()` counts code points, as
+PostgreSQL's `char_length` does. Schemas from `zod` and `zod/mini` both work.
 
 Node 22.12+, Bun, Deno, Cloudflare Workers, and browsers are supported. Nothing in the package
 imports a framework, a query builder, a driver, or a Node.js module, and declarations reach browsers
@@ -44,18 +47,21 @@ export default defineExtraction({
 });
 ```
 
-Configure the definer once, in the module the declarations import:
+Configure the definer once, in the module the declarations import, with the codecs and validators of
+[Codecs and validators](#codecs-and-validators):
 
 ```ts
 // resources/declare-resource.ts
 import { createDeclareResource } from '@netvark/resource-core';
 
 import { publicCatalog } from '../public-catalog';
+import { codecs } from './codecs';
+import { validators } from './validators';
 
 export const declareResource = createDeclareResource({
   catalog: publicCatalog,
-  codecs: { timeRange: { types: ['tstzrange'] } },
-  validators: { email: {}, lowercase: {}, contactOrNotes: {} },
+  codecs,
+  validators,
   scopes: { organization: { column: 'organization_id' } },
   domains: { email: { email_check: { validator: 'email' } } },
   links: { base: '/api' },
@@ -92,26 +98,24 @@ Contacts.declaration.fields.name.sort; // true, frozen as given
 Contacts.names.fields.get('createdAt'); // 'created_at'
 ```
 
-Until `defineCodec` and `defineValidator` land, a codec is `{ types }`, the catalog types it
-accepts, and a validator is any object; only their names are checked against the declarations.
-
 ## What `tsc` checks
 
-| Option          | Rule                                                                                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `catalog`       | the public catalog (`toPublicCatalog`), never the full one                                                                                                                     |
-| `table`         | a table of the public catalog, with a single-column primary key whose type can carry a resource id (not `json` or `jsonb`)                                                     |
-| `fields`        | columns of the table, other than the primary key, a foreign-key column, the scope column, and a `tsvector`                                                                     |
-| `access`        | what the column allows (a generated column and an identity `ALWAYS` column are `read`, an identity `BY DEFAULT` column is `read` or `immutable`) and what the operations write |
-| `codec`         | a codec of the definer that accepts the column's type; a column without a wire form, such as `tstzrange` or `bytea`, needs one                                                 |
-| `relationships` | single-column foreign keys to the primary key of a public table, of a type that can carry a resource id; the scope column is `read` only                                       |
-| `operations`    | non-empty, without repeats; `update` needs a member writable on update                                                                                                         |
-| `scope`         | a scope of the definer whose column the table has                                                                                                                              |
-| `clientIds`     | a primary key that accepts a client value: not a generated column and not an identity `ALWAYS` column                                                                          |
-| `search`        | a `tsvector` column; `config` equals the one the column is generated with, or is given                                                                                         |
-| `sort.default`  | fields declared with `sort: true`                                                                                                                                              |
-| `rules`         | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on a CHECK without a translated rule, and required on every such CHECK over a written column   |
-| `domains`       | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
+| Option                 | Rule                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `catalog`              | the public catalog (`toPublicCatalog`), never the full one                                                                                                                     |
+| `table`                | a table of the public catalog, with a single-column primary key whose type can carry a resource id (not `json` or `jsonb`)                                                     |
+| `fields`               | columns of the table, other than the primary key, a foreign-key column, the scope column, and a `tsvector`                                                                     |
+| `access`               | what the column allows (a generated column and an identity `ALWAYS` column are `read`, an identity `BY DEFAULT` column is `read` or `immutable`) and what the operations write |
+| `codec`                | a codec of the definer that accepts the column's type; a column without a wire form, such as `tstzrange` or `bytea`, needs one                                                 |
+| `relationships`        | single-column foreign keys to the primary key of a public table, of a type that can carry a resource id; the scope column is `read` only                                       |
+| `operations`           | non-empty, without repeats; `update` needs a member writable on update                                                                                                         |
+| `scope`                | a scope of the definer whose column the table has                                                                                                                              |
+| `clientIds`            | a primary key that accepts a client value: not a generated column and not an identity `ALWAYS` column                                                                          |
+| `search`               | a `tsvector` column; `config` equals the one the column is generated with, or is given                                                                                         |
+| `sort.default`         | fields declared with `sort: true`                                                                                                                                              |
+| `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on a CHECK without a translated rule, and required on every such CHECK over a written column   |
+| `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
+| `codecs`, `validators` | values `defineCodec` and `defineValidator` made, never objects written by hand; each fixture typed by its schema's input                                                       |
 
 A member the grammar does not have is an error anywhere: `fields: { name: { sortable: true } }`
 fails with `"sortable" is not a member of a field declaration`.
@@ -161,6 +165,69 @@ export const Meetings = declareResource('meetings', {
 
 Its declared return type is `void` on purpose: TypeScript then infers each declaration without first
 inferring its targets, which is what keeps mutual references free of TS7022 (SPEC 3.8).
+
+## Codecs and validators
+
+A column whose type has no wire form, such as `tstzrange`, `bytea`, or pgvector's `vector`, names a
+codec: the public schema of its values. A CHECK the catalog cannot translate into a rule names a
+validator: its twin in Zod. Both carry fixtures, examples their schema must accept (and, for a
+validator, reject), checked when the module loads; without them the call does not compile (SPEC 7,
+ADR 0006).
+
+```ts
+// resources/codecs.ts
+
+import { z } from 'zod';
+
+import { defineCodec } from '@netvark/resource-core';
+
+const instant = z.iso.datetime({ offset: true });
+
+export const codecs = {
+  timeRange: defineCodec({
+    types: ['tstzrange'],
+    schema: z
+      .object({ start: instant, end: instant })
+      .refine(({ start, end }) => Date.parse(start) < Date.parse(end)),
+    fixtures: [{ start: '2026-03-02T09:00:00Z', end: '2026-03-02T10:30:00Z' }],
+  }),
+};
+```
+
+```ts
+// resources/validators.ts: twins of CHECK (room = lower(room))
+// and CHECK (contact_id IS NOT NULL OR notes IS NOT NULL)
+
+import { z } from 'zod';
+
+import { defineValidator } from '@netvark/resource-core';
+
+export const validators = {
+  lowercase: defineValidator({
+    schema: z
+      .string()
+      .refine((value) => value === value.toLowerCase())
+      .nullable(),
+    fixtures: { accept: ['lobby-2', null], reject: ['Lobby-2'] },
+  }),
+  contactOrNotes: defineValidator({
+    schema: z
+      .object({
+        contact: z.object({ type: z.literal('contacts'), id: z.uuid() }).nullable(),
+        notes: z.string().nullable(),
+      })
+      .refine(({ contact, notes }) => contact !== null || notes !== null),
+    fixtures: {
+      accept: [{ contact: null, notes: 'Bring the signed contract.' }],
+      reject: [{ contact: null, notes: null }],
+    },
+  }),
+};
+```
+
+The storage adapter implements the other facet of each codec, typed by
+`StorageCodecs<typeof codecs>`: `read` and `write` between the parsed wire value and what the driver
+handles.
 
 ## Public names
 
@@ -236,6 +303,18 @@ Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`). SPEC 4
   CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z.
 - **Review names as API changes.** Snapshot `names` in a test, so a migration that renames a column
   shows up in review as the public name it changes.
+- **Write fixtures at the edges.** A fixture is an example and a test: give the boundary values, the
+  empty string, and `null` where the column allows it. A CHECK passes `NULL`, so the validator of a
+  nullable column must accept `null`. `pg-catalog rules --check` will run every fixture through the
+  database, so a regular expression or a case rule that disagrees with PostgreSQL shows up there.
+- **Keep validators to what PostgreSQL agrees on.** `lower()` beyond ASCII follows the database's
+  `LC_CTYPE`, and a regular expression's dialect differs in places; choose fixtures inside the
+  shared ground, and prefer a CHECK the catalog translates.
+- **Name a multi-column validator's members by their public names.** Its input is an object of the
+  CHECK's members, each relationship as its linkage, so one CHECK over different columns needs its
+  own validator.
+- **Keep schemas synchronous.** A check that needs the database or another service belongs in server
+  code, not in a validator.
 - **Cover every CHECK without a rule.** Name the validator in the declaration's `rules`, and a
   domain's once in the definer's `domains`; prefer CHECKs `@netvark/pg-catalog` translates (length,
   range, `IN`, `IS NOT NULL`, simple patterns), which need no code at all.

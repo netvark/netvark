@@ -89,7 +89,7 @@ export type UntypedDeclare = (
  */
 export function untypedDeclare(
   catalog: PublicCatalog = contactsCatalog,
-  config: Readonly<Record<string, unknown>> = catalog === contactsCatalog
+  config: object = catalog === contactsCatalog
     ? TEST_REGISTRIES
     : {
         codecs: TEST_REGISTRIES.codecs,

@@ -58,6 +58,12 @@
     "@netvark/jsonapi-core": "workspace:^",
     "@netvark/keyset-core": "workspace:^"
   },
+  "devDependencies": {
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "zod": "^4.5.0"
+  },
   "engines": {
     "node": ">=22.12.0"
   }

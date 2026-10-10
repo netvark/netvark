@@ -439,6 +439,9 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   packages/ban-core:
     devDependencies:
@@ -571,6 +574,10 @@ importers:
       '@netvark/keyset-core':
         specifier: workspace:^
         version: link:../keyset-core
+    devDependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
 packages:
 

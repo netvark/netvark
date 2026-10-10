@@ -11,7 +11,11 @@ import * as core from '@netvark/resource-core';
 
 describe('package surface (SPEC 1)', () => {
   it('@netvark/resource-core exports the documented values', () => {
-    expect(Object.keys(core).toSorted()).toEqual(['createDeclareResource']);
+    expect(Object.keys(core).toSorted()).toEqual([
+      'createDeclareResource',
+      'defineCodec',
+      'defineValidator',
+    ]);
   });
 
   it('resolves package.json through the exports map', async () => {
