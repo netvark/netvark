@@ -105,9 +105,10 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   declare only the columns clients need; an undeclared column is invisible to the API.
 - **Name your constraints.** `constraint contacts_email_unique unique (organization_id, email)`
   becomes `CONTACTS_EMAIL_UNIQUE`; an auto-generated name becomes a code you will want to rename
-  with `code`. Prefer a UNIQUE constraint to a bare unique index: the catalog lists constraints, so
-  only a constraint's violation gets a declared code, and an index's falls back to the generic 409
-  (map a partial unique index by name through `postgresMapper` if you need one).
+  with `code`. A unique index derives its code from its name too, partial or not, so name it like a
+  constraint. Only an index over an expression has none, and its violation falls back to the generic
+  409: prefer a `citext` column with a plain UNIQUE to a unique index on `lower(email)`, or map the
+  index by name through `postgresMapper`'s `constraints`.
 - **Let the database own defaults.** Never add a default to a schema or a form value; show
   `field.default.literal` as a placeholder and omit untouched fields, so the migration stays the
   only place a default lives.

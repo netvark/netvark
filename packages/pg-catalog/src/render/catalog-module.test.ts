@@ -12,7 +12,7 @@ import {
 } from './catalog-module';
 
 const tiny: Catalog = {
-  format: 1,
+  format: 2,
   schemas: ['public'],
   extensions: [],
   enums: { mood: ['happy', 'sad'] },
@@ -25,7 +25,7 @@ describe('renderCatalogModule (SPEC 9.1)', () => {
     expect(renderCatalogModule(tiny)).toBe(
       `${FILE_HEADER}
 export const catalog = {
-  "format": 1,
+  "format": 2,
   "schemas": [
     "public"
   ],
@@ -45,7 +45,7 @@ export const catalog = {
 
   it('binds the public slice as publicCatalog', () => {
     const text = renderPublicCatalogModule({
-      format: 1,
+      format: 2,
       enums: {},
       domains: {},
       tables: {},
@@ -84,9 +84,9 @@ describe('parseCatalogModule (SPEC 9.1)', () => {
     ['an empty file', ''],
     [
       'a module without the terminator',
-      'export const catalog = {"format": 1};',
+      'export const catalog = {"format": 2};',
     ],
-    ['a module without an assignment', '{"format": 1} as const;'],
+    ['a module without an assignment', '{"format": 2} as const;'],
   ])('fails with catalog_unreadable for %s', (_title, text) => {
     expect(() => parseCatalogModule(text)).toThrow(
       expect.objectContaining({
@@ -100,7 +100,7 @@ describe('parseCatalogModule (SPEC 9.1)', () => {
   it('fails with catalog_unreadable for invalid JSON, keeping the parse error as the cause', () => {
     let caught: unknown;
     try {
-      parseCatalogModule('export const catalog = {format: 1} as const;');
+      parseCatalogModule('export const catalog = {format: 2} as const;');
     } catch (error) {
       caught = error;
     }
@@ -128,12 +128,12 @@ describe('parseCatalogModule (SPEC 9.1)', () => {
 
   it('fails with catalog_format for another format, telling the reader to extract again', () => {
     expect(() =>
-      parseCatalogModule('export const catalog = {"format": 2} as const;'),
+      parseCatalogModule('export const catalog = {"format": 3} as const;'),
     ).toThrow(
       expect.objectContaining({
         code: 'catalog_format',
         message:
-          'the catalog module was written in format 2; this version reads format 1, so run pg-catalog extract again',
+          'the catalog module was written in format 3; this version reads format 2, so run pg-catalog extract again',
       }),
     );
   });

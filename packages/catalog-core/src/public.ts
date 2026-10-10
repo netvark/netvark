@@ -7,6 +7,7 @@ import type {
   Catalog,
   CatalogColumn,
   CatalogDomain,
+  CatalogIndex,
   CatalogTable,
   ColumnDefault,
   Constraint,
@@ -19,6 +20,7 @@ import type {
   PublicConstraint,
   PublicDomain,
   PublicTable,
+  PublicUniqueConstraint,
 } from './public-types';
 
 import { CATALOG_FORMAT } from './model';
@@ -76,6 +78,7 @@ function publicConstraint(constraint: Constraint): PublicConstraint {
         kind: 'unique',
         columns: constraint.columns,
         nullsDistinct: constraint.nullsDistinct,
+        partial: false,
       };
     }
     case 'foreignKey': {
@@ -99,13 +102,59 @@ function publicConstraint(constraint: Constraint): PublicConstraint {
   }
 }
 
+/** An index's key columns, or `null` when an element is an expression. */
+function keyColumns(index: CatalogIndex): ReadonlyArray<string> | null {
+  const columns = index.columns.filter((column) => column !== null);
+  return columns.length === index.columns.length ? columns : null;
+}
+
+/**
+ * The unique indexes that no constraint backs, as unique constraints (ADR
+ * 0009), in the catalog's order: PostgreSQL reports a violated one with
+ * its name in `constraint`, as it does a constraint. An index whose name a
+ * constraint of the table has stays out: either it is that constraint's
+ * own index, which PostgreSQL keeps under the constraint's name, or the
+ * constraint is a CHECK or FOREIGN KEY, which keeps the key. An index with
+ * an expression element stays out too, since the public catalog carries
+ * no expression.
+ * @ref https://www.postgresql.org/docs/18/protocol-error-fields.html ("indexes are treated as constraints")
+ * @ref https://www.postgresql.org/docs/18/sql-alterindex.html ("the constraint is renamed as well")
+ * @ref https://www.postgresql.org/docs/18/sql-altertable.html (USING INDEX: "the index will be renamed to match the constraint name")
+ */
+function uniqueIndexes(
+  table: CatalogTable,
+): Record<string, PublicUniqueConstraint> {
+  return Object.fromEntries(
+    Object.entries(table.indexes).flatMap(([name, index]) => {
+      const columns = keyColumns(index);
+      if (
+        !index.unique ||
+        columns === null ||
+        Object.hasOwn(table.constraints, name)
+      ) {
+        return [];
+      }
+      const constraint: PublicUniqueConstraint = {
+        kind: 'unique',
+        columns,
+        nullsDistinct: index.nullsDistinct,
+        partial: index.predicate !== null,
+      };
+      return [[name, constraint]];
+    }),
+  );
+}
+
 function publicTable(table: CatalogTable): PublicTable {
   return {
     schema: table.schema,
     name: table.name,
     primaryKey: table.primaryKey,
     columns: mapValues(table.columns, publicColumn),
-    constraints: mapValues(table.constraints, publicConstraint),
+    constraints: {
+      ...mapValues(table.constraints, publicConstraint),
+      ...uniqueIndexes(table),
+    },
   };
 }
 
@@ -181,8 +230,9 @@ function usedTypes(
 /**
  * The public catalog: the listed tables, in the catalog's order, with only
  * the facts a form needs, and the enums and domains their columns use.
- * Throws `TypeError` for a table the catalog does not hold or one listed
- * twice.
+ * Each table's constraints are its own, then its unique indexes that no
+ * constraint backs. Throws `TypeError` for a table the catalog does not
+ * hold or one listed twice.
  */
 export function toPublicCatalog(
   catalog: Catalog,

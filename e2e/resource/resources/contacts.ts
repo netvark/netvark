@@ -1,7 +1,9 @@
 /**
  * Contacts, scoped to the caller's organization: the server writes
  * `organization_id`, so its relationship is read-only. `search` is generated
- * with the `simple` configuration, which the declaration may restate.
+ * with the `simple` configuration, which the declaration may restate. The
+ * partial unique index `contacts_active_name_unique` takes a code like any
+ * constraint.
  */
 import { declareResource } from './declare-resource.ts';
 import { Organizations } from './organizations.ts';
@@ -32,6 +34,7 @@ export const Contacts = declareResource('contacts', {
   sort: { default: ['name', { field: 'created_at', direction: 'desc' }] },
   rules: {
     contacts_email_unique: { code: 'CONTACT_EMAIL_TAKEN' },
+    contacts_active_name_unique: { code: 'CONTACT_NAME_TAKEN' },
     contacts_name_not_null: { code: 'CONTACT_NAME_REQUIRED' },
   },
 });

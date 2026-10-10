@@ -117,6 +117,7 @@ export const ORGANIZATIONS_TABLE = {
       kind: 'unique',
       columns: ['slug'],
       nullsDistinct: true,
+      partial: false,
     },
   },
 } as const;

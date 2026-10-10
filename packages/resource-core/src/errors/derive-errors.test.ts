@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { untypedDeclare } from '../test-support/catalog-builder';
+import {
+  catalogOf,
+  column,
+  table,
+  untypedDeclare,
+} from '../test-support/catalog-builder';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
 import { check, conflict, missing, notNull } from '../test-support/errors';
@@ -172,6 +177,43 @@ describe('errors: the derived codes of a declared resource (SPEC 9.1)', () => {
       'CONTACTS_NAME_CHECK',
       'NAME_REQUIRED',
       'EMAIL_CHECK',
+    ]);
+  });
+
+  it('derives a code from a partial unique index as from a UNIQUE constraint, and takes the code a rule gives', () => {
+    const tools = table(
+      'tools',
+      {
+        id: column({ nullable: false }),
+        organization_id: column(),
+        name: column({ nullable: false }),
+      },
+      {
+        tools_pkey: { kind: 'primaryKey', columns: ['id'] },
+        tools_org_name_unique: {
+          kind: 'unique',
+          columns: ['organization_id', 'name'],
+          nullsDistinct: true,
+          partial: true,
+        },
+      },
+    );
+    const declareTools = untypedDeclare(catalogOf({ tools }));
+    const fields = { name: { access: 'readWrite' } };
+    expect(
+      declareTools('tools', { operations: ['get', 'create'], fields }).errors,
+    ).toEqual({
+      TOOLS_ORG_NAME_UNIQUE: conflict('unique', 'name'),
+      TOOLS_NAME_NOT_NULL: notNull('name'),
+    });
+    const renamed = declareTools('tools', {
+      operations: ['get', 'create'],
+      fields,
+      rules: { tools_org_name_unique: { code: 'TOOL_NAME_TAKEN' } },
+    });
+    expect(Object.keys(renamed.errors)).toEqual([
+      'TOOL_NAME_TAKEN',
+      'TOOLS_NAME_NOT_NULL',
     ]);
   });
 

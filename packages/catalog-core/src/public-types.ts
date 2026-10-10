@@ -2,7 +2,8 @@
  * The public catalog's types (SPEC 3, ADR 0005): the slice of the catalog a
  * browser may see. Each is the full type without the members a form does
  * not need: expressions, definitions, comments, collations, indexes, and
- * row security.
+ * row security. A unique index that no constraint backs appears among the
+ * constraints as a unique constraint (ADR 0009).
  * @packageDocumentation
  */
 import type { CATALOG_FORMAT, Identity, TypeKind } from './model';
@@ -40,11 +41,21 @@ export interface PublicPrimaryKeyConstraint {
   readonly columns: ReadonlyArray<string>;
 }
 
-/** A unique constraint, without its definition. */
+/**
+ * A unique constraint, or a unique index that no constraint backs (ADR
+ * 0009), without its definition.
+ */
 export interface PublicUniqueConstraint {
   readonly kind: 'unique';
   readonly columns: ReadonlyArray<string>;
   readonly nullsDistinct: boolean;
+  /**
+   * Whether a predicate limits uniqueness to some rows, as the `WHERE`
+   * clause of a partial unique index does. The predicate is an expression,
+   * so it stays private; a UNIQUE constraint is never partial.
+   * @ref https://www.postgresql.org/docs/18/indexes-partial.html
+   */
+  readonly partial: boolean;
 }
 
 /** A foreign key, without its actions, state, or definition. */

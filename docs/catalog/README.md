@@ -70,7 +70,8 @@ catalog.tables.contacts.constraints.contacts_name_length.rule;
   CHECK on every value. Anything else is `null`, which tells your API layer a validator must cover
   it.
 - **A public slice you choose.** The public catalog holds only the tables you list and only what a
-  form needs: types, nullability, defaults, rules. No expressions, policies, indexes, or comments.
+  form needs: types, nullability, defaults, rules, and every uniqueness rule, a unique index's
+  included. No expressions, policies, or comments.
 - **Kysely types from the same extraction.** Select types follow node-postgres's parsers (`int8` and
   `numeric` are strings, timestamps are `Date`), and insert types take what it can send (JSON as
   text), so the types match the rows you get back, and they can never disagree with the catalog.

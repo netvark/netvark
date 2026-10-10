@@ -194,6 +194,7 @@ export const CONTACTS_TABLE = {
       kind: 'unique',
       columns: ['organization_id', 'email'],
       nullsDistinct: true,
+      partial: false,
     },
     contacts_name_check: {
       kind: 'check',

@@ -135,8 +135,24 @@ export function accepts(rule: Rule, value: string | null, float = false): boolea
 Returns the slice a browser may see: only the listed tables, and of them only what a form needs:
 types, nullability, the default's `literal`, identity, generation kind, and constraints with their
 columns and rules. Expressions, definitions, comments, collations, indexes, and row security are
-dropped. `enums` and `domains` keep exactly the ones the kept columns use, through domains over
-domains. A table the catalog does not hold, or a table listed twice, throws `TypeError` naming it.
+dropped, but a unique index that no constraint backs follows the constraints as a unique one, keyed
+by its name, since PostgreSQL reports its violation the same way. Every unique constraint carries
+`partial`, true when a `WHERE` clause limits the rule to some rows; a unique index over an
+expression stays out. `enums` and `domains` keep exactly the ones the kept columns use, through
+domains over domains. A table the catalog does not hold, or a table listed twice, throws `TypeError`
+naming it.
+
+```ts
+const tools = toPublicCatalog(catalog, ['tools']).tables['tools'];
+tools?.constraints['tools_org_name_unique'];
+// { kind: 'unique', columns: ['organization_id', 'name'], nullsDistinct: true, partial: true }
+// from: create unique index tools_org_name_unique on tools (organization_id, name)
+//         where organization_id is not null;
+```
+
+- **Leave a partial rule to the database.** A unique constraint with `partial: true` holds only
+  among the rows its private predicate selects, so a client cannot tell whether a value breaks it;
+  check it on the server, or by the error it raises.
 
 ## `diffCatalogs(expected, actual)`
 
