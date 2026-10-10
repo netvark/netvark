@@ -1,6 +1,7 @@
-import { createBan } from 'ban-kit';
-import { problemDetails } from 'ban-kit/formats/problem-details';
 import { describe, expect, it } from 'vitest';
+
+import { createBan } from '@netvark/ban-core';
+import { problemDetails } from '@netvark/ban-core/formats/problem-details';
 
 import { errorDocument, jsonApiError } from './json-api-error';
 

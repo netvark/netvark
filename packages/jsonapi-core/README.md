@@ -1,4 +1,4 @@
-# jsonapi-kit
+# @netvark/jsonapi-core
 
 [JSON:API 1.1](https://jsonapi.org/format/1.1/) for any JavaScript runtime, framework-free. Declare
 a resource once; get typed query parsing, document building with compound documents and sparse
@@ -7,23 +7,24 @@ fieldsets, request document validation with JSON Pointers, content negotiation, 
 [Atomic Operations](https://jsonapi.org/ext/atomic/) extension, all as functions over plain values.
 Every rule is a cited clause of the specification; where the specification leaves a choice to the
 server, the choice is written down in
-[`docs/SPEC.md`](https://github.com/ali-issa/jsonapi-kit/blob/main/docs/SPEC.md).
+[`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
-Using [Hono](https://hono.dev)? [`hono-jsonapi`](https://www.npmjs.com/package/hono-jsonapi) wraps
-this package as middleware, validators, response helpers, and handlers, and re-exports all of it.
+Using [Hono](https://hono.dev)?
+[`@netvark/hono-jsonapi`](https://www.npmjs.com/package/hono-jsonapi) wraps this package as
+middleware, validators, response helpers, and handlers, and re-exports all of it.
 
 ## Install
 
 ```bash
-pnpm add jsonapi-kit
+pnpm add @netvark/jsonapi-core
 ```
 
-[`ban-kit`](https://github.com/ali-issa/ban-kit) is the one dependency: every error is a ban-kit
-error, so an application's catalog and this package's share one model (see Errors). Node 22.12+,
-Bun, Deno, and Cloudflare Workers are supported; the package uses web standards only (`URL`,
-`URLSearchParams`, `JSON`) and never reads the environment. Validators are accepted through
-[Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others) without
-importing any of them.
+[`@netvark/ban-core`](https://github.com/netvark/netvark) is the one dependency: every error is a
+@netvark/ban-core error, so an application's catalog and this package's share one model (see
+Errors). Node 22.12+, Bun, Deno, and Cloudflare Workers are supported; the package uses web
+standards only (`URL`, `URLSearchParams`, `JSON`) and never reads the environment. Validators are
+accepted through [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others)
+without importing any of them.
 
 ## Quick start
 
@@ -41,7 +42,7 @@ import {
   negotiate,
   parseQuery,
   resourceDocument,
-} from 'jsonapi-kit';
+} from '@netvark/jsonapi-core';
 
 const Articles = defineResource({
   type: 'articles',
@@ -175,7 +176,7 @@ Best practices:
 
   ```jsonc
   // .oxlintrc.json or an ESLint config
-  "no-restricted-imports": ["error", { "paths": [{ "name": "jsonapi-kit", "importNames": ["defineResource"], "message": "Import defineResource from resources/define.ts" }] }]
+  "no-restricted-imports": ["error", { "paths": [{ "name": "@netvark/jsonapi-core", "importNames": ["defineResource"], "message": "Import defineResource from resources/define.ts" }] }]
   ```
 
 - **Override only what deviates.** A builder written out wins over the derived one and the rest
@@ -303,11 +304,12 @@ const tags = parseToManyRelationshipDocument(await request.json(), { type: 'tags
 
 ### Errors
 
-Every error is a [ban-kit](https://github.com/ali-issa/ban-kit) `BanError` built by `jsonApiBan`,
-the package's ban-kit instance: a closed catalog (`ERROR_CATALOG` over ban-kit's built-ins) in which
-each `code` fixes `status` and `title`, rendered by ban-kit's JSON:API format. `jsonApiError` builds
-one error object; a list of `errorItem`s reports several problems at once, each object with its own
-identity and the response status the specification derives from them.
+Every error is a [@netvark/ban-core](https://github.com/netvark/netvark) `BanError` built by
+`jsonApiBan`, the package's @netvark/ban-core instance: a closed catalog (`ERROR_CATALOG` over
+@netvark/ban-core's built-ins) in which each `code` fixes `status` and `title`, rendered by
+@netvark/ban-core's JSON:API format. `jsonApiError` builds one error object; a list of `errorItem`s
+reports several problems at once, each object with its own identity and the response status the
+specification derives from them.
 
 ```ts
 throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
@@ -330,13 +332,14 @@ throw jsonApiError('METHOD_NOT_ALLOWED', { detail: 'Use POST', headers: { Allow:
 
 `isBanError` narrows a caught error; `error.status` is the response status, `error.headers` the
 headers it carries (`Allow`, `Vary`), `errorDocument(error)` the document to send, and
-`error.getResponse()` a bare `Response`. For a fetch handler, `jsonApiBan.handler()` is ban-kit's
-framework-free handler: it renders anything thrown (a `BanError` as is, everything else as a
-constant 500 that reveals nothing), adds `X-Error-Id` and `Cache-Control: no-store`, reads a W3C
-`traceparent` into `meta.traceId`, and calls `onReport` once with the thrown value as `cause`.
+`error.getResponse()` a bare `Response`. For a fetch handler, `jsonApiBan.handler()` is
+@netvark/ban-core's framework-free handler: it renders anything thrown (a `BanError` as is,
+everything else as a constant 500 that reveals nothing), adds `X-Error-Id` and
+`Cache-Control: no-store`, reads a W3C `traceparent` into `meta.traceId`, and calls `onReport` once
+with the thrown value as `cause`.
 
 ```ts
-import { fromRequest } from 'ban-kit';
+import { fromRequest } from '@netvark/ban-core';
 
 const handle = jsonApiBan.handler({
   onReport: (report) => logger.error({ err: report.cause }, report.error.title),
@@ -349,8 +352,8 @@ instance renders any `BanError`, so this package's errors go through it unchange
 application's errors carry `links.type` under its `docsBaseUrl`:
 
 ```ts
-import { createBan } from 'ban-kit';
-import { jsonApi } from 'ban-kit/formats/json-api';
+import { createBan } from '@netvark/ban-core';
+import { jsonApi } from '@netvark/ban-core/formats/json-api';
 
 const ban = createBan({
   errors: { ...ERROR_CATALOG, QUOTA_EXHAUSTED: { status: 429, title: 'Quota Exhausted' } },
@@ -379,16 +382,16 @@ const negotiation = negotiate(
 
 ### Atomic operations
 
-`jsonapi-kit/atomic` implements the extension over handlers you write per resource, typed by the
-definition. You own the transaction; the processor runs the operations in order inside it, resolves
-`lid` references to the ids earlier operations produced, builds `atomic:results` in operation order
-(or no document, for `204`), and points every error at the operation that failed. A rejected `run`
-rolls everything back. Whatever you hand the processor per request (here the `Request`) reaches
-`transaction` and every handler as `ctx`.
+`@netvark/jsonapi-core/atomic` implements the extension over handlers you write per resource, typed
+by the definition. You own the transaction; the processor runs the operations in order inside it,
+resolves `lid` references to the ids earlier operations produced, builds `atomic:results` in
+operation order (or no document, for `204`), and points every error at the operation that failed. A
+rejected `run` rolls everything back. Whatever you hand the processor per request (here the
+`Request`) reaches `transaction` and every handler as `ctx`.
 
 ```ts
-import type { ResourceHandlers } from 'jsonapi-kit/atomic';
-import { assertOperationsContentType, operationsProcessor } from 'jsonapi-kit/atomic';
+import type { ResourceHandlers } from '@netvark/jsonapi-core/atomic';
+import { assertOperationsContentType, operationsProcessor } from '@netvark/jsonapi-core/atomic';
 
 const articleHandlers: ResourceHandlers<typeof Articles, Transaction, Request> = {
   resource: Articles,
@@ -436,19 +439,19 @@ methods is the host's: the processor never sees the request method.
 
 ## Modules
 
-| Subpath              | What it holds                                                                                                                      |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `jsonapi-kit`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants |
-| `jsonapi-kit/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, and the operations document parser                                       |
+| Subpath                        | What it holds                                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-core`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants |
+| `@netvark/jsonapi-core/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, and the operations document parser                                       |
 
 ## Documentation
 
-- [`docs/DESIGN.md`](https://github.com/ali-issa/jsonapi-kit/blob/main/docs/DESIGN.md): what the
-  packages are, the principles, and the API by example
-- [`docs/SPEC.md`](https://github.com/ali-issa/jsonapi-kit/blob/main/docs/SPEC.md): the normative
-  contract, section by section, with the tests that prove it
-- [`docs/adr/`](https://github.com/ali-issa/jsonapi-kit/tree/main/docs/adr): the decisions,
-  including every choice the specification leaves to the server
+- [`docs/jsonapi/DESIGN.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/DESIGN.md):
+  what the packages are, the principles, and the API by example
+- [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md): the
+  normative contract, section by section, with the tests that prove it
+- [`docs/jsonapi/adr/`](https://github.com/netvark/netvark/tree/main/docs/jsonapi/adr): the
+  decisions, including every choice the specification leaves to the server
 
 ## License
 

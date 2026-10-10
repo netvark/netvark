@@ -1,4 +1,4 @@
-# kysely-keyset
+# @netvark/kysely-keyset
 
 Keyset pagination for [Kysely](https://kysely.dev) on PostgreSQL. Declare once what a collection can
 sort, filter, and search on, checked against your `DB` interface; then `paginate` any select query
@@ -7,17 +7,17 @@ timestamps. The page semantics are those of the JSON:API
 [Cursor Pagination profile](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/); every
 rule is a cited clause of the profile or the PostgreSQL manual, and every choice the profile leaves
 open is written down in
-[`docs/SPEC.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/SPEC.md).
+[`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md).
 
-This is the Kysely adapter of [`keyset-kit`](https://www.npmjs.com/package/keyset-kit), the
-database-free core. Everything the core exports is re-exported here, so an application imports from
-one package; what this package adds is `createDefineKeyset<DB>()`, `paginate`, and the two render
-functions that turn the core's plan into Kysely expressions.
+This is the Kysely adapter of [`@netvark/keyset-core`](https://www.npmjs.com/package/keyset-kit),
+the database-free core. Everything the core exports is re-exported here, so an application imports
+from one package; what this package adds is `createDefineKeyset<DB>()`, `paginate`, and the two
+render functions that turn the core's plan into Kysely expressions.
 
 ## Install
 
 ```bash
-pnpm add kysely-keyset kysely
+pnpm add @netvark/kysely-keyset kysely
 ```
 
 `kysely >= 0.28` is the peer dependency; the adapter targets PostgreSQL 14+ and PGlite through any
@@ -29,7 +29,7 @@ on Bun, Deno, and workerd.
 ## Quick start
 
 ```ts
-import { createDefineKeyset } from 'kysely-keyset';
+import { createDefineKeyset } from '@netvark/kysely-keyset';
 
 import type { DB } from './db'; // your Kysely database interface
 
@@ -240,7 +240,7 @@ const page = await contacts.paginate(query, request, {
 
 `plan` and `paginate` reject a bad request before any query runs, with one of the core's
 `KeysetError` classes: a stable `code`, the detail in fields, a constant message. A JSON:API layer
-on [`jsonapi-kit`](https://github.com/ali-issa/jsonapi-kit) maps them to the profile's error
+on [`@netvark/jsonapi-core`](https://github.com/netvark/netvark) maps them to the profile's error
 objects:
 
 ```ts
@@ -250,8 +250,8 @@ import {
   maxPageSizeExceededError,
   rangePaginationNotSupportedError,
   unsupportedSortError,
-} from 'jsonapi-kit';
-import { isKeysetError } from 'kysely-keyset';
+} from '@netvark/jsonapi-core';
+import { isKeysetError } from '@netvark/kysely-keyset';
 
 function toJsonApi(error: unknown): never {
   if (!isKeysetError(error)) throw error;
@@ -273,7 +273,7 @@ function toJsonApi(error: unknown): never {
 }
 ```
 
-With `jsonapi-kit`, the parsed query's `page` is the request's `page`, and the page is the
+With `@netvark/jsonapi-core`, the parsed query's `page` is the request's `page`, and the page is the
 document's input:
 `paginatedDocument(Contacts, { rows: page.rows, next: page.next, prev: page.prev, total: page.total, cursor: (row) => page.cursor(row) }, { url, query })`.
 Keep both definitions' page bounds equal, since each applies its own default and max.
@@ -323,12 +323,12 @@ Keep both definitions' page bounds equal, since each applies its own default and
 
 ## Documentation
 
-- [`docs/DESIGN.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/DESIGN.md): what the
-  packages are, the principles, and the API by example
-- [`docs/SPEC.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/SPEC.md): the normative
-  contract, section by section, with the tests that prove it
-- [`docs/adr/`](https://github.com/ali-issa/keyset-kit/tree/main/docs/adr): the decisions, including
-  every choice the profile leaves to the server
+- [`docs/keyset/DESIGN.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/DESIGN.md):
+  what the packages are, the principles, and the API by example
+- [`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md): the
+  normative contract, section by section, with the tests that prove it
+- [`docs/keyset/adr/`](https://github.com/netvark/netvark/tree/main/docs/keyset/adr): the decisions,
+  including every choice the profile leaves to the server
 
 ## License
 

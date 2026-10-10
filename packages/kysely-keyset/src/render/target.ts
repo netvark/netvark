@@ -10,7 +10,11 @@ import type { AliasableExpression } from 'kysely';
  * @ref https://www.postgresql.org/docs/current/functions-subquery.html (scalar subqueries)
  * @packageDocumentation
  */
-import type { AggregateTarget, ConcatTarget, Target } from 'keyset-kit';
+import type {
+  AggregateTarget,
+  ConcatTarget,
+  Target,
+} from '@netvark/keyset-core';
 
 import type { AnyExpressionBuilder, RenderContext } from '../types';
 

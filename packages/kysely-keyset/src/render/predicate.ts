@@ -15,7 +15,7 @@ import type {
   Predicate,
   Relation,
   TextSearchMode,
-} from 'keyset-kit';
+} from '@netvark/keyset-core';
 
 import type { AnyExpressionBuilder, RenderContext } from '../types';
 

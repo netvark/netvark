@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { findPostgresError, postgresMapper } from 'hono-ban/postgresql';
+import {
+  findPostgresError,
+  postgresMapper,
+} from '@netvark/hono-ban/postgresql';
 
 import {
   BUILTIN_ROWS,

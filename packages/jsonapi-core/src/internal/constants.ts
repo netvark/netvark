@@ -1,5 +1,5 @@
 /**
- * Shared constants. Every value here is named in `docs/SPEC.md` section 13.
+ * Shared constants. Every value here is named in `docs/jsonapi/SPEC.md` section 13.
  * @packageDocumentation
  */
 

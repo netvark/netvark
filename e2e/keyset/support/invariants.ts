@@ -6,7 +6,7 @@
  * several sorts, including ones with equal values and nulls, and several
  * page sizes.
  */
-import type { Page } from 'kysely-keyset';
+import type { Page } from '@netvark/kysely-keyset';
 
 import type { Harness } from './db.ts';
 import type { SortableField } from './schema.ts';

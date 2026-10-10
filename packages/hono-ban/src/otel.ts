@@ -1,1 +1,1 @@
-export * from 'ban-kit/otel';
+export * from '@netvark/ban-core/otel';

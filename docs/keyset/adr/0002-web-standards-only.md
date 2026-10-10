@@ -24,7 +24,7 @@ always backed by a plain `ArrayBuffer` (the `Bytes` type) so they satisfy `Buffe
 reads `process`, `Deno`, `Bun`, or `navigator`; the secret, the previous secrets, the TTL, and the
 clock (`now`, for tests) are options. Type-checking uses the `dom` lib for the web types rather than
 `@types/node`. The build is `platform: 'neutral'`. CI runs the unit and end-to-end suites on Node 22
-and 24 and the smoke module (`e2e/smoke/`) on Bun, Deno, and workerd through Miniflare.
+and 24 and the smoke module (`e2e/keyset/smoke/`) on Bun, Deno, and workerd through Miniflare.
 
 ## Consequences
 

@@ -7,7 +7,7 @@
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
  * @packageDocumentation
  */
-import type { BanError, ErrorItem } from 'ban-kit';
+import type { BanError, ErrorItem } from '@netvark/ban-core';
 
 import { errorItem, jsonApiError } from '../errors/json-api-error';
 

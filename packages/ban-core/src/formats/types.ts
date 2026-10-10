@@ -19,6 +19,6 @@ export interface ErrorFormat<TBody = unknown> {
     ctx: RenderContext,
   ): TBody;
   schema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
-  /** Schema of `renderErrors` bodies for the entry; `validationSchema()` in `ban-kit/openapi` reads it. */
+  /** Schema of `renderErrors` bodies for the entry; `validationSchema()` in `@netvark/ban-core/openapi` reads it. */
   errorsSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
 }

@@ -5,8 +5,9 @@
 import type { ErrorObject } from '../document/types';
 import type { AnyResource } from '../resource/types';
 
-import { isBanError } from 'ban-kit';
 import { expect } from 'vitest';
+
+import { isBanError } from '@netvark/ban-core';
 
 import { errorObjects } from '../errors/json-api-error';
 import { defineResource } from '../resource/define-resource';

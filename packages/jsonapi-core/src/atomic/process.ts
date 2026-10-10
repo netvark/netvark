@@ -1,6 +1,6 @@
 /**
  * `operationsProcessor()` (SPEC 11.1): the framework-free core of an
- * operations endpoint. The host (an HTTP adapter such as `hono-jsonapi`)
+ * operations endpoint. The host (an HTTP adapter such as `@netvark/hono-jsonapi`)
  * checks the method and the `Content-Type`, reads the JSON body, and hands
  * it here; the processor parses the document, runs every operation in
  * order inside the caller's transaction, and returns the results together
@@ -9,13 +9,13 @@
  * @ref https://jsonapi.org/ext/atomic/#processing-errors
  * @packageDocumentation
  */
-import type { ErrorItem } from 'ban-kit';
+import type { ErrorItem } from '@netvark/ban-core';
 
 import type { ExtensionDocument, JsonApiObject } from '../document/types';
 import type { OperationResult } from './execute';
 import type { AnyResourceHandlers, AtomicOptions } from './types';
 
-import { BanError, isBanError } from 'ban-kit';
+import { BanError, isBanError } from '@netvark/ban-core';
 
 import {
   ATOMIC_OPERATIONS_EXTENSION,

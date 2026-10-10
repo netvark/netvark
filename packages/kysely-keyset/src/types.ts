@@ -11,7 +11,7 @@ import type {
   KeysetRequestOf,
   Page,
   RelationsInit,
-} from 'keyset-kit';
+} from '@netvark/keyset-core';
 
 /**
  * The database shape rendering happens against: every table and column

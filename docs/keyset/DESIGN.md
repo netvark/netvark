@@ -1,17 +1,17 @@
-# keyset-kit: design
+# @netvark/keyset-core: design
 
-This document describes what keyset-kit and kysely-keyset are, the API they expose, and how they are
-built.
+This document describes what @netvark/keyset-core and @netvark/kysely-keyset are, the API they
+expose, and how they are built.
 
-Architecture decisions referenced as ADR-NNNN live in `docs/adr/`. The normative, clause-by-clause
-specification that implementers work from is `docs/SPEC.md`; this document explains the intent
-behind it. When the two disagree, fix one in the same PR.
+Architecture decisions referenced as ADR-NNNN live in `docs/keyset/adr/`. The normative,
+clause-by-clause specification that implementers work from is `docs/keyset/SPEC.md`; this document
+explains the intent behind it. When the two disagree, fix one in the same PR.
 
 ## 1. Purpose
 
-keyset-kit is the pagination layer between an API and a PostgreSQL database: a database-free core
-(`keyset-kit`) and a Kysely adapter (`kysely-keyset`) that re-exports it and adds the SQL
-(ADR-0004). They give an application:
+@netvark/keyset-core is the pagination layer between an API and a PostgreSQL database: a
+database-free core (`@netvark/keyset-core`) and a Kysely adapter (`@netvark/kysely-keyset`) that
+re-exports it and adds the SQL (ADR-0004). They give an application:
 
 1. one definition per collection, from which the request type, the validation, the seek predicate,
    the cursors, and the SQL all derive, so a client cannot sort, filter, or search on anything the
@@ -35,8 +35,9 @@ It is a library for teams who paginate large tables and want the hard cases hand
 - Teams on Kysely and PostgreSQL who want `paginate(query, request)` to be the whole story.
 - Teams on another query builder, a raw driver, or a client who want the planning, the cursors, and
   the page semantics without the SQL: the core hands them a plan to render.
-- Teams serving JSON:API who want the one published cursor profile, end to end: `jsonapi-kit` parses
-  the query and builds the document, keyset-kit runs the page in between.
+- Teams serving JSON:API who want the one published cursor profile, end to end:
+  `@netvark/jsonapi-core` parses the query and builds the document, @netvark/keyset-core runs the
+  page in between.
 
 ### Non-goals
 
@@ -82,9 +83,9 @@ It is a library for teams who paginate large tables and want the hard cases hand
 
 ## 3. The API by example
 
-The examples use `kysely-keyset`. `createDefineKeyset`, `paginate`, and the render functions are the
-adapter's; everything else is `keyset-kit`'s, and the core README shows the same flow without
-Kysely.
+The examples use `@netvark/kysely-keyset`. `createDefineKeyset`, `paginate`, and the render
+functions are the adapter's; everything else is `@netvark/keyset-core`'s, and the core README shows
+the same flow without Kysely.
 
 ### 3.1 Minimal
 
@@ -179,8 +180,8 @@ const request: KeysetRequestOf<typeof contacts> = {
 ```
 
 The filter is a tree, not a grammar (ADR-0005): an API layer builds it from its own syntax
-(`jsonapi-kit`'s parsed conditions map one to one). Values arrive as JSON or as the type's text
-form, because query strings carry text; a value the type does not accept is an
+(`@netvark/jsonapi-core`'s parsed conditions map one to one). Values arrive as JSON or as the type's
+text form, because query strings carry text; a value the type does not accept is an
 `InvalidFilterValueError` naming the field, the operator, and what was expected.
 
 ### 3.4 The plan
@@ -207,7 +208,7 @@ const page = await contacts.page(plan, rows, (row) => [row.keyset0, row.keyset1]
 `finishPage` takes the fetched rows (one more than the page size, to know whether a next page
 exists), reverses a backward page back into request order, signs a cursor per row, and decides
 `prev` and `next`. An empty page still links back to the cursors it came from, as the profile
-requires. `kysely-keyset`'s `paginate` does 3.4 and 3.5 in one call.
+requires. `@netvark/kysely-keyset`'s `paginate` does 3.4 and 3.5 in one call.
 
 ### 3.6 Errors to HTTP
 
@@ -232,15 +233,15 @@ try {
 ```
 
 Every request-time error is a `KeysetError` with a stable `code` and the detail in fields
-(ADR-0010). The example maps them to `jsonapi-kit`'s profile errors; any API layer does the same
-with its own catalog.
+(ADR-0010). The example maps them to `@netvark/jsonapi-core`'s profile errors; any API layer does
+the same with its own catalog.
 
 ## 4. Architecture
 
 ### 4.1 Modules
 
 ```
-keyset-kit (packages/keyset-kit/src)
+@netvark/keyset-core (packages/keyset-core/src)
   internal     base64url, Web Crypto, prototype-safe objects, canonical JSON, LIKE escaping
   definition   defineKeyset: vocabularies, field and relation validation, the definition
   filter       the tree, the operator table, value checks, condition and tree normalization
@@ -249,15 +250,16 @@ keyset-kit (packages/keyset-kit/src)
   page         page request resolution, page assembly
   cursor       the codec: sign, verify, rotate, expire, bind to context
   errors       the request-time error classes
-kysely-keyset (packages/kysely-keyset/src)
+@netvark/kysely-keyset (packages/kysely-keyset/src)
   define-keyset   createDefineKeyset<DB>(): names checked against DB, keysets with paginate
   paginate        the plan onto a select query: filter, total, seek, keys, order, limit
   render          targets and predicates as Kysely expressions
 ```
 
-Imports form a DAG from `internal` outward. Nothing in `keyset-kit` imports a database library; it
-has no dependencies. `kysely-keyset` imports `keyset-kit` and `kysely` and re-exports the core so
-applications see one package (ADR-0004). `import/no-cycle` is enforced.
+Imports form a DAG from `internal` outward. Nothing in `@netvark/keyset-core` imports a database
+library; it has no dependencies. `@netvark/kysely-keyset` imports `@netvark/keyset-core` and
+`kysely` and re-exports the core so applications see one package (ADR-0004). `import/no-cycle` is
+enforced.
 
 ### 4.2 Data flow for a page
 
@@ -302,18 +304,18 @@ database: `createDefineKeyset<DB>()` returns a definer whose `TypedKeysetInit` c
 
 ## 5. Decisions
 
-| ADR  | Decision                                                                                 |
-| ---- | ---------------------------------------------------------------------------------------- |
-| 0001 | Record architecture decisions                                                            |
-| 0002 | Web standards only; no ambient environment reads                                         |
-| 0003 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                           |
-| 0004 | Two packages: the database-free core `keyset-kit` and the Kysely adapter `kysely-keyset` |
-| 0005 | The filter is a typed tree with a per-type operator table                                |
-| 0006 | Cursors: HMAC-signed, versioned, bound to the request context, with expiry and rotation  |
-| 0007 | Sort-key values travel as text under private aliases                                     |
-| 0008 | The key is a mandatory tie-breaker; `NULLS LAST` forward, inverted on backward pages     |
-| 0009 | PostgreSQL first                                                                         |
-| 0010 | Typed error classes with constant messages; no ban-kit dependency                        |
-| 0011 | Definitions are validated at definition time, never at request time                      |
-| 0012 | Totals are an opt-in second query; the base query must be a plain selection              |
-| 0013 | Page size bounds, defaults, and range requests                                           |
+| ADR  | Decision                                                                                                    |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
+| 0001 | Record architecture decisions                                                                               |
+| 0002 | Web standards only; no ambient environment reads                                                            |
+| 0003 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                              |
+| 0004 | Two packages: the database-free core `@netvark/keyset-core` and the Kysely adapter `@netvark/kysely-keyset` |
+| 0005 | The filter is a typed tree with a per-type operator table                                                   |
+| 0006 | Cursors: HMAC-signed, versioned, bound to the request context, with expiry and rotation                     |
+| 0007 | Sort-key values travel as text under private aliases                                                        |
+| 0008 | The key is a mandatory tie-breaker; `NULLS LAST` forward, inverted on backward pages                        |
+| 0009 | PostgreSQL first                                                                                            |
+| 0010 | Typed error classes with constant messages; no @netvark/ban-core dependency                                 |
+| 0011 | Definitions are validated at definition time, never at request time                                         |
+| 0012 | Totals are an opt-in second query; the base query must be a plain selection                                 |
+| 0013 | Page size bounds, defaults, and range requests                                                              |

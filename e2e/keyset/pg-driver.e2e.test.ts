@@ -4,13 +4,13 @@
  * and the key values cast to text are identical to the in-process
  * dialect's, so cursors issued through either decode to the same values.
  */
-import type { CursorDecodeResult, CursorValue } from 'kysely-keyset';
+import type { CursorDecodeResult, CursorValue } from '@netvark/kysely-keyset';
 
 import type { Harness } from './support/db.ts';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createCursorCodec } from 'kysely-keyset';
+import { createCursorCodec } from '@netvark/kysely-keyset';
 
 import { openPglite, openPgOverSocket } from './support/db.ts';
 import { runInvariants } from './support/invariants.ts';

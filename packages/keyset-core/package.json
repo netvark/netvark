@@ -1,5 +1,5 @@
 {
-  "name": "keyset-kit",
+  "name": "@netvark/keyset-core",
   "version": "0.0.0",
   "description": "Keyset pagination for any JavaScript runtime: a typed filter AST with a per-type operator table, sort and page validation, HMAC-signed expiring cursors bound to the query, and a query plan a database adapter renders. Database-free.",
   "keywords": [
@@ -11,14 +11,14 @@
     "postgres",
     "seek"
   ],
-  "homepage": "https://github.com/ali-issa/keyset-kit/tree/main/packages/keyset-kit#readme",
-  "bugs": "https://github.com/ali-issa/keyset-kit/issues",
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/keyset-core#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
   "license": "MIT",
   "author": "Ali Issa (https://github.com/ali-issa)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ali-issa/keyset-kit.git",
-    "directory": "packages/keyset-kit"
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/keyset-core"
   },
   "files": [
     "dist",

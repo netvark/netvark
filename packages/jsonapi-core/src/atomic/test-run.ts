@@ -8,7 +8,7 @@ import type { OperationsProcessor, OperationsResultDocument } from './process';
 import type { Caller, Store } from './test-fixtures';
 import type { AtomicOptions } from './types';
 
-import { isBanError } from 'ban-kit';
+import { isBanError } from '@netvark/ban-core';
 
 import { errorObjects } from '../errors/json-api-error';
 import { CALLER, createProcessor } from './test-fixtures';

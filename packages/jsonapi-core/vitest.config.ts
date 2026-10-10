@@ -9,13 +9,13 @@ import { defineProject } from 'vitest/config';
  */
 const config: UserWorkspaceConfig = defineProject({
   test: {
-    name: 'jsonapi-kit',
+    name: '@netvark/jsonapi-core',
     include: ['src/**/*.test.ts'],
     environment: 'node',
     restoreMocks: true,
     // The conformance tests compile the vendored JSON:API schema with Ajv on
     // first use; on a two-core CI runner with coverage instrumentation and one
-    // worker per file that can pass Vitest's 5 s default. Same headroom as e2e/.
+    // worker per file that can pass Vitest's 5 s default. Same headroom as e2e/jsonapi/.
     testTimeout: 20_000,
     typecheck: {
       enabled: true,

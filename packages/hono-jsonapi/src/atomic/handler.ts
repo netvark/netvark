@@ -1,7 +1,7 @@
 /**
  * `atomicOperations()` (SPEC 11.1): a Hono handler for an operations
  * endpoint. It accepts `POST` with the extension declared, reads the
- * document, runs it through `operationsProcessor` from `jsonapi-kit`, and
+ * document, runs it through `operationsProcessor` from `@netvark/jsonapi-core`, and
  * answers with `atomic:results` or, when no operation produced data,
  * `204 No Content`.
  * @ref https://jsonapi.org/ext/atomic/#processing
@@ -10,13 +10,13 @@
  */
 import type { Context, Env, Handler } from 'hono';
 
-import type { AtomicOptions } from 'jsonapi-kit/atomic';
+import type { AtomicOptions } from '@netvark/jsonapi-core/atomic';
 
-import { jsonApiError } from 'jsonapi-kit';
+import { jsonApiError } from '@netvark/jsonapi-core';
 import {
   assertOperationsContentType,
   operationsProcessor,
-} from 'jsonapi-kit/atomic';
+} from '@netvark/jsonapi-core/atomic';
 
 import { readDocument } from '../body';
 import { respond } from '../respond';

@@ -1,8 +1,9 @@
-import type { ErrorItem } from 'ban-kit';
+import type { ErrorItem } from '@netvark/ban-core';
 
-import { createBan, isBanError } from 'ban-kit';
-import { jsonApi } from 'ban-kit/formats/json-api';
 import { describe, expect, it } from 'vitest';
+
+import { createBan, isBanError } from '@netvark/ban-core';
+import { jsonApi } from '@netvark/ban-core/formats/json-api';
 
 import { ERROR_CATALOG, ERROR_CODES } from './catalog';
 import {
@@ -106,7 +107,7 @@ describe('errorItem', () => {
     expect('location' in bare).toBe(false);
   });
 
-  it('keeps meta and the entry type link, and accepts ban-kit built-in codes', () => {
+  it('keeps meta and the entry type link, and accepts @netvark/ban-core built-in codes', () => {
     expect(
       errorItem('MAX_PAGE_SIZE_EXCEEDED', {
         detail: 'x',

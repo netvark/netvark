@@ -34,4 +34,4 @@ same data must be nested there. The question is only how the Problem Details for
 Callers who need a guaranteed nested object in Problem Details bodies use a single `meta` key of
 their own, for example `meta: { context: { ... } }`. The OpenAPI schema for Problem Details bodies
 keeps `additionalProperties: true`; the schema for the other two formats is closed. The normative
-field order and examples are in `docs/SPEC.md` section 7.1.
+field order and examples are in `docs/ban/SPEC.md` section 7.1.

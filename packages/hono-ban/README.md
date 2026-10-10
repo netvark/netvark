@@ -1,22 +1,23 @@
-# hono-ban
+# @netvark/hono-ban
 
 Structured, extensible HTTP errors for [Hono](https://hono.dev), built on
-[ban-kit](https://github.com/ali-issa/ban-kit/tree/main/packages/ban-kit#readme). One API for
-creating errors, one `onError` handler, and pluggable wire formats: RFC 9457 Problem Details,
+[@netvark/ban-core](https://github.com/netvark/netvark/tree/main/packages/ban-core#readme). One API
+for creating errors, one `onError` handler, and pluggable wire formats: RFC 9457 Problem Details,
 JSON:API, Google's AIP-193, and Stripe's error object are built in, and your own shape is a
 `defineFormat` call away.
 
-hono-ban is the Hono adapter: everything that does not need Hono lives in `ban-kit`, which it
-re-exports under the same subpaths, and its `createBan` adds `onError` for `app.onError()` and
-adopts Hono's `HTTPException`. Code that needs the same errors outside Hono imports `ban-kit`.
+@netvark/hono-ban is the Hono adapter: everything that does not need Hono lives in
+`@netvark/ban-core`, which it re-exports under the same subpaths, and its `createBan` adds `onError`
+for `app.onError()` and adopts Hono's `HTTPException`. Code that needs the same errors outside Hono
+imports `@netvark/ban-core`.
 
 ## Install
 
 ```bash
-pnpm add hono-ban hono
+pnpm add @netvark/hono-ban hono
 ```
 
-`ban-kit` comes along as a dependency.
+`@netvark/ban-core` comes along as a dependency.
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
 on Node 22 and 24 and a smoke test of every subpath on Bun, Deno, and workerd.
@@ -25,7 +26,7 @@ on Node 22 and 24 and a smoke test of every subpath on Bun, Deno, and workerd.
 
 ```ts
 import { Hono } from 'hono';
-import { createBan } from 'hono-ban';
+import { createBan } from '@netvark/hono-ban';
 
 const ban = createBan();
 
@@ -62,7 +63,7 @@ for any other `Error`.
 ### Guard and narrow
 
 ```ts
-import { assert } from 'hono-ban';
+import { assert } from '@netvark/hono-ban';
 
 const order = await orders.find(id);
 assert(order, () => ban.notFound(`Order ${id} does not exist`));
@@ -103,12 +104,12 @@ throw ban.ORDER_CONFLICT({
 
 ### Database errors
 
-`hono-ban/postgresql` maps a Postgres driver error to a catalog entry by SQLSTATE with constant
-client-facing text. It recognizes the errors of node-postgres, postgres.js, PGlite, Neon, and Bun,
-thrown directly or wrapped by Drizzle, Kysely, TypeORM, MikroORM, Slonik, or Sequelize:
+`@netvark/hono-ban/postgresql` maps a Postgres driver error to a catalog entry by SQLSTATE with
+constant client-facing text. It recognizes the errors of node-postgres, postgres.js, PGlite, Neon,
+and Bun, thrown directly or wrapped by Drizzle, Kysely, TypeORM, MikroORM, Slonik, or Sequelize:
 
 ```ts
-import { postgresMapper } from 'hono-ban/postgresql';
+import { postgresMapper } from '@netvark/hono-ban/postgresql';
 
 const ban = createBan({
   map: postgresMapper({
@@ -133,8 +134,8 @@ no row, such as a syntax error, a missing table, or a `RAISE EXCEPTION`, fall th
 constant 500 with `handled: false`. The full table and the precedence rules are in SPEC section
 6.10.
 
-How each driver's support is verified (versions are the pins in `e2e/package.json`; the dated matrix
-is in ADR 0015):
+How each driver's support is verified (versions are the pins in `e2e/ban/package.json`; the dated
+matrix is in ADR 0015):
 
 | Driver or ORM                                | Verified by                                                                                |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -148,7 +149,7 @@ is in ADR 0015):
 To put an application-authored `RAISE` message on the wire, compose your own `map`:
 
 ```ts
-import { findPostgresError, postgresMapper } from 'hono-ban/postgresql';
+import { findPostgresError, postgresMapper } from '@netvark/hono-ban/postgresql';
 
 const postgres = postgresMapper();
 const ban = createBan({
@@ -173,7 +174,7 @@ validates every attribute against its grammar, and knows RFC 9728 `resource_meta
 OAuth-protected resources.
 
 ```ts
-import { bearerChallenge } from 'hono-ban';
+import { bearerChallenge } from '@netvark/hono-ban';
 
 throw ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } });
 throw ban.unauthorized({
@@ -189,12 +190,12 @@ throw ban.unauthorized({
 throw ban.tooManyRequests({ headers: { 'Retry-After': '30' } });
 ```
 
-The full table with RFC references is in `docs/SPEC.md` section 3.1.
+The full table with RFC references is in `docs/ban/SPEC.md` section 3.1.
 
 ### Pick a format
 
 ```ts
-import { jsonApi } from 'hono-ban/formats/json-api';
+import { jsonApi } from '@netvark/hono-ban/formats/json-api';
 
 const ban = createBan({ format: jsonApi() });
 ```
@@ -225,7 +226,7 @@ match `[a-z][a-zA-Z0-9-_]+` and stay under 64 characters (`error_details.proto`)
 grammar (`order.id`, `UserId`) is dropped rather than sent.
 
 ```ts
-import { googleApi } from 'hono-ban/formats/google-api';
+import { googleApi } from '@netvark/hono-ban/formats/google-api';
 
 const ban = createBan({
   format: googleApi({ domain: 'orders.example.com' }),
@@ -268,7 +269,7 @@ no member for `meta`, the trace id, or the error id, which stays in the `X-Error
 validation error carries its first issue as `param`.
 
 ```ts
-import { stripe } from 'hono-ban/formats/stripe';
+import { stripe } from '@netvark/hono-ban/formats/stripe';
 
 const ban = createBan({ format: stripe(), docsBaseUrl: 'https://api.example.com/errors' });
 ```
@@ -295,7 +296,7 @@ becomes `error_description`, and `type` becomes `error_uri`. The end-to-end suit
 definition and checks it against its own schema.
 
 ```ts
-import { createBan, defineFormat } from 'hono-ban';
+import { createBan, defineFormat } from '@netvark/hono-ban';
 
 const oauth = defineFormat({
   name: 'oauth',
@@ -336,8 +337,8 @@ throw token.INVALID_GRANT('The refresh token has expired');
 
 ```ts
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
-import { errorResponses, validationResponse } from 'hono-ban/openapi';
-import { defaultHook } from 'hono-ban/zod';
+import { errorResponses, validationResponse } from '@netvark/hono-ban/openapi';
+import { defaultHook } from '@netvark/hono-ban/zod';
 
 const app = new OpenAPIHono({ defaultHook: defaultHook(ban) });
 
@@ -354,12 +355,13 @@ const route = createRoute({
 });
 ```
 
-Hooks for `@hono/zod-validator` (`hook` from `hono-ban/zod`), `@hono/valibot-validator`
-(`hono-ban/valibot`), and `@hono/standard-validator` (`hono-ban/standard-schema`) work the same way:
-they throw into `onError`, so validation failures get the same id, header, and report as every other
-error, rendered by the active format. Under the hood `ban.validation(issues, { location })` builds
-an `errors` list of items (`detail`, `path`, `reason`, `expected`, `received`); any factory accepts
-`errors` too, so several problems that did not come from a validator render the same way:
+Hooks for `@hono/zod-validator` (`hook` from `@netvark/hono-ban/zod`), `@hono/valibot-validator`
+(`@netvark/hono-ban/valibot`), and `@hono/standard-validator` (`@netvark/hono-ban/standard-schema`)
+work the same way: they throw into `onError`, so validation failures get the same id, header, and
+report as every other error, rendered by the active format. Under the hood
+`ban.validation(issues, { location })` builds an `errors` list of items (`detail`, `path`, `reason`,
+`expected`, `received`); any factory accepts `errors` too, so several problems that did not come
+from a validator render the same way:
 
 ```ts
 throw ban.badRequest('Two fields are wrong', {
@@ -391,7 +393,7 @@ Content-Type: application/problem+json
 
 ```ts
 import { trace } from '@opentelemetry/api';
-import { traceIdFromOtel } from 'hono-ban/otel';
+import { traceIdFromOtel } from '@netvark/hono-ban/otel';
 
 app.onError(
   ban.onError({
@@ -425,11 +427,12 @@ app.onError(
 
 ### Without Hono
 
-The instance `hono-ban` builds is a `ban-kit` instance with `onError` added. `ban.handler()` is the
-framework-free handler underneath, usable from any `fetch` handler with `fromRequest`:
+The instance `@netvark/hono-ban` builds is a `@netvark/ban-core` instance with `onError` added.
+`ban.handler()` is the framework-free handler underneath, usable from any `fetch` handler with
+`fromRequest`:
 
 ```ts
-import { createBan, fromRequest } from 'ban-kit';
+import { createBan, fromRequest } from '@netvark/ban-core';
 
 const ban = createBan();
 const handle = ban.handler();
@@ -445,45 +448,45 @@ export default {
 };
 ```
 
-The `ban-kit` README covers the core on its own, including `createBan({ adopt })` for recognizing
-other frameworks' exceptions the way `hono-ban` recognizes `HTTPException`.
+The `@netvark/ban-core` README covers the core on its own, including `createBan({ adopt })` for
+recognizing other frameworks' exceptions the way `@netvark/hono-ban` recognizes `HTTPException`.
 
 ## Modules
 
-| Import                                                                                                                                              | What it gives you                                                                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hono-ban`                                                                                                                                          | everything `ban-kit` exports, with `createBan` adding `onError`; plus `fromHttpException`, `assert`, `defineFormat`, `bearerChallenge`, `BanError`, `isBanError`, `problemDetails` |
-| `hono-ban/formats/problem-details`, `hono-ban/formats/json-api`, `hono-ban/formats/plain`, `hono-ban/formats/google-api`, `hono-ban/formats/stripe` | the built-in wire formats                                                                                                                                                          |
-| `hono-ban/zod`, `hono-ban/valibot`, `hono-ban/standard-schema`                                                                                      | validator hooks and issue converters                                                                                                                                               |
-| `hono-ban/openapi`                                                                                                                                  | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                         |
-| `hono-ban/otel`                                                                                                                                     | `traceIdFromOtel`                                                                                                                                                                  |
-| `hono-ban/postgresql`                                                                                                                               | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                        |
-| `hono-ban/testing`                                                                                                                                  | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                         |
+| Import                                                                                                                                                                                           | What it gives you                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/hono-ban`                                                                                                                                                                              | everything `@netvark/ban-core` exports, with `createBan` adding `onError`; plus `fromHttpException`, `assert`, `defineFormat`, `bearerChallenge`, `BanError`, `isBanError`, `problemDetails` |
+| `@netvark/hono-ban/formats/problem-details`, `@netvark/hono-ban/formats/json-api`, `@netvark/hono-ban/formats/plain`, `@netvark/hono-ban/formats/google-api`, `@netvark/hono-ban/formats/stripe` | the built-in wire formats                                                                                                                                                                    |
+| `@netvark/hono-ban/zod`, `@netvark/hono-ban/valibot`, `@netvark/hono-ban/standard-schema`                                                                                                        | validator hooks and issue converters                                                                                                                                                         |
+| `@netvark/hono-ban/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                                   |
+| `@netvark/hono-ban/otel`                                                                                                                                                                         | `traceIdFromOtel`                                                                                                                                                                            |
+| `@netvark/hono-ban/postgresql`                                                                                                                                                                   | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                                  |
+| `@netvark/hono-ban/testing`                                                                                                                                                                      | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                                   |
 
-Every subpath is the same module as the matching `ban-kit/<subpath>`; importing either is fine in
-one application. Other databases go through `createBan({ map })` the same way `hono-ban/postgresql`
-does: catalog entries with constant client-facing messages, never the driver's own text (a driver's
-detail line can contain the failing row).
+Every subpath is the same module as the matching `@netvark/ban-core/<subpath>`; importing either is
+fine in one application. Other databases go through `createBan({ map })` the same way
+`@netvark/hono-ban/postgresql` does: catalog entries with constant client-facing messages, never the
+driver's own text (a driver's detail line can contain the failing row).
 
 ## Documentation
 
-- [`docs/DESIGN.md`](https://github.com/ali-issa/ban-kit/blob/main/docs/DESIGN.md): goals, the full
-  API, architecture, security defaults, and roadmap
-- [`docs/SPEC.md`](https://github.com/ali-issa/ban-kit/blob/main/docs/SPEC.md): the normative
+- [`docs/ban/DESIGN.md`](https://github.com/netvark/netvark/blob/main/docs/ban/DESIGN.md): goals,
+  the full API, architecture, security defaults, and roadmap
+- [`docs/ban/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/ban/SPEC.md): the normative
   implementation specification (exact types, catalog, rendering rules, handler algorithm, validator
   mappings, packaging, test plan)
-- [`docs/adr/`](https://github.com/ali-issa/ban-kit/blob/main/docs/adr/): architecture decision
-  records
-- [`CONTRIBUTING.md`](https://github.com/ali-issa/ban-kit/blob/main/CONTRIBUTING.md): setup, quality
+- [`docs/ban/adr/`](https://github.com/netvark/netvark/blob/main/docs/ban/adr/): architecture
+  decision records
+- [`CONTRIBUTING.md`](https://github.com/netvark/netvark/blob/main/CONTRIBUTING.md): setup, quality
   gates, release process
 - [`CHANGELOG.md`](./CHANGELOG.md): what changed in each release, including the 2.0 migration notes
 
 ## Why
 
 Without a contract, error bodies drift: `{ message }` here, `{ error }` there, a Zod issue array
-somewhere else, and an OpenAPI document that describes none of them. hono-ban gives every error in a
-Hono app one shape, one id, and one place to observe it, while letting you choose which standard
-that shape follows.
+somewhere else, and an OpenAPI document that describes none of them. @netvark/hono-ban gives every
+error in a Hono app one shape, one id, and one place to observe it, while letting you choose which
+standard that shape follows.
 
 - **Typed catalog.** Every standard 4xx and 5xx status has a factory (`ban.notFound()`), and your
   own domain errors join the catalog with full inference (`ban.ORDER_CONFLICT()`).
@@ -501,12 +504,12 @@ that shape follows.
 - **Runs everywhere Hono runs.** Web standards only; no `process.env`, no Node-only APIs. ESM, and
   `hono` is the only peer dependency: the Zod, Valibot, Standard Schema, and OpenTelemetry modules
   are typed structurally and never import those packages.
-- **Not tied to Hono.** The core is `ban-kit`; a library, a worker, or a test renders the same
-  errors without the framework.
+- **Not tied to Hono.** The core is `@netvark/ban-core`; a library, a worker, or a test renders the
+  same errors without the framework.
 
 ## Comparison
 
-|                                         | hono-ban 2.0                                                    | hono-problem-details          | @hapi/boom |
+|                                         | @netvark/hono-ban 2.0                                           | hono-problem-details          | @hapi/boom |
 | --------------------------------------- | --------------------------------------------------------------- | ----------------------------- | ---------- |
 | Wire formats                            | RFC 9457, JSON:API, Google API (AIP-193), Stripe, plain, custom | RFC 9457                      | flat JSON  |
 | Typed error catalog with custom entries | yes                                                             | registry                      | no         |
@@ -514,7 +517,7 @@ that shape follows.
 | OpenAPI response helpers                | yes, derived from the format schema                             | yes                           | no         |
 | Error report hook with shared error id  | yes                                                             | no                            | no         |
 | Hono `HTTPException` interop            | adopts it                                                       | maps it                       | n/a        |
-| Usable without Hono                     | yes, through `ban-kit`                                          | no                            | yes        |
+| Usable without Hono                     | yes, through `@netvark/ban-core`                                | no                            | yes        |
 | Runtime                                 | web standards only                                              | web standards only            | Node       |
 
 ## License

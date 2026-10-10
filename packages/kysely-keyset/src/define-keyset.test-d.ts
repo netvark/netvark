@@ -1,6 +1,6 @@
 import type { Selectable } from 'kysely';
 
-import type { Page } from 'keyset-kit';
+import type { Page } from '@netvark/keyset-core';
 
 import type { Contacts, DB } from './test-support/db';
 

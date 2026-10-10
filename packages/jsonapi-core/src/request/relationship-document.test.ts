@@ -1,7 +1,8 @@
-import type { BanError } from 'ban-kit';
+import type { BanError } from '@netvark/ban-core';
 
-import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
+
+import { isBanError } from '@netvark/ban-core';
 
 import { errorObjects } from '../errors/json-api-error';
 import {

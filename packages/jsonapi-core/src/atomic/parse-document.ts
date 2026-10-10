@@ -6,7 +6,7 @@
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @packageDocumentation
  */
-import type { ErrorItem } from 'ban-kit';
+import type { ErrorItem } from '@netvark/ban-core';
 
 import type { Meta } from '../document/types';
 import type { ParseDocumentOptions } from './parse-support';

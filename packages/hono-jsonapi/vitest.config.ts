@@ -4,7 +4,7 @@ import { defineProject } from 'vitest/config';
 
 /**
  * The adapter's test project; the root `vitest.config.ts` runs it and owns
- * coverage. `jsonapi-kit` resolves to its source through the `source`
+ * coverage. `@netvark/jsonapi-core` resolves to its source through the `source`
  * condition (see tsconfig.json), so the tests run against the core as it is
  * edited and the combined coverage attributes core lines they execute.
  * @ref https://vitest.dev/guide/projects
@@ -20,7 +20,7 @@ const config: UserWorkspaceConfig = defineProject({
     },
   },
   test: {
-    name: 'hono-jsonapi',
+    name: '@netvark/hono-jsonapi',
     include: ['src/**/*.test.ts'],
     environment: 'node',
     restoreMocks: true,

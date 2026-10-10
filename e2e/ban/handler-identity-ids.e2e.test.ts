@@ -9,14 +9,19 @@
  */
 import type { Env } from 'hono';
 
-import type { Ban, EmptyCatalog, ErrorReport, HandlerOptions } from 'hono-ban';
+import type {
+  Ban,
+  EmptyCatalog,
+  ErrorReport,
+  HandlerOptions,
+} from '@netvark/hono-ban';
 
 import type { RunningServer } from './support/server';
 
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
+import { createBan } from '@netvark/hono-ban';
 
 import { startServer } from './support/server';
 

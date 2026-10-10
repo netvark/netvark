@@ -1,5 +1,5 @@
 {
-  "name": "jsonapi-kit",
+  "name": "@netvark/jsonapi-core",
   "version": "0.0.0",
   "description": "JSON:API 1.1 for any JavaScript runtime: resource definitions, documents, query parsing, request parsing, content negotiation, the Cursor Pagination profile, and the Atomic Operations extension. Framework-free.",
   "keywords": [
@@ -11,14 +11,14 @@
     "rest",
     "sparse-fieldsets"
   ],
-  "homepage": "https://github.com/ali-issa/jsonapi-kit/tree/main/packages/jsonapi-kit#readme",
-  "bugs": "https://github.com/ali-issa/jsonapi-kit/issues",
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/jsonapi-core#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
   "license": "MIT",
   "author": "Ali Issa (https://github.com/ali-issa)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ali-issa/jsonapi-kit.git",
-    "directory": "packages/jsonapi-kit"
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/jsonapi-core"
   },
   "files": [
     "dist",
@@ -57,7 +57,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "ban-kit": "^1.0.0"
+    "@netvark/ban-core": "workspace:^"
   },
   "devDependencies": {
     "ajv": "8.20.0",

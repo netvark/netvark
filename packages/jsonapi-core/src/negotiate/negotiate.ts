@@ -5,11 +5,11 @@
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-servers
  * @packageDocumentation
  */
-import type { BanError } from 'ban-kit';
+import type { BanError } from '@netvark/ban-core';
 
 import type { MediaRange, MediaType } from '../media-type/parse';
 
-import { isBanError } from 'ban-kit';
+import { isBanError } from '@netvark/ban-core';
 
 import { jsonApiError } from '../errors/json-api-error';
 import { isJsonApiMediaType, jsonApiParameters } from '../media-type/json-api';

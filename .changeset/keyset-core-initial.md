@@ -1,5 +1,5 @@
 ---
-'keyset-kit': minor
+'@netvark/keyset-core': minor
 ---
 
 First release: keyset pagination for any JavaScript runtime, database-free.

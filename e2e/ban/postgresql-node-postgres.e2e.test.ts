@@ -5,7 +5,7 @@ import {
   findPostgresError,
   postgresMapper,
   readPostgresFields,
-} from 'hono-ban/postgresql';
+} from '@netvark/hono-ban/postgresql';
 
 import {
   BUILTIN_ROWS,

@@ -1,4 +1,4 @@
-# hono-ban
+# @netvark/hono-ban
 
 ## 1.3.0
 

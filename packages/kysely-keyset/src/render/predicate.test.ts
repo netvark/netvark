@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 
-import type { ColumnTarget, Predicate } from 'keyset-kit';
+import type { ColumnTarget, Predicate } from '@netvark/keyset-core';
 
 import type { AnyDatabase } from '../types';
 

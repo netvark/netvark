@@ -9,13 +9,16 @@
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 
-import type { NegotiationOptions, NegotiationSuccess } from 'jsonapi-kit';
+import type {
+  NegotiationOptions,
+  NegotiationSuccess,
+} from '@netvark/jsonapi-core';
 
 import type { JsonApiEnv } from './types';
 
 import { createMiddleware } from 'hono/factory';
 
-import { negotiate } from 'jsonapi-kit';
+import { negotiate } from '@netvark/jsonapi-core';
 
 import { isJsonApiResponse, varyAccept } from './respond';
 

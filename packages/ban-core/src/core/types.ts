@@ -37,7 +37,7 @@ export type ErrorMapper<TErrors extends Catalog> = (
  * Adapter hook (SPEC 5.6): recognizes a framework's own exception and
  * returns the `BanError` standing for it, `undefined` for anything else.
  * Runs before `map`, in `from()` and in the handler, and what it returns
- * counts as handled. `hono-ban` installs one for Hono's `HTTPException`.
+ * counts as handled. `@netvark/hono-ban` installs one for Hono's `HTTPException`.
  */
 export type ErrorAdopter<TErrors extends Catalog> = (
   value: unknown,
@@ -116,7 +116,7 @@ export interface ErrorRequest {
 
 /**
  * `ban.handler()` options (SPEC 6.2). `TContext` is whatever the caller
- * passes as the handler's third argument (hono-ban passes the Hono
+ * passes as the handler's third argument (@netvark/hono-ban passes the Hono
  * `Context`); the callbacks receive it unchanged. It defaults to `void`, so
  * a handler called straight from `fetch` takes two arguments.
  */

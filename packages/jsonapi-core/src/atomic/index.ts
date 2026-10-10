@@ -1,7 +1,7 @@
 /**
- * jsonapi-kit/atomic: the Atomic Operations extension, framework-free. An
+ * `@netvark/jsonapi-core/atomic`: the Atomic Operations extension, framework-free. An
  * HTTP adapter checks the method and `Content-Type`, reads the body, and
- * hands it to the processor; `hono-jsonapi/atomic` does that for Hono.
+ * hands it to the processor; `@netvark/hono-jsonapi/atomic` does that for Hono.
  * @ref https://jsonapi.org/ext/atomic/
  * @packageDocumentation
  */

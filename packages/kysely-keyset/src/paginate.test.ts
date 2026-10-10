@@ -232,7 +232,7 @@ describe('paginate', () => {
       {},
     );
     const plan = await contacts.plan({});
-    const codec = await import('keyset-kit').then((m) =>
+    const codec = await import('@netvark/keyset-core').then((m) =>
       m.createCursorCodec(CONTACTS.cursor),
     );
     expect(await codec.decode(page.cursors[0]!, plan.context, 1)).toEqual({

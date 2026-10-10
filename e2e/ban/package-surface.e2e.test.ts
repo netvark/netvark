@@ -1,31 +1,31 @@
+import { Hono } from 'hono';
+import { afterAll, describe, expect, it } from 'vitest';
+
 /**
  * Package surface. Every subpath in SPEC section 1 must resolve through the
  * published `exports` map at runtime and export what the SPEC lists. The
  * imports below are value imports on purpose: a missing dist file or a wrong
  * `exports` entry fails here before any feature test runs.
  */
-import * as kit from 'ban-kit';
-import * as kitJsonApi from 'ban-kit/formats/json-api';
-import * as kitProblemDetails from 'ban-kit/formats/problem-details';
-import * as kitOpenapi from 'ban-kit/openapi';
-import * as kitTesting from 'ban-kit/testing';
-import * as kitZod from 'ban-kit/zod';
-import { Hono } from 'hono';
-import { afterAll, describe, expect, it } from 'vitest';
-
-import * as root from 'hono-ban';
-import * as googleApi from 'hono-ban/formats/google-api';
-import * as jsonApi from 'hono-ban/formats/json-api';
-import * as plain from 'hono-ban/formats/plain';
-import * as problemDetails from 'hono-ban/formats/problem-details';
-import * as stripe from 'hono-ban/formats/stripe';
-import * as openapi from 'hono-ban/openapi';
-import * as otel from 'hono-ban/otel';
-import * as postgres from 'hono-ban/postgresql';
-import * as standardSchema from 'hono-ban/standard-schema';
-import * as testing from 'hono-ban/testing';
-import * as valibot from 'hono-ban/valibot';
-import * as zod from 'hono-ban/zod';
+import * as kit from '@netvark/ban-core';
+import * as kitJsonApi from '@netvark/ban-core/formats/json-api';
+import * as kitProblemDetails from '@netvark/ban-core/formats/problem-details';
+import * as kitOpenapi from '@netvark/ban-core/openapi';
+import * as kitTesting from '@netvark/ban-core/testing';
+import * as kitZod from '@netvark/ban-core/zod';
+import * as root from '@netvark/hono-ban';
+import * as googleApi from '@netvark/hono-ban/formats/google-api';
+import * as jsonApi from '@netvark/hono-ban/formats/json-api';
+import * as plain from '@netvark/hono-ban/formats/plain';
+import * as problemDetails from '@netvark/hono-ban/formats/problem-details';
+import * as stripe from '@netvark/hono-ban/formats/stripe';
+import * as openapi from '@netvark/hono-ban/openapi';
+import * as otel from '@netvark/hono-ban/otel';
+import * as postgres from '@netvark/hono-ban/postgresql';
+import * as standardSchema from '@netvark/hono-ban/standard-schema';
+import * as testing from '@netvark/hono-ban/testing';
+import * as valibot from '@netvark/hono-ban/valibot';
+import * as zod from '@netvark/hono-ban/zod';
 
 import { startServer } from './support/server';
 
@@ -59,11 +59,11 @@ const CORE_ROOT = [
 ];
 
 describe('package surface', () => {
-  it('ban-kit root exports the SPEC section 1 values', () => {
+  it('@netvark/ban-core root exports the SPEC section 1 values', () => {
     expect(names(kit)).toEqual(sorted(CORE_ROOT));
   });
 
-  it('hono-ban root re-exports the core and adds the Hono members', () => {
+  it('@netvark/hono-ban root re-exports the core and adds the Hono members', () => {
     expect(names(root)).toEqual(sorted([...CORE_ROOT, 'fromHttpException']));
     expect(root.BanError).toBe(kit.BanError);
     expect(root.createBan).not.toBe(kit.createBan);
@@ -123,7 +123,7 @@ describe('package surface', () => {
     );
   });
 
-  it('hono-ban subpaths are the ban-kit modules', () => {
+  it('@netvark/hono-ban subpaths are the @netvark/ban-core modules', () => {
     expect(problemDetails.problemDetails).toBe(
       kitProblemDetails.problemDetails,
     );

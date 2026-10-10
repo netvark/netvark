@@ -1,7 +1,7 @@
 /**
  * In-process entry for Bun and Deno: the runtime under test hosts the app and
  * `app.request()` drives it, so both subpaths are loaded and executed by that
- * runtime. Both resolve `hono-jsonapi` and `jsonapi-kit` through
+ * runtime. Both resolve `@netvark/hono-jsonapi` and `@netvark/jsonapi-core` through
  * `node_modules` the way Node does; Deno 2 does so because `package.json`
  * puts it in manual `node_modules` mode.
  * @ref https://bun.com/docs/runtime/modules

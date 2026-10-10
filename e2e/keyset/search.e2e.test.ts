@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * in them never escape.
  * @ref https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES
  */
-import { UnsupportedSearchError } from 'kysely-keyset';
+import { UnsupportedSearchError } from '@netvark/kysely-keyset';
 
 import { openPglite } from './support/db.ts';
 import { composite, contacts, phrased, searchable } from './support/keysets.ts';

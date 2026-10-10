@@ -1,6 +1,11 @@
 import type { Env } from 'hono';
 
-import type { Ban, EmptyCatalog, ErrorReport, HandlerOptions } from 'hono-ban';
+import type {
+  Ban,
+  EmptyCatalog,
+  ErrorReport,
+  HandlerOptions,
+} from '@netvark/hono-ban';
 
 import type { FetchApp, RunningServer } from './support/server';
 
@@ -8,7 +13,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan, defineFormat, problemDetails } from 'hono-ban';
+import { createBan, defineFormat, problemDetails } from '@netvark/hono-ban';
 
 import { startServer } from './support/server';
 

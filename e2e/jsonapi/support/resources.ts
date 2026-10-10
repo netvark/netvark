@@ -3,13 +3,13 @@
  * handlers. Module-level so `typeof Articles` types the validators and
  * handlers everywhere.
  */
-import type { AnyResource } from 'jsonapi-kit';
+import type { AnyResource } from '@netvark/jsonapi-core';
 
 import type { ArticleRow, PersonRow, TagRow } from './store.ts';
 
 import { z } from 'zod';
 
-import { createDefineResource } from 'jsonapi-kit';
+import { createDefineResource } from '@netvark/jsonapi-core';
 
 export const BASE_URL = 'https://blog.example';
 

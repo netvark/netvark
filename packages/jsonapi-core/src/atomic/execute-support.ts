@@ -3,7 +3,7 @@
  * the lookups and checks the runners make before calling a handler.
  * @packageDocumentation
  */
-import type { BanError } from 'ban-kit';
+import type { BanError } from '@netvark/ban-core';
 
 import type { ResourceLinkage, ResourceObject } from '../document/types';
 import type { AnyResource } from '../resource/types';

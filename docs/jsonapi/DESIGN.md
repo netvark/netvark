@@ -1,17 +1,17 @@
-# jsonapi-kit: design
+# @netvark/jsonapi-core: design
 
-This document describes what jsonapi-kit and hono-jsonapi are, the API they expose, and how they are
-built.
+This document describes what @netvark/jsonapi-core and @netvark/hono-jsonapi are, the API they
+expose, and how they are built.
 
-Architecture decisions referenced as ADR-NNNN live in `docs/adr/`. The normative, clause-by-clause
-specification that implementers work from is `docs/SPEC.md`; this document explains the intent
-behind it. When the two disagree, fix one in the same PR.
+Architecture decisions referenced as ADR-NNNN live in `docs/jsonapi/adr/`. The normative,
+clause-by-clause specification that implementers work from is `docs/jsonapi/SPEC.md`; this document
+explains the intent behind it. When the two disagree, fix one in the same PR.
 
 ## 1. Purpose
 
-jsonapi-kit is the JSON:API layer for JavaScript servers: a framework-free core (`jsonapi-kit`) and
-a Hono adapter (`hono-jsonapi`) that re-exports it and adds the framework glue (ADR-0013). They give
-an application:
+@netvark/jsonapi-core is the JSON:API layer for JavaScript servers: a framework-free core
+(`@netvark/jsonapi-core`) and a Hono adapter (`@netvark/hono-jsonapi`) that re-exports it and adds
+the framework glue (ADR-0013). They give an application:
 
 1. one resource definition per type, from which field names, relationships, query capabilities,
    links, and validation all derive, so a response, a request check, and a query parser cannot
@@ -63,11 +63,11 @@ It is a library for teams who treat their JSON:API surface as a contract.
 6. **Web standards only. No ambient environment.** `URL`, `URLSearchParams`, `Response`, `btoa`;
    nothing reads `process` (ADR-0003).
 7. **One error model, shared with the application.** Every error is a
-   [ban-kit](https://github.com/ali-issa/ban-kit) `BanError`; `jsonapi-kit` depends on `ban-kit` and
-   on nothing else, imports no framework, and the adapter renders through `hono-ban`, so an
-   application's own catalog, this package's, and any other library's on ban-kit go through one
-   handler (ADR-0014). Validators arrive through Standard Schema; the types are vendored (ADR-0002,
-   ADR-0013).
+   [@netvark/ban-core](https://github.com/netvark/netvark) `BanError`; `@netvark/jsonapi-core`
+   depends on `@netvark/ban-core` and on nothing else, imports no framework, and the adapter renders
+   through `@netvark/hono-ban`, so an application's own catalog, this package's, and any other
+   library's on @netvark/ban-core go through one handler (ADR-0014). Validators arrive through
+   Standard Schema; the types are vendored (ADR-0002, ADR-0013).
 8. **Headers follow the body.** `Content-Type` parameters are derived from the document's `jsonapi`
    object; `Location` from the created resource's `self` link (ADR-0005).
 9. **Client input is hostile.** Prototype keys are rejected wherever a name becomes a key; lookups
@@ -76,8 +76,9 @@ It is a library for teams who treat their JSON:API surface as a contract.
 
 ## 3. The API by example
 
-The examples use `hono-jsonapi`. Every function in them that is not a Hono hook is `jsonapi-kit`'s,
-and the core README shows the same minimal server as a plain `fetch` handler.
+The examples use `@netvark/hono-jsonapi`. Every function in them that is not a Hono hook is
+`@netvark/jsonapi-core`'s, and the core README shows the same minimal server as a plain `fetch`
+handler.
 
 ### 3.1 Minimal
 
@@ -163,7 +164,7 @@ and `params` for links. Or it throws one 400 with every problem, which `errorHan
 }
 ```
 
-The `id` is the error id hono-ban also sends as `X-Error-Id` and hands to `onReport`.
+The `id` is the error id @netvark/hono-ban also sends as `X-Error-Id` and hands to `onReport`.
 
 ### 3.4 Request documents
 
@@ -197,24 +198,24 @@ from a handler is given the operation's pointer; every failure propagates after 
 ### 4.1 Modules
 
 ```
-jsonapi-kit (packages/jsonapi-kit/src)
+@netvark/jsonapi-core (packages/jsonapi-core/src)
   media-type   RFC 9110 parsing and serialization; the JSON:API media type and its parameters
   negotiate    the server negotiation rules as a pure function of two header values
-  errors       the catalog fragment, the ban-kit instance, jsonApiError and errorItem
+  errors       the catalog fragment, the @netvark/ban-core instance, jsonApiError and errorItem
   document     types, member names, serialization, builders, full linkage
   resource     defineResource and query capability resolution
   query        parseQuery and the family parsers
   pagination   the Cursor Pagination profile
   request      identifiers, resource documents, relationship documents
   atomic       the extension: processor, content type check, document parser, lids, executors
-hono-jsonapi (packages/hono-jsonapi/src)
+@netvark/hono-jsonapi (packages/hono-jsonapi/src)
   middleware, respond, body, validators, handlers; atomic/handler wraps the core processor
 ```
 
-Imports form a DAG from `internal` outward. Nothing in `jsonapi-kit` imports a framework; it imports
-`ban-kit` for the error class, the catalog shape, and the JSON:API format. `hono-jsonapi` imports
-`jsonapi-kit`, `hono`, and `hono-ban`, and re-exports the core so applications see one package
-(ADR-0013). `import/no-cycle` is enforced.
+Imports form a DAG from `internal` outward. Nothing in `@netvark/jsonapi-core` imports a framework;
+it imports `@netvark/ban-core` for the error class, the catalog shape, and the JSON:API format.
+`@netvark/hono-jsonapi` imports `@netvark/jsonapi-core`, `hono`, and `@netvark/hono-ban`, and
+re-exports the core so applications see one package (ADR-0013). `import/no-cycle` is enforced.
 
 ### 4.2 Data flow for a read
 
@@ -238,19 +239,20 @@ request ──jsonApi()──▶ 415 on bad parameters or unsupported ext
 
 ### 4.4 Error rendering
 
-Every error is a `BanError` from `jsonApiBan`, the package's ban-kit instance: `ERROR_CATALOG` over
-ban-kit's built-in catalog, rendered by ban-kit's JSON:API format with `mixedEntries` on so one
-document can combine entries. A parser accumulates `ErrorItem`s, each with the entry's identity and
-the occurrence's `detail` and address, and throws once; the response status is the shared entry's,
-else the "most generally applicable" one. Everything in the adapter throws: the validators,
-`jsonApi()`, `readDocument`, and `atomicOperations()`. Hono hands a thrown error to `app.onError`,
-where `errorHandler()`, a hono-ban handler over the same catalog, renders it with an error id in the
-header and the body, `Cache-Control: no-store`, the trace id from `traceparent`, and a report;
-Hono's `HTTPException` is adopted by status and anything else is a constant 500. Without
-`errorHandler()`, Hono's default handler still answers a thrown `BanError` through its
-`getResponse()`, so a rejection is a JSON:API document either way (ADR-0014). An application with
-entries of its own spreads `ERROR_CATALOG` into its `createBan` and installs that instance's
-`onError`; the package's errors render through it unchanged.
+Every error is a `BanError` from `jsonApiBan`, the package's @netvark/ban-core instance:
+`ERROR_CATALOG` over @netvark/ban-core's built-in catalog, rendered by @netvark/ban-core's JSON:API
+format with `mixedEntries` on so one document can combine entries. A parser accumulates
+`ErrorItem`s, each with the entry's identity and the occurrence's `detail` and address, and throws
+once; the response status is the shared entry's, else the "most generally applicable" one.
+Everything in the adapter throws: the validators, `jsonApi()`, `readDocument`, and
+`atomicOperations()`. Hono hands a thrown error to `app.onError`, where `errorHandler()`, a
+@netvark/hono-ban handler over the same catalog, renders it with an error id in the header and the
+body, `Cache-Control: no-store`, the trace id from `traceparent`, and a report; Hono's
+`HTTPException` is adopted by status and anything else is a constant 500. Without `errorHandler()`,
+Hono's default handler still answers a thrown `BanError` through its `getResponse()`, so a rejection
+is a JSON:API document either way (ADR-0014). An application with entries of its own spreads
+`ERROR_CATALOG` into its `createBan` and installs that instance's `onError`; the package's errors
+render through it unchanged.
 
 ### 4.5 Types
 
@@ -298,20 +300,20 @@ a cited clause with a test.
 
 ## 5. Decisions
 
-| ADR  | Decision                                                                                         |
-| ---- | ------------------------------------------------------------------------------------------------ |
-| 0001 | Record architecture decisions                                                                    |
-| 0002 | Validators through vendored Standard Schema types; `hono` is the adapter's peer dependency       |
-| 0003 | Web standards only; no ambient environment reads                                                 |
-| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                   |
-| 0005 | `Content-Type` parameters and `Location` are derived from the document                           |
-| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own (superseded) |
-| 0007 | The `filter` grammar                                                                             |
-| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                            |
-| 0009 | A closed error catalog over registered status codes                                              |
-| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing                     |
-| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas                       |
-| 0012 | Definitions are validated at definition time, never at request time                              |
-| 0013 | Two packages: the framework-neutral core `jsonapi-kit` and the Hono adapter `hono-jsonapi`       |
-| 0014 | Errors are ban-kit errors; the adapter renders through hono-ban; everything throws               |
-| 0015 | Resource links by convention: opt-in `base`, a configured definer, no implicit defaults          |
+| ADR  | Decision                                                                                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------- |
+| 0001 | Record architecture decisions                                                                                 |
+| 0002 | Validators through vendored Standard Schema types; `hono` is the adapter's peer dependency                    |
+| 0003 | Web standards only; no ambient environment reads                                                              |
+| 0004 | ESM only, TypeScript 7 `isolatedDeclarations`, erasable syntax                                                |
+| 0005 | `Content-Type` parameters and `Location` are derived from the document                                        |
+| 0006 | Thrown errors render in `errorHandler`; validators and `jsonApi()` answer their own (superseded)              |
+| 0007 | The `filter` grammar                                                                                          |
+| 0008 | Cursor pagination: bounds, defaults, link rebuilding, the profile URI                                         |
+| 0009 | A closed error catalog over registered status codes                                                           |
+| 0010 | Atomic operations: caller-owned transaction, lid scope, two-phase processing                                  |
+| 0011 | Conformance tests against the vendored JSON:API 1.0 schema with 1.1 deltas                                    |
+| 0012 | Definitions are validated at definition time, never at request time                                           |
+| 0013 | Two packages: the framework-neutral core `@netvark/jsonapi-core` and the Hono adapter `@netvark/hono-jsonapi` |
+| 0014 | Errors are @netvark/ban-core errors; the adapter renders through @netvark/hono-ban; everything throws         |
+| 0015 | Resource links by convention: opt-in `base`, a configured definer, no implicit defaults                       |

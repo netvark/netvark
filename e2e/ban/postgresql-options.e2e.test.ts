@@ -1,15 +1,20 @@
 import type { Env } from 'hono';
 
-import type { Ban, EmptyCatalog, ErrorReport, HandlerOptions } from 'hono-ban';
+import type {
+  Ban,
+  EmptyCatalog,
+  ErrorReport,
+  HandlerOptions,
+} from '@netvark/hono-ban';
 
 import type { RunningServer } from './support/server';
 
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { jsonApi } from 'hono-ban/formats/json-api';
-import { postgresMapper } from 'hono-ban/postgresql';
+import { createBan } from '@netvark/hono-ban';
+import { jsonApi } from '@netvark/hono-ban/formats/json-api';
+import { postgresMapper } from '@netvark/hono-ban/postgresql';
 
 import { compileWithAjv } from './support/ajv';
 import { startServer } from './support/server';

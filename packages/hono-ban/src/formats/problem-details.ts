@@ -1,1 +1,1 @@
-export * from 'ban-kit/formats/problem-details';
+export * from '@netvark/ban-core/formats/problem-details';

@@ -1,10 +1,11 @@
-# ban-kit 1.0 and hono-ban 2.0: implementation specification
+# @netvark/ban-core 1.0 and @netvark/hono-ban 2.0: implementation specification
 
-- Status: normative for the ban-kit 1.x and hono-ban 2.x lines; `docs/DESIGN.md` explains the why
+- Status: normative for the @netvark/ban-core 1.x and @netvark/hono-ban 2.x lines;
+  `docs/ban/DESIGN.md` explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. File references are relative to
-`packages/ban-kit/src/` unless they start with `packages/`. When this document and the code
+`packages/ban-core/src/` unless they start with `packages/`. When this document and the code
 disagree, fix one of them in the same pull request.
 
 Contents
@@ -30,43 +31,43 @@ Contents
 
 Two packages ship from this repository (ADR 0016):
 
-- `ban-kit` is the framework-free core: the catalog, `BanError`, the formats, the handler, and the
-  validation, OpenAPI, observability, Postgres, and testing modules. It has no dependencies and no
-  peer dependencies. Every integration types the third-party objects it receives structurally (ADR
-  0009), so installing `ban-kit` never pulls in or requires Hono, Zod, Valibot,
+- `@netvark/ban-core` is the framework-free core: the catalog, `BanError`, the formats, the handler,
+  and the validation, OpenAPI, observability, Postgres, and testing modules. It has no dependencies
+  and no peer dependencies. Every integration types the third-party objects it receives structurally
+  (ADR 0009), so installing `@netvark/ban-core` never pulls in or requires Hono, Zod, Valibot,
   `@standard-schema/spec`, `@hono/*` validators, `@opentelemetry/api`, a Postgres driver, or Ajv.
-- `hono-ban` is the Hono adapter. It depends on `ban-kit`, peers on `hono`, re-exports every
-  `ban-kit` subpath under its own name, and replaces `createBan` with one whose instances also carry
-  `onError` for `app.onError()` and adopt Hono's `HTTPException` (6.11).
+- `@netvark/hono-ban` is the Hono adapter. It depends on `@netvark/ban-core`, peers on `hono`,
+  re-exports every `@netvark/ban-core` subpath under its own name, and replaces `createBan` with one
+  whose instances also carry `onError` for `app.onError()` and adopt Hono's `HTTPException` (6.11).
 
-| Subpath                           | Exports                                                                                                                                                                                                                                                                                                                                   |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ban-kit`                         | `createBan`, `assert`, `defineFormat`, `problemDetails`, `bearerChallenge`, `fromRequest`, `isErrorStatus`, `reasonPhrase`, `resolveDefinition`, `BanError`, `isBanError`, `BUILTIN_CATALOG`, `FACTORY_NAMES`, `parseTraceparent`, `pointerFromPath`, `nameFromPath`, `locationFromTarget`, and every type in sections 2, 3.2, 4, 6, 7, 8 |
-| `ban-kit/formats/problem-details` | `problemDetails(options?)`, `PROBLEM_DETAILS_CONTENT_TYPE`, `ProblemDetailsOptions`, `ProblemDetailsBody`                                                                                                                                                                                                                                 |
-| `ban-kit/formats/json-api`        | `jsonApi(options?)`, `responseStatus(errors)`, `JSON_API_CONTENT_TYPE`, `JsonApiOptions`, `JsonApiDocumentMembers`, `JsonApiBody`, `JsonApiErrorObject`, `JsonApiLinks`, `JsonApiSource`                                                                                                                                                  |
-| `ban-kit/formats/google-api`      | `googleApi(options)`, `GOOGLE_API_CONTENT_TYPE`, `GoogleApiOptions`, `GoogleApiBody`, `GoogleApiStatus`, `GoogleApiDetail`, `GoogleApiErrorInfo`, `GoogleApiBadRequest`, `GoogleApiFieldViolation`, `GoogleApiRetryInfo`, `GoogleApiRequestInfo`, `GoogleApiDebugInfo`, `GoogleApiHelp`, `GoogleApiHelpLink`, `GoogleRpcCode`             |
-| `ban-kit/formats/stripe`          | `stripe(options?)`, `STRIPE_CONTENT_TYPE`, `StripeOptions`, `StripeBody`, `StripeErrorObject`, `StripeErrorType`                                                                                                                                                                                                                          |
-| `ban-kit/formats/plain`           | `plain()`, `PLAIN_CONTENT_TYPE`, `PlainBody`                                                                                                                                                                                                                                                                                              |
-| `ban-kit/zod`                     | `hook(ban)`, `defaultHook(ban)`, `fromZodError(ban, error, location, options?)`, `toIssues(error)`, `ZodIssueLike`, `ZodErrorLike`, `ZodHookResult`                                                                                                                                                                                       |
-| `ban-kit/valibot`                 | `hook(ban)`, `fromValibotIssues(ban, issues, location, options?)`, `toIssues(issues)`, `ValibotIssueLike`, `ValibotPathItemLike`, `ValibotHookResult`                                                                                                                                                                                     |
-| `ban-kit/standard-schema`         | `hook(ban)`, `fromIssues(ban, issues, location, options?)`, `toIssues(issues)`, `StandardHookResult`                                                                                                                                                                                                                                      |
-| `ban-kit/openapi`                 | `errorSchema`, `errorResponse`, `errorResponses`, `validationSchema`, `validationResponse`, `SchemaSource`, `OpenApiOptions`, `ResponseObject`, `MediaTypeObject`, `ErrorRef`                                                                                                                                                             |
-| `ban-kit/otel`                    | `traceIdFromOtel(source)`, `OtelSource`, `OtelTraceLike`, `OtelSpanLike`, `OtelSpanContextLike`                                                                                                                                                                                                                                           |
-| `ban-kit/postgresql`              | `postgresMapper(options?)`, `findPostgresError(value)`, `readPostgresFields(error)`, `PostgresMapOptions`, `PostgresMapping`, `PostgresIssue`, `PostgresIssueMapping`, `PostgresConstraintMapping`, `PostgresMapper`, `CatalogWith`, `PostgresErrorLike`, `PostgresErrorFields`                                                           |
-| `ban-kit/testing`                 | `renderError`, `expectBanError`, `assertFormatConformance`, `ExpectedError`, `ConformanceOptions`, `SchemaValidator`                                                                                                                                                                                                                      |
-| `hono-ban`                        | everything `ban-kit` exports, with `createBan`, `Ban`, `BanInstance`, `HandlerOptions`, `NoReserved`, and `ReservedKey` replaced by the Hono-aware versions (2.2), plus `fromHttpException` and `HonoMembers`                                                                                                                             |
-| `hono-ban/<subpath>`              | the same module object as `ban-kit/<subpath>`, for each subpath above                                                                                                                                                                                                                                                                     |
+| Subpath                                     | Exports                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/ban-core`                         | `createBan`, `assert`, `defineFormat`, `problemDetails`, `bearerChallenge`, `fromRequest`, `isErrorStatus`, `reasonPhrase`, `resolveDefinition`, `BanError`, `isBanError`, `BUILTIN_CATALOG`, `FACTORY_NAMES`, `parseTraceparent`, `pointerFromPath`, `nameFromPath`, `locationFromTarget`, and every type in sections 2, 3.2, 4, 6, 7, 8 |
+| `@netvark/ban-core/formats/problem-details` | `problemDetails(options?)`, `PROBLEM_DETAILS_CONTENT_TYPE`, `ProblemDetailsOptions`, `ProblemDetailsBody`                                                                                                                                                                                                                                 |
+| `@netvark/ban-core/formats/json-api`        | `jsonApi(options?)`, `responseStatus(errors)`, `JSON_API_CONTENT_TYPE`, `JsonApiOptions`, `JsonApiDocumentMembers`, `JsonApiBody`, `JsonApiErrorObject`, `JsonApiLinks`, `JsonApiSource`                                                                                                                                                  |
+| `@netvark/ban-core/formats/google-api`      | `googleApi(options)`, `GOOGLE_API_CONTENT_TYPE`, `GoogleApiOptions`, `GoogleApiBody`, `GoogleApiStatus`, `GoogleApiDetail`, `GoogleApiErrorInfo`, `GoogleApiBadRequest`, `GoogleApiFieldViolation`, `GoogleApiRetryInfo`, `GoogleApiRequestInfo`, `GoogleApiDebugInfo`, `GoogleApiHelp`, `GoogleApiHelpLink`, `GoogleRpcCode`             |
+| `@netvark/ban-core/formats/stripe`          | `stripe(options?)`, `STRIPE_CONTENT_TYPE`, `StripeOptions`, `StripeBody`, `StripeErrorObject`, `StripeErrorType`                                                                                                                                                                                                                          |
+| `@netvark/ban-core/formats/plain`           | `plain()`, `PLAIN_CONTENT_TYPE`, `PlainBody`                                                                                                                                                                                                                                                                                              |
+| `@netvark/ban-core/zod`                     | `hook(ban)`, `defaultHook(ban)`, `fromZodError(ban, error, location, options?)`, `toIssues(error)`, `ZodIssueLike`, `ZodErrorLike`, `ZodHookResult`                                                                                                                                                                                       |
+| `@netvark/ban-core/valibot`                 | `hook(ban)`, `fromValibotIssues(ban, issues, location, options?)`, `toIssues(issues)`, `ValibotIssueLike`, `ValibotPathItemLike`, `ValibotHookResult`                                                                                                                                                                                     |
+| `@netvark/ban-core/standard-schema`         | `hook(ban)`, `fromIssues(ban, issues, location, options?)`, `toIssues(issues)`, `StandardHookResult`                                                                                                                                                                                                                                      |
+| `@netvark/ban-core/openapi`                 | `errorSchema`, `errorResponse`, `errorResponses`, `validationSchema`, `validationResponse`, `SchemaSource`, `OpenApiOptions`, `ResponseObject`, `MediaTypeObject`, `ErrorRef`                                                                                                                                                             |
+| `@netvark/ban-core/otel`                    | `traceIdFromOtel(source)`, `OtelSource`, `OtelTraceLike`, `OtelSpanLike`, `OtelSpanContextLike`                                                                                                                                                                                                                                           |
+| `@netvark/ban-core/postgresql`              | `postgresMapper(options?)`, `findPostgresError(value)`, `readPostgresFields(error)`, `PostgresMapOptions`, `PostgresMapping`, `PostgresIssue`, `PostgresIssueMapping`, `PostgresConstraintMapping`, `PostgresMapper`, `CatalogWith`, `PostgresErrorLike`, `PostgresErrorFields`                                                           |
+| `@netvark/ban-core/testing`                 | `renderError`, `expectBanError`, `assertFormatConformance`, `ExpectedError`, `ConformanceOptions`, `SchemaValidator`                                                                                                                                                                                                                      |
+| `@netvark/hono-ban`                         | everything `@netvark/ban-core` exports, with `createBan`, `Ban`, `BanInstance`, `HandlerOptions`, `NoReserved`, and `ReservedKey` replaced by the Hono-aware versions (2.2), plus `fromHttpException` and `HonoMembers`                                                                                                                   |
+| `@netvark/hono-ban/<subpath>`               | the same module object as `@netvark/ban-core/<subpath>`, for each subpath above                                                                                                                                                                                                                                                           |
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
 `*.test-d.ts`. Type-only and data-only modules (`types.ts`, `context.ts`, `internal.ts`,
 `report.ts`, `resolve.ts`, `hook.ts`, `schema-helpers.ts`) are covered through their consumers;
 coverage thresholds apply to both packages' `src/`. Imports form a DAG (`import/no-cycle` is
-enforced, type-only imports included). `packages/hono-ban/src` imports `ban-kit` by package name; in
-the repository the `source` export condition resolves it to `packages/ban-kit/src` for tests and
-type checks, and the published build resolves it to `ban-kit`'s `dist/`.
+enforced, type-only imports included). `packages/hono-ban/src` imports `@netvark/ban-core` by
+package name; in the repository the `source` export condition resolves it to `packages/ban-core/src`
+for tests and type checks, and the published build resolves it to `@netvark/ban-core`'s `dist/`.
 
 ```
-packages/ban-kit/src/
+packages/ban-core/src/
   index.ts                     root entry
   internal/
     constants.ts               section 13
@@ -139,10 +140,10 @@ packages/ban-kit/src/
   test-support/postgresql-fixtures.ts   driver-shaped fixtures; not published
 
 packages/hono-ban/src/
-  index.ts                     export * from 'ban-kit', then the Hono-aware createBan and types (2.2)
+  index.ts                     export * from '@netvark/ban-core', then the Hono-aware createBan and types (2.2)
   create-ban.ts                createBan(): wraps the core with the HTTPException adopter and adds onError (6.11)
   http-exception.ts            fromHttpException(), passthroughResponse(), MALFORMED_JSON_MESSAGE (6.11)
-  formats/<name>.ts, <name>.ts one-line re-exports of each ban-kit subpath
+  formats/<name>.ts, <name>.ts one-line re-exports of each @netvark/ban-core subpath
   hooks.test-d.ts              validator hook types against the @hono/* middleware (8.4)
   validators.test.ts           zValidator, vValidator, sValidator, and OpenAPIHono through onError (8.4)
   openapi.test.ts              the generated @hono/zod-openapi document (section 9)
@@ -299,7 +300,7 @@ non-standard 499 relies on. 1xx, 2xx, and 3xx are rejected at the type level and
 https://www.rfc-editor.org/rfc/rfc9110#section-15 @ref
 https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 
-### 2.2 `hono-ban` types (`packages/hono-ban/src/create-ban.ts`)
+### 2.2 `@netvark/hono-ban` types (`packages/hono-ban/src/create-ban.ts`)
 
 ```ts
 import type { Context, Env, ErrorHandler } from 'hono';
@@ -326,9 +327,10 @@ export function fromHttpException<TErrors extends Catalog>(
 ): BanError | undefined;
 ```
 
-`hono-ban`'s `createBan` calls the core's with `adopt` set to `fromHttpException` followed by the
-caller's own `adopt`, rejects the catalog key `onError` (type level and `TypeError`), and returns
-the core instance with `onError` assigned (6.11). Everything else on the instance is the core's.
+`@netvark/hono-ban`'s `createBan` calls the core's with `adopt` set to `fromHttpException` followed
+by the caller's own `adopt`, rejects the catalog key `onError` (type level and `TypeError`), and
+returns the core instance with `onError` assigned (6.11). Everything else on the instance is the
+core's.
 
 ## 3. Built-in catalog
 
@@ -401,8 +403,8 @@ Rules:
 
 The library fills in `Content-Type`, the error id header, and `Cache-Control` (6.9). Some statuses
 also require a header only the application can write; the factories accept it through `headers`
-(`ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } })`) and `hono-ban`'s adopter keeps it from
-an `HTTPException` (6.11). The library never fabricates these values.
+(`ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } })`) and `@netvark/hono-ban`'s adopter
+keeps it from an `HTTPException` (6.11). The library never fabricates these values.
 
 | Status   | Header                          | Strength | Source                                                 |
 | -------- | ------------------------------- | -------- | ------------------------------------------------------ |
@@ -416,8 +418,8 @@ an `HTTPException` (6.11). The library never fabricates these values.
 
 For bearer tokens the 401 challenge follows RFC 6750 section 3 (`Bearer realm=..., error=...`), and
 RFC 9728 section 5.1 adds `resource_metadata`; `hono/bearer-auth` produces the former and
-`hono-ban`'s `onError` preserves it (6.11). `bearerChallenge()` (3.2) builds the value. @ref
-https://www.rfc-editor.org/rfc/rfc6750#section-3 @ref
+`@netvark/hono-ban`'s `onError` preserves it (6.11). `bearerChallenge()` (3.2) builds the value.
+@ref https://www.rfc-editor.org/rfc/rfc6750#section-3 @ref
 https://www.rfc-editor.org/rfc/rfc9728#section-5.1
 
 ### 3.2 `bearerChallenge(options?)` (`headers/bearer-challenge.ts`, ADR 0013)
@@ -480,9 +482,10 @@ export function isBanError(value: unknown): value is BanError;
 ```
 
 - `BanError` extends `Error` and nothing else (ADR 0018): the core knows no framework, and
-  `instanceof HTTPException` was the one thing a Hono app lost. `hono-ban` restores the behavior
-  that mattered, Hono middleware's `HTTPException` reaching the catalog, through `adopt` (6.11).
-  Without `app.onError(ban.onError())`, Hono answers a thrown `BanError` with its default 500.
+  `instanceof HTTPException` was the one thing a Hono app lost. `@netvark/hono-ban` restores the
+  behavior that mattered, Hono middleware's `HTTPException` reaching the catalog, through `adopt`
+  (6.11). Without `app.onError(ban.onError())`, Hono answers a thrown `BanError` with its
+  default 500.
 - `super(detail ?? title, { cause })`, so ordinary logging of the error reads well.
 - `id` is `init.id ?? generateErrorId()`; `meta` is stored as given (sanitized at render time);
   `headers` is `new Headers(init.headers)`; `errors` is stored as given.
@@ -593,13 +596,13 @@ adopters that receive a status from somewhere else, such as `fromHttpException` 
 `BanError` for them, or `undefined`. It runs inside `from()` (5.5) and ahead of `map` in the handler
 (6.3), and what it returns counts as handled: an adopted value is a deliberate error, not an
 unexpected one. `map` remains the place for domain errors that are not HTTP-shaped. Adapters install
-their own adopter and run the caller's after it (`hono-ban`, 6.11); the core ships none.
+their own adopter and run the caller's after it (`@netvark/hono-ban`, 6.11); the core ships none.
 
 ## 6. The handler, and `onError` for Hono
 
 File: `handler/handler.ts`. `ban.handler(options?)` returns a `BanHandler<TContext>`: a function
 from the thrown value, the request facts, and a caller-chosen context to a `Response`. It is
-framework-free; `hono-ban` wraps it as `ban.onError()` (6.11), and any other host passes
+framework-free; `@netvark/hono-ban` wraps it as `ban.onError()` (6.11), and any other host passes
 `fromRequest(request)` from a fetch handler, a router's error hook, or a test.
 
 ```ts
@@ -647,8 +650,8 @@ https://fetch.spec.whatwg.org/#concept-headers-fill
 - Resolves to a `Response` for every value, `Error` or not; never throws or rejects.
 - Calls `onReport` exactly once per invocation and swallows anything `onReport` throws.
 - Hono itself only routes `Error` instances to `onError`; a thrown string or plain object is
-  rethrown by Hono before `hono-ban`'s handler runs (`handleError` in `hono-base.ts`). Hosts that
-  call `ban.handler()` themselves can pass anything.
+  rethrown by Hono before `@netvark/hono-ban`'s handler runs (`handleError` in `hono-base.ts`).
+  Hosts that call `ban.handler()` themselves can pass anything.
 
 ### 6.2 Algorithm
 
@@ -767,7 +770,7 @@ owns only the configured error id header name: renaming or disabling it does not
 `X-Error-Id`, so a header of that name supplied through `options.headers` or on the error passes
 through unchanged.
 
-### 6.10 Postgres mapper (`ban-kit/postgresql`, ADR 0015)
+### 6.10 Postgres mapper (`@netvark/ban-core/postgresql`, ADR 0015)
 
 `postgresMapper(options?)` returns a `map` for `createBan` or `ban.handler` that turns a Postgres
 driver error into a catalog entry by SQLSTATE with constant client-facing text. Files:
@@ -880,7 +883,7 @@ https://github.com/pgbouncer/pgbouncer/blob/master/src/proto.c
 
 ### 6.11 `onError` for Hono (`packages/hono-ban/src`)
 
-`ban.onError(options?)` on a `hono-ban` instance returns a Hono `ErrorHandler<E>`:
+`ban.onError(options?)` on a `@netvark/hono-ban` instance returns a Hono `ErrorHandler<E>`:
 
 ```
 handle = core.handler<Context<E>>(options)
@@ -1340,23 +1343,23 @@ https://github.com/honojs/middleware/blob/main/packages/zod-openapi/src/index.ts
 https://github.com/honojs/middleware/blob/main/packages/valibot-validator/src/index.ts @ref
 https://github.com/honojs/middleware/blob/main/packages/standard-validator/src/index.ts
 
-### 8.5 Zod (`ban-kit/zod`)
+### 8.5 Zod (`@netvark/ban-core/zod`)
 
 Reads `error.issues[]` with `path` (PropertyKey[]), `message`, `code`, and scalar `expected` and
 `received` when present, so Zod 3.25+ and Zod 4 both work (`zod.test.ts` covers both). @ref
 https://zod.dev/error-formatting
 
-### 8.6 Valibot (`ban-kit/valibot`)
+### 8.6 Valibot (`@netvark/ban-core/valibot`)
 
 Reads `issues[]` with `type` (as `code`), `message`, `expected` (omitted when `null`), `received`,
 and `path[].key` (non-scalar keys render as `?`). @ref https://valibot.dev/api/BaseIssue/
 
-### 8.7 Standard Schema (`ban-kit/standard-schema`)
+### 8.7 Standard Schema (`@netvark/ban-core/standard-schema`)
 
 Reads `issues[]` with `message` and `path` (raw keys or `{ key }` segments). The spec defines no
 code, expected, or received. @ref https://standardschema.dev
 
-## 9. OpenAPI (`ban-kit/openapi`)
+## 9. OpenAPI (`@netvark/ban-core/openapi`)
 
 ```ts
 export interface OpenApiOptions {
@@ -1392,7 +1395,7 @@ export function validationResponse(ban, options?): ResponseObject;
   https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registry.ts
 - `OpenAPIHono.doc()` always generates a 3.0.x document (it uses `OpenApiGeneratorV3` whatever the
   `openapi` string says); `doc31()` generates 3.1. Pair `doc()` with `{ dialect: 'openapi-3.0' }`
-  and `doc31()` with the default dialect. Verified in `e2e/openapi-document.e2e.test.ts`. @ref
+  and `doc31()` with the default dialect. Verified in `e2e/ban/openapi-document.e2e.test.ts`. @ref
   https://github.com/honojs/middleware/blob/main/packages/zod-openapi/src/index.ts
 
 ## 10. Observability
@@ -1418,7 +1421,7 @@ The same `id` appears in the body, in the error id header, and in the report (`h
 Stripe is the exception (7.7): its shape has no member for the id, which travels in the header and
 the report only.
 
-### 10.3 `ban-kit/otel`
+### 10.3 `@netvark/ban-core/otel`
 
 `traceIdFromOtel(source)` accepts the `trace` API or the whole `@opentelemetry/api` namespace
 (structurally: `getActiveSpan()` returning a span with `spanContext().traceId`) and returns a
@@ -1427,7 +1430,7 @@ and not all zeros. Usage: `ban.handler({ traceId: traceIdFromOtel(trace) })` or,
 `ban.onError({ traceId: traceIdFromOtel(trace) })`. @ref
 https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_api.SpanContext.html
 
-## 11. Testing utilities (`ban-kit/testing`)
+## 11. Testing utilities (`@netvark/ban-core/testing`)
 
 - `renderError(ban, error, options?)`: `ban.render`.
 - `expectBanError(value, expected?)`: asserts `value is BanError`, comparing `status`, `code`,
@@ -1446,22 +1449,22 @@ index, formats/problem-details, formats/json-api, formats/plain, formats/google-
 zod, valibot, standard-schema, openapi, otel, postgresql, testing
 ```
 
-`ban-kit` has no `dependencies` and no `peerDependencies`. `hono-ban` has
-`dependencies: { "ban-kit": "workspace:^" }` (a caret range on the published version) and
+`@netvark/ban-core` has no `dependencies` and no `peerDependencies`. `@netvark/hono-ban` has
+`dependencies: { "@netvark/ban-core": "workspace:^" }` (a caret range on the published version) and
 `peerDependencies: { "hono": ">=4.12.34" }`. Validators, `@hono/*` packages, `@opentelemetry/api`,
 `postgres` (postgres.js, for one type-level test), Ajv, and `ajv-formats` are devDependencies used
 only by tests; `@electric-sql/pglite`, `@electric-sql/pglite-socket`, `drizzle-orm`, `pg`, and
-`postgres` are devDependencies of `e2e/` only. Both packages set `sideEffects: false`. publint and
-attw run as part of each build.
+`postgres` are devDependencies of `e2e/ban/` only. Both packages set `sideEffects: false`. publint
+and attw run as part of each build.
 
 The repository is a pnpm workspace with four packages: the private root (`ban-kit-monorepo`),
-`packages/ban-kit`, `packages/hono-ban`, and `e2e/` (private, `ban-kit-e2e`). `e2e/` depends on both
-published packages through `workspace:*`, so its imports resolve through the `exports` map above
-into each `dist/`, and its own `tsconfig.json` checks the emitted declarations. `pnpm test:e2e`
-builds first, then type-checks and runs it. `e2e/smoke/` holds the runtime smoke test and its Bun,
-Deno, and workerd entry points (14.2); `pnpm test:runtimes` builds and runs the three. Section 14
-lists the suites. Changesets version the two packages independently;
-`updateInternalDependencies: patch` bumps `hono-ban` whenever `ban-kit` releases.
+`packages/ban-core`, `packages/hono-ban`, and `e2e/ban/` (private, `@netvark/ban-e2e`). `e2e/ban/`
+depends on both published packages through `workspace:*`, so its imports resolve through the
+`exports` map above into each `dist/`, and its own `tsconfig.json` checks the emitted declarations.
+`pnpm test:e2e` builds first, then type-checks and runs it. `e2e/ban/smoke/` holds the runtime smoke
+test and its Bun, Deno, and workerd entry points (14.2); `pnpm test:runtimes` builds and runs the
+three. Section 14 lists the suites. Changesets version the two packages independently;
+`updateInternalDependencies: patch` bumps `@netvark/hono-ban` whenever `@netvark/ban-core` releases.
 
 ## 13. Constants (`internal/constants.ts`)
 
@@ -1482,13 +1485,13 @@ lists the suites. Changesets version the two packages independently;
 
 `MALFORMED_JSON_MESSAGE` (`'Malformed JSON in request body'`) and `BODY_HEADERS` (`content-type`,
 `content-length`, `content-encoding`, `content-location`, `content-range`, `transfer-encoding`)
-belong to `hono-ban` (`packages/hono-ban/src/http-exception.ts`, 6.11); `MALFORMED_JSON_MESSAGE` is
-exported from the `hono-ban` root.
+belong to `@netvark/hono-ban` (`packages/hono-ban/src/http-exception.ts`, 6.11);
+`MALFORMED_JSON_MESSAGE` is exported from the `@netvark/hono-ban` root.
 
 ## 14. Test plan
 
 Coverage thresholds (90 percent) are enforced by Vitest across both packages. Rows name
-`packages/ban-kit/src` modules unless prefixed.
+`packages/ban-core/src` modules unless prefixed.
 
 | Module                    | Tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1512,18 +1515,18 @@ Coverage thresholds (90 percent) are enforced by Vitest across both packages. Ro
 | `testing`                 | `expectBanError` messages, `renderError`, `assertFormatConformance` on a broken format (21 cases per definition, 3 when only `schema` is broken)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `packages/hono-ban/src/*` | `onError` over a Hono app: `HTTPException` by status and message, bearer-auth, the built-in validator's JSON failure, body headers dropped and `Content-Range` kept on 416, a thrown 302 passed through, non-Error throws rethrown by Hono, the `Context` in every callback, request id and traceparent headers, reserved key `onError`, `from()` adopting `HTTPException` ahead of the user hook; `fromHttpException` and `passthroughResponse` directly; `zValidator`, `vValidator`, `sValidator`, and `OpenAPIHono` through `onError`; hook type assignability; the generated OpenAPI 3.1 document; typed `onError<E>`                                                                                                                                                                                           |
 
-### 14.1 End-to-end suite (`e2e/`)
+### 14.1 End-to-end suite (`e2e/ban/`)
 
-The `e2e/` workspace package (section 12) consumes both built packages and runs every file against a
-real `@hono/node-server` HTTP server on an ephemeral port (`e2e/support/server.ts`). Files import
-`hono-ban` unless they prove the core alone. Bodies are read with `fetch` and, wherever the package
-publishes a schema, validated with Ajv (`e2e/support/ajv.ts`). `pnpm test:e2e` runs it; CI runs it
-on Node 22 and 24.
+The `e2e/ban/` workspace package (section 12) consumes both built packages and runs every file
+against a real `@hono/node-server` HTTP server on an ephemeral port (`e2e/ban/support/server.ts`).
+Files import `@netvark/hono-ban` unless they prove the core alone. Bodies are read with `fetch` and,
+wherever the package publishes a schema, validated with Ajv (`e2e/ban/support/ajv.ts`).
+`pnpm test:e2e` runs it; CI runs it on Node 22 and 24.
 
 | File(s)                                                             | Proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package-surface`                                                   | every subpath in section 1 resolves through `exports` and exports exactly the listed values for both packages; `hono-ban` subpaths are the `ban-kit` module objects; first HTTP round trip                                                                                                                                                                                                                                                                              |
-| `core-handler`                                                      | `ban-kit` alone: `ban.handler()` with a typed context and `fromRequest` behind a plain `fetch` function served by `@hono/node-server`; instance, trace id, request id from the context, error headers, `adopt`, and the constant 500                                                                                                                                                                                                                                    |
+| `package-surface`                                                   | every subpath in section 1 resolves through `exports` and exports exactly the listed values for both packages; `@netvark/hono-ban` subpaths are the `@netvark/ban-core` module objects; first HTTP round trip                                                                                                                                                                                                                                                           |
+| `core-handler`                                                      | `@netvark/ban-core` alone: `ban.handler()` with a typed context and `fromRequest` behind a plain `fetch` function served by `@hono/node-server`; instance, trace id, request id from the context, error headers, `adopt`, and the constant 500                                                                                                                                                                                                                          |
 | `catalog-builtins`, `catalog-custom`                                | every `FACTORY_NAMES` entry over HTTP (status, title, code, `about:blank`, `X-Error-Id`), aliases, call forms, custom entries and overrides, `custom()`, `assert()` narrowing, reserved-key and `validationKey` constructor errors                                                                                                                                                                                                                                      |
 | `handler-identity-ids`, `-reports`, `-correlation`                  | id coherence across body, header, report; `errorIdHeader`; header merge matrix including `Set-Cookie` and the `Cache-Control` default and override; deterministic ids; 20 concurrent requests; `ErrorReport` shape and `handled`; `includeStack` rules; request id and traceparent tables; `traceId` override                                                                                                                                                           |
 | `handler-not-found`                                                 | `app.notFound` throwing `ban.notFound()` reaches `onError` on both Hono dispatch paths (no handler matched; one middleware matched) with body, header, and report; matched routes untouched                                                                                                                                                                                                                                                                             |
@@ -1539,25 +1542,25 @@ on Node 22 and 24.
 | `validation-valibot-standard-valibot`, `-standard-schema`           | `vValidator` and `sValidator` hooks (Zod and Valibot schemas), `expected`/`received` mapping, direct converters, `ban.validation()`, JSON:API `source` for Valibot issues                                                                                                                                                                                                                                                                                               |
 | `openapi-document`, `openapi-responses`                             | served 3.1 (`doc31`) and 3.0 (`doc`) documents, `const` versus `enum`, `anyOf` grouping, real error bodies validated against the served schemas, `RangeError`s                                                                                                                                                                                                                                                                                                          |
 | `postgresql-pglite`, `postgresql-pglite-options`                    | PGlite (PostgreSQL 18) raising every table row it can and the fallthrough codes over HTTP, directly and through Drizzle (wrapper on the report, driver error on the error); `constraints`, `columns`, and `codes`; `includeStack` rendering the driver stack and not the ORM wrapper's; no server text in any body                                                                                                                                                      |
-| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`; `severity_local`, `constraint_name`/`table_name`/`column_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`                                             |
+| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/ban/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`; `severity_local`, `constraint_name`/`table_name`/`column_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`                                         |
 | `postgresql-options`                                                | hand-built errors in the node-postgres, Neon, postgres.js (with and without field V), Bun, and Sequelize shapes; Prisma and Node errno shapes left unhandled; `retryAfter` on 503 only; an issue mapping rendered by JSON:API with `source.pointer` and validated against `errorsSchema`                                                                                                                                                                                |
 | `otel-correlation`, `otel-sources`                                  | real `NodeTracerProvider` spans: body and report trace id equal the exported span, option wins over `traceparent`, no span outside the middleware, `{ trace }` form, invalid span contexts ignored, JSON:API `meta.traceId`                                                                                                                                                                                                                                             |
 
-### 14.2 Runtime smoke test (`e2e/smoke/`)
+### 14.2 Runtime smoke test (`e2e/ban/smoke/`)
 
-The README promises Bun, Deno, and Cloudflare Workers. `e2e/smoke/app.ts` is one Hono app that
+The README promises Bun, Deno, and Cloudflare Workers. `e2e/ban/smoke/app.ts` is one Hono app that
 imports every published subpath and throws one error per feature family (catalog and custom entries
 through an explicit `problemDetails()`, `ban.validation` through the Zod, Valibot, and Standard
 Schema hooks, `HTTPException` from `hono/bearer-auth`, an unknown `Error`, JSON:API, plain, Google
-API, and Stripe sub-apps, the OpenAPI helpers, `renderError` from `hono-ban/testing`, a
+API, and Stripe sub-apps, the OpenAPI helpers, `renderError` from `@netvark/hono-ban/testing`, a
 `bearerChallenge` header, the OpenTelemetry adapter, a unique violation through `postgresMapper` in
-the node-postgres and Bun shapes, and a route answered by a `ban-kit` instance's own `handler` with
-`fromRequest`, so the core package is loaded by every runtime too). `app.ts` imports no database
-driver: the workerd bundle inlines every import of it, so the Postgres routes throw driver-shaped
-fixtures. `checks.ts` asserts the responses through a runtime-neutral `dispatch` function, checks
-`Cache-Control: no-store` and a matching `X-Error-Id` on every Problem Details response, and
-`report()` throws on any failure, so the process exits non-zero. A new subpath is not covered until
-`app.ts` imports it and `checks.ts` exercises it. Entry points:
+the node-postgres and Bun shapes, and a route answered by a `@netvark/ban-core` instance's own
+`handler` with `fromRequest`, so the core package is loaded by every runtime too). `app.ts` imports
+no database driver: the workerd bundle inlines every import of it, so the Postgres routes throw
+driver-shaped fixtures. `checks.ts` asserts the responses through a runtime-neutral `dispatch`
+function, checks `Cache-Control: no-store` and a matching `X-Error-Id` on every Problem Details
+response, and `report()` throws on any failure, so the process exits non-zero. A new subpath is not
+covered until `app.ts` imports it and `checks.ts` exercises it. Entry points:
 
 | Script                  | Runtime                                                                                                                                      |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |

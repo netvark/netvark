@@ -1,4 +1,4 @@
-# ban-kit
+# @netvark/ban-core
 
 Structured, extensible HTTP errors for any JavaScript runtime that speaks `fetch`. One API for
 creating errors, one handler that turns anything thrown into a well-formed response, and pluggable
@@ -6,13 +6,14 @@ wire formats: RFC 9457 Problem Details, JSON:API, Google's AIP-193, and Stripe's
 built in, and your own shape is a `defineFormat` call away. No dependencies, no peer dependencies,
 web standards only.
 
-Using Hono? [hono-ban](https://github.com/ali-issa/ban-kit/tree/main/packages/hono-ban#readme) is
-this package plus `app.onError()` wiring and `HTTPException` adoption, under the same subpaths.
+Using Hono?
+[@netvark/hono-ban](https://github.com/netvark/netvark/tree/main/packages/hono-ban#readme) is this
+package plus `app.onError()` wiring and `HTTPException` adoption, under the same subpaths.
 
 ## Install
 
 ```bash
-pnpm add ban-kit
+pnpm add @netvark/ban-core
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
@@ -21,7 +22,7 @@ on Node 22 and 24 and a smoke test of every subpath on Bun, Deno, and workerd.
 ## Quick start
 
 ```ts
-import { createBan, fromRequest } from 'ban-kit';
+import { createBan, fromRequest } from '@netvark/ban-core';
 
 const ban = createBan();
 const handle = ban.handler();
@@ -71,7 +72,7 @@ every callback receives (`ban.handler<MyContext>()`). It resolves to a `Response
 ### Guard and narrow
 
 ```ts
-import { assert } from 'ban-kit';
+import { assert } from '@netvark/ban-core';
 
 const order = await orders.find(id);
 assert(order, () => ban.notFound(`Order ${id} does not exist`));
@@ -120,7 +121,7 @@ below). For JSON:API documents that combine entries with different statuses,
 `responseStatus(errors)` picks the response status the way the specification asks:
 
 ```ts
-import { jsonApi, responseStatus } from 'ban-kit/formats/json-api';
+import { jsonApi, responseStatus } from '@netvark/ban-core/formats/json-api';
 
 const ban = createBan({ format: jsonApi({ mixedEntries: true }) });
 const errors = [
@@ -134,7 +135,7 @@ throw ban.fromStatus(responseStatus(errors) ?? 400, { errors }); // 400 with two
 
 `createBan({ adopt })` recognizes thrown values that already describe an HTTP outcome, ahead of
 `map` and inside `ban.from()` too; what it returns counts as handled rather than unexpected.
-`ban.fromStatus()` picks the catalog entry for a status. This is how `hono-ban` recognizes
+`ban.fromStatus()` picks the catalog entry for a status. This is how `@netvark/hono-ban` recognizes
 `HTTPException`; the same shape serves any router that throws its own class:
 
 ```ts
@@ -148,12 +149,12 @@ const ban = createBan({
 
 ### Database errors
 
-`ban-kit/postgresql` maps a Postgres driver error to a catalog entry by SQLSTATE with constant
-client-facing text. It recognizes the errors of node-postgres, postgres.js, PGlite, Neon, and Bun,
-thrown directly or wrapped by Drizzle, Kysely, TypeORM, MikroORM, Slonik, or Sequelize:
+`@netvark/ban-core/postgresql` maps a Postgres driver error to a catalog entry by SQLSTATE with
+constant client-facing text. It recognizes the errors of node-postgres, postgres.js, PGlite, Neon,
+and Bun, thrown directly or wrapped by Drizzle, Kysely, TypeORM, MikroORM, Slonik, or Sequelize:
 
 ```ts
-import { postgresMapper } from 'ban-kit/postgresql';
+import { postgresMapper } from '@netvark/ban-core/postgresql';
 
 const ban = createBan({
   map: postgresMapper({
@@ -178,8 +179,8 @@ no row, such as a syntax error, a missing table, or a `RAISE EXCEPTION`, fall th
 constant 500 with `handled: false`. The full table and the precedence rules are in SPEC section
 6.10.
 
-How each driver's support is verified (versions are the pins in `e2e/package.json`; the dated matrix
-is in ADR 0015):
+How each driver's support is verified (versions are the pins in `e2e/ban/package.json`; the dated
+matrix is in ADR 0015):
 
 | Driver or ORM                                | Verified by                                                                                |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -193,7 +194,7 @@ is in ADR 0015):
 To put an application-authored `RAISE` message on the wire, compose your own `map`:
 
 ```ts
-import { findPostgresError, postgresMapper } from 'ban-kit/postgresql';
+import { findPostgresError, postgresMapper } from '@netvark/ban-core/postgresql';
 
 const postgres = postgresMapper();
 const ban = createBan({
@@ -216,7 +217,7 @@ headers it carried. `bearerChallenge()` builds the RFC 6750 value, validates eve
 its grammar, and knows RFC 9728 `resource_metadata` for OAuth-protected resources.
 
 ```ts
-import { bearerChallenge } from 'ban-kit';
+import { bearerChallenge } from '@netvark/ban-core';
 
 throw ban.methodNotAllowed({ headers: { Allow: 'GET, HEAD' } });
 throw ban.unauthorized({
@@ -233,12 +234,12 @@ throw ban.tooManyRequests({ headers: { 'Retry-After': '30' } });
 ```
 
 The full table with RFC references is in
-[`docs/SPEC.md`](https://github.com/ali-issa/ban-kit/blob/main/docs/SPEC.md) section 3.1.
+[`docs/ban/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/ban/SPEC.md) section 3.1.
 
 ### Pick a format
 
 ```ts
-import { jsonApi } from 'ban-kit/formats/json-api';
+import { jsonApi } from '@netvark/ban-core/formats/json-api';
 
 const ban = createBan({ format: jsonApi() });
 ```
@@ -269,7 +270,7 @@ match `[a-z][a-zA-Z0-9-_]+` and stay under 64 characters (`error_details.proto`)
 grammar (`order.id`, `UserId`) is dropped rather than sent.
 
 ```ts
-import { googleApi } from 'ban-kit/formats/google-api';
+import { googleApi } from '@netvark/ban-core/formats/google-api';
 
 const ban = createBan({
   format: googleApi({ domain: 'orders.example.com' }),
@@ -312,7 +313,7 @@ no member for `meta`, the trace id, or the error id, which stays in the `X-Error
 validation error carries its first issue as `param`.
 
 ```ts
-import { stripe } from 'ban-kit/formats/stripe';
+import { stripe } from '@netvark/ban-core/formats/stripe';
 
 const ban = createBan({ format: stripe(), docsBaseUrl: 'https://api.example.com/errors' });
 ```
@@ -339,7 +340,7 @@ becomes `error_description`, and `type` becomes `error_uri`. The end-to-end suit
 definition and checks it against its own schema.
 
 ```ts
-import { createBan, defineFormat } from 'ban-kit';
+import { createBan, defineFormat } from '@netvark/ban-core';
 
 const oauth = defineFormat({
   name: 'oauth',
@@ -378,16 +379,16 @@ throw token.INVALID_GRANT('The refresh token has expired');
 
 ### Validation
 
-`ban-kit/zod`, `ban-kit/valibot`, and `ban-kit/standard-schema` convert a validator's failure into
-`ban.validation()`: `fromZodError(ban, error, location)`,
+`@netvark/ban-core/zod`, `@netvark/ban-core/valibot`, and `@netvark/ban-core/standard-schema`
+convert a validator's failure into `ban.validation()`: `fromZodError(ban, error, location)`,
 `fromValibotIssues(ban, issues, location)`, `fromIssues(ban, issues, location)`, and `toIssues()`
 for the raw list. Each also exports `hook(ban)`, a function that takes a
 `{ success, target, error | issues }` result (the shape the `@hono/*` validator middleware passes)
-and throws the validation error, so the hooks work unchanged through `hono-ban` and with anything
-that produces the same result object.
+and throws the validation error, so the hooks work unchanged through `@netvark/hono-ban` and with
+anything that produces the same result object.
 
 ```ts
-import { fromZodError } from 'ban-kit/zod';
+import { fromZodError } from '@netvark/ban-core/zod';
 
 const parsed = OrderInput.safeParse(await request.json());
 if (!parsed.success) {
@@ -414,11 +415,11 @@ Content-Type: application/problem+json
 
 ### OpenAPI
 
-`ban-kit/openapi` turns the active format's schemas into OpenAPI Response Objects, so the documented
-body is the rendered body:
+`@netvark/ban-core/openapi` turns the active format's schemas into OpenAPI Response Objects, so the
+documented body is the rendered body:
 
 ```ts
-import { errorResponses, validationResponse } from 'ban-kit/openapi';
+import { errorResponses, validationResponse } from '@netvark/ban-core/openapi';
 
 const responses = {
   200: { description: 'Order', content: { 'application/json': { schema: OrderSchema } } },
@@ -433,7 +434,7 @@ Pass `{ dialect: 'openapi-3.0' }` for 3.0 documents, which predate `const`.
 
 ```ts
 import { trace } from '@opentelemetry/api';
-import { traceIdFromOtel } from 'ban-kit/otel';
+import { traceIdFromOtel } from '@netvark/ban-core/otel';
 
 interface RequestContext {
   readonly tenant: string;
@@ -470,45 +471,45 @@ const handle = ban.handler<{ language: string }>({
 
 ### Test
 
-`ban-kit/testing` has `expectBanError(value, { status, code, detail })` for asserting on what a
-handler received, `renderError(ban, error)` for reproducing a body without a request, and
+`@netvark/ban-core/testing` has `expectBanError(value, { status, code, detail })` for asserting on
+what a handler received, `renderError(ban, error)` for reproducing a body without a request, and
 `assertFormatConformance(format, ban.catalog, { compile })` for proving a custom format's bodies
 match its schemas, with any JSON Schema 2020-12 compiler.
 
 ## Modules
 
-| Import                                                                                                                                         | What it gives you                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ban-kit`                                                                                                                                      | `createBan`, `assert`, `defineFormat`, `fromRequest`, `bearerChallenge`, `isErrorStatus`, `BanError`, `isBanError`, `problemDetails`, `BUILTIN_CATALOG`, `parseTraceparent`, pointer helpers |
-| `ban-kit/formats/problem-details`, `ban-kit/formats/json-api`, `ban-kit/formats/plain`, `ban-kit/formats/google-api`, `ban-kit/formats/stripe` | the built-in wire formats; `json-api` also exports `responseStatus`                                                                                                                          |
-| `ban-kit/zod`, `ban-kit/valibot`, `ban-kit/standard-schema`                                                                                    | validator hooks and issue converters                                                                                                                                                         |
-| `ban-kit/openapi`                                                                                                                              | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                                   |
-| `ban-kit/otel`                                                                                                                                 | `traceIdFromOtel`                                                                                                                                                                            |
-| `ban-kit/postgresql`                                                                                                                           | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                                  |
-| `ban-kit/testing`                                                                                                                              | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                                   |
+| Import                                                                                                                                                                                           | What it gives you                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/ban-core`                                                                                                                                                                              | `createBan`, `assert`, `defineFormat`, `fromRequest`, `bearerChallenge`, `isErrorStatus`, `BanError`, `isBanError`, `problemDetails`, `BUILTIN_CATALOG`, `parseTraceparent`, pointer helpers |
+| `@netvark/ban-core/formats/problem-details`, `@netvark/ban-core/formats/json-api`, `@netvark/ban-core/formats/plain`, `@netvark/ban-core/formats/google-api`, `@netvark/ban-core/formats/stripe` | the built-in wire formats; `json-api` also exports `responseStatus`                                                                                                                          |
+| `@netvark/ban-core/zod`, `@netvark/ban-core/valibot`, `@netvark/ban-core/standard-schema`                                                                                                        | validator hooks and issue converters                                                                                                                                                         |
+| `@netvark/ban-core/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                                   |
+| `@netvark/ban-core/otel`                                                                                                                                                                         | `traceIdFromOtel`                                                                                                                                                                            |
+| `@netvark/ban-core/postgresql`                                                                                                                                                                   | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                                  |
+| `@netvark/ban-core/testing`                                                                                                                                                                      | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                                   |
 
-Other databases go through `createBan({ map })` the same way `ban-kit/postgresql` does: catalog
-entries with constant client-facing messages, never the driver's own text (a driver's detail line
-can contain the failing row).
+Other databases go through `createBan({ map })` the same way `@netvark/ban-core/postgresql` does:
+catalog entries with constant client-facing messages, never the driver's own text (a driver's detail
+line can contain the failing row).
 
 ## Documentation
 
-- [`docs/DESIGN.md`](https://github.com/ali-issa/ban-kit/blob/main/docs/DESIGN.md): goals, the full
-  API, architecture, security defaults, and roadmap
-- [`docs/SPEC.md`](https://github.com/ali-issa/ban-kit/blob/main/docs/SPEC.md): the normative
+- [`docs/ban/DESIGN.md`](https://github.com/netvark/netvark/blob/main/docs/ban/DESIGN.md): goals,
+  the full API, architecture, security defaults, and roadmap
+- [`docs/ban/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/ban/SPEC.md): the normative
   implementation specification (exact types, catalog, rendering rules, handler algorithm, validator
   mappings, packaging, test plan)
-- [`docs/adr/`](https://github.com/ali-issa/ban-kit/blob/main/docs/adr/): architecture decision
-  records
-- [`CONTRIBUTING.md`](https://github.com/ali-issa/ban-kit/blob/main/CONTRIBUTING.md): setup, quality
+- [`docs/ban/adr/`](https://github.com/netvark/netvark/blob/main/docs/ban/adr/): architecture
+  decision records
+- [`CONTRIBUTING.md`](https://github.com/netvark/netvark/blob/main/CONTRIBUTING.md): setup, quality
   gates, release process
 
 ## Why
 
 Without a contract, error bodies drift: `{ message }` here, `{ error }` there, a Zod issue array
-somewhere else, and an OpenAPI document that describes none of them. ban-kit gives every error one
-shape, one id, and one place to observe it, while letting you choose which standard that shape
-follows, and it does so without binding you to a framework.
+somewhere else, and an OpenAPI document that describes none of them. @netvark/ban-core gives every
+error one shape, one id, and one place to observe it, while letting you choose which standard that
+shape follows, and it does so without binding you to a framework.
 
 - **Typed catalog.** Every standard 4xx and 5xx status has a factory (`ban.notFound()`), and your
   own domain errors join the catalog with full inference (`ban.ORDER_CONFLICT()`).

@@ -2,7 +2,7 @@
  * The blog API every e2e file and the runtime smoke test drive: one Hono
  * app built only from the published package. Never imports from `src/`.
  */
-import type { JsonApiEnv } from 'hono-jsonapi';
+import type { JsonApiEnv } from '@netvark/hono-jsonapi';
 
 import { Hono } from 'hono';
 
@@ -12,8 +12,8 @@ import {
   errorHandler,
   jsonApi,
   notFoundHandler,
-} from 'hono-jsonapi';
-import { atomicOperations } from 'hono-jsonapi/atomic';
+} from '@netvark/hono-jsonapi';
+import { atomicOperations } from '@netvark/hono-jsonapi/atomic';
 
 import { atomicOptions } from './operations.ts';
 import { registerRoutes } from './routes.ts';

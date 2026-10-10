@@ -17,11 +17,11 @@ import type {
   PageInit,
   SortInit,
   TextSearchMode,
-} from 'keyset-kit';
+} from '@netvark/keyset-core';
 
 import type { KyselyKeyset } from './types';
 
-import { defineKeyset } from 'keyset-kit';
+import { defineKeyset } from '@netvark/keyset-core';
 
 import { paginate } from './paginate';
 

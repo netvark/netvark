@@ -17,7 +17,7 @@ Source under `src/` uses only APIs defined by web standards or ECMAScript: `URL`
 `Response`, `Headers`, `JSON`. Nothing reads `process`, `Deno`, `Bun`, or `navigator`. Behavior that
 depends on the deployment is an explicit option. Type-checking uses the `dom` lib for the web types
 rather than `@types/node`. The build is `platform: 'neutral'`. CI runs the unit and end-to-end
-suites on Node 22 and 24 and the smoke app (`e2e/smoke/`) on Bun, Deno, and workerd through
+suites on Node 22 and 24 and the smoke app (`e2e/jsonapi/smoke/`) on Bun, Deno, and workerd through
 Miniflare.
 
 ## Consequences

@@ -20,7 +20,7 @@ import type {
   PlanKey,
   QueryPlan,
   RelationsInit,
-} from 'keyset-kit';
+} from '@netvark/keyset-core';
 
 import type {
   AnyQuery,

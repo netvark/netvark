@@ -5,7 +5,7 @@
  * database: the Kysely instance uses `DummyDriver`, so the same module
  * runs on Bun, Deno, and workerd.
  */
-import type { QueryEvent } from 'kysely-keyset';
+import type { QueryEvent } from '@netvark/kysely-keyset';
 
 import {
   DummyDriver,
@@ -19,7 +19,7 @@ import {
   createDefineKeyset,
   InvalidCursorError,
   isKeysetError,
-} from 'kysely-keyset';
+} from '@netvark/kysely-keyset';
 
 export interface SmokeResult {
   readonly runtime: string;
@@ -185,7 +185,7 @@ export function report(result: SmokeResult): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
     console.log(
-      `keyset-kit smoke: ${total} checks passed on ${result.runtime}`,
+      `@netvark/keyset-core smoke: ${total} checks passed on ${result.runtime}`,
     );
     return;
   }
@@ -193,6 +193,6 @@ export function report(result: SmokeResult): void {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `keyset-kit smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `@netvark/keyset-core smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

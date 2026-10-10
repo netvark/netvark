@@ -1,5 +1,5 @@
 ---
-'jsonapi-kit': minor
+'@netvark/jsonapi-core': minor
 ---
 
 First release: JSON:API 1.1 for any JavaScript runtime, framework-free.
@@ -17,8 +17,10 @@ First release: JSON:API 1.1 for any JavaScript runtime, framework-free.
 - `parseCreateDocument`, `parseUpdateDocument`, and the relationship document parsers check request
   documents against the definition with RFC 6901 pointers on every error.
 - `negotiate` applies the server content negotiation rules (415, 406) over two header values.
-- Errors are [ban-kit](https://github.com/ali-issa/ban-kit) errors: `jsonApiError` builds one from a
-  closed catalog (`ERROR_CATALOG` over ban-kit's built-ins), `errorItem` one object of a list, and
-  `errorDocument` the document; an application spreads the catalog into its own `createBan`.
-- `jsonapi-kit/atomic` implements the Atomic Operations extension as `operationsProcessor`, with a
-  caller-owned transaction, local ids across operations, and a host-supplied context for handlers.
+- Errors are [@netvark/ban-core](https://github.com/netvark/netvark) errors: `jsonApiError` builds
+  one from a closed catalog (`ERROR_CATALOG` over @netvark/ban-core's built-ins), `errorItem` one
+  object of a list, and `errorDocument` the document; an application spreads the catalog into its
+  own `createBan`.
+- `@netvark/jsonapi-core/atomic` implements the Atomic Operations extension as
+  `operationsProcessor`, with a caller-owned transaction, local ids across operations, and a
+  host-supplied context for handlers.

@@ -1,1 +1,1 @@
-export * from 'ban-kit/testing';
+export * from '@netvark/ban-core/testing';

@@ -7,16 +7,20 @@
  * publishes for it.
  * @ref https://www.rfc-editor.org/rfc/rfc9457#section-3.2
  */
-import type { IssueLocation, JsonSchema, ValidationIssue } from 'hono-ban';
+import type {
+  IssueLocation,
+  JsonSchema,
+  ValidationIssue,
+} from '@netvark/hono-ban';
 
 import type { FetchApp, RunningServer } from './support/server';
 
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { PROBLEM_DETAILS_CONTENT_TYPE } from 'hono-ban/formats/problem-details';
-import { errorSchema, validationSchema } from 'hono-ban/openapi';
+import { createBan } from '@netvark/hono-ban';
+import { PROBLEM_DETAILS_CONTENT_TYPE } from '@netvark/hono-ban/formats/problem-details';
+import { errorSchema, validationSchema } from '@netvark/hono-ban/openapi';
 
 import { schemaErrors } from './support/ajv';
 import { startServer } from './support/server';

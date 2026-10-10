@@ -2,7 +2,7 @@ import type {
   ParsedQuery,
   ParsedResourceObject,
   ResourceIdentifier,
-} from 'jsonapi-kit';
+} from '@netvark/jsonapi-core';
 
 import type { JsonApiContext, JsonApiEnv } from './types';
 
@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 
-import { defineResource } from 'jsonapi-kit';
+import { defineResource } from '@netvark/jsonapi-core';
 
 import { jsonApi } from './middleware';
 import {

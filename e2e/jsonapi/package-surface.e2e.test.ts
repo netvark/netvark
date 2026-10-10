@@ -1,16 +1,16 @@
+import { describe, expect, it } from 'vitest';
+
 /**
  * Package surface. Every subpath of both packages must resolve through the
  * published `exports` maps at runtime and export exactly what the SPEC
  * lists. Value imports on purpose: a missing dist file or a wrong `exports`
  * entry fails here before any feature test runs.
  */
-import { BanError } from 'hono-ban';
-import { describe, expect, it } from 'vitest';
-
-import * as hono from 'hono-jsonapi';
-import * as honoAtomic from 'hono-jsonapi/atomic';
-import * as kit from 'jsonapi-kit';
-import * as kitAtomic from 'jsonapi-kit/atomic';
+import { BanError } from '@netvark/hono-ban';
+import * as hono from '@netvark/hono-jsonapi';
+import * as honoAtomic from '@netvark/hono-jsonapi/atomic';
+import * as kit from '@netvark/jsonapi-core';
+import * as kitAtomic from '@netvark/jsonapi-core/atomic';
 
 function names(module: object): Array<string> {
   return Object.keys(module).toSorted();
@@ -103,7 +103,7 @@ const HONO = [
   'varyAccept',
 ];
 
-describe('jsonapi-kit surface', () => {
+describe('@netvark/jsonapi-core surface', () => {
   it('the root exports the SPEC section 1 values', () => {
     expect(names(kit)).toEqual(CORE);
     expect(kit.JSON_API_MEDIA_TYPE).toBe('application/vnd.api+json');
@@ -121,10 +121,10 @@ describe('jsonapi-kit surface', () => {
   });
 });
 
-describe('hono-jsonapi surface', () => {
+describe('@netvark/hono-jsonapi surface', () => {
   it('the root re-exports the core, the same bindings, and adds the Hono integration', () => {
     expect(names(hono)).toEqual([...CORE, ...HONO].toSorted());
-    // One copy of the core in the graph, and one copy of ban-kit under it:
+    // One copy of the core in the graph, and one copy of @netvark/ban-core under it:
     // an error thrown through any of the packages is the same class, so
     // instanceof holds across them.
     expect(hono.BanError).toBe(kit.BanError);

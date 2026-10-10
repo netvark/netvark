@@ -7,31 +7,31 @@
  * the workerd bundle inlines every import of this file, so the Postgres
  * routes throw driver-shaped fixtures instead.
  */
-import type { ErrorReport } from 'hono-ban';
+import type { ErrorReport } from '@netvark/hono-ban';
 
 import { sValidator } from '@hono/standard-validator';
 import { vValidator } from '@hono/valibot-validator';
 import { zValidator } from '@hono/zod-validator';
 import { trace } from '@opentelemetry/api';
-import { createBan as createCoreBan, fromRequest } from 'ban-kit';
 import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 import * as v from 'valibot';
 import { z } from 'zod';
 
-import { bearerChallenge, createBan } from 'hono-ban';
-import { googleApi } from 'hono-ban/formats/google-api';
-import { jsonApi } from 'hono-ban/formats/json-api';
-import { plain } from 'hono-ban/formats/plain';
-import { problemDetails } from 'hono-ban/formats/problem-details';
-import { stripe } from 'hono-ban/formats/stripe';
-import { errorResponses, validationResponse } from 'hono-ban/openapi';
-import { traceIdFromOtel } from 'hono-ban/otel';
-import { postgresMapper } from 'hono-ban/postgresql';
-import { hook as standardHook } from 'hono-ban/standard-schema';
-import { renderError } from 'hono-ban/testing';
-import { hook as valibotHook } from 'hono-ban/valibot';
-import { hook as zodHook } from 'hono-ban/zod';
+import { createBan as createCoreBan, fromRequest } from '@netvark/ban-core';
+import { bearerChallenge, createBan } from '@netvark/hono-ban';
+import { googleApi } from '@netvark/hono-ban/formats/google-api';
+import { jsonApi } from '@netvark/hono-ban/formats/json-api';
+import { plain } from '@netvark/hono-ban/formats/plain';
+import { problemDetails } from '@netvark/hono-ban/formats/problem-details';
+import { stripe } from '@netvark/hono-ban/formats/stripe';
+import { errorResponses, validationResponse } from '@netvark/hono-ban/openapi';
+import { traceIdFromOtel } from '@netvark/hono-ban/otel';
+import { postgresMapper } from '@netvark/hono-ban/postgresql';
+import { hook as standardHook } from '@netvark/hono-ban/standard-schema';
+import { renderError } from '@netvark/hono-ban/testing';
+import { hook as valibotHook } from '@netvark/hono-ban/valibot';
+import { hook as zodHook } from '@netvark/hono-ban/zod';
 
 import { DOCS_BASE_URL } from './checks.ts';
 

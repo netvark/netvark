@@ -7,8 +7,8 @@ import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { createBan } from 'hono-ban';
-import { hook } from 'hono-ban/zod';
+import { createBan } from '@netvark/hono-ban';
+import { hook } from '@netvark/hono-ban/zod';
 
 import { startServer } from './support/server';
 

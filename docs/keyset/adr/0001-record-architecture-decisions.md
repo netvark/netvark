@@ -16,9 +16,9 @@ visible to be reviewable.
 
 Every decision that affects the public API, the cursor format, the SQL shape, a choice the profile
 leaves to the server, the runtime or database support matrix, security defaults, or dependencies is
-recorded as an ADR in `docs/adr/`, numbered sequentially, using `0000-template.md`. A decision is
-changed by adding a new ADR that supersedes the old one, never by editing history. Pull requests
-that make such a change link the ADR.
+recorded as an ADR in `docs/keyset/adr/`, numbered sequentially, using `0000-template.md`. A
+decision is changed by adding a new ADR that supersedes the old one, never by editing history. Pull
+requests that make such a change link the ADR.
 
 ## Consequences
 

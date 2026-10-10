@@ -1,7 +1,7 @@
 {
-  "name": "ban-kit",
+  "name": "@netvark/ban-core",
   "version": "0.0.0",
-  "description": "Structured, extensible HTTP errors for any JavaScript runtime. One API, any wire format: RFC 9457 Problem Details, JSON:API, Google API (AIP-193), Stripe, or your own. Framework-free; hono-ban is the Hono adapter.",
+  "description": "Structured, extensible HTTP errors for any JavaScript runtime. One API, any wire format: RFC 9457 Problem Details, JSON:API, Google API (AIP-193), Stripe, or your own. Framework-free; @netvark/hono-ban is the Hono adapter.",
   "keywords": [
     "aip-193",
     "boom",
@@ -22,14 +22,14 @@
     "stripe",
     "zod"
   ],
-  "homepage": "https://github.com/ali-issa/ban-kit/tree/main/packages/ban-kit#readme",
-  "bugs": "https://github.com/ali-issa/ban-kit/issues",
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/ban-core#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
   "license": "MIT",
   "author": "Ali Issa (https://github.com/ali-issa)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ali-issa/ban-kit.git",
-    "directory": "packages/ban-kit"
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/ban-core"
   },
   "files": [
     "dist",

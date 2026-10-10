@@ -1,4 +1,4 @@
-# keyset-kit
+# @netvark/keyset-core
 
 Keyset pagination for any JavaScript runtime, database-free. Declare once what a collection can
 sort, filter, and search on; get a typed request, validation that rejects what the definition did
@@ -6,16 +6,18 @@ not declare, a query plan any adapter can render, HMAC-signed cursors bound to t
 assembly with the semantics of the JSON:API
 [Cursor Pagination profile](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/). Every
 rule is a cited clause of the profile or the PostgreSQL manual; where a choice is the library's, it
-is written down in [`docs/SPEC.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/SPEC.md).
+is written down in
+[`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md).
 
-Using [Kysely](https://kysely.dev)? [`kysely-keyset`](https://www.npmjs.com/package/kysely-keyset)
-renders the plan onto your select query and runs it, checks every name against your `DB` interface,
-and re-exports all of this package.
+Using [Kysely](https://kysely.dev)?
+[`@netvark/kysely-keyset`](https://www.npmjs.com/package/kysely-keyset) renders the plan onto your
+select query and runs it, checks every name against your `DB` interface, and re-exports all of this
+package.
 
 ## Install
 
 ```bash
-pnpm add keyset-kit
+pnpm add @netvark/keyset-core
 ```
 
 No dependencies. Node 22.12+, Bun, Deno, and Cloudflare Workers are supported; the package uses web
@@ -27,7 +29,7 @@ vocabulary is PostgreSQL's (`ILIKE`, array operators, `tsvector`, `NULLS FIRST` 
 Three calls: define, plan, page. You run the query in between, with whatever builds your SQL.
 
 ```ts
-import { defineKeyset } from 'keyset-kit';
+import { defineKeyset } from '@netvark/keyset-core';
 
 const contacts = defineKeyset({
   table: 'contacts',
@@ -152,8 +154,8 @@ const page = await contacts.plan({
 
 `sort` is a list of `'field'`, `'-field'`, or `{ field, direction }`; the key is appended when not
 named. `filter` is a tree of conditions, `and`, `or`, `not`, and `{ relation, some }`; an API layer
-builds it from its own grammar (jsonapi-kit's parsed conditions map one to one). Values arrive as
-JSON or as the type's text form, because query strings carry text: `'18'`, `'true'`, and
+builds it from its own grammar (@netvark/jsonapi-core's parsed conditions map one to one). Values
+arrive as JSON or as the type's text form, because query strings carry text: `'18'`, `'true'`, and
 `'2024-01-31'` are accepted for an integer, a boolean, and a date. `search` is a term; blank means
 none. `page` carries `size`, `after`, and `before`.
 
@@ -194,10 +196,10 @@ placement, limits, and hands the rows to `page` with a function that reads the a
 predicate tree has thirteen kinds (`and`, `or`, `not`, `literal`, `compare`, `null`, `in`,
 `between`, `like`, `array`, `exists`, `textSearch`) over three targets (a column, an aggregate
 subquery, a concatenation);
-[`docs/SPEC.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/SPEC.md) section 6 lists each
-with its SQL, and
-[`kysely-keyset`](https://github.com/ali-issa/keyset-kit/tree/main/packages/kysely-keyset) is the
-reference rendering in under two hundred lines.
+[`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md) section 6
+lists each with its SQL, and
+[`@netvark/kysely-keyset`](https://github.com/netvark/netvark/tree/main/packages/kysely-keyset) is
+the reference rendering in under two hundred lines.
 
 Why text? A cursor must round-trip a value exactly, and drivers parse values for convenience, not
 exactness (a `timestamptz` becomes a millisecond `Date`, a `numeric` a string or a number). The
@@ -301,12 +303,12 @@ try {
 
 ## Documentation
 
-- [`docs/DESIGN.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/DESIGN.md): what the
-  packages are, the principles, and the API by example
-- [`docs/SPEC.md`](https://github.com/ali-issa/keyset-kit/blob/main/docs/SPEC.md): the normative
-  contract, section by section, with the tests that prove it
-- [`docs/adr/`](https://github.com/ali-issa/keyset-kit/tree/main/docs/adr): the decisions, including
-  every choice the profile leaves to the server
+- [`docs/keyset/DESIGN.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/DESIGN.md):
+  what the packages are, the principles, and the API by example
+- [`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md): the
+  normative contract, section by section, with the tests that prove it
+- [`docs/keyset/adr/`](https://github.com/netvark/netvark/tree/main/docs/keyset/adr): the decisions,
+  including every choice the profile leaves to the server
 
 ## License
 

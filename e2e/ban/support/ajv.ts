@@ -1,5 +1,5 @@
-import type { JsonSchema } from 'hono-ban';
-import type { SchemaValidator } from 'hono-ban/testing';
+import type { JsonSchema } from '@netvark/hono-ban';
+import type { SchemaValidator } from '@netvark/hono-ban/testing';
 
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020.js';

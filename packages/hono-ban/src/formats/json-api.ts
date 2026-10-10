@@ -1,1 +1,1 @@
-export * from 'ban-kit/formats/json-api';
+export * from '@netvark/ban-core/formats/json-api';

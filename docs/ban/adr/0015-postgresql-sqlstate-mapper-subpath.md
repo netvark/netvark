@@ -1,4 +1,4 @@
-# ADR 0015: Postgres SQLSTATE mapping ships as the `hono-ban/postgresql` subpath
+# ADR 0015: Postgres SQLSTATE mapping ships as the `@netvark/hono-ban/postgresql` subpath
 
 - Status: accepted
 - Date: 2026-09-07
@@ -6,7 +6,7 @@
 ## Context
 
 ADR 0007 keeps driver error translation out of the core and forecast that "application code or a
-separate package maps driver errors to catalog entries". `docs/DESIGN.md` section 7 named that
+separate package maps driver errors to catalog entries". `docs/ban/DESIGN.md` section 7 named that
 package `hono-ban-pg` and preferred it over a subpath for two reasons: its own release cadence and
 its own driver peer dependency. Both were examined before building it:
 
@@ -16,8 +16,8 @@ its own driver peer dependency. Both were examined before building it:
   typed structurally like every other integration (ADR 0009).
 - No separate cadence is needed. The module has no dependencies, the SQLSTATE table comes from the
   Postgres manual's Appendix A and is stable across major versions, and the module changes when the
-  catalog or the handler change, which is when `hono-ban` itself releases. `./zod`, `./valibot`, and
-  `./otel` already ship optional integrations as subpaths under the same reasoning.
+  catalog or the handler change, which is when `@netvark/hono-ban` itself releases. `./zod`,
+  `./valibot`, and `./otel` already ship optional integrations as subpaths under the same reasoning.
 
 Sources consulted, all fetched on 2026-09-07:
 
@@ -56,7 +56,7 @@ Sources consulted, all fetched on 2026-09-07:
 
 ## Decision
 
-`hono-ban/postgresql` exports `postgresMapper(options?)`, `findPostgresError(value)`, and
+`@netvark/hono-ban/postgresql` exports `postgresMapper(options?)`, `findPostgresError(value)`, and
 `readPostgresFields(error)` (SPEC 6.10). The subpath is named after the database in full,
 `postgresql`, because `postgres` is postgres.js's npm name and the module serves every driver.
 
@@ -98,9 +98,9 @@ any ban without a type argument.
 
 ## Consequences
 
-- The README's "companion package" gap closes; `docs/DESIGN.md` section 7 loses its only row. ADR
-  0007's Decision stands; its Consequences sentence about a separate package is clarified by this
-  record.
+- The README's "companion package" gap closes; `docs/ban/DESIGN.md` section 7 loses its only row.
+  ADR 0007's Decision stands; its Consequences sentence about a separate package is clarified by
+  this record.
 - Choosing the mapper never forwards driver text. Applications that want `RAISE EXCEPTION` messages
   on the wire compose their own `map` with `findPostgresError` and pass the message themselves; the
   package offers no opt-in for it.
@@ -116,11 +116,11 @@ any ban without a type argument.
 The first release verified two shapes against a live server (PGlite, Drizzle) and the rest by source
 inspection and fixtures. Since 2026-09-08 the e2e suite also connects the real node-postgres and
 postgres.js drivers over the wire protocol to the same PGlite through `@electric-sql/pglite-socket`
-(`e2e/support/pglite-socket.ts`), so every built-in row is raised by a real server and thrown by the
-real driver class for the three driver shapes that differ. Failing statements go through the simple
-query protocol because PGlite answers each extended-protocol message with its own ReadyForQuery
-(electric-sql/pglite issue 958), which desynchronizes a driver after a failed parameterized
-statement. @ref https://pglite.dev/docs/pglite-socket @ref
+(`e2e/ban/support/pglite-socket.ts`), so every built-in row is raised by a real server and thrown by
+the real driver class for the three driver shapes that differ. Failing statements go through the
+simple query protocol because PGlite answers each extended-protocol message with its own
+ReadyForQuery (electric-sql/pglite issue 958), which desynchronizes a driver after a failed
+parameterized statement. @ref https://pglite.dev/docs/pglite-socket @ref
 https://github.com/electric-sql/pglite/issues/958
 
 | Driver or ORM        | Version inspected or run          | Verified by                                                                                   |
@@ -136,5 +136,5 @@ https://github.com/electric-sql/pglite/issues/958
 | TypeORM, MikroORM    | `master`                          | Copy the driver error's own properties onto their exception; source inspection only           |
 | Slonik, Objection    | `main`                            | `cause` and `nativeError` links; source inspection only                                       |
 
-Versions that move with Dependabot are the pins in `e2e/package.json`; this table is the snapshot at
-the amendment date.
+Versions that move with Dependabot are the pins in `e2e/ban/package.json`; this table is the
+snapshot at the amendment date.

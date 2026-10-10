@@ -1,12 +1,12 @@
 ---
-'hono-ban': major
+'@netvark/hono-ban': major
 ---
 
-hono-ban 2.0 is the Hono adapter for `ban-kit`, which now holds everything that does not need Hono.
-Every subpath keeps its name and exports (`hono-ban/formats/json-api` is
-`ban-kit/formats/json-api`), `createBan` keeps `ban.onError()` for `app.onError()`, and the
-callbacks still receive the Hono `Context`. The root also exports `fromHttpException` and the core's
-new members (`ban.handler`, `fromRequest`, `isErrorStatus`, `ban.fromStatus`,
+@netvark/hono-ban 2.0 is the Hono adapter for `@netvark/ban-core`, which now holds everything that
+does not need Hono. Every subpath keeps its name and exports (`@netvark/hono-ban/formats/json-api`
+is `@netvark/ban-core/formats/json-api`), `createBan` keeps `ban.onError()` for `app.onError()`, and
+the callbacks still receive the Hono `Context`. The root also exports `fromHttpException` and the
+core's new members (`ban.handler`, `fromRequest`, `isErrorStatus`, `ban.fromStatus`,
 `createBan({ adopt })`).
 
 Breaking changes:
@@ -28,3 +28,7 @@ Breaking changes:
 - The catalog key `onError` is reserved, as before; `handler` and `fromStatus` are reserved too.
 
 Wire bodies for the built-in formats are unchanged for single errors and validation errors.
+
+This is the first release under the `@netvark` scope. Releases before 2.0.0 were published as
+`hono-ban`, without the scope; that name stays at 1.x and is deprecated in favor of
+`@netvark/hono-ban`.

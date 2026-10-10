@@ -1,5 +1,11 @@
-import type { BanError, Catalog, EmptyCatalog, Factory } from 'ban-kit';
 import type { Context, Env, ErrorHandler } from 'hono';
+
+import type {
+  BanError,
+  Catalog,
+  EmptyCatalog,
+  Factory,
+} from '@netvark/ban-core';
 
 import type { Ban } from './create-ban';
 
@@ -11,7 +17,7 @@ import { createBan } from './create-ban';
 type AppEnv = { Bindings: { DB: string }; Variables: { user: string } };
 declare const app: Hono<AppEnv>;
 
-describe('createBan (hono-ban) types', () => {
+describe('createBan (@netvark/hono-ban) types', () => {
   it('returns the core instance plus onError', () => {
     const ban = createBan({ errors: { TEAPOT: { status: 418 } } });
     expectTypeOf(ban.TEAPOT).toEqualTypeOf<Factory>();

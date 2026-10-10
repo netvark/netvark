@@ -1,8 +1,8 @@
 /**
- * keyset-kit: keyset pagination for any JavaScript runtime, database-free.
+ * `@netvark/keyset-core`: keyset pagination for any JavaScript runtime, database-free.
  * `defineKeyset` validates a definition; `plan` turns a request into a
  * query plan an adapter renders; `page` assembles the result with signed
- * cursors. See `docs/SPEC.md` for the contract.
+ * cursors. See `docs/keyset/SPEC.md` for the contract.
  * @packageDocumentation
  */
 export type {

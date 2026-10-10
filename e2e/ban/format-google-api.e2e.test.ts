@@ -19,18 +19,18 @@
 import type {
   GoogleApiBody,
   GoogleApiDetail,
-} from 'hono-ban/formats/google-api';
+} from '@netvark/hono-ban/formats/google-api';
 
 import type { RunningServer } from './support/server';
 
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
+import { createBan } from '@netvark/hono-ban';
 import {
   GOOGLE_API_CONTENT_TYPE,
   googleApi,
-} from 'hono-ban/formats/google-api';
+} from '@netvark/hono-ban/formats/google-api';
 
 import { schemaErrors } from './support/ajv';
 import { startServer } from './support/server';

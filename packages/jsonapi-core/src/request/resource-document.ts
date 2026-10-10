@@ -10,7 +10,7 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-resource-relationships
  * @packageDocumentation
  */
-import type { ErrorItem } from 'ban-kit';
+import type { ErrorItem } from '@netvark/ban-core';
 
 import type { Meta, ResourceLinkage } from '../document/types';
 import type { StandardSchema } from '../internal/standard-schema-types';

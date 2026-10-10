@@ -4,7 +4,7 @@ import type { CamelDB, DB } from './db.ts';
  * The keysets under test, defined through the typed definer against the
  * snake_case `DB` and the camelCase `CamelDB`.
  */
-import { createDefineKeyset } from 'kysely-keyset';
+import { createDefineKeyset } from '@netvark/kysely-keyset';
 
 export const SECRET = 'e2e-secret-with-at-least-32-bytes-in-it';
 

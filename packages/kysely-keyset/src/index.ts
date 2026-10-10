@@ -1,13 +1,13 @@
 /**
- * kysely-keyset: keyset pagination for Kysely on PostgreSQL. Everything
- * `keyset-kit` exports is re-exported, so an application imports from one
+ * `@netvark/kysely-keyset`: keyset pagination for Kysely on PostgreSQL. Everything
+ * `@netvark/keyset-core` exports is re-exported, so an application imports from one
  * package; on top come `createDefineKeyset`, whose keysets check names
  * against the `DB` interface and carry `paginate`, and `paginate` itself
  * for keysets defined with the core.
  * @ref https://kysely.dev/
  * @packageDocumentation
  */
-export * from 'keyset-kit';
+export * from '@netvark/keyset-core';
 
 export type {
   DefineKeyset,

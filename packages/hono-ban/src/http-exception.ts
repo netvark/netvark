@@ -6,10 +6,11 @@
  * @ref https://hono.dev/docs/api/exception
  * @packageDocumentation
  */
-import type { Ban, BanError, Catalog } from 'ban-kit';
+import type { Ban, BanError, Catalog } from '@netvark/ban-core';
 
-import { isErrorStatus } from 'ban-kit';
 import { HTTPException } from 'hono/http-exception';
+
+import { isErrorStatus } from '@netvark/ban-core';
 
 const BAD_REQUEST = 400;
 const RANGE_NOT_SATISFIABLE = 416;

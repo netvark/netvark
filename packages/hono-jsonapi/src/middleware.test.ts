@@ -3,7 +3,7 @@ import type { JsonApiContext, JsonApiEnv } from './types';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { ATOMIC_OPERATIONS_EXTENSION } from 'jsonapi-kit';
+import { ATOMIC_OPERATIONS_EXTENSION } from '@netvark/jsonapi-core';
 
 import { jsonApi } from './middleware';
 import { respond } from './respond';

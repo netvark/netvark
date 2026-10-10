@@ -5,7 +5,7 @@
  */
 import type { Hono } from 'hono';
 
-import type { Included, JsonApiEnv, ParsedQuery } from 'hono-jsonapi';
+import type { Included, JsonApiEnv, ParsedQuery } from '@netvark/hono-jsonapi';
 
 import type { PersonView } from './resources.ts';
 import type { ArticleRow, PersonRow, Store } from './store.ts';
@@ -24,7 +24,7 @@ import {
   toManyRelationshipDocument,
   toOneLinkage,
   toOneRelationshipDocument,
-} from 'hono-jsonapi';
+} from '@netvark/hono-jsonapi';
 
 import { Articles, BASE_URL, People, Tags } from './resources.ts';
 import { cursorOf } from './store.ts';

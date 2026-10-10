@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import * as core from 'keyset-kit';
-import * as kysely from 'kysely-keyset';
+import * as core from '@netvark/keyset-core';
+import * as kysely from '@netvark/kysely-keyset';
 
 function names(module: object): Array<string> {
   return Object.keys(module).toSorted();
@@ -55,28 +55,28 @@ const ADAPTER = [
 ].toSorted();
 
 describe('package surface', () => {
-  it('keyset-kit exports the documented values', () => {
+  it('@netvark/keyset-core exports the documented values', () => {
     expect(names(core)).toEqual(CORE);
   });
 
-  it('kysely-keyset re-exports the core and adds the adapter', () => {
+  it('@netvark/kysely-keyset re-exports the core and adds the adapter', () => {
     expect(names(kysely)).toEqual([...CORE, ...ADAPTER].toSorted());
     expect(kysely.defineKeyset).toBe(core.defineKeyset);
     expect(kysely.InvalidCursorError).toBe(core.InvalidCursorError);
   });
 
   it('resolves package.json through the exports map', async () => {
-    const corePkg = (await import('keyset-kit/package.json', {
+    const corePkg = (await import('@netvark/keyset-core/package.json', {
       with: { type: 'json' },
     })) as {
       default: { name: string };
     };
-    const adapterPkg = (await import('kysely-keyset/package.json', {
+    const adapterPkg = (await import('@netvark/kysely-keyset/package.json', {
       with: { type: 'json' },
     })) as {
       default: { name: string };
     };
-    expect(corePkg.default.name).toBe('keyset-kit');
-    expect(adapterPkg.default.name).toBe('kysely-keyset');
+    expect(corePkg.default.name).toBe('@netvark/keyset-core');
+    expect(adapterPkg.default.name).toBe('@netvark/kysely-keyset');
   });
 });

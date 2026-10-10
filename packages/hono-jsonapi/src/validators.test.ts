@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { defineResource } from 'jsonapi-kit';
+import { defineResource } from '@netvark/jsonapi-core';
 
 import {
   bodyValidator,

@@ -1,8 +1,9 @@
 # ADR 0002: `hono` is the only peer dependency; validators through Standard Schema
 
-- Status: accepted; scope narrowed by ADR-0013 (`hono` is the peer dependency of `hono-jsonapi`) and
-  amended by ADR-0014 (`jsonapi-kit` depends on `ban-kit`; `hono-ban` is `hono-jsonapi`'s second
-  peer dependency). The Standard Schema decision stands unchanged.
+- Status: accepted; scope narrowed by ADR-0013 (`hono` is the peer dependency of
+  `@netvark/hono-jsonapi`) and amended by ADR-0014 (`@netvark/jsonapi-core` depends on
+  `@netvark/ban-core`; `@netvark/hono-ban` is `@netvark/hono-jsonapi`'s second peer dependency). The
+  Standard Schema decision stands unchanged.
 - Date: 2026-10-08
 
 ## Context
@@ -24,7 +25,7 @@ read with `in`, because zod 4, Valibot, and ArkType define it as a prototype get
 must be 1 with a `validate` function. Issue paths become RFC 6901 pointers; the issue `message`
 becomes `detail`; nothing else from the library reaches a response.
 
-The real libraries used in tests (Zod) are devDependencies of the root and of `e2e/`.
+The real libraries used in tests (Zod) are devDependencies of the root and of `e2e/jsonapi/`.
 
 ## Consequences
 

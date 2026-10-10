@@ -1,10 +1,10 @@
 /**
- * hono-ban: ban-kit for Hono. Everything `ban-kit` exports, plus a
+ * `@netvark/hono-ban`: @netvark/ban-core for Hono. Everything `@netvark/ban-core` exports, plus a
  * `createBan` whose instances carry `onError` for `app.onError()` and adopt
  * Hono's `HTTPException`.
  * @packageDocumentation
  */
-export * from 'ban-kit';
+export * from '@netvark/ban-core';
 
 export type {
   Ban,

@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * truncation, as the Cursor Pagination profile prescribes.
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--query-parameters
  */
-import { RangeNotSupportedError } from 'kysely-keyset';
+import { RangeNotSupportedError } from '@netvark/kysely-keyset';
 
 import { openPglite } from './support/db.ts';
 import { contacts, searchable } from './support/keysets.ts';

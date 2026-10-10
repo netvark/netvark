@@ -1,1 +1,1 @@
-export * from 'ban-kit/valibot';
+export * from '@netvark/ban-core/valibot';

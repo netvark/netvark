@@ -1,1 +1,1 @@
-export * from 'ban-kit/openapi';
+export * from '@netvark/ban-core/openapi';

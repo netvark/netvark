@@ -6,12 +6,12 @@
 ## Context
 
 JSON:API reserves the `filter` query parameter family and leaves its strategy to the server; URL
-grammars belong to the API layer (`jsonapi-kit` parses `filter[field][op]=v` into conditions). The
-pagination layer has to turn conditions into SQL safely: an undeclared column name must never reach
-a query, a value must match the column's type, and nothing may be dropped silently. Query strings
-carry only text, so `18`, `true`, and `2024-01-01` arrive as strings even when the column is an
-integer, a boolean, or a date. @ref https://jsonapi.org/format/1.1/#fetching-filtering @ref
-https://www.postgresql.org/docs/current/functions-comparison.html @ref
+grammars belong to the API layer (`@netvark/jsonapi-core` parses `filter[field][op]=v` into
+conditions). The pagination layer has to turn conditions into SQL safely: an undeclared column name
+must never reach a query, a value must match the column's type, and nothing may be dropped silently.
+Query strings carry only text, so `18`, `true`, and `2024-01-01` arrive as strings even when the
+column is an integer, a boolean, or a date. @ref https://jsonapi.org/format/1.1/#fetching-filtering
+@ref https://www.postgresql.org/docs/current/functions-comparison.html @ref
 https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-LIKE @ref
 https://www.postgresql.org/docs/current/functions-array.html
 

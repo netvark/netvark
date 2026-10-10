@@ -1,14 +1,14 @@
 /**
- * jsonapi-kit: JSON:API 1.1 for any JavaScript runtime. Resource
+ * `@netvark/jsonapi-core`: JSON:API 1.1 for any JavaScript runtime. Resource
  * definitions, document building, query parsing, request document parsing,
  * content negotiation, and the Cursor Pagination profile, all as functions
  * over plain values; nothing here knows about a web framework. The Atomic
- * Operations extension lives in `jsonapi-kit/atomic`; the Hono integration
- * is the `hono-jsonapi` package.
+ * Operations extension lives in `@netvark/jsonapi-core/atomic`; the Hono integration
+ * is the `@netvark/hono-jsonapi` package.
  * @ref https://jsonapi.org/format/1.1/
  * @packageDocumentation
  */
-export type { Ban, ErrorItem, ErrorStatusCode } from 'ban-kit';
+export type { Ban, ErrorItem, ErrorStatusCode } from '@netvark/ban-core';
 
 export type { DocumentOptions, Included } from './document/build';
 export type {
@@ -142,7 +142,7 @@ export type {
   UpdateAttributesOf,
 } from './resource/types';
 
-export { BanError, isBanError } from 'ban-kit';
+export { BanError, isBanError } from '@netvark/ban-core';
 
 export {
   collectionDocument,

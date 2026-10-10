@@ -5,8 +5,8 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { defaultHook, hook } from 'hono-ban/zod';
+import { createBan } from '@netvark/hono-ban';
+import { defaultHook, hook } from '@netvark/hono-ban/zod';
 
 import { startServer } from './support/server';
 

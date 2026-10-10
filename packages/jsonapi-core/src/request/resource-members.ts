@@ -9,7 +9,7 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-resource-relationships
  * @packageDocumentation
  */
-import type { ErrorItem } from 'ban-kit';
+import type { ErrorItem } from '@netvark/ban-core';
 
 import type { AnyResource } from '../resource/types';
 import type { RequestLinkage } from './identifiers';

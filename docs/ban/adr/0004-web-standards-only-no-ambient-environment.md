@@ -17,7 +17,7 @@ Source under `src/` uses only APIs defined by web standards or ECMAScript: `Resp
 `crypto.randomUUID`, `structuredClone`. Nothing reads `process`, `Deno`, `Bun`, or `navigator`.
 Behavior that depends on the deployment environment (`includeStack`, `docsBaseUrl`) is an explicit
 option; the README shows how to derive it from `env(c)` or the platform's own config. CI runs the
-unit and end-to-end suites on Node 22 and 24 and one smoke app (`e2e/smoke/`) on Bun, Deno, and
+unit and end-to-end suites on Node 22 and 24 and one smoke app (`e2e/ban/smoke/`) on Bun, Deno, and
 workerd through Miniflare.
 
 ## Consequences

@@ -8,7 +8,10 @@ import type { Harness } from './support/db.ts';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { InvalidFilterValueError, UnsupportedFilterError } from 'kysely-keyset';
+import {
+  InvalidFilterValueError,
+  UnsupportedFilterError,
+} from '@netvark/kysely-keyset';
 
 import { openPglite } from './support/db.ts';
 import { contacts } from './support/keysets.ts';

@@ -1,7 +1,7 @@
 /**
  * Own-property reads over values that came from a document, so a member
  * named `constructor` is a plain key and never a prototype walk. The same
- * two helpers as jsonapi-kit's internal module, which is not part of its
+ * two helpers as @netvark/jsonapi-core's internal module, which is not part of its
  * public surface.
  * @packageDocumentation
  */

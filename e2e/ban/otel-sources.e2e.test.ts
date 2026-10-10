@@ -13,8 +13,8 @@
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-node';
 import type { MiddlewareHandler } from 'hono';
 
-import type { ErrorReport } from 'hono-ban';
-import type { OtelSource, OtelSpanContextLike } from 'hono-ban/otel';
+import type { ErrorReport } from '@netvark/hono-ban';
+import type { OtelSource, OtelSpanContextLike } from '@netvark/hono-ban/otel';
 
 import type { RunningServer } from './support/server';
 
@@ -27,9 +27,9 @@ import {
 import { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { jsonApi } from 'hono-ban/formats/json-api';
-import { traceIdFromOtel } from 'hono-ban/otel';
+import { createBan } from '@netvark/hono-ban';
+import { jsonApi } from '@netvark/hono-ban/formats/json-api';
+import { traceIdFromOtel } from '@netvark/hono-ban/otel';
 
 import { startServer } from './support/server';
 
@@ -40,8 +40,8 @@ const { trace } = otelApi;
  * second `register()` only logs a warning. `register()` with no
  * `contextManager` installs `AsyncLocalStorageContextManager`, which carries
  * the active span from the middleware into `onError`.
- * @ref e2e/node_modules/@opentelemetry/sdk-trace-node/build/src/NodeTracerProvider.js (register -> setupContextManager)
- * @ref e2e/node_modules/@opentelemetry/sdk-trace-node/build/src/NodeTracerProvider.d.ts (constructor(config?: NodeTracerConfig))
+ * @ref e2e/ban/node_modules/@opentelemetry/sdk-trace-node/build/src/NodeTracerProvider.js (register -> setupContextManager)
+ * @ref e2e/ban/node_modules/@opentelemetry/sdk-trace-node/build/src/NodeTracerProvider.d.ts (constructor(config?: NodeTracerConfig))
  * @ref node_modules/.pnpm/@opentelemetry+sdk-trace@2.11.0_@opentelemetry+api@1.9.1/node_modules/@opentelemetry/sdk-trace/build/src/types.d.ts (TracerProviderOptions.spanProcessors)
  */
 const exporter = new InMemorySpanExporter();
@@ -66,9 +66,9 @@ const DETAIL = 'Order 42 does not exist';
 
 /**
  * Opens an active span for the request; Hono calls `onError` from the same
- * `dispatch` frame that threw, so the span is active while hono-ban renders.
+ * `dispatch` frame that threw, so the span is active while @netvark/hono-ban renders.
  * @ref https://opentelemetry.io/docs/languages/js/instrumentation/#create-spans
- * @ref e2e/node_modules/hono/dist/compose.js (onError runs inside the throwing dispatch)
+ * @ref e2e/ban/node_modules/hono/dist/compose.js (onError runs inside the throwing dispatch)
  */
 const withSpan: MiddlewareHandler = async (c, next) => {
   await tracer.startActiveSpan(
@@ -183,7 +183,7 @@ describe('structural OtelSource (SPEC 10.3)', () => {
   });
   const server = useServer(app);
 
-  // @ref e2e/node_modules/@opentelemetry/api/build/src/trace/invalid-span-constants.d.ts (INVALID_TRACEID, INVALID_SPANID)
+  // @ref e2e/ban/node_modules/@opentelemetry/api/build/src/trace/invalid-span-constants.d.ts (INVALID_TRACEID, INVALID_SPANID)
   const INVALID_TRACE_ID = '0'.repeat(32);
   const INVALID_SPAN_ID = '0'.repeat(16);
   const cases: Array<{

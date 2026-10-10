@@ -1,19 +1,19 @@
-import type { JsonSchema, SchemaDialect } from 'hono-ban';
+import type { JsonSchema, SchemaDialect } from '@netvark/hono-ban';
 
 import type { RunningServer } from './support/server';
 
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { PROBLEM_DETAILS_CONTENT_TYPE } from 'hono-ban/formats/problem-details';
+import { createBan } from '@netvark/hono-ban';
+import { PROBLEM_DETAILS_CONTENT_TYPE } from '@netvark/hono-ban/formats/problem-details';
 import {
   errorResponse,
   errorResponses,
   errorSchema,
   validationResponse,
   validationSchema,
-} from 'hono-ban/openapi';
+} from '@netvark/hono-ban/openapi';
 
 import { startServer } from './support/server';
 

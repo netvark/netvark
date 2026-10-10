@@ -1,7 +1,7 @@
-# keyset-kit: implementation specification
+# @netvark/keyset-core: implementation specification
 
-- Status: normative for the 0.x line of `keyset-kit` and `kysely-keyset`; `docs/DESIGN.md` explains
-  the why
+- Status: normative for the 0.x line of `@netvark/keyset-core` and `@netvark/kysely-keyset`;
+  `docs/keyset/DESIGN.md` explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. When this document and the code
@@ -20,7 +20,7 @@ Contents
 7. Pages
 8. Cursors
 9. Errors
-10. Kysely adapter (`kysely-keyset`)
+10. Kysely adapter (`@netvark/kysely-keyset`)
 11. Test plan
 12. Packaging
 13. Constants
@@ -29,28 +29,29 @@ Contents
 
 ## 1. Public surface and module map
 
-Two packages, one repository (ADR 0004). `keyset-kit` is the database-free core: every module is a
-function over plain values and none imports a query builder, a driver, or a runtime API beyond web
-standards (ADR 0002). `kysely-keyset` is the Kysely adapter: it depends on `keyset-kit`, re-exports
-all of it (one import for a Kysely application), and adds the typed definer, `paginate`, and the
-render functions (section 10). `kysely >= 0.28.0` is its only peer dependency.
+Two packages, one repository (ADR 0004). `@netvark/keyset-core` is the database-free core: every
+module is a function over plain values and none imports a query builder, a driver, or a runtime API
+beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter: it depends on
+`@netvark/keyset-core`, re-exports all of it (one import for a Kysely application), and adds the
+typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its only
+peer dependency.
 
-| Package         | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keyset-kit`    | Values: `defineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
-| `kysely-keyset` | Everything of `keyset-kit` (the same bindings), plus `createDefineKeyset`, `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `KyselyKeyset`, `TypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/keyset-core`   | Values: `defineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
+| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus `createDefineKeyset`, `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `KyselyKeyset`, `TypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-`e2e/package-surface.e2e.test.ts` asserts the exact value export list of both packages against the
-built packages, and that the adapter's re-exports are the core's own bindings.
+`e2e/keyset/package-surface.e2e.test.ts` asserts the exact value export list of both packages
+against the built packages, and that the adapter's re-exports are the core's own bindings.
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
 `*.test-d.ts`. Type-only modules (`types.ts` files) are covered through their consumers; coverage
 thresholds apply to all of `packages/*/src/`. Imports form a DAG (`import/no-cycle` is enforced,
-type-only imports included); nothing under `packages/keyset-kit` imports `kysely`, and
+type-only imports included); nothing under `packages/keyset-core` imports `kysely`, and
 `packages/kysely-keyset` imports the core only through its package name.
 
 ```
-packages/keyset-kit/src/
+packages/keyset-core/src/
   index.ts                     root entry
   errors.ts                    section 9
   internal/
@@ -82,7 +83,7 @@ packages/keyset-kit/src/
   cursor/codec.ts              createCursorCodec(), CURSOR_VERSION, MIN_SECRET_BYTES (8)
   test-support/                the shared definition and helpers for the repository's own tests; not published
 packages/kysely-keyset/src/
-  index.ts                     root entry: re-exports keyset-kit, adds section 10
+  index.ts                     root entry: re-exports @netvark/keyset-core, adds section 10
   types.ts                     KyselyKeyset, PaginateOptions, QueryEvent, RenderContext, the widened Kysely shapes (10)
   define-keyset.ts             createDefineKeyset(), the Typed*Init types, RelationsOf (10.1)
   render/target.ts             renderTarget(), concat() (10.2)
@@ -93,7 +94,7 @@ packages/kysely-keyset/src/
 
 ---
 
-## 2. Internals (`packages/keyset-kit/src/internal/`)
+## 2. Internals (`packages/keyset-core/src/internal/`)
 
 Never exported. Each is a small, fully tested primitive the rest of the core builds on.
 
@@ -578,7 +579,7 @@ Tests: `errors.test.ts`.
 
 ---
 
-## 10. Kysely adapter (`kysely-keyset`, `packages/kysely-keyset/src/`)
+## 10. Kysely adapter (`@netvark/kysely-keyset`, `packages/kysely-keyset/src/`)
 
 ### 10.1 `createDefineKeyset<DB>()` (`define-keyset.ts`)
 
@@ -650,31 +651,32 @@ the base query's clauses; row splitting; the dummy driver).
 ## 11. Test plan
 
 One Vitest run over two projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled for
-its `*.test-d.ts`; `kysely-keyset`'s project resolves `keyset-kit` from source (section 12). V8
-coverage thresholds of 90% for statements, branches, functions, and lines over `packages/*/src/`
-combined (the `index.ts` barrels excluded). Every test names the rule or choice it pins. The
-adapter's tests run against a compile-only Kysely (`DummyDriver`) and a driver that answers canned
-rows while recording the compiled queries; no module of the packages is mocked.
+its `*.test-d.ts`; `@netvark/kysely-keyset`'s project resolves `@netvark/keyset-core` from source
+(section 12). V8 coverage thresholds of 90% for statements, branches, functions, and lines over
+`packages/*/src/` combined (the `index.ts` barrels excluded). Every test names the rule or choice it
+pins. The adapter's tests run against a compile-only Kysely (`DummyDriver`) and a driver that
+answers canned rows while recording the compiled queries; no module of the packages is mocked.
 
-| Area                      | Files                                                                                                                                                                      | What is pinned                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Internal                  | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                               | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                              |
-| Definition                | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts` | every definition-time rejection and default, inference                                                      |
-| Filter                    | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                  | the operator table, value forms, each predicate mapping, tree shapes and paths                              |
-| Sort, plan, page, cursor  | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                  | tie-breaking, the context, inversion, every seek case, page bounds, links, the cursor format and its checks |
-| Errors                    | `errors.test.ts`                                                                                                                                                           | constant messages, structured fields, the guard                                                             |
-| Adapter (`kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                              | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB` |
+| Area                               | Files                                                                                                                                                                      | What is pinned                                                                                              |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Internal                           | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                               | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                              |
+| Definition                         | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts` | every definition-time rejection and default, inference                                                      |
+| Filter                             | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                  | the operator table, value forms, each predicate mapping, tree shapes and paths                              |
+| Sort, plan, page, cursor           | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                  | tie-breaking, the context, inversion, every seek case, page bounds, links, the cursor format and its checks |
+| Errors                             | `errors.test.ts`                                                                                                                                                           | constant messages, structured fields, the guard                                                             |
+| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                              | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB` |
 
-### 11.1 End-to-end suite and invariants (`e2e/`)
+### 11.1 End-to-end suite and invariants (`e2e/keyset/`)
 
-A private workspace package that depends on `keyset-kit` and `kysely-keyset` through `workspace:*`,
-so imports resolve through the published `exports` maps into each `dist/` (never the `source`
-condition) and `tsc` checks the emitted declarations. `e2e/support/` holds the schema (three tables:
-`contacts` with every field type and a generated `tsvector`, `contact_emails`, `work_history`) and a
-twelve-row seed with the cases keyset pagination must survive: equal sort values, nulls in sortable
-columns, mixed-case text, a microsecond timestamp, enums, arrays, and relations with zero, one, or
-several rows. `expectedIds(sort)` orders the seed in JavaScript (nulls last, the key breaking ties),
-so no test trusts the SQL under test for its expectation.
+A private workspace package that depends on `@netvark/keyset-core` and `@netvark/kysely-keyset`
+through `workspace:*`, so imports resolve through the published `exports` maps into each `dist/`
+(never the `source` condition) and `tsc` checks the emitted declarations. `e2e/keyset/support/`
+holds the schema (three tables: `contacts` with every field type and a generated `tsvector`,
+`contact_emails`, `work_history`) and a twelve-row seed with the cases keyset pagination must
+survive: equal sort values, nulls in sortable columns, mixed-case text, a microsecond timestamp,
+enums, arrays, and relations with zero, one, or several rows. `expectedIds(sort)` orders the seed in
+JavaScript (nulls last, the key breaking ties), so no test trusts the SQL under test for its
+expectation.
 
 `runInvariants(label, open)` runs, for eight sorts (single and composite, ascending and descending,
 over ties, nulls, an insensitive column, and both aggregates) and page sizes 1, 3, and 5: walking
@@ -685,7 +687,7 @@ it came from.
 
 | File                          | Covers                                                                                                               |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `package-surface.e2e.test.ts` | the exact export lists of both packages, and that `kysely-keyset` re-exports the core's own bindings                 |
+| `package-surface.e2e.test.ts` | the exact export lists of both packages, and that `@netvark/kysely-keyset` re-exports the core's own bindings        |
 | `paginate.e2e.test.ts`        | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps     |
 | `filters.e2e.test.ts`         | every operator of every type against real rows, combinators, rejections before querying, totals                      |
 | `relations.e2e.test.ts`       | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging |
@@ -711,7 +713,7 @@ production uses. The file runs only when `KEYSET_PG_URL` names a server and skip
 it creates a throwaway schema, scopes its connections to it with `search_path`, and drops it. CI
 provides PostgreSQL 14 and 18.
 
-### 11.4 Runtime smoke test (`e2e/smoke/`)
+### 11.4 Runtime smoke test (`e2e/keyset/smoke/`)
 
 `checks.ts` holds runtime-neutral checks over the built packages: define a keyset, plan a request,
 sign and verify cursors with the runtime's Web Crypto, render SQL through Kysely's PostgreSQL
@@ -732,9 +734,9 @@ runs them on every push.
   by `packages/kysely-keyset/tsconfig.json` (`customConditions`) and its Vitest project
   (`ssr.resolve.conditions`); `publishConfig.exports` is the dist-only map `pnpm publish` and
   `pnpm pack` apply. CI fails when the build changes the committed maps.
-- `keyset-kit` has no dependencies. `kysely-keyset` depends on `keyset-kit` (`workspace:^`, written
-  as a caret range on publish) and has `kysely >= 0.28.0` as its only peer dependency; CI runs its
-  unit tests on 0.28.17.
+- `@netvark/keyset-core` has no dependencies. `@netvark/kysely-keyset` depends on
+  `@netvark/keyset-core` (`workspace:^`, written as a caret range on publish) and has
+  `kysely >= 0.28.0` as its only peer dependency; CI runs its unit tests on 0.28.17.
 - `files` is `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`. `sideEffects: false`.
 - Releases go through Changesets: a "Version Packages" PR, then `changeset publish` under npm
   trusted publishing with provenance, one GitHub release per package.

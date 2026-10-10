@@ -7,7 +7,11 @@
  */
 import type { Context, Env } from 'hono';
 
-import { isJsonApiMediaType, jsonApiError, parseMediaType } from 'jsonapi-kit';
+import {
+  isJsonApiMediaType,
+  jsonApiError,
+  parseMediaType,
+} from '@netvark/jsonapi-core';
 
 /** The parsed JSON body of a request declared as `application/vnd.api+json`. */
 export async function readDocument<E extends Env>(

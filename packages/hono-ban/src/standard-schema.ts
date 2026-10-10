@@ -1,1 +1,1 @@
-export * from 'ban-kit/standard-schema';
+export * from '@netvark/ban-core/standard-schema';

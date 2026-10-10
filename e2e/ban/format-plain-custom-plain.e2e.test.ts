@@ -1,13 +1,13 @@
-import type { IssueLocation, SchemaContext } from 'hono-ban';
+import type { IssueLocation, SchemaContext } from '@netvark/hono-ban';
 
 import type { RunningServer } from './support/server';
 
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBan } from 'hono-ban';
-import { plain, PLAIN_CONTENT_TYPE } from 'hono-ban/formats/plain';
-import { assertFormatConformance } from 'hono-ban/testing';
+import { createBan } from '@netvark/hono-ban';
+import { plain, PLAIN_CONTENT_TYPE } from '@netvark/hono-ban/formats/plain';
+import { assertFormatConformance } from '@netvark/hono-ban/testing';
 
 import { compileWithAjv, schemaErrors } from './support/ajv';
 import { startServer } from './support/server';

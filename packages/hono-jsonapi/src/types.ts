@@ -4,7 +4,7 @@
  * `Env`) so `c.get('jsonApi')` is typed in handlers after `jsonApi()`.
  * @packageDocumentation
  */
-import type { NegotiatedRequest } from 'jsonapi-kit';
+import type { NegotiatedRequest } from '@netvark/jsonapi-core';
 
 /** What `jsonApi()` negotiated for the current request. */
 export interface JsonApiContext {

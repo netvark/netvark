@@ -1,8 +1,9 @@
 import type { ErrorObject } from '../document/types';
 
-import { isBanError } from 'ban-kit';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+
+import { isBanError } from '@netvark/ban-core';
 
 import { errorObjects } from '../errors/json-api-error';
 import { defineResource } from '../resource/define-resource';

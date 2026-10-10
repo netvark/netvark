@@ -243,7 +243,7 @@ export function report(result: SmokeResult): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
     console.log(
-      `jsonapi-kit smoke: ${total} checks passed on ${result.runtime}`,
+      `@netvark/jsonapi-core smoke: ${total} checks passed on ${result.runtime}`,
     );
     return;
   }
@@ -251,6 +251,6 @@ export function report(result: SmokeResult): void {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `jsonapi-kit smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `@netvark/jsonapi-core smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

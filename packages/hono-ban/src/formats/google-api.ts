@@ -1,1 +1,1 @@
-export * from 'ban-kit/formats/google-api';
+export * from '@netvark/ban-core/formats/google-api';

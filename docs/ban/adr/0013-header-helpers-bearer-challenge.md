@@ -36,8 +36,8 @@ https://www.rfc-editor.org/rfc/rfc6749#section-5.2
 - No per-status factory options. Every factory takes the same `BanErrorOptions` (DESIGN principle
   3); a `headers` entry is one line and `from()` already preserves middleware-set values.
 - No built-in OAuth format. The README documents the token endpoint shape as a `defineFormat`
-  example, and `e2e/format-custom-oauth.e2e.test.ts` serves that exact definition over HTTP and runs
-  it through the conformance test, so the example stays correct.
+  example, and `e2e/ban/format-custom-oauth.e2e.test.ts` serves that exact definition over HTTP and
+  runs it through the conformance test, so the example stays correct.
 
 ## Consequences
 
