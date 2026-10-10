@@ -10,9 +10,9 @@ import type {
   ResourceLinksInit,
 } from '@netvark/jsonapi-core';
 
+import type { Codec, Validator } from '../codecs/types';
 import type {
   CodecRegistry,
-  CodecTypes,
   DomainRule,
   DomainRules,
   ScopeColumn,
@@ -23,6 +23,8 @@ import type {
 import { CATALOG_FORMAT } from '@netvark/catalog-core';
 import { createDefineResource } from '@netvark/jsonapi-core';
 
+import { isCodec } from '../codecs/define-codec';
+import { isValidator } from '../codecs/define-validator';
 import {
   expectKnownKeys,
   expectRecord,
@@ -86,26 +88,20 @@ function checkCatalog(value: unknown): PublicCatalog {
   return catalog as unknown as PublicCatalog;
 }
 
-/** Whether `codec` names a non-empty list of type names (SPEC 2.2). */
-function hasTypeNames(
-  codec: Readonly<Record<string, unknown>>,
-): codec is Readonly<Record<string, unknown>> & CodecTypes {
-  const types = codec['types'];
-  return (
-    Array.isArray(types) &&
-    types.length > 0 &&
-    types.every((type) => typeof type === 'string')
-  );
+/** A codec registry entry: a value `defineCodec` returned (SPEC 2), which checked itself. */
+function checkCodec(path: string, value: unknown): Codec {
+  if (!isCodec(value)) {
+    throw new TypeError(`${path}: must be made by defineCodec`);
+  }
+  return value;
 }
 
-function checkCodec(path: string, value: unknown): CodecTypes {
-  const codec = expectRecord(path, value);
-  if (!hasTypeNames(codec)) {
-    throw new TypeError(
-      `${path}.types: must be a non-empty list of type names`,
-    );
+/** A validator registry entry: a value `defineValidator` returned. */
+function checkValidator(path: string, value: unknown): Validator {
+  if (!isValidator(value)) {
+    throw new TypeError(`${path}: must be made by defineValidator`);
   }
-  return codec;
+  return value;
 }
 
 function checkScope(path: string, value: unknown): ScopeColumn {
@@ -202,7 +198,7 @@ export function checkDefinerConfig(value: unknown): DefinerContext {
   const validators = optionalRegistry(
     'validators',
     config['validators'],
-    expectRecord,
+    checkValidator,
   );
   const page = checkPageInit(`${DEFINER}.page`, config['page']);
   mergePage(`${DEFINER}.page`, page, {});

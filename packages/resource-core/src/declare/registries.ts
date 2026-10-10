@@ -1,22 +1,24 @@
 /**
  * The definer's registries and the context every declaration is checked
- * against (SPEC 2). A codec registry is read for each codec's `types`, a
- * validator registry for its names; `defineCodec` and `defineValidator`
- * (SPEC 7) make the values.
+ * against (SPEC 2). `defineCodec` and `defineValidator` (SPEC 7) make the
+ * values of the first two; a declaration reads each codec's `types` and
+ * each validator's name.
  * @packageDocumentation
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
+
+import type { Codec, Validator } from '../codecs/types';
 
 /** What a declaration reads of a codec: the type names it attaches to (SPEC 7.1). */
 export interface CodecTypes {
   readonly types: ReadonlyArray<string>;
 }
 
-/** Codecs by name. */
-export type CodecRegistry = Readonly<Record<string, CodecTypes>>;
+/** Codecs by name, each made by `defineCodec`. */
+export type CodecRegistry = Readonly<Record<string, Codec>>;
 
-/** Validators by name. */
-export type ValidatorRegistry = Readonly<Record<string, object>>;
+/** Validators by name, each made by `defineValidator`. */
+export type ValidatorRegistry = Readonly<Record<string, Validator>>;
 
 /** A scope: the column that holds the actor's tenant in every scoped table (SPEC 3.2). */
 export interface ScopeColumn {

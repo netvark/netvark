@@ -1,14 +1,15 @@
 /**
  * Runtime-neutral checks (resource SPEC 15.4, 16) over the built
  * `@netvark/resource-core`: the contacts application's declarations load,
- * resolve, and derive their public names, and mistakes throw the
+ * resolve, and derive their public names, the codecs and validators parse
+ * their fixtures with the application's Zod, and mistakes throw the
  * documented `TypeError`s. Codes are upper-cased by the runtime's
  * `String.prototype.toUpperCase`, so each runtime derives them here. No
  * Node.js API, so the same module runs on Bun, Deno, and workerd.
  */
 import type { Checks } from './report.ts';
 
-import { createDeclareResource } from '@netvark/resource-core';
+import { createDeclareResource, defineValidator } from '@netvark/resource-core';
 
 import { catalog } from '../fixtures/contacts/catalog.ts';
 import { Contacts } from '../resources/contacts.ts';
@@ -16,6 +17,7 @@ import { declareResource } from '../resources/declare-resource.ts';
 import { Meetings } from '../resources/meetings.ts';
 import { Notes } from '../resources/notes.ts';
 import { Organizations } from '../resources/organizations.ts';
+import { validators } from '../resources/validators.ts';
 import { check } from './report.ts';
 
 /** The `TypeError` message of calling `fn` with `args` as JavaScript would, types erased. */
@@ -70,6 +72,19 @@ export const neutralChecks: Checks = {
     check(
       message ===
         'notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code',
+      message,
+    );
+  },
+  'checks a validator against its fixtures': () => {
+    const message = messageOf(defineValidator, [
+      {
+        schema: validators.lowercase.schema,
+        fixtures: { accept: ['lobby'], reject: ['lobby-2'] },
+      },
+    ]);
+    check(
+      message ===
+        'defineValidator.fixtures.reject[0]: the schema accepts this fixture',
       message,
     );
   },

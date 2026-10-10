@@ -42,6 +42,25 @@ describe('createDeclareResource', () => {
     expectTypeOf(Contacts.declaration.scope).toEqualTypeOf<'organization'>();
   });
 
+  it('takes only codecs and validators their define functions made (SPEC 2)', () => {
+    createDeclareResource({
+      catalog: contactsCatalog,
+      // @ts-expect-error a codec written by hand lacks defineCodec's mark
+      codecs: { range: { types: ['tstzrange'] } },
+    });
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: {
+        // @ts-expect-error a validator written by hand lacks defineValidator's mark
+        email: {
+          schema: TEST_REGISTRIES.validators.email.schema,
+          fixtures: TEST_REGISTRIES.validators.email.fixtures,
+          description: undefined,
+        },
+      },
+    });
+  });
+
   it('refuses a full catalog, which would reach browsers (ADR 0002)', () => {
     // @ts-expect-error a full catalog carries schemas, expressions, and policies
     createDeclareResource({ catalog: fullCatalog });
@@ -50,12 +69,12 @@ describe('createDeclareResource', () => {
   it('checks domains against the catalog and the validators (SPEC 3.6)', () => {
     createDeclareResource({
       catalog: contactsCatalog,
-      validators: { email: {} },
+      validators: { email: TEST_REGISTRIES.validators.email },
       domains: { email: { email_check: { validator: 'email' } } },
     });
     createDeclareResource({
       catalog: contactsCatalog,
-      validators: { email: {} },
+      validators: { email: TEST_REGISTRIES.validators.email },
       domains: {
         // @ts-expect-error phone_number is not a domain of the catalog
         phone_number: { phone_number_check: { validator: 'email' } },
@@ -63,7 +82,7 @@ describe('createDeclareResource', () => {
     });
     createDeclareResource({
       catalog: contactsCatalog,
-      validators: { email: {} },
+      validators: { email: TEST_REGISTRIES.validators.email },
       domains: {
         short_text: {
           // @ts-expect-error short_text_check has a rule
@@ -73,7 +92,7 @@ describe('createDeclareResource', () => {
     });
     createDeclareResource({
       catalog: contactsCatalog,
-      validators: { email: {} },
+      validators: { email: TEST_REGISTRIES.validators.email },
       domains: {
         email: {
           // @ts-expect-error phone is not a validator

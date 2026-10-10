@@ -5,6 +5,8 @@
  * for the contract.
  * @packageDocumentation
  */
+export type { StorageCodec, StorageCodecs } from './codecs/storage-codecs';
+export type { Codec, Validator } from './codecs/types';
 export type { DeclarationCheck } from './declare/declaration-check';
 export type { DeclareResourceConfig } from './declare/create-declare-resource';
 export type { DeclareResource } from './declare/declare-resource-type';
@@ -33,4 +35,6 @@ export type {
 } from './declare/types';
 export type { ResourceNames } from './names/types';
 
+export { defineCodec } from './codecs/define-codec';
+export { defineValidator } from './codecs/define-validator';
 export { createDeclareResource } from './declare/create-declare-resource';

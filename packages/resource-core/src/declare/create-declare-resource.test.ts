@@ -72,21 +72,22 @@ describe('createDeclareResource: the catalog (SPEC 2)', () => {
 });
 
 describe('createDeclareResource: the registries (SPEC 2, 3.6)', () => {
-  it('refuses a codec without type names', () => {
-    for (const types of [[], [1], 'text', undefined]) {
-      expect(failure({ ...valid, codecs: { phone: { types } } })).toBe(
-        'createDeclareResource.codecs.phone.types: must be a non-empty list of type names',
+  it('takes only codecs and validators their define functions made', () => {
+    const { phone } = TEST_REGISTRIES.codecs;
+    const { email } = TEST_REGISTRIES.validators;
+    for (const codec of [{ types: ['text'] }, { ...phone }, 1, null]) {
+      expect(failure({ ...valid, codecs: { phone: codec } })).toBe(
+        'createDeclareResource.codecs.phone: must be made by defineCodec',
       );
     }
-    expect(failure({ ...valid, codecs: { phone: 1 } })).toBe(
-      'createDeclareResource.codecs.phone: must be an object, received 1',
-    );
+    for (const validator of [{}, { ...email }, 'x', phone]) {
+      expect(failure({ ...valid, validators: { email: validator } })).toBe(
+        'createDeclareResource.validators.email: must be made by defineValidator',
+      );
+    }
   });
 
-  it('refuses a validator that is not an object, and a malformed scope', () => {
-    expect(failure({ ...valid, validators: { email: 'x' } })).toBe(
-      'createDeclareResource.validators.email: must be an object, received "x"',
-    );
+  it('refuses a malformed scope', () => {
     expect(
       failure({ ...valid, scopes: { organization: { column: '' } } }),
     ).toBe(
