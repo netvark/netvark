@@ -63,6 +63,8 @@ describe('readCatalog: the catalog (SPEC 2.2, 7.2)', () => {
       'measurements',
       'modern',
       'organizations',
+      'reading_notes',
+      'readings',
     ]);
   });
 
@@ -91,6 +93,8 @@ describe('readCatalog: reading (SPEC 2.1, 7.1)', () => {
       'public.measurements',
       'public.modern',
       'public.organizations',
+      'public.reading_notes',
+      'public.readings',
     ]);
     expect(flipped.tables['events']?.columns['action']?.type).toBe('action');
     expect(

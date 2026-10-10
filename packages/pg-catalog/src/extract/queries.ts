@@ -155,6 +155,14 @@ function attributeNames(numbers: string, relation: string): string {
     join pg_attribute a on a.attrelid = ${relation} and a.attnum = u.attnum)`;
 }
 
+/**
+ * The constraints declared on each table. A foreign key that references a
+ * partitioned table also gets one clone per partition of that table, with
+ * `conparentid` set and a name that differs between majors; pg_dump leaves
+ * the clones out, and so does the catalog.
+ * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/bin/pg_dump/pg_dump.c (getConstraints: "AND conparentid = 0")
+ * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/commands/tablecmds.c (addFkConstraint names the clones)
+ */
 function constraints(version: number): string {
   const enforced = version >= ENFORCED_VERSION ? 'k.conenforced' : 'true';
   const nullsNotDistinct =
@@ -180,7 +188,8 @@ function constraints(version: number): string {
   left join pg_class rc on rc.oid = k.confrelid
   left join pg_namespace rn on rn.oid = rc.relnamespace
   left join pg_index ki on ki.indexrelid = k.conindid and k.contype = 'u'
-  where k.conrelid = c.oid and k.contype in ('p', 'u', 'f', 'c', 'x')`;
+  where k.conrelid = c.oid and k.contype in ('p', 'u', 'f', 'c', 'x')
+    and k.conparentid = 0`;
 }
 
 function indexes(version: number): string {

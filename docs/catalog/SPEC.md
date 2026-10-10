@@ -249,9 +249,14 @@ interface ExclusionConstraint {
 
 Constraints come from `pg_constraint` rows with `contype` `p`, `u`, `f`, `c`, and `x`; NOT NULL rows
 (`n`, PostgreSQL 18) and constraint triggers (`t`) are left out, because nullability is `attnotnull`
-on every major (ADR 0004). `columns` maps `conkey` to names in `conkey` order, dropping the zero
-entries of expression elements; `references.columns` maps `confkey` the same way. The actions decode
-`confupdtype` and `confdeltype` (`a`, `r`, `c`, `n`, `d`). `nullsDistinct` reads the backing index's
+on every major (ADR 0004). A foreign key that references a partitioned table is cloned once per
+partition of that table, with `conparentid` pointing at it and a name that differs between majors
+(PostgreSQL 14 derives it from the table and columns, PostgreSQL 18 from the constraint); these
+clones are left out, as pg_dump leaves them out. @ref
+https://github.com/postgres/postgres/blob/REL_18_STABLE/src/bin/pg_dump/pg_dump.c (`getConstraints`)
+`columns` maps `conkey` to names in `conkey` order, dropping the zero entries of expression
+elements; `references.columns` maps `confkey` the same way. The actions decode `confupdtype` and
+`confdeltype` (`a`, `r`, `c`, `n`, `d`). `nullsDistinct` reads the backing index's
 `indnullsnotdistinct`, and `enforced` reads `conenforced`; on majors without those columns they are
 `true`. @ref https://www.postgresql.org/docs/18/catalog-pg-constraint.html
 
@@ -583,10 +588,10 @@ has no privilege on, which would make a read-only drift role see a different cat
    domains, `format_type(atttypid, atttypmod)`, `attnotnull`, `attidentity`, `attgenerated`,
    `pg_get_expr(adbin, adrelid)` from `pg_attrdef`, the collation name and `collisdeterministic`
    when `attcollation` differs from the type's `typcollation`, and `col_description`.
-7. Constraints: `pg_constraint` with `conrelid` in the tables and
-   `contype in ('p', 'u', 'f', 'c', 'x')`, with `conkey`, `confkey`, and the referenced table mapped
-   to names, `pg_get_constraintdef(oid)`, `pg_get_expr(conbin, conrelid)`, and the version
-   fragments.
+7. Constraints: `pg_constraint` with `conrelid` in the tables,
+   `contype in ('p', 'u', 'f', 'c', 'x')`, and `conparentid = 0`, with `conkey`, `confkey`, and the
+   referenced table mapped to names, `pg_get_constraintdef(oid)`, `pg_get_expr(conbin, conrelid)`,
+   and the version fragments.
 8. Indexes: `pg_index` joined to the index's `pg_class` and `pg_am`, with `indkey::int2[]`,
    `indnkeyatts`, `pg_get_expr(indpred, indrelid)`, and `pg_get_indexdef(indexrelid)`.
 9. Policies: `pg_policy`, with `polroles` mapped through `pg_roles` (`0` is `public`).
@@ -1020,9 +1025,10 @@ PostgreSQL 18; nothing is mocked.
 A private workspace package that depends on both packages through `workspace:*` and imports only
 their built entries. `e2e/catalog/fixtures/contacts/` holds a realistic application's migrations in
 Flyway naming (extensions, organizations, contacts with enums, domains, checks of every recognized
-shape, a generated `tsvector`, identity, foreign keys, partial and expression indexes, an exclusion
-constraint, row security with forced policies, and comments), and `expected/` holds the three files
-`extract` must produce for them, reviewed by hand.
+shape, a generated `tsvector`, identity, foreign keys, a partitioned table that a foreign key
+references, partial and expression indexes, an exclusion constraint, row security with forced
+policies, and comments), and `expected/` holds the three files `extract` must produce for them,
+reviewed by hand.
 
 | File                          | Covers                                                                                                                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

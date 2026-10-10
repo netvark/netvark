@@ -83,6 +83,30 @@ describe('readCatalog: constraints (SPEC 2.5)', () => {
     ).toMatchObject({ onDelete: 'setDefault' });
   });
 
+  it('leaves out the foreign keys PostgreSQL clones for the partitions of a referenced table', () => {
+    // PostgreSQL adds one constraint per partition of `readings` to
+    // reading_notes, named differently on each major; only the declared one
+    // belongs in the catalog.
+    expect(table('reading_notes').constraints).toEqual({
+      reading_notes_pkey: {
+        kind: 'primaryKey',
+        columns: ['id'],
+        definition: 'PRIMARY KEY (id)',
+      },
+      reading_notes_reading_fk: {
+        kind: 'foreignKey',
+        columns: ['sensor_id', 'taken_on'],
+        references: { table: 'readings', columns: ['sensor_id', 'taken_on'] },
+        onUpdate: 'noAction',
+        onDelete: 'noAction',
+        validated: true,
+        enforced: true,
+        definition:
+          'FOREIGN KEY (sensor_id, taken_on) REFERENCES readings(sensor_id, taken_on)',
+      },
+    });
+  });
+
   it('reads NULLS NOT DISTINCT and NOT ENFORCED (PostgreSQL 15 and 18)', () => {
     const { constraints } = table('modern');
     expect(constraints['modern_code_key']).toEqual({
