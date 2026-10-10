@@ -1,0 +1,277 @@
+# resource: design
+
+- Status: accepted for the 0.x line of `@netvark/resource-core`
+
+Architecture decisions referenced as ADR-NNNN live in `docs/resource/adr/`. The normative contract
+is [`SPEC.md`](SPEC.md); this document explains what the packages are for and why they are shaped
+the way they are.
+
+## 1. Purpose
+
+An API over PostgreSQL usually restates the database four or five times: Zod schemas repeat column
+types and lengths, OpenAPI repeats them again, forms hard-code the enum labels, an error mapper
+translates constraint names by hand, and the routes, filters, and sort keys pick their own names.
+Every copy drifts on its own schedule, and the drift reaches users as a confusing 422, a form that
+accepts what the database rejects, or a 500.
+
+`@netvark/resource-core` replaces the copies with one declaration per resource, keyed by database
+names, from which the public API follows:
+
+1. **Extract.** `@netvark/pg-catalog` writes the public catalog: every exposed table with its column
+   types, nullability, defaults, constraints, and the CHECK rules it could translate exactly
+   (catalog ADR 0005, 0006).
+2. **Declare.** A declaration states only what the catalog cannot know: the operations, which
+   columns are exposed and how, filters, sorting, search, codecs for types the API cannot represent
+   by itself, and validators for CHECKs the recognizer could not translate (ADR-0002).
+3. **Derive.** Public names (ADR-0003), Zod schemas for reads, creates, and updates (ADR-0004,
+   0005), field metadata for forms, the error catalog (ADR-0007), the `@netvark/jsonapi-core`
+   resource definition, the `@netvark/keyset-core` definition, and the OpenAPI document all come
+   from the declaration and the catalog. Nothing is restated.
+4. **Prove.** Codecs and validators carry fixtures that the oracle runs through Zod and through
+   PostgreSQL (ADR-0006); the default wire forms and rule translations are proven the same way; the
+   derived surface is snapshotted and diffed in CI.
+5. **Serve.** The `server` subpath adds policies, scopes, quotas, rules, and effects;
+   `@netvark/kysely-resource` runs the operations and `@netvark/hono-resource` serves them, while
+   `@netvark/jsonapi-client` and `@netvark/react-resource` consume the same declarations in clients
+   (ADR-0008).
+
+### Who it is for
+
+Teams that write PostgreSQL migrations by hand, serve JSON:API (or want a typed CRUD API without
+writing one handler per route), and use TypeScript from the database to the form. A declaration is
+plain data plus Zod schemas: anything can read it.
+
+### Non-goals
+
+- Generating migrations from declarations. The migrations are the source of truth; declarations
+  follow them.
+- Databases other than PostgreSQL, and API styles other than JSON:API.
+- Business logic. Validators restate CHECKs with fixtures; rules that need outside state are server
+  code (`reject`), and the library only gives them a typed place to live.
+- Hiding SQL. Storage is Kysely through `@netvark/kysely-resource`; a custom query is still a Kysely
+  query.
+- UI components. `@netvark/react-resource` provides hooks and metadata, not widgets.
+
+## 2. Principles
+
+1. **The database decides, the declaration adds intent.** Types, nullability, requiredness, limits,
+   enum labels, and the key are read from the public catalog; a declaration never restates them
+   (ADR-0002).
+2. **Database names in, derived names out.** Every name in a declaration is a database name, and
+   every public name is derived by one rule, with `as` and `code` as the only overrides (ADR-0003).
+3. **Never invent a value.** Omitted means untouched, `null` means null, and the database supplies
+   defaults; no schema carries a default (ADR-0004).
+4. **Exact or rejected.** The wire forms reject what PostgreSQL would reject or silently alter, so a
+   stored value is the value sent (ADR-0005). A CHECK the recognizer could not translate needs a
+   validator, and a validator needs fixtures the database judges (ADR-0006).
+5. **Every failure has a code and a place.** Schema issues are named by JSON Schema keywords,
+   database rejections by their constraint, and both point at the member; localization replaces the
+   words, never the codes (ADR-0007).
+6. **Compile errors first.** What TypeScript can check fails `tsc`; what it cannot fails at startup
+   with a `TypeError` naming the path; nothing waits for a request.
+7. **Browsers get the public part.** The root entry runs anywhere; policies, scopes, and the storage
+   contract live behind `server` (ADR-0008).
+
+## 3. The workflow by example
+
+### 3.1 The catalog
+
+The contacts application of the catalog's end-to-end fixture has this table, among others:
+
+```sql
+create table contacts (
+  id uuid primary key default gen_random_uuid(),
+  organization_id bigint not null references organizations (id) on delete cascade,
+  kind contact_kind not null default 'person',            -- enum ('person', 'company')
+  name text not null check (char_length(name) between 1 and 200),
+  nickname text check (nickname <> ''),
+  email email,                                             -- domain over citext with a pattern
+  website text check (website is null or website ~ '^https://'),
+  status text not null default 'active' check (status in ('active', 'archived')),
+  priority smallint check (priority between 1 and 5),
+  discount percentage default 0,                           -- domain numeric(5, 2), 0 to 100
+  tags text[] not null default '{}',
+  search tsvector generated always as (to_tsvector('simple', ...)) stored,
+  created_at timestamptz not null default now(),
+  constraint contacts_email_unique unique (organization_id, email)
+);
+```
+
+`pg-catalog extract` writes it into the public catalog with every fact a declaration needs: `name`
+has the rule `{ kind: 'length', min: 1, max: 200 }`, `status` the rule
+`{ kind: 'enum', values: ['active', 'archived'] }`, `website` a pattern, `search` the configuration
+`simple`, and so on.
+
+### 3.2 The definer
+
+```ts
+// src/resources/declare.ts
+import { createDeclareResource } from '@netvark/resource-core';
+
+import { publicCatalog } from '../generated/public-catalog';
+
+export const SCOPES = { organization: { column: 'organization_id' } } as const;
+
+export const declareResource = createDeclareResource({
+  catalog: publicCatalog,
+  scopes: SCOPES,
+  links: { base: '/api/v1' },
+  page: { default: 20, max: 100 },
+});
+```
+
+### 3.3 A declaration
+
+```ts
+// src/resources/contacts.ts
+export const Contacts = declareResource('contacts', {
+  operations: ['list', 'get', 'create', 'update', 'remove'],
+  scope: 'organization',
+  fields: {
+    kind: { access: 'immutable', filter: ['eq', 'in'] },
+    name: { access: 'readWrite', filter: ['eq', 'containsi'], sort: true },
+    nickname: { access: 'readWrite' },
+    email: { access: 'readWrite', filter: ['eq'] },
+    website: { access: 'readWrite' },
+    status: { access: 'readWrite', filter: ['eq', 'in'] },
+    priority: { access: 'readWrite', filter: ['gte', 'lte'], sort: true },
+    discount: { access: 'readWrite' },
+    tags: { access: 'readWrite', filter: ['contains', 'overlaps'] },
+    created_at: { access: 'read', filter: ['gte', 'lte'], sort: true },
+  },
+  relationships: { organization_id: { target: () => Organizations, access: 'read' } },
+  search: { column: 'search' },
+  sort: { default: ['-created_at'] },
+  rules: { contacts_email_unique: { code: 'CONTACT_EMAIL_TAKEN' } },
+});
+```
+
+A typo in a column, `filter: ['gt']` on `tags`, the `tsvector` column `search` under `fields`, or
+the foreign key `organization_id` under `fields` fails `tsc` at the line that says it.
+
+### 3.4 What follows from it
+
+- **Names.** The type is `contacts`; the fields are `kind`, `name`, ..., `createdAt`; the
+  relationship is `organization`; the id is the `uuid` primary key; the codes are
+  `CONTACT_EMAIL_TAKEN`, `CONTACTS_NAME_CHECK`, `CONTACTS_STATUS_CHECK`, and so on.
+- **Schemas.** `Contacts.schema.create` requires only `name`: every other writable column is
+  nullable or has a default, `organization_id` comes from the scope, and `id` from its default.
+  `Contacts.schema.update` makes everything writable on update optional and drops `kind`. The types
+  follow: `Infer<typeof Contacts>['create']['status']` is `'active' | 'archived' | undefined`.
+- **Exactness.** `name` rejects 201 code points and accepts 200 emoji; `discount` rejects `'1.005'`
+  instead of letting PostgreSQL round it; `priority` rejects 6; `website` rejects `http://`.
+- **Metadata.** `Contacts.fields` gives a form each member's label key, limits (`maxLength: 200`),
+  options (`['active', 'archived']`), requiredness, and the default literal to show as a
+  placeholder.
+- **Errors.** A duplicate email in the organization is a 409 `CONTACT_EMAIL_TAKEN` pointing at
+  `/data/attributes/email`; a too-long name sent anyway is a 422 `VALIDATION_FAILED` item with
+  `meta.code` `"maxLength"` and `meta.expected` `"200"`.
+- **Definitions.** `Contacts.resource` is the JSON:API definition (attributes, the relationship,
+  sort, filters, `filter[q]`, page bounds, validators), and `Contacts.keyset` the keyset definition
+  (columns, keyset types, operators, the `search` vector with `simple`, the default sort).
+
+### 3.5 Messages
+
+```ts
+export const de = defineMessages([Contacts, Organizations], APP_ERRORS, {
+  errors: { ...JSON_API_ERRORS_DE, CONTACT_EMAIL_TAKEN: { title: 'Konflikt', detail: 'Diese E-Mail-Adresse ist bereits vergeben.' } },
+  constraints: { check: { ... }, unique: { ... }, foreignKey: { ... }, notNull: { ... } },
+  validation: { maxLength: '{field} darf höchstens {limit} Zeichen lang sein.', /* every kind used */ },
+  fields: { contacts: { name: 'Name', createdAt: 'Erstellt am', /* every member */ } },
+  options: { contacts: { kind: { person: 'Person', company: 'Firma' }, status: { active: 'Aktiv', archived: 'Archiviert' } } },
+});
+```
+
+A missing kind, label, or option fails `tsc`. `localizeErrors({ en, de }, { language })` is the
+`transform` of the ban handler: it negotiates `Accept-Language` and rewrites titles and details,
+never codes or pointers.
+
+### 3.6 The server
+
+```ts
+const { definePolicy, defineResource } = createDomainDefiners<AppDomain>();
+
+export const contacts = defineResource(Contacts, {
+  policy: definePolicy(Contacts, {
+    list: ({ actor }) => actor.can('contacts:read'),
+    get: ({ actor }) => actor.can('contacts:read'),
+    create: ({ actor }) => actor.can('contacts:write'),
+    update: ({ actor }) => actor.can('contacts:write'),
+    remove: ({ actor }) => actor.can('contacts:delete'),
+  }),
+  operations: {
+    create: { quota: 'contacts', effects: [({ row }) => [ContactCreated.of({ id: row.id })]] },
+  },
+});
+```
+
+`@netvark/kysely-resource` runs the operations against the storage contract: one transaction per
+operation that sets `app.organization_id` for row security, adds the scope predicate to every
+statement, writes only the members a request carried, and maps every PostgreSQL rejection to its
+declared code.
+
+### 3.7 A migration
+
+A migration that makes `nickname` NOT NULL without a default makes `nickname` required on create
+after `extract`; the snapshot diff in the pull request marks it breaking. A migration that drops
+`priority` fails `tsc` at `priority: { ... }` in the declaration. A migration that adds a `phone`
+column whose CHECK uses a lookahead, which the recognizer cannot translate, fails `tsc` as soon as
+`phone` is declared writable, until the declaration names a validator for it; the validator's
+fixtures then run against the new CHECK in CI.
+
+## 4. Architecture
+
+### 4.1 The family
+
+| Package                    | Role                                                                                                   | Epic |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ | ---- |
+| `@netvark/resource-core`   | declarations, derivations, messages, the `server` contracts, OpenAPI, the storage contract suite       | E1   |
+| `@netvark/kysely-resource` | the runtime: the storage adapter over Kysely, boot checks against the full catalog, quotas, the outbox | E3   |
+| `@netvark/hono-resource`   | routes for every declared operation on Hono, localized errors, the OpenAPI route                       | E4   |
+| `@netvark/react-resource`  | TanStack Query keys, form hooks over the schemas and metadata, typed messages                          | E6   |
+
+Companions in other families: `@netvark/pg-catalog` extracts the catalog and runs the oracle
+(`rules --check`); `@netvark/jsonapi-client` is the typed fetch client over the JSON:API
+definitions; `@netvark/jsonapi-core`, `@netvark/keyset-core`, and `@netvark/ban-core` provide the
+definitions and the error model this family derives.
+
+### 4.2 Modules
+
+`declare/` checks a declaration against the catalog and assembles the declared resource from
+`names/` (public names and reverse maps), `wire/` and `schema/` (wire forms, value schemas, object
+schemas, issues), `codecs/` (codecs and validators), `meta/` (field metadata), `errors/` (codes and
+`forbiddenMembers`), and `jsonapi/` (the two derived definitions). `messages/` works on lists of
+declared resources. `server/`, `openapi/`, and `testing/` are separate entry points.
+
+### 4.3 Data flow
+
+```
+migrations ──pg-catalog──▶ public catalog (as const) ──┐
+                                                      ├──▶ declareResource ──▶ DeclaredResource
+codecs, validators, scopes ──createDeclareResource──────┘        │
+                                                                 ├─ names, schema, linkage, validate, fields, errors
+                                                                 ├─ resource (jsonapi-core), keyset (keyset-core)
+                                                                 └─ registry: errorCatalog, defineMessages, openapi, surfaceOf
+                                                                                │
+server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶ hono-resource ──▶ clients
+```
+
+## 5. Decisions
+
+| ADR  | Decision                                                                                           |
+| ---- | -------------------------------------------------------------------------------------------------- |
+| 0001 | Record architecture decisions                                                                      |
+| 0002 | The public catalog is the type source; a declaration is keyed by database names                    |
+| 0003 | Public names are derived; `as` and `code` are the only overrides                                   |
+| 0004 | Writes omit what they do not change; the database supplies defaults                                |
+| 0005 | Values cross the wire in canonical forms; a write PostgreSQL would alter is rejected               |
+| 0006 | Fixtures are mandatory on codecs and validators; the database is the oracle                        |
+| 0007 | Schema issues are named by JSON Schema keywords; constraint violations carry the constraint's code |
+| 0008 | A host-free core with a server subpath and a storage contract                                      |
+
+## 6. Later
+
+Each of these is left out of 0.x on purpose and would enter with an ADR: to-many relationships
+(reverse foreign keys and join tables), composite primary keys, include paths deeper than one level,
+sorting by a related field, and wire forms for `time`, `interval`, and the range types, which need a
+codec today.
