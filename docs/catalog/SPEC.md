@@ -171,7 +171,7 @@ interface CatalogColumn {
   readonly array: boolean;
   readonly sqlType: string; // format_type(atttypid, atttypmod), e.g. "character varying(320)"
   readonly maxLength: number | null; // n of varchar(n) and char(n)
-  readonly precision: number | null; // p of numeric(p) and numeric(p, s)
+  readonly precision: number | null; // p of numeric(p), numeric(p, s), timestamp(p), timestamptz(p), time(p), timetz(p)
   readonly scale: number | null; // s of numeric(p, s); 0 for numeric(p)
   readonly collation: string | null; // an explicit COLLATE; null for the default or none
   readonly nullable: boolean; // not attnotnull
@@ -609,9 +609,13 @@ has no privilege on, which would make a read-only drift role see a different cat
 the length plus 4, as `anychar_typmodout` decodes it. For `numeric` a modifier of 4 or more encodes
 precision and scale: `p = ((typmod - 4) >> 16) & 0xffff` and
 `s = (((typmod - 4) & 0x7ff) ^ 1024) - 1024`, the sign-extended 11-bit scale PostgreSQL 15
-introduced, which decodes PostgreSQL 14's non-negative scales the same way. Every other type gives
-`null` for all three. @ref
-https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/numeric.c
+introduced, which decodes PostgreSQL 14's non-negative scales the same way. For `timestamp`,
+`timestamptz`, `time`, and `timetz` a modifier of 0 or more is the precision itself, the fraction
+digits of a second PostgreSQL rounds a value to (`'9999-12-31 23:59:59.999999'::timestamp(3)` is
+`10000-01-01 00:00:00`). Every other type gives `null` for all three, `interval` included, whose
+modifier also packs the fields. An array column carries its element's modifier. @ref
+https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/numeric.c @ref
+https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/timestamp.c
 
 **Default literals** (`defaults.ts`). `literal` is set only when converting it with the column
 type's input function yields the stored default, which rules out defaults where the deparser hid a
