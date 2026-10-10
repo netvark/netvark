@@ -4,10 +4,17 @@
  * domain's rules and validators folded in at the level they apply to. A
  * domain reached through an array applies to every element; a domain over
  * an array applies to the array. Only the domains above the first array
- * decide the column's nullability and default (SPEC 6.3).
+ * decide the column's nullability and default (SPEC 6.3), and the nearest
+ * of their defaults is the one PostgreSQL applies: a domain's default
+ * overrides its underlying type's.
+ * @ref https://www.postgresql.org/docs/18/sql-createdomain.html
  * @packageDocumentation
  */
-import type { PublicCatalog, Rule } from '@netvark/catalog-core';
+import type {
+  PublicCatalog,
+  PublicColumnDefault,
+  Rule,
+} from '@netvark/catalog-core';
 
 import type {
   TypeRecord,
@@ -25,8 +32,8 @@ export interface ValueLevel {
   readonly spec: ValueSpec;
   /** A NOT NULL domain or a `notNull` rule above the first array. */
   readonly notNull: boolean;
-  /** A domain default above the first array. */
-  readonly hasDefault: boolean;
+  /** The nearest domain default above the first array, or `null`. */
+  readonly default: PublicColumnDefault | null;
 }
 
 /** What a level reads besides the catalog: the definer's validators for domain CHECKs. */
@@ -43,7 +50,7 @@ function baseLevel(record: TypeRecord, path: string): ValueLevel {
   if (spec === undefined) {
     throw new TypeError(`${path}: type ${record.type} has no wire form`);
   }
-  return { spec, notNull: false, hasDefault: false };
+  return { spec, notNull: false, default: null };
 }
 
 function enumLevel(
@@ -58,7 +65,7 @@ function enumLevel(
   return {
     spec: { ...specOf({ kind: 'enum', type }), options: labels },
     notNull: false,
-    hasDefault: false,
+    default: null,
   };
 }
 
@@ -141,7 +148,7 @@ function domainLevel(
   return {
     spec: { ...spec, validators: [...spec.validators, ...validators] },
     notNull,
-    hasDefault: inner.hasDefault || domain.default !== null,
+    default: domain.default ?? inner.default,
   };
 }
 
@@ -179,6 +186,6 @@ export function levelOf(
   return {
     spec: specOf({ kind: 'array', element: element.spec }),
     notNull: false,
-    hasDefault: false,
+    default: null,
   };
 }

@@ -27,6 +27,7 @@ import {
   isMultipleOfPowerOfTen,
   writtenFractionDigits,
 } from '../wire/decimal';
+import { WIRE_FORMATS } from '../wire/formats';
 import { raise } from './raise';
 import { checkRange } from './range-check';
 
@@ -51,7 +52,7 @@ export function decimalSchema(
     if (type === 'int8' ? !INTEGER_TEXT.test(text) : !isNumericText(text)) {
       raise(
         payload,
-        { kind: 'format', expected: type === 'int8' ? 'int64' : 'decimal' },
+        { kind: 'format', expected: WIRE_FORMATS[type] },
         { abort: true },
       );
       return;

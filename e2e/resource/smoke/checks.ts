@@ -3,12 +3,16 @@
  * `@netvark/resource-core`: the contacts application's declarations load,
  * resolve, and derive their public names, the codecs and validators parse
  * their fixtures with the application's Zod, the composed schemas parse
- * and report issues, the error catalog assembles and renders through
- * `@netvark/ban-core`, and mistakes throw the documented `TypeError`s.
+ * and report issues, the field metadata describes the members and its
+ * patterns compile with the flags `su`, the error catalog assembles and
+ * renders through `@netvark/ban-core`, and mistakes throw the documented
+ * `TypeError`s.
  * Codes are upper-cased by the runtime's `String.prototype.toUpperCase`, so
  * each runtime derives them here. No Node.js API, so the same module runs
  * on Bun, Deno, and workerd.
  */
+import type { FieldMeta } from '@netvark/resource-core';
+
 import type { Checks } from './report.ts';
 
 import { createBan } from '@netvark/ban-core';
@@ -136,6 +140,30 @@ export const neutralChecks: Checks = {
       codes === 'MEETING_NEEDS_CONTACT_OR_NOTES,MEETING_NEEDS_CONTACT_OR_NOTES',
       codes,
     );
+  },
+  'describes the members in field metadata': () => {
+    // Typed wide, so each comparison tests the runtime value, not the literal type.
+    const name: FieldMeta = Contacts.fields.name;
+    const during: FieldMeta = Meetings.fields.during;
+    const { website, organization } = Contacts.fields;
+    const patterns = website.limits.patterns.map(
+      (source) => new RegExp(source, 'su'),
+    );
+    const matches = (text: string): boolean =>
+      patterns.every((pattern) => pattern.test(text));
+    check(name.required && name.limits.maxLength === 200, JSON.stringify(name));
+    check(
+      patterns.length === 1 &&
+        matches('https://example.org') &&
+        !matches('http://example.org'),
+      website.limits.patterns.join(','),
+    );
+    check(
+      organization.wire === 'string' && organization.format === 'int64',
+      JSON.stringify(organization),
+    );
+    check(during.codec === 'timeRange', `codec ${String(during.codec)}`);
+    check(Object.isFrozen(Contacts.fields), 'fields not frozen');
   },
   'assembles the error catalog and renders a derived code': () => {
     const codes = errorCatalog([Organizations, Contacts, Meetings, Notes]);

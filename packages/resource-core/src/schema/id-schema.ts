@@ -15,6 +15,7 @@ import { z } from 'zod/v4';
 
 import { compareDecimals, INTEGER_TEXT } from '../wire/decimal';
 import { isStorableReal } from '../wire/floats';
+import { WIRE_FORMATS } from '../wire/formats';
 import { raise } from './raise';
 import { checkRange, NUMBER_COMPARE } from './range-check';
 import { levelSchema } from './value-schema';
@@ -24,16 +25,17 @@ type IdKind = 'text' | 'number' | 'decimal' | 'string' | 'boolean' | 'enum';
 type IdForm = Extract<ValueForm, { readonly kind: IdKind }>;
 type FormOf<TKind extends IdKind> = Extract<IdForm, { readonly kind: TKind }>;
 
-/** The format an id reports for each number type: OpenAPI's names for the value it carries. */
-const NUMBER_FORMATS = {
-  int2: 'int16',
-  int4: 'int32',
-  float4: 'float',
-  float8: 'double',
-} as const;
+/** The two texts a `bool` key's id takes (SPEC 3.4). */
+export const BOOLEAN_IDS: readonly ['true', 'false'] = Object.freeze([
+  'true',
+  'false',
+] as const);
+
+/** The number types, whose ids travel as text (SPEC 3.4). */
+type NumberType = 'int2' | 'int4' | 'float4' | 'float8';
 
 /** Whether an id's text is the canonical spelling of a value of the number type. */
-function isNumberId(text: string, type: keyof typeof NUMBER_FORMATS): boolean {
+function isNumberId(text: string, type: NumberType): boolean {
   if (type === 'int2' || type === 'int4') {
     return INTEGER_TEXT.test(text);
   }
@@ -45,16 +47,13 @@ function isNumberId(text: string, type: keyof typeof NUMBER_FORMATS): boolean {
   );
 }
 
-function numberIdSchema(
-  spec: ValueSpec,
-  type: keyof typeof NUMBER_FORMATS,
-): z.ZodType {
+function numberIdSchema(spec: ValueSpec, type: NumberType): z.ZodType {
   const compare = NUMBER_COMPARE[type];
   return z.string().check((payload) => {
     if (!isNumberId(payload.value, type)) {
       raise(
         payload,
-        { kind: 'format', expected: NUMBER_FORMATS[type] },
+        { kind: 'format', expected: WIRE_FORMATS[type] },
         { abort: true },
       );
       return;
@@ -77,7 +76,7 @@ const ID_SCHEMAS: {
   string: (spec) => levelSchema(spec, { nullable: false, validators: false }),
   enum: (spec) => levelSchema(spec, { nullable: false, validators: false }),
   number: (spec, form) => numberIdSchema(spec, form.type),
-  boolean: () => z.enum(['true', 'false']),
+  boolean: () => z.enum(BOOLEAN_IDS),
 };
 
 function isIdForm(form: ValueForm): form is IdForm {

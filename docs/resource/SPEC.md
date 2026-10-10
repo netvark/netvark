@@ -40,12 +40,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ```
 packages/resource-core/src/
@@ -53,7 +53,7 @@ packages/resource-core/src/
   declare/                  createDeclareResource, declareResource, the declaration types, checks (2, 3, 14)
   catalog/                  type-level and prototype-safe runtime lookups into the public catalog
   names/                    derived names and codes, the reverse maps, their type-level twins and checks (4)
-  wire/                     the wire forms, exact decimal comparison, the JSON Schema of each form (5)
+  wire/                     the wire forms and their formats, exact decimal comparison, the JSON Schema of each form (5)
   schema/                   value, read, create, and update schemas; rules; issue mapping; Standard Schema (6)
   codecs/                   defineCodec, defineValidator, StorageCodecs (7)
   meta/                     field metadata (8)
@@ -870,37 +870,101 @@ This package only stores, types, and self-checks them. Tests: `define-codec.test
 ## 8. Field metadata (`meta/`)
 
 `fields` on a declared resource describes each public field and relationship for forms,
-documentation, and clients: a record keyed by public name, in declaration order
-(`Contacts.fields.name.limits`):
+documentation, and clients: a frozen record keyed by public name, the fields and then the
+relationships, each in declaration order (`Contacts.fields.name.limits`). Every entry reads the
+member spec the schemas are built from (6.1), so a client that follows the metadata sends what the
+schemas accept. A relationship's `target` reads the target resource (3.8), so the record is built on
+first read and cached.
 
 ```ts
-interface FieldMeta {
-  readonly name: string; // public
-  readonly column: string;
-  readonly kind: 'attribute' | 'relationship';
-  readonly access: Access;
-  readonly wire: 'string' | 'integer' | 'number' | 'boolean' | 'array' | 'any';
-  readonly format: string | null; // the OpenAPI format of 5.1, or null
-  readonly nullable: boolean;
-  readonly required: boolean; // on create (6.3)
-  readonly default: { readonly literal: string | null } | null; // the public catalog's, for display only
-  readonly limits: Limits; // minLength, maxLength, minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, pattern
-  readonly options: ReadonlyArray<string> | null; // enum labels or an enum rule's values, in order
-  readonly target: string | null; // a relationship's target type
-  readonly filter: ReadonlyArray<Operator>;
-  readonly sortable: boolean;
-  readonly codec: string | null;
+interface FieldMeta<TFacts extends FieldFacts = FieldFacts> {
+  readonly name: TFacts['name']; // public, the key of `fields`
+  readonly column: TFacts['column'];
+  readonly kind: TFacts['kind']; // 'attribute' | 'relationship'
+  readonly access: TFacts['access'];
+  readonly wire: WireType; // 'string' | 'integer' | 'number' | 'boolean' | 'array' | 'any'
+  readonly format: string | null; // the OpenAPI format of 5.1
+  readonly fractionDigits: number | null; // a date-time's: p of timestamp(p), 6 without one
+  readonly nullable: TFacts['nullable'];
+  readonly required: TFacts['required']; // a create must carry it (6.3)
+  readonly default: PublicColumnDefault | null; // for display, never sent
+  readonly limits: FieldLimits;
+  readonly options: TFacts['options']; // enum labels or an enum rule's values, in order
+  readonly items: TFacts['items']; // an array's elements
+  readonly target: TFacts['target']; // a relationship's target type
+  readonly filter: TFacts['filter'];
+  readonly sortable: TFacts['sortable'];
+  readonly codec: TFacts['codec'];
   readonly description: string | null;
   readonly example: unknown; // undefined when none is declared
 }
+
+interface FieldLimits {
+  readonly minLength: number | null; // code points
+  readonly maxLength: number | null;
+  readonly minimum: string | null; // numeric bounds are decimal strings
+  readonly exclusiveMinimum: string | null;
+  readonly maximum: string | null;
+  readonly exclusiveMaximum: string | null;
+  readonly multipleOf: string | null; // numeric(p, s): 10^-s
+  readonly patterns: ReadonlyArray<string>; // each read with the flags `su`
+}
+
+interface ItemMeta<TOptions> {
+  readonly wire: Exclude<WireType, 'array' | 'any'>;
+  readonly format: string | null;
+  readonly fractionDigits: number | null;
+  readonly limits: FieldLimits;
+  readonly options: TOptions;
+}
 ```
 
-`limits` merges the type's bounds and every rule of 6.1 into the tightest value per keyword (numeric
-bounds as decimal strings), the same fold the OpenAPI schema uses. `options` is typed as the tuple
-of literals. A declared `example` MUST pass the field's value schema; otherwise `declareResource`
-throws `TypeError`.
+- **`wire`, `format`**: the wire form of 5.1. `wire/formats.ts` holds the one table of formats that
+  issues (6.4) and the metadata read. `json`, `jsonb`, and a codec's value are `any`, which the JSON
+  value or the codec's schema describes (7.1); an array is `array`, with `items`.
+- **`fractionDigits`**: for `timestamp` and `timestamptz`, the precision p, six without one; a value
+  with more digits is refused (5.2). `null` for every other type.
+- **`limits`**: the type's bounds and every rule of 6.1, folded into the tightest value per JSON
+  Schema keyword, the fold the schemas use and the OpenAPI document reads: at most one of `minimum`
+  and `exclusiveMinimum` is set, and at most one of `maximum` and `exclusiveMaximum`. Numeric bounds
+  are decimal strings whatever the wire type, since `int8` and `numeric` values exceed JavaScript's
+  numbers. A value contains a match of each pattern, read with the flags `su` (catalog SPEC 8.4);
+  JSON Schema's `pattern` holds one, so several join under `allOf` (13.1).
+- **`options`**: the enum's labels or an `enum` rule's values, in order, as a frozen copy; with
+  several, the values all of them allow. `null` when any value of the type goes.
+- **`items`**: an array's element, with the rules of the levels below the array (6.1). `null` for
+  any other value.
+- **`nullable`**: whether the value may be `null` (6.1 step 4).
+- **`required`**: whether `schema.create` or `linkage.create` requires the member: an access
+  `create` takes (3.1) over a column required on insert (6.3).
+- **`default`**: the column's default, else the nearest domain default above the first array level,
+  which PostgreSQL applies when a create leaves the member out. `literal` is a constant's text,
+  `null` for an expression such as `now()`. It is for display: a client never sends it, and the
+  database decides the value.
+- **`description`**, **`example`**: the declaration's own. A declared `example` MUST pass the
+  field's value schema; otherwise `declareResource` throws `TypeError`.
+- **A relationship** describes its id (3.4): `wire` is `string`, with its key's `format`,
+  `fractionDigits`, `limits`, and `options`; a `bool` key's ids are `['true', 'false']`, the two
+  texts the linkage schema accepts. `nullable` and `required` are its foreign key's, `target` is the
+  target's type, `sortable` is `false`, and `codec` is `null`.
+- **Validators are not described** (7.2). What a validator, a multi-column CHECK, a unique
+  constraint, or a foreign key refuses, the metadata does not state, so a value the metadata admits
+  can still be refused, and the server stays the authority.
 
-Tests: `field-meta.test.ts` (the contacts fixture, the folds), `field-meta.test-d.ts`.
+For a resource declared over a table of a typed catalog, `fields` is typed: each entry is a
+`FieldMeta` with literal `name`, `column`, `kind`, `access`, `nullable`, `required`, `target`,
+`sortable`, and `codec`, the declared `filter` tuple, `options` as a `ReadonlyArray` of the literal
+labels, and `items` as an `ItemMeta` of the element's labels. The runtime array keeps the order; the
+type is the union of every label a rule names, where the runtime array holds only the values all the
+rules allow. Without a typed table, `fields` is a record of `FieldMeta`. Declaring a resource never
+computes the type; reading `fields` does (15.5).
+
+Tests: `meta/value-meta.test.ts` (one case per row of 5.1, the folds, patterns, fraction digits,
+elements, domain defaults), `meta/field-meta.test.ts` (the contacts fixture, `required` against
+`schema.create` and `linkage.create`, frozen, built on first read), `meta/id-meta.test.ts` (one case
+per key type, the `bool` ids against the linkage schema), `field-meta.test-d.ts` and
+`id-meta.test-d.ts`, the NOT ENFORCED case of `declare/not-enforced.test.ts`, and the end-to-end
+suites `fields.e2e.test.ts` and `fields-create.e2e.test.ts` (15.4).
 
 ---
 
@@ -1429,10 +1493,11 @@ Returns an OpenAPI 3.1 document object for the listed resources:
   `PATCH` when it is writable) and the related link (`GET` when the target has `get`), each only for
   declared operations. Requests and responses use `application/vnd.api+json`.
 - **Schemas** per resource and operation, from the field metadata (8): the JSON Schema of each wire
-  form (5.1) with the folded limits as keywords, `readOnly` and `writeOnly` by access, `required` by
-  6.2, and enum `options`; a codec field takes `z.toJSONSchema(codec.schema)` with `io: 'input'` for
-  requests and `'output'` for responses. Validators add no keyword: their constraint appears in the
-  error responses.
+  form (5.1) with the folded limits as keywords (several `patterns` as one `pattern` each under
+  `allOf`), an array's `items`, `readOnly` and `writeOnly` by access, `required` by 6.2, and enum
+  `options`; a codec field takes `z.toJSONSchema(codec.schema)` with `io: 'input'` for requests and
+  `'output'` for responses. Validators add no keyword: their constraint appears in the error
+  responses.
 - **Parameters** from the query capabilities: `filter[<member>][<operator>]` per declared operator,
   `sort` with its allowed values, `page[size]`, `page[after]`, `page[before]`, `include`,
   `fields[<type>]`, and `filter[q]`.
@@ -1450,10 +1515,10 @@ https://jsonapi.org/format/1.1/#content-negotiation
 ### 13.2 The surface and its diff
 
 `surfaceOf(resources)` returns a deterministic, sorted JSON value of what clients depend on: per
-type, the operations; per field its access, wire form, format, nullability, requiredness on create,
-limits, options, operators, and sortability; per relationship its target, access, requiredness,
-operators, and include; the codes with their statuses; search; and page bounds. Committed next to
-the catalog, it is the snapshot of ADR 0003.
+type, the operations; per field its access, wire form, format, fraction digits, nullability,
+requiredness on create, limits, options, an array's elements, operators, and sortability; per
+relationship its target, access, requiredness, operators, and include; the codes with their
+statuses; search; and page bounds. Committed next to the catalog, it is the snapshot of ADR 0003.
 
 `diffSurfaces(before, after)` returns `ReadonlyArray<SurfaceChange>`, each
 `{ path, change, breaking, before, after }`:
@@ -1464,7 +1529,7 @@ the catalog, it is the snapshot of ADR 0003.
 | a public name renamed (reported as a removal and an addition)                    | yes      |
 | a member becoming required on create, or a new member required on create         | yes      |
 | a writable member becoming non-nullable, or a readable member becoming nullable  | yes      |
-| an option removed, a limit tightened, a code's status changed                    | yes      |
+| an option removed, a limit tightened, a pattern added, a code's status changed   | yes      |
 | a member, option, operator, code, or operation added; a limit loosened           | no       |
 
 The command that writes the snapshot and fails CI on a breaking change ships with the CLI that loads
@@ -1637,14 +1702,20 @@ server of major 18 or later), the catalogs `@netvark/pg-catalog` extracts from t
 `extract --check`), and declarations over them. It proves: the declarations type-check, and a
 `fails/` directory of declarations fails `tsc` with the expected errors; the derived names, recorded
 in a reviewed snapshot (`snapshots/names.json`), and a derived code TypeScript leaves to the
-runtime; the derived schemas, metadata, and definitions; the derived error codes, recorded in a
-reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
-(`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
-catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
-same violations; localized error documents; that a row breaking every NOT ENFORCED constraint is
-stored by the database and accepted by the schemas, while the enforced CHECK beside them refuses in
-both (`not-enforced.e2e.test.ts`); the package surface (every value export listed); and the runtime
-smoke test on Bun, Deno, and workerd for the root and `openapi` entries.
+runtime; the derived schemas, metadata, and definitions; that a client that follows `fields` alone
+sends values PostgreSQL stores as sent, while each value one step past a stated bound, outside the
+stated options or form, or with a fraction digit too many is refused or changed, and the schemas
+give the metadata's verdict on each (`fields.e2e.test.ts`, over every column type of the oracle and
+the ids of each key type); that the `required` members of the contacts application are exactly the
+ones an insert needs, and a member left out holds its stated `default`
+(`fields-create.e2e.test.ts`); the derived error codes, recorded in a reviewed snapshot
+(`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
+both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
+them, rendered by `createBan`; `constraintError` against the same violations; localized error
+documents; that a row breaking every NOT ENFORCED constraint is stored by the database and accepted
+by the schemas, while the enforced CHECK beside them refuses in both (`not-enforced.e2e.test.ts`);
+the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
+workerd for the root and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -1820,6 +1891,50 @@ byte, and `tsc` asks for the validator again. In types, as medians of five runs:
 The declarations took under 0.1 percent more instantiations than in the sixth record, and
 `errorCatalog` 0.3 and 0.5 percent more, the cost of leaving unenforced constraints out of the typed
 codes.
+
+The eighth record covers section 8. Read once on every declaration, on Node.js 24, `fields` took 3
+ms over stern's 111 declarations and 3 ms over the GitLab slice's 60. A script built the probes of
+`support/meta-probes.ts` from each entry alone, as `fields.e2e.test.ts` does, and checked three
+things on PostgreSQL 18.3 (PGlite) and on a PostgreSQL 14.19 server holding each schema. The
+member's schema without validators gives the metadata's verdict on every probe. PostgreSQL, writing
+each probe into a probe table holding the column's type, its NOT NULL, and its single-column CHECKs
+that have a rule (a relationship's ids go into its target's key), stores what the metadata admits as
+sent and refuses or changes the rest. And on a `LIKE` copy of each table, holding only the CHECKs
+that have a rule on a creatable member and NOT NULL only on creatable members and identities, a row
+of the `required` members alone is stored, leaving out any one of them fails with 23502 or 23514,
+and each creatable member left out holds its stated `default`:
+
+| Catalog            | Entries | Probes | Required | Left out: constant, expression, no default | Disagreements |
+| ------------------ | ------- | ------ | -------- | ------------------------------------------ | ------------- |
+| stern              | 1,367   | 26,416 | 265      | 129, 181, 741                              | 0             |
+| GitLab 17.11 slice | 1,487   | 23,790 | 223      | 649, 1, 614                                | 0             |
+
+The oracle's own keys had already changed the metadata once: a `bool` key's id took any string,
+where the linkage schema takes only `true` and `false`, so such a relationship now states those two
+options. The real catalogs changed the probes twice: a pattern that rules out the probe length
+(`^[0-9]{14}$` on GitLab's `ai_active_context_migrations.version`) is probed at the first length it
+admits, and a `date`, `uuid`, or `boolean` value gains a probe just outside its form. That member's
+`maxLength` of 255, which its pattern makes unreachable, is the only stated fact left unprobed. A
+codec member is carried with its codec's first fixture, except stern's `embeddings.embedding`: its
+codec's fixtures have 3 dimensions where the column holds 768, which no metadata states. Turning off
+`required`, `default`, `maxLength`, or `nullable` in the installed build made the script report 110,
+310, 512, and 1,050 problems on stern.
+
+In types, as medians of five runs, declaring the resources computes nothing of `fields`, and reading
+every declaration's `fields`, one resource at a time as a form would, costs about as much as reading
+each one's `schema.create` output instead:
+
+| Catalog            | File                                            | Instantiations | Check time | Peak memory |
+| ------------------ | ----------------------------------------------- | -------------- | ---------- | ----------- |
+| stern              | the declarations                                | 411,577        | 0.184 s    | 127 MB      |
+| stern              | plus `Object.values(X.fields)` on each          | 892,682        | 0.348 s    | 160 MB      |
+| stern              | plus `z.output<typeof X.schema.create>` on each | 924,465        | 0.380 s    | 179 MB      |
+| GitLab 17.11 slice | the declarations                                | 495,111        | 0.266 s    | 153 MB      |
+| GitLab 17.11 slice | plus `Object.values(X.fields)` on each          | 1,129,235      | 0.565 s    | 182 MB      |
+| GitLab 17.11 slice | plus `z.output<typeof X.schema.create>` on each | 1,225,432      | 0.544 s    | 210 MB      |
+
+Flattening each entry's facts with a mapped type costs 9 percent of the instantiations and no check
+time, so hovers show one object.
 
 ### 15.6 The Zod floor
 

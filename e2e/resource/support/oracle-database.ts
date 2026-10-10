@@ -72,7 +72,7 @@ export interface OracleDatabase {
   /** Runs one statement; rejects with an error carrying the SQLSTATE in `code`. */
   query(
     sql: string,
-    parameters?: ReadonlyArray<string>,
+    parameters?: ReadonlyArray<string | null>,
   ): Promise<ReadonlyArray<Row>>;
   close(): Promise<void>;
 }

@@ -1,9 +1,10 @@
 /**
- * NOT ENFORCED constraints (catalog ADR 0010; SPEC 3.5, 6.1, 9.1).
+ * NOT ENFORCED constraints (catalog ADR 0010; SPEC 3.5, 6.1, 8, 9.1).
  * PostgreSQL 18 stores values that break them, so the schemas accept those
- * values, no validator covers them, and they derive no error code. An
- * unenforced foreign key still declares a relationship. The compile-time
- * twins are in `not-enforced.test-d.ts`.
+ * values, the field metadata states none of their rules, no validator
+ * covers them, and they derive no error code. An unenforced foreign key
+ * still declares a relationship. The compile-time twins are in
+ * `not-enforced.test-d.ts` and `meta/field-meta.test-d.ts`.
  * @ref https://www.postgresql.org/docs/18/sql-createtable.html (`NOT ENFORCED`)
  */
 import type { ResourceIssue } from '../schema/issues';
@@ -112,6 +113,17 @@ describe('NOT ENFORCED: schemas (SPEC 6.1)', () => {
         relationships: { owner: null },
       }),
     ).toEqual([]);
+  });
+});
+
+describe('NOT ENFORCED: field metadata (SPEC 8)', () => {
+  it('states the rules of the enforced CHECK only', () => {
+    const { fields } = ImportedContacts;
+    expect(fields.nickname).toMatchObject({ nullable: true, required: false });
+    expect(fields.email.limits.patterns).toEqual([]);
+    expect(fields.status.options).toBeNull();
+    expect(fields.score.limits).toMatchObject({ minimum: '0', maximum: '100' });
+    expect(fields.owner).toMatchObject({ target: 'owners', nullable: true });
   });
 });
 

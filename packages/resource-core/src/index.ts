@@ -38,6 +38,13 @@ export type {
 } from './declare/types';
 export type { ErrorCatalog } from './errors/error-catalog';
 export type { ConstraintKind, ErrorEntry } from './errors/error-entry';
+export type {
+  FieldFacts,
+  FieldLimits,
+  FieldMeta,
+  ItemMeta,
+  WireType,
+} from './meta/types';
 export type { ResourceNames } from './names/types';
 export type { Infer } from './schema/infer';
 export type { IssueKind } from './schema/issue-kinds';

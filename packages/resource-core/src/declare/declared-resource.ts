@@ -10,6 +10,8 @@ import type { PublicCatalog } from '@netvark/catalog-core';
 
 import type { ErrorEntry } from '../errors/error-entry';
 import type { ResourceErrors } from '../errors/error-types';
+import type { TypedFields } from '../meta/field-meta-types';
+import type { FieldMeta } from '../meta/types';
 import type { ResourceNames } from '../names/types';
 import type { AttributeValidators } from '../schema/attribute-schemas';
 import type { ObjectSchemas } from '../schema/object-schemas';
@@ -90,6 +92,15 @@ export interface DeclaredResource<
     TTable,
     WriteValidators,
     TypedWrite<Types<TContext, TTable, TDecl>>
+  >;
+  /**
+   * Each public field's and relationship's metadata, keyed by public name
+   * (SPEC 8), built on first read, which reads every target (SPEC 3.8).
+   */
+  readonly fields: Typed<
+    TTable,
+    Readonly<Record<string, FieldMeta>>,
+    TypedFields<TContext, TTable, TDecl>
   >;
   /**
    * Type-only: the definer's catalog and registries, for type helpers such as

@@ -13,6 +13,7 @@ import type { ValueForm } from './value-form';
 
 import { z } from 'zod/v4';
 
+import { WIRE_FORMATS } from '../wire/formats';
 import {
   isWireDate,
   isWireTimestamp,
@@ -22,13 +23,6 @@ import { UUID_TEXT } from '../wire/uuid';
 import { raise } from './raise';
 
 type StringForm = Extract<ValueForm, { readonly kind: 'string' }>;
-
-const FORMATS: Readonly<Record<StringForm['type'], string>> = {
-  uuid: 'uuid',
-  date: 'date',
-  timestamp: 'date-time-local',
-  timestamptz: 'date-time',
-};
 
 /** The test of a form's text; a date-time's reads the column's fraction digits. */
 function testOf(form: StringForm): (text: string) => boolean {
@@ -42,7 +36,7 @@ function testOf(form: StringForm): (text: string) => boolean {
 
 /** The schema of a string wire form with a format. */
 export function stringFormSchema(form: StringForm): z.ZodType {
-  const format = FORMATS[form.type];
+  const format = WIRE_FORMATS[form.type];
   const test = testOf(form);
   return z.string().check((payload) => {
     if (!test(payload.value)) {

@@ -73,7 +73,7 @@ import type { Infer } from '@netvark/resource-core';
 
 Contacts.schema.create.parse({ name: 'Ada' }); // status and the rest default in the database
 Contacts.schema.update.parse({ status: 'archived' }); // the name stays as it is
-Contacts.fields.name.limits; // { minLength: 1, maxLength: 200 }
+Contacts.fields.name.limits; // { minLength: 1, maxLength: 200, ... }
 Contacts.errors.CONTACT_EMAIL_TAKEN; // { status: 409, title: 'Conflict', fields: ['email'] }
 type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 'active' | 'archived'; ... }
 ```
@@ -88,6 +88,10 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   changes only what it is sent, translated CHECKs become checks, and values PostgreSQL would reject
   or silently alter (a rounded decimal, a truncated string, a lone surrogate) are rejected with a
   pointer to the member.
+- **Form metadata the schemas agree with.** `Contacts.fields` states each member's wire type,
+  format, requiredness, limits, options, and default, typed by the catalog and read from the same
+  specs as the schemas, so a form never copies a limit by hand. Probes built from it alone agree
+  with PostgreSQL on every column type and on two real schemas.
 - **Errors clients can act on.** Schema issues are `VALIDATION_FAILED` items named by JSON Schema
   keywords (`maxLength`, `enum`, ...) with their limit; database rejections carry the constraint's
   code with the right status: 409 for a duplicate, 404 for a missing related resource, 422 for a
@@ -109,6 +113,10 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   constraint. Only an index over an expression has none, and its violation falls back to the generic
   409: prefer a `citext` column with a plain UNIQUE to a unique index on `lower(email)`, or map the
   index by name through `postgresMapper`'s `constraints`.
+- **Drive forms from `fields`, check with the schemas.** Mark required members by `required`, offer
+  `options` as choices, and compare numeric bounds as decimal strings. Validators and CHECKs over
+  several columns are not in the metadata, so validate the whole write with `write.create` or
+  `write.update` before sending it.
 - **Let the database own defaults.** Never add a default to a schema or a form value; show
   `field.default.literal` as a placeholder and omit untouched fields, so the migration stays the
   only place a default lives.

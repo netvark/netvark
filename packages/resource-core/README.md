@@ -361,6 +361,33 @@ type MeetingLinks = Infer<typeof Meetings>['linkage']['create'];
 // { contact?: { type: 'contacts'; id: string } | null }
 ```
 
+## Field metadata
+
+`fields` describes each public field and relationship for forms, documentation, and clients (SPEC
+8). It is keyed by public name, the fields and then the relationships, frozen, and read from the
+specs the schemas are built from, so what it states is what the schemas enforce:
+
+```ts
+const { name, kind, createdAt, organization } = Contacts.fields;
+
+name.required; // true: NOT NULL without a default, so a create carries it
+name.limits; // { minLength: 1, maxLength: 200, minimum: null, ..., patterns: [] }
+name.filter; // ['eq', 'startsWithi'], typed as that tuple
+kind.options; // ['person', 'company'], typed ReadonlyArray<'person' | 'company'>
+kind.default; // { literal: 'person' }: a create may leave it out
+createdAt.format; // 'date-time', with fractionDigits 6 and access 'read'
+organization.wire; // 'string': a relationship describes its id, here an int8 key's
+organization.limits.maximum; // '9223372036854775807', a decimal string
+```
+
+An array states its elements in `items`; a `json` column or a codec's value is `wire: 'any'`,
+described by the JSON value or by the codec's schema; a relationship to a `bool` key lists the ids
+`['true', 'false']` as its options. A validator states nothing here, and neither does a CHECK over
+several columns, a unique constraint, or a foreign key: a value the metadata admits can still be
+refused, so the server stays the authority. Over the oracle's columns and two real schemas, a client
+that follows `fields` alone sent only what PostgreSQL stores as sent, and every value one step past
+a stated limit was refused or changed (SPEC 15.4, 15.5).
+
 ## Testing at the limits
 
 `boundaryFixtures(resource)`, from `@netvark/resource-core/testing`, lists for each field and
@@ -516,6 +543,22 @@ same message as the runtime.
 - **Validate a whole write with `write`.** On the server, pass the resource object
   `@netvark/jsonapi-core` parsed to `write.create` or `write.update`: only they run the CHECKs over
   a field and a relationship, and their issue paths start at `attributes` or `relationships`.
+- **Build forms from `fields`, validate with the schemas.** Mark a member required by `required`,
+  never by `nullable`: a NOT NULL column with a default may be left out. Render `options` as a
+  choice, cap input at `maxLength`, and offer date-times at `fractionDigits`. Then validate the
+  whole write with `write.create` or `write.update`, which also run the validators and the CHECKs
+  over several members that `fields` does not describe.
+- **Compare numeric bounds as decimals.** `minimum`, `maximum`, and `multipleOf` are decimal strings
+  for every number type, since an `int8` or `numeric` bound exceeds JavaScript's numbers. Compare
+  with `BigInt` or a decimal library, not `Number(...)`.
+- **Test every pattern in script.** A value must contain a match of each entry of `patterns`, read
+  as `new RegExp(source, 'su')`. Do not copy one into an HTML `pattern` attribute, which the browser
+  anchors to the whole value and compiles with the `v` flag and without `s`, so it can accept or
+  refuse otherwise
+  ([HTML](https://html.spec.whatwg.org/multipage/input.html#the-pattern-attribute)).
+- **Show `default`, never send it.** It is the value PostgreSQL applies when a create leaves the
+  member out: show `literal` as a placeholder, and leave the member out to get it. An expression
+  default such as `now()` has `literal: null`.
 - **Validate responses with `read`.** It strips members it does not know, so a deployed client keeps
   working when the server adds one. For a sparse fieldset, validate with `schema.read.pick(...)` of
   the requested members.
@@ -551,7 +594,9 @@ The names checks account for about 15 percent of the stern check time and 11 per
 one. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB of peak
 memory, most of it to parse Zod's own declarations. A resource's codes are typed only where code
 reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the check
-from 0.17 s and 129 MB to 0.36 s and 143 MB.
+from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: reading every
+declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what reading each one's
+`schema.create` output costs.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in

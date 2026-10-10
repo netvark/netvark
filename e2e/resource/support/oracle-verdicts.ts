@@ -11,9 +11,9 @@ import type { OracleDatabase } from './oracle-database.ts';
 import { readForm, UNREPRESENTABLE } from './read-form.ts';
 import { sameValue } from './same-value.ts';
 
-/** PostgreSQL's verdict: the stored value as text, or the error's SQLSTATE. */
+/** PostgreSQL's verdict: the stored value as text, `null` for SQL `NULL`, or the error's SQLSTATE. */
 export type DatabaseVerdict =
-  | { readonly accepted: true; readonly stored: string }
+  | { readonly accepted: true; readonly stored: string | null }
   | { readonly accepted: false; readonly code: string };
 
 function identifier(name: string): string {
@@ -26,12 +26,12 @@ function sqlState(error: unknown): string {
     : 'unknown';
 }
 
-/** Writes `text` into `table.column` and rolls back. */
+/** Writes `text`, or SQL `NULL` for `null`, into `table.column` and rolls back. */
 export async function databaseVerdict(
   database: OracleDatabase,
   table: string,
   column: string,
-  text: string,
+  text: string | null,
 ): Promise<DatabaseVerdict> {
   const target = identifier(column);
   await database.query('begin');
@@ -40,7 +40,13 @@ export async function databaseVerdict(
       `insert into ${identifier(table)} (${target}) values ($1) returning ${target}::text as stored`,
       [text],
     );
-    return { accepted: true, stored: String(row?.['stored']) };
+    const stored = row?.['stored'];
+    if (typeof stored !== 'string' && stored !== null) {
+      throw new Error(
+        `${table}.${column}: the stored value did not come back as text`,
+      );
+    }
+    return { accepted: true, stored };
   } catch (error) {
     return { accepted: false, code: sqlState(error) };
   } finally {
@@ -54,6 +60,7 @@ export async function databaseVerdict(
  * must be refused by the database, or stored as a value whose read form
  * does not give back what was sent (resource SPEC 5.2). `givesBack` says
  * whether a read form gives back exactly what was sent, spelling included.
+ * `null` is stored as SQL `NULL` or refused, never changed.
  */
 export function disagreement(
   sent: unknown,
@@ -66,6 +73,12 @@ export function disagreement(
     return accepted
       ? `the schema accepts it; the database refuses it (${verdict.code})`
       : undefined;
+  }
+  if (verdict.stored === null) {
+    const asSent = sent === null;
+    return asSent === accepted
+      ? undefined
+      : `the schema ${accepted ? 'accepts' : 'refuses'} it; the database stores NULL`;
   }
   const read = readForm(verdict.stored, type);
   if (accepted) {
