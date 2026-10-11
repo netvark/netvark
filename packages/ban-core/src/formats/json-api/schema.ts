@@ -2,7 +2,8 @@
  * JSON Schema for the JSON:API error document (SPEC 7.2.3): a closed
  * `{ errors: [ErrorObject, ...] }` whose error objects are closed too and,
  * unless the document may mix entries, pin `status`, `code`, and `title` to
- * the definition.
+ * the definition. A document that combines known entries pins each object
+ * to one of them (7.2.4).
  * @ref https://jsonapi.org/format/#error-objects
  * @packageDocumentation
  */
@@ -93,6 +94,26 @@ function errorObjectSchema(
   };
 }
 
+/** The closed document whose `errors` hold `items`, with the configured top-level members (7.2.5). */
+function documentSchema(
+  items: JsonSchema,
+  options: JsonApiSchemaOptions,
+): JsonSchema {
+  const members = options.document;
+  const properties: Record<string, JsonSchema> = {
+    ...(members?.jsonapi === undefined ? {} : { jsonapi: { type: 'object' } }),
+    errors: { type: 'array', minItems: 1, items },
+    ...(members?.links === undefined ? {} : { links: { type: 'object' } }),
+    ...(members?.meta === undefined ? {} : { meta: { type: 'object' } }),
+  };
+  return {
+    type: 'object',
+    required: ['errors'],
+    properties,
+    additionalProperties: false,
+  };
+}
+
 /**
  * The document schema. `list` is true for `errorsSchema`, where the entry's
  * identity is pinned unless `mixedEntries` is on (7.2.4); a single-object
@@ -105,21 +126,30 @@ export function bodySchema(
   list: boolean,
 ): JsonSchema {
   const pinned = !(list && options.mixedEntries);
-  const members = options.document;
-  const properties: Record<string, JsonSchema> = {
-    ...(members?.jsonapi === undefined ? {} : { jsonapi: { type: 'object' } }),
-    errors: {
-      type: 'array',
-      minItems: 1,
-      items: errorObjectSchema(definition, ctx, options, pinned),
-    },
-    ...(members?.links === undefined ? {} : { links: { type: 'object' } }),
-    ...(members?.meta === undefined ? {} : { meta: { type: 'object' } }),
-  };
-  return {
-    type: 'object',
-    required: ['errors'],
-    properties,
-    additionalProperties: false,
-  };
+  return documentSchema(
+    errorObjectSchema(definition, ctx, options, pinned),
+    options,
+  );
+}
+
+/**
+ * The document of a list that combines entries (7.2.4): each object is the
+ * pinned object of one definition, under `anyOf` when there are several, so
+ * an object's `status`, `code`, and `title` always belong to one entry.
+ * `anyOf`, not `oneOf`, for the reason `errorResponses` gives (ADR 0011).
+ * Throws `TypeError` for an empty list, which no body matches.
+ */
+export function mixedBodySchema(
+  definitions: ReadonlyArray<ResolvedDefinition>,
+  ctx: SchemaContext,
+  options: JsonApiSchemaOptions,
+): JsonSchema {
+  const objects = definitions.map((definition) =>
+    errorObjectSchema(definition, ctx, options, true),
+  );
+  const [only, ...rest] = objects;
+  if (only === undefined) {
+    throw new TypeError('mixedSchema needs at least one definition');
+  }
+  return documentSchema(rest.length === 0 ? only : { anyOf: objects }, options);
 }

@@ -434,6 +434,12 @@ const responses = {
 
 Pass `{ dialect: 'openapi-3.0' }` for 3.0 documents, which predate `const`.
 
+List every code an operation can send. With `jsonApi({ mixedEntries: true })` one document may
+combine them, and `errorResponses` describes those documents too: each status admits the objects of
+its own codes, 400 also every client-error code once they span two statuses, and 500 every code once
+a server error is among them, which is how `responseStatus` picks the status of a combined document.
+Each object stays pinned to one entry's `status`, `code`, and `title`.
+
 ### Observe
 
 ```ts

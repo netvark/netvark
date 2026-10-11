@@ -21,4 +21,14 @@ export interface ErrorFormat<TBody = unknown> {
   schema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
   /** Schema of `renderErrors` bodies for the entry; `validationSchema()` in `@netvark/ban-core/openapi` reads it. */
   errorsSchema(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
+  /**
+   * Present on a format whose `renderErrors` gives each item its own
+   * identity, so one body can combine entries (SPEC 7.2.4): the schema of a
+   * body whose objects each carry the identity of one of `definitions`.
+   * `errorResponses()` in `@netvark/ban-core/openapi` reads it.
+   */
+  mixedSchema?(
+    definitions: ReadonlyArray<ResolvedDefinition>,
+    ctx: SchemaContext,
+  ): JsonSchema;
 }

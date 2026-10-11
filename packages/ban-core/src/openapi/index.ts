@@ -17,6 +17,10 @@ import type { ErrorFormat } from '../formats/types';
 
 import { indexByStatus } from '../core/definition';
 
+/** The statuses `responseStatus` sends a body of several statuses with (SPEC 7.2.4). */
+const BAD_REQUEST = 400;
+const INTERNAL_SERVER_ERROR = 500;
+
 /** The part of a `Ban` instance the helpers read. */
 export interface SchemaSource {
   readonly format: ErrorFormat;
@@ -109,12 +113,101 @@ function uniqueSchemas(schemas: ReadonlyArray<JsonSchema>): Array<JsonSchema> {
   });
 }
 
+/** Each ref's definition once, in the order given. */
+function definitionsOf(
+  ban: SchemaSource,
+  refs: ReadonlyArray<ErrorRef>,
+): Array<ResolvedDefinition> {
+  const byKey = new Map<string, ResolvedDefinition>();
+  for (const ref of refs) {
+    const definition = resolve(ban, ref);
+    byKey.set(definition.key, definition);
+  }
+  return [...byKey.values()];
+}
+
+/** The definitions of each status, in the order given. */
+function byStatus(
+  definitions: ReadonlyArray<ResolvedDefinition>,
+): Map<number, Array<ResolvedDefinition>> {
+  const groups = new Map<number, Array<ResolvedDefinition>>();
+  for (const definition of definitions) {
+    const group = groups.get(definition.status) ?? [];
+    group.push(definition);
+    groups.set(definition.status, group);
+  }
+  return groups;
+}
+
+/**
+ * The definitions a body of each status may carry when one body combines
+ * entries. Such a body is sent with `responseStatus` of its objects (SPEC
+ * 7.2.4): the status they share, else 400 when every one is a client error,
+ * else 500. So each status carries its own entries; 400 also every 4xx
+ * entry once the 4xx entries span two statuses; 500 every entry once the
+ * entries span two statuses and one of them is 5xx.
+ * @ref https://jsonapi.org/format/1.1/#errors-processing
+ */
+function mixedGroups(
+  definitions: ReadonlyArray<ResolvedDefinition>,
+): Map<number, ReadonlyArray<ResolvedDefinition>> {
+  const groups: Map<number, ReadonlyArray<ResolvedDefinition>> = byStatus(
+    definitions,
+  );
+  const clientErrors = definitions.filter(
+    (definition) => definition.status < INTERNAL_SERVER_ERROR,
+  );
+  if (new Set(clientErrors.map((definition) => definition.status)).size > 1) {
+    groups.set(BAD_REQUEST, clientErrors);
+  }
+  const statuses = [...groups.keys()];
+  if (
+    statuses.length > 1 &&
+    statuses.some((status) => status >= INTERNAL_SERVER_ERROR)
+  ) {
+    groups.set(INTERNAL_SERVER_ERROR, definitions);
+  }
+  return groups;
+}
+
+function describe(definitions: ReadonlyArray<ResolvedDefinition>): string {
+  return definitions.map((definition) => definition.description).join(' or ');
+}
+
+/** A format that combines entries in one body (SPEC 7.2.4). */
+type MixingFormat = ErrorFormat & Required<Pick<ErrorFormat, 'mixedSchema'>>;
+
+function mixes(format: ErrorFormat): format is MixingFormat {
+  return format.mixedSchema !== undefined;
+}
+
+/** Each status's response when one body may combine entries: `mixedSchema` of the entries it may carry. */
+function mixedResponses(
+  ban: SchemaSource,
+  format: MixingFormat,
+  definitions: ReadonlyArray<ResolvedDefinition>,
+  ctx: SchemaContext,
+): Record<string, ResponseObject> {
+  const responses: Record<string, ResponseObject> = {};
+  for (const [status, group] of mixedGroups(definitions)) {
+    responses[String(status)] = response(
+      ban,
+      describe(group),
+      format.mixedSchema(group, ctx),
+    );
+  }
+  return responses;
+}
+
 /**
  * Response Objects keyed by status. Entries sharing a status (for example
  * `BAD_REQUEST` and `MALFORMED_JSON`) merge into one `anyOf` response whose
  * description joins theirs with " or ". `anyOf`, not `oneOf`: a body has to
  * match at least one entry's schema, and a format whose schemas do not
  * discriminate by `code` would fail `oneOf` by matching several (ADR 0011).
+ * A format that combines entries in one body (`mixedSchema`, SPEC 7.2.4)
+ * instead gives each status the document of every entry a body of that
+ * status may carry.
  * @ref https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.1.2
  */
 export function errorResponses(
@@ -123,27 +216,21 @@ export function errorResponses(
   options: OpenApiOptions = {},
 ): Record<string, ResponseObject> {
   const ctx = context(ban, options);
-  const grouped = new Map<number, Array<ResolvedDefinition>>();
-  for (const ref of refs) {
-    const definition = resolve(ban, ref);
-    const group = grouped.get(definition.status) ?? [];
-    if (!group.some((existing) => existing.key === definition.key)) {
-      group.push(definition);
-    }
-    grouped.set(definition.status, group);
+  const definitions = definitionsOf(ban, refs);
+  const { format } = ban;
+  if (mixes(format)) {
+    return mixedResponses(ban, format, definitions, ctx);
   }
   const responses: Record<string, ResponseObject> = {};
-  for (const [status, definitions] of grouped) {
-    const schemas = uniqueSchemas(
-      definitions.map((d) => ban.format.schema(d, ctx)),
-    );
+  for (const [status, group] of byStatus(definitions)) {
+    const schemas = uniqueSchemas(group.map((d) => format.schema(d, ctx)));
     const [first, ...rest] = schemas;
     if (first === undefined) {
       continue;
     }
     responses[String(status)] = response(
       ban,
-      definitions.map((d) => d.description).join(' or '),
+      describe(group),
       rest.length === 0 ? first : { anyOf: schemas },
     );
   }

@@ -599,6 +599,9 @@ Subpath exports (each also available as `@netvark/hono-ban/<name>`):
 `errorResponses(ban, list)`, `errorSchema(ban, statusOrKey)`, `validationResponse(ban)`, and
 `validationSchema(ban)`. Schemas are JSON Schema 2020-12 objects, which OpenAPI 3.1 accepts
 directly; pass `{ dialect: 'openapi-3.0' }` to get `enum` instead of `const` for 3.0 documents.
+Under `jsonApi({ mixedEntries: true })` a document may combine the listed codes, so `errorResponses`
+describes each status as the documents whose objects carry any code a body of that status may carry,
+the statuses chosen as `responseStatus` chooses them, each object pinned to one entry.
 `@hono/zod-openapi` accepts raw schema objects in `responses[*].content[*].schema`, so the helpers
 drop into `createRoute()` without any Zod wrapping (verified by a generated-document test). @ref
 https://spec.openapis.org/oas/v3.1.0#schema-object @ref
