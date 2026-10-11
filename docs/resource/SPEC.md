@@ -2214,11 +2214,12 @@ The seed is printed on failure and fixed seeds run in CI. The generator adds no 
 
 ### 15.3 The oracle (`e2e/resource/oracle.e2e.test.ts`)
 
-`boundaryFixtures(resource)`, from the `testing` entry, returns `{ fields, relationships }`: for
-each field with a wire form and each relationship, keyed by public name, a frozen list of
-`BoundaryFixture`s, `{ value, label }`, the wire values at or next to each limit of the member's
-folded value spec (6.1), each value once, the label naming the limit (`maxLength 3, plus one`,
-`upper bound 5`, `fraction digits 3, zeros past it`):
+`boundaryFixtures(resource)`, from the `testing` entry, takes any declared resource
+(`AnyDeclaredResource`, 15.5) and returns `{ fields, relationships }`: for each field with a wire
+form and each relationship, keyed by public name, a frozen list of `BoundaryFixture`s,
+`{ value, label }`, the wire values at or next to each limit of the member's folded value spec
+(6.1), each value once, the label naming the limit (`maxLength 3, plus one`, `upper bound 5`,
+`fraction digits 3, zeros past it`):
 
 - text: the empty string, one character, a trailing space, an astral character, U+0000, and an
   unpaired surrogate; `maxLength` and `minLength` with their neighbors, in ASCII and in astral
@@ -2242,6 +2243,7 @@ A codec field has no entry, since its codec's fixtures cover it (7.1), and any v
 and `boundary-forms.test.ts` check, for every form and every key type that carries an id, that each
 list straddles its member's own schema: accepted on one side of each limit, refused on the other. A
 `bool` or `json` field has no limit inside its JSON type, so the schema accepts all its fixtures.
+`boundary-fixtures.test-d.ts` pins the parameter to `AnyDeclaredResource` and refuses a declaration.
 
 The oracle declares a schema that covers every row of 5.1 and every rule shape of 6.1, and runs
 every fixture of every field through the field's schema and through PostgreSQL; the verdicts MUST
@@ -2693,6 +2695,13 @@ the declarations alone, and 0.185 s and 0.269 s of check time, unchanged. The fi
 wide `DeclaredResource` and 1,513,970 and 1,907,038 instantiations, 0.468 s and 0.752 s: TypeScript
 compared each resource's typed members with the definer context's, which `AnyDeclaredResource` skips
 (AGENTS).
+
+Taking each resource's fixtures as an oracle does, `boundaryFixtures` called once per resource over
+the declarations as written took 490,423 and 580,783 instantiations and 0.185 s and 0.264 s of check
+time, and called in a `map` over the list 512,594 and 602,376, of which the `map` alone takes
+512,255 and 602,190 (medians of three runs with one checker). With the wide `DeclaredResource`
+parameter, one call per resource took 1,514,424 and 1,907,288 instantiations, 0.462 s and 0.744 s,
+and the `map` 1,515,593 and 1,907,947.
 
 ### 15.6 The Zod floor
 

@@ -7,7 +7,7 @@
  * digits a date-time keeps and one more, and the date limits.
  * @packageDocumentation
  */
-import type { DeclaredResource } from '../declare/declared-resource';
+import type { AnyDeclaredResource } from '../declare/declared-resource';
 import type { MemberSpec } from '../schema/field-spec';
 import type { ValueSpec } from '../schema/value-form';
 import type { BoundaryFixture } from './fixture';
@@ -41,11 +41,15 @@ function byName(
 }
 
 /**
- * The boundary fixtures of every field and relationship of `resource`.
- * Throws `TypeError` for a value `declareResource` did not return.
+ * The boundary fixtures of every field and relationship of `resource`, any
+ * declared resource: its members come from what `declareResource` recorded,
+ * so the parameter is `AnyDeclaredResource`, which a typed resource meets
+ * without TypeScript comparing its members with the wide `DeclaredResource`
+ * (SPEC 15.5). Throws `TypeError` for a value `declareResource` did not
+ * return.
  */
 export function boundaryFixtures(
-  resource: DeclaredResource,
+  resource: AnyDeclaredResource,
 ): ResourceBoundaries {
   const internals = internalsOf(resource);
   if (internals === undefined) {
