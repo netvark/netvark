@@ -4,13 +4,14 @@ Declare a resource once, keyed by your PostgreSQL names, and get its public name
 metadata, error codes, localized messages, JSON:API definition, keyset pagination, and OpenAPI
 document, all typed by the catalog `@netvark/pg-catalog` extracts from your migrations:
 
-| Package                                                  | What it is                                                                                                                                                                                                                            |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@netvark/resource-core`](../../packages/resource-core) | Declarations and everything derived from them, the typed messages and their localization, the `server` contracts (policies, scopes, quotas, rules, effects, the storage adapter contract), and OpenAPI. Runs in browsers and servers. |
+| Package                                                      | What it is                                                                                                                                                                                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@netvark/resource-core`](../../packages/resource-core)     | Declarations and everything derived from them, the typed messages and their localization, the `server` contracts (policies, scopes, quotas, rules, effects, the storage adapter contract), and OpenAPI. Runs in browsers and servers. |
+| [`@netvark/kysely-resource`](../../packages/kysely-resource) | The runtime over Kysely on PostgreSQL: the storage adapter, which runs each operation in one transaction scoped to the actor's tenant, for row security policies and its own scope predicate alike.                                   |
 
-`@netvark/kysely-resource` (the runtime over Kysely), `@netvark/hono-resource` (routes on Hono), and
-`@netvark/react-resource` (queries and forms) join the family next. Status: the 0.x line is in
-development and unreleased. Every choice is written down in [`SPEC.md`](SPEC.md).
+`@netvark/hono-resource` (routes on Hono) and `@netvark/react-resource` (queries and forms) join the
+family next. Status: the 0.x line is in development and unreleased. Every choice is written down in
+[`SPEC.md`](SPEC.md).
 
 ## Install
 

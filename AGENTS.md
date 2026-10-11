@@ -54,13 +54,13 @@ and e2e directory imports; read the family's file before changing that family.
 
 A pnpm workspace of five families:
 
-| Family   | Core                     | Binding                  | Docs            | E2E            |
-| -------- | ------------------------ | ------------------------ | --------------- | -------------- |
-| ban      | `packages/ban-core`      | `packages/hono-ban`      | `docs/ban`      | `e2e/ban`      |
-| catalog  | `packages/catalog-core`  | `packages/pg-catalog`    | `docs/catalog`  | `e2e/catalog`  |
-| jsonapi  | `packages/jsonapi-core`  | `packages/hono-jsonapi`  | `docs/jsonapi`  | `e2e/jsonapi`  |
-| keyset   | `packages/keyset-core`   | `packages/kysely-keyset` | `docs/keyset`   | `e2e/keyset`   |
-| resource | `packages/resource-core` | none yet                 | `docs/resource` | `e2e/resource` |
+| Family   | Core                     | Binding                    | Docs            | E2E            |
+| -------- | ------------------------ | -------------------------- | --------------- | -------------- |
+| ban      | `packages/ban-core`      | `packages/hono-ban`        | `docs/ban`      | `e2e/ban`      |
+| catalog  | `packages/catalog-core`  | `packages/pg-catalog`      | `docs/catalog`  | `e2e/catalog`  |
+| jsonapi  | `packages/jsonapi-core`  | `packages/hono-jsonapi`    | `docs/jsonapi`  | `e2e/jsonapi`  |
+| keyset   | `packages/keyset-core`   | `packages/kysely-keyset`   | `docs/keyset`   | `e2e/keyset`   |
+| resource | `packages/resource-core` | `packages/kysely-resource` | `docs/resource` | `e2e/resource` |
 
 - `packages/<name>/`: one published package, `@netvark/<name>`. `src/` with colocated tests;
   `tsdown.config.ts`, whose entry map becomes the `exports` map in `package.json` on build;

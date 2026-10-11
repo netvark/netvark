@@ -3049,18 +3049,29 @@ Types exported: `KyselyStorage`, `KyselyStorageOptions`, `KyselyTransaction`, `T
 const storage = createKyselyStorage({
   db, // the application's Kysely<DB> over PostgreSQL 14 or later, or PGlite
   catalog: publicCatalog, // the public catalog the declarations are built from
-  codecs: STORAGE_CODECS, // one storage codec per codec name, over PostgreSQL's text (7.1)
+  codecs: STORAGE_CODECS, // optional: one storage codec per codec name, over PostgreSQL's text (7.1)
   defineKeyset, // the server's definer with the cursor secret: createDefineKeyset({ cursor })
-  outbox: { table: 'outbox' }, // in the catalog's default schema unless `schema` names another
+  outbox: { table: 'outbox' }, // optional until a behavior has effects; in `public` unless `schema` names another
 });
 ```
 
 `KyselyStorage` is `StorageAdapter<KyselyTransaction>` (12.8) plus `many` (18.4), the `total` option
-of `list`, and the `db`, `catalog`, and `outbox` it was created with. A `TextCodec` is
-`{ read(text: string): unknown; write(value: unknown): string }`, the shape of `resources.storage`
-in `netvark.config` (catalog SPEC 10.3), so one object of storage codecs serves `rules --check` and
-the runtime. A codec field without a storage codec throws `Error('no storage codec <name>')` the
-first time the adapter reads or writes it. Creating the adapter runs no query.
+of `list`, and the `catalog` and `outbox` it was created with, the outbox as `{ schema, table }` or
+`undefined`. It does not hand out `db`: boot runs its connected checks through the storage (18.3),
+on the connection the operations run on. A `TextCodec` is
+`{ read: (stored: string) => unknown; write: (value: never) => string }`, the `TextStorageCodec` of
+`resources.storage` in `netvark.config` (catalog SPEC 10.3): `write` takes `never`, so the storage
+codec of any codec fits, and one object of storage codecs serves `rules --check` and the runtime. A
+codec field without a storage codec throws `Error('no storage codec <name>')` the first time the
+adapter reads or writes it. An outbox without `schema` is in `public`, the schema PostgreSQL creates
+in every database and the catalog's default `schemas` (catalog SPEC 11.1): the public catalog names
+no default schema, and `relayOutbox` takes no catalog.
+
+Creating the adapter runs no query. It checks its options, and a value it cannot use, or a key that
+is not an option, throws `TypeError` naming it, among them
+`createKyselyStorage: options.db must be a Kysely instance`,
+`createKyselyStorage: options.catalog: a full catalog; pass the public catalog the declarations are built from (toPublicCatalog)`,
+and `createKyselyStorage: options.outbox.shema is not an option`.
 
 Every statement runs on `db.withoutPlugins()`, so an application's plugins, such as
 `CamelCasePlugin`, never rename the adapter's identifiers or result keys. @ref
@@ -3073,15 +3084,20 @@ callback resolves, and rolls back and rejects with its error otherwise. The life
 `default_transaction_isolation`; PGlite runs one transaction at a time at its default, READ
 COMMITTED, and Kysely's PGlite dialect does not pass a level on. The callback:
 
-1. runs
-   `select set_config('TimeZone', 'UTC', true), set_config('DateStyle', 'ISO, YMD', true), set_config('IntervalStyle', 'postgres', true), set_config('extra_float_digits', '1', true), set_config('bytea_output', 'hex', true)`,
-   so every value prints one way (ADR 0012);
-2. runs `select set_config($1::text, $2::text, true)` for each scope, with its `session` and
-   `String(value)`;
-3. calls `run(tx)`. Each statement the adapter runs on `tx` records the first error it raised. When
-   `run` resolves after such an error, the callback throws that error, since PostgreSQL turns the
-   COMMIT of an aborted transaction into a ROLLBACK that reports no error. When `run` rejects, its
-   error is thrown unchanged.
+1. runs one statement, which fixes how every value prints (ADR 0012) and sets each scope's parameter
+   for the transaction only:
+   `select set_config('TimeZone', 'UTC', true), set_config('DateStyle', 'ISO, YMD', true), set_config('IntervalStyle', 'postgres', true), set_config('extra_float_digits', '1', true), set_config('bytea_output', 'hex', true), set_config($1::text, $2::text, true), ...`,
+   with each scope's `session` and `String(value)` in the order given; `set_config` with `true` is
+   `SET LOCAL` with parameters;
+2. calls `run(tx)`. A `KyselyTransaction` holds the scopes it set, as `scopes`, and runs each of the
+   adapter's statements with `execute(build)`, which builds the statement on the Kysely transaction
+   and resolves to its rows. `execute` records the first error a statement raised. When `run`
+   resolves after such an error, the callback throws that error, since PostgreSQL turns the COMMIT
+   of an aborted transaction into a ROLLBACK that reports no error. When `run` rejects, its error is
+   thrown unchanged.
+
+A `KyselyTransaction` has ES private fields, so no object of the same shape stands in for one, and
+only `transaction` creates one.
 
 @ref https://kysely-org.github.io/kysely-apidoc/classes/Kysely.html#transaction @ref
 https://www.postgresql.org/docs/18/sql-set-transaction.html @ref
@@ -3090,12 +3106,14 @@ https://www.postgresql.org/docs/18/runtime-config-client.html
 
 **Statements.** Names are `sql.id` parts, which Kysely's PostgreSQL compiler quotes by doubling `"`;
 a table is `"schema"."name"`. Every value of the adapter's own statements is a parameter sent as a
-string and cast to its column's type, `$n::text::<type>`: the type's reference quoted part by part,
-with `[]` for an array column, so the type's input function reads it as it would read a literal.
-Every selected value is cast to text, `"column"::text as "<public name>"`, and the key as `"id"`. A
-statement on a scoped table carries `"column" = $n::text::<type>` for the transaction's value of the
-resource's scope. A resource without a scope gets no predicate, and runs only when boot allowed it
-(18.3).
+string and cast to its column's type, `$n::text::<type>`: a domain by its schema and name, any other
+type by its reference name split at its first dot, each part quoted, with `[]` for an array column,
+so the type's input function reads it as it would read a literal. A type of the default schema is
+named without its schema, as the catalog names it (catalog SPEC 2.1), so it resolves through the
+connection's `search_path`. Every selected value is cast to text,
+`"column"::text as "<public name>"`, and the key as `"id"`. A statement on a scoped table carries
+`"column" = $n::text::<type>` for the transaction's value of the resource's scope. A resource
+without a scope gets no predicate, and runs only when boot allowed it (18.3).
 
 **Read forms** (obligation 3). A selected text becomes the read form of 5.1 by its column's type,
 followed through its domains to the base type. A value outside the read form fails the read with
@@ -3213,9 +3231,9 @@ Static problems:
   unscoped resource of `resources`;
 - a relationship declared with `include: true` whose target type has no behavior in `resources`;
 - a create quota that `quotas` does not hold;
-- when any behavior has effects, an outbox table that is not in `catalog`, or lacks one of
-  `position` (an `int8` primary key with a default or an identity), `name` (`text`), `version`
-  (`int4`), and `payload` (`jsonb`);
+- when any behavior has effects, a storage created without `outbox`, an outbox table that is not in
+  `catalog`, or one that lacks one of `position` (an `int8` primary key with a default or an
+  identity), `name` (`text`), `version` (`int4`), and `payload` (`jsonb`);
 - for each scoped resource, a table without row security enabled, and each command below whose
   policies do not read the scope's session parameter.
 
@@ -3245,7 +3263,7 @@ Type; Application of Multiple Policies) @ref https://www.postgresql.org/docs/18/
 Warnings: for each field a declaration makes sortable, no btree index whose key columns begin with
 the scope column and then the field's column, or with the field's column for an unscoped resource.
 
-Connected problems, at `createResourceRuntime` only, through `storage.db`:
+Connected problems, at `createResourceRuntime` only, run through the storage on its connection:
 
 - the role (`current_user`) is a superuser or has `BYPASSRLS`, which bypass row security on every
   table: `select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
@@ -3424,4 +3442,5 @@ never reaches the operation's caller, whose write has committed.
 | quota lock key   | `JSON.stringify([type, quota, scope value or null])`, hashed by `hashtextextended(key, 0)`                           | no       |
 | row locks        | `FOR NO KEY UPDATE` before an update, `FOR UPDATE` before a remove                                                   | no       |
 | outbox columns   | `position` `int8`, `name` `text`, `version` `int4`, `payload` `jsonb`                                                | no       |
+| outbox schema    | `public` when `outbox.schema` is not given                                                                           | no       |
 | relay `limit`    | 100 by default                                                                                                       | no       |

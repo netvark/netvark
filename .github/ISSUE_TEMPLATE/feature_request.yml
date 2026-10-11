@@ -17,6 +17,7 @@ body:
           '@netvark/keyset-core',
           '@netvark/kysely-keyset',
           '@netvark/resource-core',
+          '@netvark/kysely-resource',
           a new package,
           the repository or its docs,
         ]

@@ -442,6 +442,9 @@ importers:
       '@netvark/keyset-core':
         specifier: workspace:*
         version: link:../../packages/keyset-core
+      '@netvark/kysely-resource':
+        specifier: workspace:*
+        version: link:../../packages/kysely-resource
       '@netvark/pg-catalog':
         specifier: workspace:*
         version: link:../../packages/pg-catalog
@@ -466,6 +469,9 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.13.13
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0
@@ -579,6 +585,31 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.29.6
+
+  packages/kysely-resource:
+    dependencies:
+      '@netvark/catalog-core':
+        specifier: workspace:^
+        version: link:../catalog-core
+      '@netvark/keyset-core':
+        specifier: workspace:^
+        version: link:../keyset-core
+      '@netvark/kysely-keyset':
+        specifier: workspace:^
+        version: link:../kysely-keyset
+      '@netvark/resource-core':
+        specifier: workspace:^
+        version: link:../resource-core
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: 'catalog:'
+        version: 0.5.8
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   packages/pg-catalog:
     dependencies:

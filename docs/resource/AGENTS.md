@@ -1,8 +1,8 @@
 # resource family: instructions for coding agents
 
 Read with the root [`AGENTS.md`](../../AGENTS.md), which holds the rules every family shares; this
-file adds what is specific to `@netvark/resource-core` and the bindings that will join it. Humans:
-see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resource`, and the bindings
+that will join them. Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Ground rules
 
@@ -51,6 +51,11 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   into `message` or `detail`; declaration names may appear in startup `TypeError`s.
 - Lookups are prototype-safe. Derived lookups are `ReadonlyMap`s, and a name that arrives in a
   request is checked against them before it is used as a key.
+- The runtime binds the core to Kysely and PostgreSQL and nothing else: `packages/kysely-resource/`
+  imports Kysely, never a driver or a Node.js module, so it runs wherever a Kysely dialect does. Its
+  tests run on PGlite through Kysely's PGlite dialect, never on a mocked database, and what only a
+  server shows (the isolation level, pooled connections) runs in `e2e/resource` on PostgreSQL 14
+  and 18.
 
 ## Repository map
 
@@ -67,6 +72,11 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   twin
 - `jsonapi/` the `@netvark/jsonapi-core` and `@netvark/keyset-core` definitions
 - `server/`, `openapi/`, `testing/` the three other entry points
+
+`packages/kysely-resource/src/` (SPEC 18.1):
+
+- `storage/` `createKyselyStorage`: its options, the transaction protocol, names and casts, and the
+  scope predicate
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
