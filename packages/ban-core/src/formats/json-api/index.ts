@@ -17,7 +17,7 @@ import type { JsonApiDocumentMembers } from './schema';
 
 import { assertMemberName } from '../../internal/member-name';
 import { errorAsObject, itemsAsObjects } from './error-object';
-import { bodySchema } from './schema';
+import { bodySchema, mixedBodySchema } from './schema';
 
 export type {
   JsonApiErrorObject,
@@ -40,8 +40,9 @@ export interface JsonApiOptions {
   readonly traceIdMetaKey?: string | false | undefined;
   /**
    * Error documents may combine catalog entries (SPEC 7.2.4): an item's own
-   * `status`, `code`, and `title` are rendered, and `errorsSchema` types
-   * those members as strings instead of pinning the entry's values. Default
+   * `status`, `code`, and `title` are rendered, `errorsSchema` types those
+   * members as strings instead of pinning the entry's values, and
+   * `mixedSchema` describes a document combining known entries. Default
    * false: every object carries the error's identity and the schema pins it
    * (ADR 0011).
    */
@@ -156,5 +157,15 @@ export function jsonApi(
     ): JsonSchema {
       return bodySchema(definition, ctx, schemaOptions, true);
     },
+    ...(resolved.mixedEntries
+      ? {
+          mixedSchema(
+            definitions: ReadonlyArray<ResolvedDefinition>,
+            ctx: SchemaContext,
+          ): JsonSchema {
+            return mixedBodySchema(definitions, ctx, schemaOptions);
+          },
+        }
+      : {}),
   };
 }
