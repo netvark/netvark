@@ -20,6 +20,7 @@ import pg from 'pg';
 import { contractFixture } from '@netvark/resource-core/testing';
 
 import { throwawayDatabase } from './oracle-database.ts';
+import { endPool } from './pool-closed.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Pool } = pg` for ESM
 const { Pool } = pg;
@@ -112,7 +113,7 @@ async function openServer(url: string): Promise<ContractDatabase> {
   const database = await throwawayDatabase(url);
   const pool = new Pool({ connectionString: database.url, max: POOL_SIZE });
   const close = async () => {
-    await pool.end();
+    await endPool(pool);
     await database.drop();
   };
   try {

@@ -19,6 +19,7 @@ import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import pg from 'pg';
 
 import { MIGRATIONS_DIR } from './contacts.ts';
+import { endPool } from './pool-closed.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Pool } = pg` for ESM
 const { Client, Pool } = pg;
@@ -126,7 +127,7 @@ export async function openServerDatabase(url: string): Promise<LiveDatabase> {
     name,
     pool,
     close: async () => {
-      await pool.end();
+      await endPool(pool);
       await onServer(url, `drop database ${name} with (force)`);
     },
   });
