@@ -25,6 +25,8 @@ import { describe, isRecord } from '../internal/object';
 /** A checked list of resources and the application's own codes. */
 export interface Registry {
   readonly resources: ReadonlyArray<DeclaredResource>;
+  /** What each listed resource was built from, in the list's order. */
+  readonly internals: ReadonlyArray<DeclaredInternals>;
   readonly appErrors: Catalog;
 }
 
@@ -216,5 +218,9 @@ export function checkRegistry(
   if (conflicts.length > 0) {
     throw new TypeError(`${caller}: ${conflicts.join('; ')}`);
   }
-  return { resources: listed.map(({ resource }) => resource), appErrors: app };
+  return {
+    resources: listed.map(({ resource }) => resource),
+    internals: listed,
+    appErrors: app,
+  };
 }

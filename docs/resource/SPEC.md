@@ -44,7 +44,7 @@ driver, or a Node.js module.
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
 | `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                                            |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ```
@@ -1914,58 +1914,157 @@ selected as a driver reads them by default, and checks that the cases about it f
 
 ### 13.1 `openapi(resources, options)`
 
-Returns an OpenAPI 3.1 document object for the listed resources:
+Returns an OpenAPI 3.1.2 document object (`openapi: '3.1.2'`, the latest 3.1 release) for the listed
+resources, after the checks of every list of resources (4.2). The options:
 
-- **Paths** from each resource's links base: the collection (`GET` list, `POST` create), the
-  resource (`GET`, `PATCH`, `DELETE`), and for each relationship the relationship link (`GET`, and
-  `PATCH` when it is writable) and the related link (`GET` when the target has `get`), each only for
-  declared operations. Requests and responses use `application/vnd.api+json`.
-- **Schemas** per resource and operation, from the field metadata (8): the JSON Schema of each wire
-  form (5.1) with the folded limits as keywords (several `patterns` as one `pattern` each under
-  `allOf`), an array's `items`, `readOnly` and `writeOnly` by access, `required` by 6.2, and enum
-  `options`; a codec field takes `z.toJSONSchema(codec.schema)` with `io: 'input'` for requests and
-  `'output'` for responses. Validators add no keyword: their constraint appears in the error
-  responses.
-- **Parameters** from the query capabilities: `filter[<member>][<operator>]` per declared operator,
-  `sort` with its allowed values, `page[size]`, `page[after]`, `page[before]`, `include`,
-  `fields[<type>]`, and `filter[q]`.
-- **Error responses** through `@netvark/ban-core/openapi`'s `errorResponses` for every status an
-  operation can produce, each listing its codes: the jsonapi-core codes, the resource's derived
-  codes (9.1), `FORBIDDEN` for members and policies, and the application's codes its rules name.
-- **Examples**: each declared field `example` composes a resource example, and `options.examples`
-  adds business examples per type and operation. Every example MUST pass the matching Zod schema;
-  `openapi` throws `TypeError` naming the first that fails, so an invalid example is a failed build,
-  not a wrong document.
+| Option      | Meaning                                                                                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info`      | The Info Object: `title` and `version`, and `summary` and `description` when given.                                                                                                                                                     |
+| `appErrors` | The application's own codes, as `errorCatalog` takes them (9.2).                                                                                                                                                                        |
+| `codes`     | The codes the declarations cannot know, since rules, quotas, and middleware are functions: `all`, codes any operation may answer with (an authentication middleware's `UNAUTHORIZED`), and `resources`, by type and declared operation. |
+| `errors`    | The error handler's `docsBaseUrl` and the JSON:API format's options (jsonapi SPEC 10.5), so the documented error objects are the ones the handler renders.                                                                              |
+| `examples`  | Business examples by type, body (`create`, `update`, `get`), and name.                                                                                                                                                                  |
 
-@ref https://spec.openapis.org/oas/v3.1.1.html @ref
-https://jsonapi.org/format/1.1/#content-negotiation
+- **Paths** come from each resource's JSON:API links: the resource at `links.self(id)`, built for a
+  marker id that becomes the template `{id}`, and the collection at that path without its last
+  segment. The collection has `GET` (list) and `POST` (create), the resource `GET`, `PATCH`, and
+  `DELETE`, and each relationship its relationship link's `GET`, with `PATCH` when the relationship
+  is `readWrite` and the resource declares `update`, and its related link's `GET` when the target
+  serves `get`; each operation exists only when declared. An absolute link's origin becomes the
+  document's only server, so resources whose links have different origins throw `TypeError`, as do
+  two resources with one path. An operation's id is `<type>.<operation>` (`contacts.list`,
+  `contacts.organization.relationship.get`), unique since neither a type nor a member name holds a
+  `.`, and its tag is the type.
+- **Bodies** use `application/vnd.api+json` without parameters, which matches the media type with
+  the Cursor Pagination profile a page carries (RFC 9110 media ranges). Documents are those
+  `@netvark/jsonapi-core` builds and parses (11.1): a resource document with the includable targets'
+  resource objects in `included`, a page with the profile's links and meta, a relationship document,
+  and the request documents of a create, an update, and a relationship's update. Top-level
+  `jsonapi`, `links`, and `meta` are open. A create answers 201 with a `Location` header, an update
+  and a relationship's update 200, and a remove 204 without a body.
+- **Schemas**: `components.schemas` holds, per resource, `<type>.resource`, the resource object a
+  response carries, `<type>.identifier`, and `<type>.create` and `<type>.update` for the declared
+  operations. A response object is open, since `schema.read` strips the keys it does not know, and
+  requires no attribute, since a sparse fieldset may leave any out; a request object is closed, as
+  the parser is, but for `@`-members, which the parser skips. A value's schema is read from its
+  metadata (8): the wire form's type and format (5.1), the folded limits as keywords, a digit
+  pattern for integer and decimal text, each catalog pattern as a `pattern` (several under `allOf`;
+  a `.` outside a class becomes `[\s\S]`, since the catalog reads patterns with `su`), the options
+  as `enum`, an array's `items`, `null` where the value may be null, `readOnly` and `writeOnly` by
+  access, and the declared `description` and `example`, as `examples`. A codec's value is
+  `z.toJSONSchema(codec.schema)`, its input in a request and its output in a response (7.1).
+  Validators add no keyword: their codes appear in the error responses. `int16`, `decimal`, and
+  `date-time-local` come from the OpenAPI Format Registry, which a validator that does not know a
+  format ignores.
+- **Component keys** hold only `A-Za-z0-9.-_`: a type, which may hold a space or characters outside
+  ASCII, and a code, which may be any string, are spelled with each UTF-16 code unit outside
+  `A-Za-z0-9_-` as `.` and four uppercase hexadecimal digits, which is injective. A suffix is a
+  lowercase word after the last `.`, and an error key starts with `_`, which no type's spelling
+  does.
+- **Parameters** come from the JSON:API definition's capabilities, which `parseQuery` holds a
+  request to: `filter[<member>][<operator>]` per declared operator, whose value is the text
+  `@netvark/keyset-core` accepts for the member's keyset type, a list for `in`, `nin`, `between`,
+  and an array's operators, sent as the parameter repeated, and `true` or `false` for `isNull`; the
+  search parameter; `sort`, each sortable name and its `-` form, comma-separated, each at most once
+  and never in both directions; `include`; `fields[<type>]` for the primary type and each includable
+  target; `page[size]` from 1 to the page maximum; `page[after]` and `page[before]`; and the path's
+  `{id}` in the key's id form (3.4).
+- **Error responses** are built by `@netvark/ban-core/openapi`'s `errorResponses` with the instance
+  `@netvark/hono-jsonapi`'s `errorHandler` renders with: the JSON:API catalog, every listed
+  resource's codes, and the application's, under the JSON:API format with combined entries (jsonapi
+  SPEC 10.5). Each status an operation can produce lists its codes; a document that combines errors
+  of different statuses answers with ban's combined status (ban SPEC 7.2.4), so the 400 lists every
+  4xx code of the operation and the 500 every code. Each code's error object is
+  `components.schemas['_error.<code>']`, written once and referenced from every response (ban SPEC
+  9). The codes of each operation (`operation-codes.ts`): every request's content negotiation and
+  `INTERNAL_SERVER_ERROR`; a list's or a get's query codes, `FORBIDDEN` for a denied list or include
+  and `NOT_FOUND` for a denied or missing row (12.2); a create's or an update's document codes,
+  `CONFLICT` for a type or an id that differs, `CLIENT_GENERATED_ID_NOT_SUPPORTED` for a create's id
+  without client ids, `FORBIDDEN` for a member the operation does not accept (9.4) and a denied
+  create, and the derived codes the operation can raise (9.1, 9.5); a remove's `NOT_FOUND` and
+  `CONFLICT` for a row still referenced; and `options.codes`. A code `codes` names outside the
+  catalog throws `TypeError`
+  (`openapi: codes: TEAPOT is not a code of the catalog; give it in appErrors`).
+- **Examples**: `options.examples` adds named Example Objects (`summary`, `description`, `value`) to
+  a create's and an update's request body and to a get's 200 response. Each MUST pass what the
+  server holds that body to: the id's schema where the body carries one (3.4), `write.create` or
+  `write.update` (6.2), and for a get `schema.read` and `linkage.read`, with no unknown member. A
+  get's example is the document `resourceDocument` builds for the row it stands for, links included,
+  so it shows what the server sends. `openapi` throws `TypeError` naming the first example that
+  fails, with the issue's path and message and never a value, so an invalid example fails the build
+  instead of shipping in the document; and it throws for examples of a type it does not list or of a
+  body whose operation the resource lacks, which would otherwise be dropped unseen.
+
+The document admits every value and request the server accepts and may admit more, never less: what
+JSON Schema cannot state compactly stays with the server, whose refusals the error responses
+document. The document is looser for U+0000 and unpaired surrogates in text; a `real`'s range; an
+`int8` or `numeric` bound finer than its digit count, since a digit pattern bounds a value only by
+the power of ten above its bounds, sign included (a pattern for `> 0` still admits `0`); a negative
+zero; a date-time's range and leap second; a validator; a codec's refinements; and an update whose
+`data.id` differs from the path's id, which answers 409 `CONFLICT`. Patterns keep to the regular
+expression tokens JSON Schema recommends for interoperability, so no lookahead refuses `-0`.
+
+@ref https://spec.openapis.org/oas/v3.1.2.html @ref
+https://spec.openapis.org/oas/v3.1.2.html#components-object @ref
+https://spec.openapis.org/registry/format/ @ref https://jsonapi.org/format/1.1/#content-negotiation
+@ref https://www.rfc-editor.org/rfc/rfc9110#section-12.5.1
 
 ### 13.2 The surface and its diff
 
-`surfaceOf(resources)` returns a deterministic, sorted JSON value of what clients depend on: per
-type, the operations; per field its access, wire form, format, fraction digits, nullability,
-requiredness on create, limits, options, an array's elements, operators, and sortability; per
-relationship its target, access, requiredness, operators, and include; the codes with their
-statuses; search; and page bounds. Committed next to the catalog, it is the snapshot of ADR 0003.
+`surfaceOf(resources)` returns a deterministic JSON value of what clients depend on, after the
+checks of 4.2: `{ resources }`, by type, each with its operations; per field its access, wire form,
+format, fraction digits, limits, options, nullability, requiredness on create, an array's elements,
+codec, operators, and sortability, read from the field metadata (8); per relationship its target,
+access, nullability, requiredness, operators, and include; the derived codes with their statuses;
+the search parameter, or `null`; and the page's default size, maximum, and range support, or `null`.
+Every map's keys are sorted, and so is every list whose order means nothing (operations, operators,
+patterns); an enum's options keep PostgreSQL's sort order. Committed next to the catalog, it is the
+snapshot of ADR 0003.
 
 `diffSurfaces(before, after)` returns `ReadonlyArray<SurfaceChange>`, each
-`{ path, change, breaking, before, after }`:
+`{ path, change, breaking, before, after }`: `path` names the type, then the keys down to what
+changed (`['contacts', 'fields', 'email', 'nullable']`); `change` is `added`, `removed`, or
+`changed`; `before` is `null` for an addition and `after` for a removal. Changes come by type, then
+by part, in key order. A change breaks a client when the server stops taking what the client sent,
+or starts sending a JSON type the client did not expect:
 
-| Change                                                                           | Breaking |
-| -------------------------------------------------------------------------------- | -------- |
-| a type, operation, field, relationship, code, operator, or sortable flag removed | yes      |
-| a public name renamed (reported as a removal and an addition)                    | yes      |
-| a member becoming required on create, or a new member required on create         | yes      |
-| a writable member becoming non-nullable, or a readable member becoming nullable  | yes      |
-| an option removed, a limit tightened, a pattern added, a code's status changed   | yes      |
-| a member, option, operator, code, or operation added; a limit loosened           | no       |
+| Change                                                                                                                               | Breaking |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| a type, operation, field, relationship, code, operator, or option removed                                                            | yes      |
+| a public name renamed (reported as a removal and an addition)                                                                        | yes      |
+| an access losing a capability (read, create, update)                                                                                 | yes      |
+| a member becoming required on create, or a new member required on create                                                             | yes      |
+| a writable member becoming non-nullable, or a readable member becoming nullable                                                      | yes      |
+| a wire form, format, codec, or target changed; fewer fraction digits                                                                 | yes      |
+| a limit tightened, a pattern added, options appearing on a member that had none                                                      | yes      |
+| a code's status changed; the sortable or include flag removed                                                                        | yes      |
+| the search parameter or paging removed or renamed, a smaller page maximum, range withdrawn                                           | yes      |
+| a member, option, operator, code, operation, search, or paging added; a limit loosened or a pattern removed; a new default page size | no       |
+
+A requiredness change breaks only a resource that has a create. Clients read responses tolerantly,
+as the open response schemas assume: a longer text, a new option, a wider range, or a new code in a
+response breaks nobody, while a `null` where the type had none does. Across GitLab 17.11 and its
+master of October 2026, the same declarations over 36 unchanged tables gave 34 changes: an `integer`
+column widened to `bigint` broke its wire form (`integer` to a `string` of `int64`), a new CHECK
+raised a minimum, renamed CHECKs removed their codes, and widened text limits and a new column
+default broke nobody (15.5).
 
 The command that writes the snapshot and fails CI on a breaking change ships with the CLI that loads
 the registry, next to `rules --check` (catalog SPEC 10.3, 11.2).
 
-Tests: `openapi.test.ts` validates the contacts document against the OpenAPI 3.1 schema and every
-response example against its schema with Ajv (2020-12); `surface.test.ts`; `diff.test.ts` with one
-case per row.
+Tests: `document.test.ts` validates the contacts document against the official OpenAPI 3.1 schemas
+with Ajv 2020-12 (`schema-base`, Schema Objects against the OpenAPI dialect with formats asserted,
+`src/test-support/openapi-conformance.ts`), and checks every request the parser accepts and refuses
+against the request schemas and every error the handler renders against its response;
+`document-checks.test.ts` the lists it refuses (two origins, two resources at one path, an unknown
+code) and the endpoints a resource does not serve; `document.test-d.ts` that `openapi` and
+`surfaceOf` take `ReadonlyArray<AnyDeclaredResource>` and refuse a declaration;
+`value-schema-oracle.test.ts` runs the boundary fixtures through each value's Zod schema and its
+JSON Schema: each fixture the Zod schema accepts passes, and each it refuses fails, but those of the
+looseness above; `paths.test.ts`, `parameters.test.ts`, `filter-schemas.test.ts`,
+`form-pattern.test.ts`, `pattern.test.ts`, `resource-schemas.test.ts`, `value-schema.test.ts`,
+`operation-codes.test.ts`, `component-names.test.ts`, and `examples.test.ts` for each part;
+`surface.test.ts`; and `diff.test.ts` with one case per row. End to end, 15.4.
 
 ---
 
@@ -2161,7 +2260,18 @@ the database and accepted by the schemas, while the enforced CHECK beside them r
 (`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
 the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
 12.9); the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
-workerd for the root, `server`, `testing`, and `openapi` entries.
+workerd for the root, `server`, `testing`, and `openapi` entries. The OpenAPI document is proven
+against the contacts application's HTTP API (`runtime/api.ts`: the runtime of 12 behind Hono and
+`@netvark/hono-jsonapi`): the document passes an independent validator
+(`@seriousme/openapi-schema-validator`) with every reference resolved, is the same on every build,
+and puts the application's codes where its options name them (`openapi-document.e2e.test.ts`); every
+exchange, success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, and a
+client-keyed resource (`openapi-refusals-*.e2e.test.ts`), answers with a status, media type, body,
+and codes the document lists for its operation, a 201's `Location` matching its header's schema,
+while the request schema refuses exactly the requests the server refuses as documents
+(`support/openapi-contract.ts`, Ajv 2020-12 with the formats the document names); and the surface,
+recorded in a reviewed snapshot (`snapshots/surface.json`), diffs an edited declaration into exactly
+its four changes (`openapi-surface.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 
@@ -2482,6 +2592,54 @@ alone, which only keyset-core names, kept its hand-written request. Everything r
 18.3 (PGlite) and on a 14.19 server without a disagreement. Typed, `keysetRequest` over a
 `parseQuery` of every declaration as written took 1.8 and 1.7 percent more instantiations than the
 `parseQuery` calls alone (33,639 over 1,826,064 and 34,709 over 2,027,233).
+
+The fourteenth record covers section 13. The declarations as written, linked under `/api`, and the
+eleventh record's per-table declarations (`list` and `get`, every column with every operator) were
+documented by `openapi`, and every document passed the OpenAPI Initiative's `schema-base`, each
+Schema Object checked against the OpenAPI dialect with formats asserted, and
+`@seriousme/openapi-schema-validator` with every reference resolved:
+
+| Catalog            | Declarations | Paths | Operations | Schemas (error objects) | Size     | Built in |
+| ------------------ | ------------ | ----- | ---------- | ----------------------- | -------- | -------- |
+| stern              | as written   | 590   | 1,056      | 1,204 (760)             | 5,375 KB | 67 ms    |
+| stern              | per table    | 590   | 590        | 232 (10)                | 5,685 KB | 25 ms    |
+| GitLab 17.11 slice | as written   | 172   | 378        | 1,557 (1,317)           | 3,915 KB | 85 ms    |
+| GitLab 17.11 slice | per table    | 172   | 172        | 130 (10)                | 4,355 KB | 24 ms    |
+
+Each field's boundary fixtures (15.3), in a create holding the first accepted fixture of every other
+required member and in an update of that member alone, went through jsonapi-core's parser and the
+declaration's `write`, and through the documented request body: of 24,480 documents on stern and
+22,597 on the GitLab slice, the document refused none the server accepted, and accepted 5,908 and
+3,942 the server refused, each of the looseness 13.1 lists (U+0000 and unpaired surrogates, a
+date-time's range and leap second, `int8`'s limits and one past them, `real`'s overflow and
+underflow, `numeric`'s digit limits, `> 0` admitting zero, a negative zero) or of Ajv's `date-time`,
+which takes a space for `T` as RFC 3339 lets readers. In the oracle's probe tables, every value
+PostgreSQL stored came back in the reference adapter's read form and passed the documented
+attribute's schema, `null` included: 8,598 of stern's 12,288 fixtures and 8,220 of the GitLab
+slice's 11,623 were stored, and the document refused none, on PostgreSQL 18.3 (PGlite) and on a
+14.19 server.
+
+Error responses are 2,899 KB of stern's 5,375 KB: 6,215 responses, 1,150 distinct. The 3,408 that
+hold one code (894 KB) are 33 distinct, and sharing them as `components.responses` would save 13
+percent of the document; sharing the 2,807 that combine codes too, mostly the 400 and 500 that list
+every code of their operation, 30 percent. `surfaceOf` took 3 and 7 ms (488 KB and 603 KB), gave the
+same JSON on every call, and diffed empty against itself.
+
+Across versions, the GitLab slice's declarations were declared again over the catalog of GitLab's
+master of October 2026 (1,465 tables). 36 of the 60 fit unchanged; 24 were refused with their
+reason: 4 tables gone, 8 a column gone, 3 a new CHECK that needs a validator, 1 a column that became
+a foreign key, and 8 a relationship whose target was refused. The 36 diffed into 34 changes, each
+matching the two schemas, 12 breaking: `source_xid` widened from `integer` to `bigint`, changing its
+wire form and format; a new `CHECK (pause_ms >= 100)` raised a minimum; and nine CHECKs renamed with
+wider limits removed their codes. Their new codes, the wider limits (255 to 30,000, 512 to 1,024),
+and a column default that made `dns_zone` optional on create broke nothing.
+
+In types, as medians of five runs with one checker, calling `openapi` and `surfaceOf` once each over
+the declarations as written took 490,423 and 580,783 instantiations, against 489,983 and 580,496 for
+the declarations alone, and 0.185 s and 0.269 s of check time, unchanged. The first version took the
+wide `DeclaredResource` and 1,513,970 and 1,907,038 instantiations, 0.468 s and 0.752 s: TypeScript
+compared each resource's typed members with the definer context's, which `AnyDeclaredResource` skips
+(AGENTS).
 
 ### 15.6 The Zod floor
 

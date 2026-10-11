@@ -12,8 +12,9 @@ names and codes derived from it, the wire forms and Zod schemas, `defineCodec` a
 `defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
 derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), messages with
 their localization (SPEC 10), the JSON:API resource and the keyset definition a declaration derives
-(SPEC 11), and the `server` subpath with `constraintError` and the storage adapter contract and its
-suite, `list` included (SPEC 9.5 and 12). `forbiddenMembers` and OpenAPI follow;
+(SPEC 11), the `server` subpath with `constraintError` and the storage adapter contract and its
+suite, `list` included (SPEC 9.5 and 12), and the `openapi` entry: the OpenAPI document, the
+surface, and its diff (SPEC 13). `forbiddenMembers` follows;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -955,6 +956,64 @@ Take every resource's behavior as `ResourceBehavior<AppDomain>`. The complete ru
 get, and remove, is
 [`e2e/resource/runtime/runtime.ts`](https://github.com/netvark/netvark/blob/main/e2e/resource/runtime/runtime.ts).
 
+## OpenAPI and the API diff
+
+`@netvark/resource-core/openapi` documents the resources you serve as an OpenAPI 3.1.2 document, and
+records what clients depend on as a surface you commit and diff (SPEC 13):
+
+```ts
+import { openapi } from '@netvark/resource-core/openapi';
+
+export const document = openapi([Organizations, Contacts, Meetings], {
+  info: { title: 'Contacts', version: '1.0.0' },
+  appErrors: APP_ERRORS, // the catalog errorCatalog and the error handler take
+  codes: {
+    all: ['UNAUTHORIZED'], // what middleware answers on every route
+    resources: { contacts: { create: ['PLAN_UPGRADE_REQUIRED', 'QUOTA_EXCEEDED'] } },
+  },
+  examples: {
+    contacts: {
+      create: { person: { summary: 'A person', attributes: { name: 'Ada', kind: 'person' } } },
+    },
+  },
+});
+
+app.get('/openapi.json', (c) => c.json(document));
+```
+
+Every operation the declarations serve has its path, parameters, request and response documents, and
+an error response for each status it can answer with, listing its codes; each code's error object is
+a component, written once and referenced. Paths come from each resource's links, and an absolute
+base becomes the document's server. The schemas admit every request the server accepts, and may
+admit more: what JSON Schema cannot state compactly, such as a validator or a date-time's range,
+stays with the server, whose refusals the error responses document. An example that the server would
+refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the build fails instead of
+the document lying.
+
+The surface is the part of the document a client can break on, as sorted JSON: per type the
+operations, each member's access, form, limits, options, nullability, requiredness, operators, and
+sortability, the codes with their statuses, and the page bounds. Commit it next to the catalog and
+diff it in CI:
+
+```ts
+import type { Surface } from '@netvark/resource-core/openapi';
+
+import { readFile } from 'node:fs/promises';
+
+import { diffSurfaces, surfaceOf } from '@netvark/resource-core/openapi';
+
+const committed: Surface = JSON.parse(await readFile('api/surface.json', 'utf8'));
+const breaking = diffSurfaces(committed, surfaceOf(resources)).filter((change) => change.breaking);
+// [{ path: ['contacts', 'fields', 'email', 'access'], change: 'changed', breaking: true,
+//    before: 'readWrite', after: 'read' }]
+```
+
+A change breaks a client when the server stops taking what the client sent, or starts sending a JSON
+type it did not expect: a member removed or renamed, an access that loses a capability, a member
+that becomes required on create, a writable member that becomes non-nullable or a readable one
+nullable, a changed wire form, a tightened limit, a removed option, operator, or code. A new member,
+option, operator, or code, a loosened limit, and a new default page size break nobody.
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -1008,6 +1067,27 @@ get, and remove, is
   `postgresMapper`'s `constraints`.
 - **Pass `errorCatalog` the registry you serve.** Give it the same list of resources the server and
   the OpenAPI document take, so its checks cover every code and relationship a client can reach.
+- **Document what the handler renders.** Give `openapi` the `appErrors` of your error catalog and
+  the error handler's `docsBaseUrl` and JSON:API format options under `errors`, so the documented
+  error objects are the ones clients receive. List in `codes` what the declarations cannot see:
+  `all` for what middleware answers everywhere (`UNAUTHORIZED`), and per type and operation the
+  codes of each rule and quota.
+- **Build the document once.** It depends only on the declarations and the options, so build it at
+  startup or at build time and serve the same object; on a hundred tables it is a few megabytes.
+- **Test exchanges against the document.** Validate the status, the media type, the body, and the
+  codes of every response your API tests receive against the document's operation, with a JSON
+  Schema 2020-12 validator that knows the OpenAPI formats (`int16`, `decimal`, `date-time-local`). A
+  response outside the document is a bug in one of them.
+- **Answer the planner's refusals as the parser's.** Map keyset-core's `InvalidCursorError` to
+  `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and `InvalidFilterValueError` at its
+  `filter[<field>][<operator>]`, as the document's 400 lists them; left unmapped, they answer 500.
+- **Commit the surface and review its diff.** Write `surfaceOf(resources)` next to the catalog, and
+  fail CI on a breaking change unless the API's major version changes with it. A migration that
+  renames a column, tightens a CHECK, or widens an `integer` to a `bigint` shows up there as the
+  public change it is.
+- **Read responses tolerantly.** Handle error codes, options, and members your client does not know,
+  and validate responses with schemas that allow them, as `read` and the document's response schemas
+  do: the diff counts adding them as safe.
 - **Keep derived codes unique.** A code is the constraint's name upper-cased, without its table, so
   two tables that share a CHECK name, as tables copied from one another do, derive one code twice.
   `errorCatalog` names both constraints; give `code` on one, or name constraints after their table.
@@ -1152,8 +1232,11 @@ and 129 MB to 0.52 s and 202 MB, and the GitLab slice's from 0.27 s and 151 MB t
   `Infer` and `ErrorCatalog` do, never by the wide `DeclaredResource`. TypeScript checks a type
   argument's constraint with error reporting on, and against the wide type it recomputes a failed
   check of the definer context on every reference: 20 `Infer<typeof X>` aliases cost 1.05 s and 577
-  MB on stern that way, against 0.19 s and 130 MB. Annotating a value with `DeclaredResource` stays
-  cheap.
+  MB on stern that way, against 0.19 s and 130 MB. Type a function's parameter that takes any
+  resource, or a list of them, by `AnyDeclaredResource` too, as `openapi` and `surfaceOf` do: called
+  over stern's declarations with the wide type, the two tripled the check's instantiations and time;
+  with `AnyDeclaredResource` they add 440 instantiations. Annotating a value with `DeclaredResource`
+  stays cheap.
 - **For contributors.** Keep the valid path free of error types. A mapped type over unknown members
   is built only when a member is unknown (`KnownMembers`): built for every field, it made the stern
   check take 1.55 s and 874 MB. Messages for keys that cannot be declared come from a separate

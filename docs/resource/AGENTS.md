@@ -39,7 +39,11 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   `tsc --extendedDiagnostics --checkers 1`.
 - Type parameters that take a resource are constrained by `AnyDeclaredResource`, never by the wide
   `DeclaredResource` (SPEC 3): a type argument's constraint check reports errors, and against the
-  wide type TypeScript recomputes a failed check of the definer context on every reference.
+  wide type TypeScript recomputes a failed check of the definer context on every reference. So are
+  parameters that take any resource, or a list of them, unless the function reads the wide members:
+  each argument is compared with the definer context member by member, which tripled the
+  instantiations and check time of a 111-table schema that called `openapi` and `surfaceOf` (SPEC
+  15.5).
 - The core knows no host. Nothing under `packages/resource-core/` imports Kysely, Hono, React, a
   driver, or a Node.js module; `server/` holds contracts, and adapters implement them (ADR 0008).
   The root and `openapi` entries never import from `server/`.

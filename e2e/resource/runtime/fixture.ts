@@ -6,7 +6,8 @@
  */
 import type { RuntimeDatabase } from './database.ts';
 import type { AppActor, Permission, Plan, Services } from './domain.ts';
-import type { ResourceInput, Runtime } from './runtime.ts';
+import type { ResourceInput } from './input.ts';
+import type { Runtime } from './runtime.ts';
 
 import { BanError } from '@netvark/ban-core';
 
@@ -49,6 +50,12 @@ function member(
 export const editor = member(1, ['contacts:read', 'contacts:write']);
 export const viewer = member(1, ['contacts:read']);
 export const stranger = member(1, []);
+/** An editor who may also read organizations, so may include a contact's. */
+export const manager = member(1, [
+  'contacts:read',
+  'contacts:write',
+  'organizations:read',
+]);
 export const globex = member(2, ['contacts:read', 'contacts:write']);
 
 /** A contact's attributes as `@netvark/jsonapi-core` parses a resource object. */
