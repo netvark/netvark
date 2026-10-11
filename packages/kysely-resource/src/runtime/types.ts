@@ -1,10 +1,13 @@
 /**
  * What the domain runs with and takes (SPEC 18.3, 18.4): the storage, each
  * resource's behavior keyed by its type, the scope bindings, the quotas,
- * the services, the application's codes, and the hooks after commit; and
- * a create's or an update's input as a host or a worker hands it over.
+ * the services, the application's codes, and the hooks after commit; what
+ * boot reads besides, the full catalog and the resources that run without
+ * a scope; and a create's or an update's input as a host or a worker
+ * hands it over.
  * @packageDocumentation
  */
+import type { Catalog } from '@netvark/catalog-core';
 import type {
   DomainEvent,
   DomainShape,
@@ -50,4 +53,22 @@ export interface DomainOptions<TDomain extends DomainShape> {
   readonly afterCommit?: AfterCommit | undefined;
   /** Receives what `afterCommit` threw, which never reaches the operation's caller. */
   readonly report?: ((error: unknown) => void | Promise<void>) | undefined;
+}
+
+/** The behaviors of an application's resources, keyed by type. */
+export type RuntimeResources<TDomain extends DomainShape> = Readonly<
+  Record<string, ResourceBehavior<TDomain>>
+>;
+
+/** What `checkResourceRuntime` and `createResourceRuntime` take (SPEC 18.3). */
+export interface RuntimeOptions<
+  TDomain extends DomainShape,
+  TResources extends RuntimeResources<TDomain> = RuntimeResources<TDomain>,
+> extends DomainOptions<TDomain> {
+  /** Typed as both, so `TDomain` is inferred from the behaviors and `TResources` keeps each one's resource. */
+  readonly resources: TResources & RuntimeResources<TDomain>;
+  /** The full catalog `pg-catalog extract` writes: row security, indexes, and the outbox table. */
+  readonly catalog: Catalog;
+  /** The resources that run without a scope, by type; every other resource needs one. */
+  readonly unscoped?: ReadonlyArray<string> | undefined;
 }

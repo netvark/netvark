@@ -52,6 +52,7 @@ export type {
 } from './storage';
 
 export { constraintError } from './constraint-error';
+export { isResourceBehavior } from './define-resource';
 export { createDomainDefiners } from './domain';
 export { defineEvent } from './event';
 export { keysetRequest } from './keyset-request';
@@ -60,4 +61,4 @@ export { denyAll } from './policy';
 export { defineQuota, quotaExceeded } from './quota';
 export { reject, Rejection, rejectionError } from './reject';
 export { relationshipTargets } from './relationship-targets';
-export { defineScope, scopeValues } from './scope';
+export { defineScope, scopeColumnOf, scopeValues } from './scope';

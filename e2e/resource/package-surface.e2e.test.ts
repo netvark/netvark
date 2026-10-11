@@ -38,12 +38,14 @@ describe('package surface (SPEC 1, 18.1)', () => {
       'defineQuota',
       'defineScope',
       'denyAll',
+      'isResourceBehavior',
       'keysetRequest',
       'partitionViolation',
       'quotaExceeded',
       'reject',
       'rejectionError',
       'relationshipTargets',
+      'scopeColumnOf',
       'scopeValues',
     ]);
   });
@@ -69,7 +71,10 @@ describe('package surface (SPEC 1, 18.1)', () => {
 
   it('@netvark/kysely-resource exports the documented values', () => {
     expect(Object.keys(runtime).toSorted()).toEqual([
+      'BootError',
+      'checkResourceRuntime',
       'createKyselyStorage',
+      'createResourceRuntime',
       'relayOutbox',
     ]);
   });

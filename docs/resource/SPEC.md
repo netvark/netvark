@@ -42,12 +42,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`             |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform`                            |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `scopeColumnOf`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `isResourceBehavior`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow` |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ```
 packages/resource-core/src/
@@ -1825,6 +1825,8 @@ must supply, in column order. JavaScript mistakes throw `TypeError`, among them
 `defineResource: teams: operations: create is not a declared operation`,
 `defineResource: contacts: operations.update: "quota" is not one of rules, effects`, and
 `defineResource: contacts: policy must come from definePolicy(contacts, ...) or be denyAll`.
+`isResourceBehavior(value)` is true exactly for a behavior `defineResource` returned, not for a copy
+of one, so a runtime refuses any other value before it runs (18.3). Tests: `behavior.test.ts`.
 
 Every operation runs the same lifecycle inside one transaction: policy, rules, relationship targets,
 quota, write, effects; any failure rolls back everything, effects included. Before a create or an
@@ -1890,6 +1892,9 @@ const SCOPE_BINDINGS = {
 - `scopeValues(SCOPE_BINDINGS, actor)` gives each scope's `{ scope, column, session, value }` for
   `StorageAdapter.transaction`, and throws `TypeError` when a binding's value is not a string or a
   finite number, so an actor without a tenant never runs unscoped.
+- `scopeColumnOf(resource)` gives the column the declaration scopes the resource by, `undefined` for
+  a resource without a scope, so a runtime holds each binding to it where types do not reach (18.3);
+  it throws `TypeError` for a value `declareResource` did not return.
 - For every operation on a scoped resource, the adapter sets the parameter for the transaction only
   (`set_config(session, value, true)`), adds `column = value` to every statement as defense in depth
   next to row security, and writes `value` into the column on create. @ref
@@ -3060,6 +3065,7 @@ their numbers; this section holds the runtime's own test plan, packaging, and co
 ├── createKyselyStorage(options)    storage/create-storage.ts   the adapter of 12.8 over Kysely (18.2)
 ├── checkResourceRuntime(options)   boot/check-runtime.ts       the static boot checks, for CI (18.3)
 ├── createResourceRuntime(options)  runtime/create-runtime.ts   every boot check, then the domain (18.3, 18.4)
+├── BootError                       boot/report.ts              what createResourceRuntime rejects with (18.3)
 └── relayOutbox(options)            outbox/relay.ts             delivery after commit (18.6)
 ```
 
@@ -3071,8 +3077,8 @@ their numbers; this section holds the runtime's own test plan, packaging, and co
 | `outbox/`  | `relayOutbox`                                                                                                           |
 
 Types exported: `KyselyStorage`, `KyselyStorageOptions`, `KyselyTransaction`, `TextCodec`,
-`OutboxTable`, `RuntimeOptions`, `ResourceRuntime`, `Domain`, `ResourceOperations`, `ResourceInput`,
-`ListOptions`, `BootReport`, `BootError`, `RelayOptions`, `OutboxEvent`.
+`OutboxTable`, `RuntimeOptions`, `RuntimeResources`, `ResourceRuntime`, `Domain`,
+`ResourceOperations`, `ResourceInput`, `ListOptions`, `BootReport`, `RelayOptions`, `OutboxEvent`.
 
 ### 18.2 The storage adapter: `createKyselyStorage(options)`
 
@@ -3261,17 +3267,18 @@ const runtime = await createResourceRuntime(options); // at startup: the same ch
 
 `resources` holds what `defineResource` returned (12.3), keyed by type. `checkResourceRuntime` runs
 the static checks and returns `BootReport`, `{ problems, warnings }`, each a list of messages that
-start with the resource's type; it runs no query, so CI runs it without a database.
-`createResourceRuntime` runs the same checks, then the connected ones, and rejects with a
-`BootError` whose `problems` lists them all and whose message joins them, one per line; otherwise it
-resolves to the runtime, whose `warnings` are the report's. A message names tables, columns, roles,
-and session parameters, never a connection string.
+start with the resource's type, or with `role <name>` for a problem of the role; it runs no query,
+so CI runs it without a database. `createResourceRuntime` runs the same checks, then the connected
+ones, and rejects with a `BootError` whose `problems` lists them all and whose message joins them,
+one per line; otherwise it resolves to the runtime, whose `warnings` are the report's. A message
+names tables, columns, roles, and session parameters, never a connection string.
 
 Static problems:
 
 - a key of `resources` that is not its behavior's type;
 - a resource whose table is not in `catalog`;
-- a scoped resource whose scope has no binding in `scopes`;
+- a scoped resource whose scope has no binding in `scopes`, or whose binding names another column
+  than `scopeColumnOf` gives (12.5): the storage filters and writes the binding's column;
 - a resource without a scope that `unscoped` does not list, and a name in `unscoped` that is not an
   unscoped resource of `resources`;
 - a relationship declared with `include: true` whose target type has no behavior in `resources`;
@@ -3305,22 +3312,45 @@ server, so the check is strict rather than blind. `FORCE ROW LEVEL SECURITY` is 
 0012). @ref https://www.postgresql.org/docs/18/sql-createpolicy.html (Policies Applied by Command
 Type; Application of Multiple Policies) @ref https://www.postgresql.org/docs/18/ddl-rowsecurity.html
 
-Warnings: for each field a declaration makes sortable, no btree index whose key columns begin with
-the scope column and then the field's column, or with the field's column for an unscoped resource.
+Warnings:
+
+- for each field a declaration makes sortable, no btree index without a predicate whose key columns
+  begin with the scope column and then the field's column, or with the field's column for an
+  unscoped resource;
+- for each scoped resource, a unique index, the primary key among them, whose key columns leave out
+  the scope column and hold an expression or the column of a member the client writes (`readWrite`,
+  `immutable`, or `write`): PostgreSQL checks uniqueness without row security, so a create or an
+  update answers the index's 409 for a value another scope holds, which tells the actor the value
+  exists there. Put the scope column in the index, or keep the value server-side. The id is no
+  member, so a primary key over it alone never warns. An index keeps to one scope without the scope
+  column, and does not warn, when it holds the column of a relationship the runtime looks up in the
+  actor's scope (`relationshipTargets`, 12.3) whose target has the same scope, and its nulls cannot
+  conflict (the index's nulls are distinct, or the column is `NOT NULL`): a write that names another
+  scope's row is refused before the insert. It does not warn either when its predicate keeps only
+  rows whose scope column is null, which `pg_get_expr` prints as `(organization_id IS NULL)`: no
+  scoped write makes one.
+
+@ref https://www.postgresql.org/docs/18/ddl-rowsecurity.html (unique and primary key constraints
+always bypass row security)
 
 Connected problems, at `createResourceRuntime` only, run through the storage on its connection:
 
-- the role (`current_user`) is a superuser or has `BYPASSRLS`, which bypass row security on every
-  table: `select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
-- for each scoped resource's table, `select row_security_active($1::text::regclass)` is false: row
-  security does not apply to the role, most often because the role owns the table and the table does
-  not force it. The message names the role and the table, and the two ways out: force row security
-  on the table, or connect as a role that does not own it.
+- the role (`current_user`) is a superuser, or else has `BYPASSRLS`, either of which bypasses row
+  security on every table:
+  `select rolsuper, rolbypassrls from pg_roles where rolname = current_user`. Such a role is the one
+  problem reported, since every table would report it again;
+- for each scoped resource whose table the catalog shows with row security enabled,
+  `row_security_active` of the table, found by schema and name in `pg_class`, is false: row security
+  does not apply to the role, most often because the role owns the table and the table does not
+  force it. The message names the role and the table, and the two ways out: force row security on
+  the table, or connect as a role that does not own it. A table the database lacks is a problem of
+  its own: the catalog was extracted from another schema.
 
 @ref https://www.postgresql.org/docs/18/functions-info.html (`row_security_active`) @ref
 https://www.postgresql.org/docs/18/view-pg-roles.html
 
-JavaScript mistakes in the options themselves throw `TypeError` before any check, among them
+JavaScript mistakes in the options themselves throw `TypeError` before any check
+(`createResourceRuntime` rejects with it), among them
 `createResourceRuntime: options.storage must come from createKyselyStorage` and
 `createResourceRuntime: resources.contacts must be a behavior defineResource returned`.
 
@@ -3340,10 +3370,15 @@ await domain.contacts.remove(created.id);
 
 `as(actor)` returns a `Domain`: one `ResourceOperations` per resource, keyed by type, holding the
 operations the declaration declares (3.3), and `include` when it declares an includable
-relationship. Each operation runs the lifecycle of 12.3 in one transaction of `storage.transaction`,
-with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for an unscoped resource too: a
-policy on its table may read them, as one on the tenants table reads the tenant. An actor without a
-value for every scope runs no operation: `scopeValues` throws its `TypeError` before any statement.
+relationship. `createResourceRuntime` infers the domain's definer and each behavior's resource from
+`resources`, so for a typed declaration `Domain` holds exactly those operations, each resolving to
+its public rows, `PublicRowOf` (11.1), with `list` taking a request in the declaration's keyset
+fields (`KeysetRequestOf`) and `include` the names of its includable relationships; for a behavior
+typed wide every operation is optional. Each operation runs the lifecycle of 12.3 in one transaction
+of `storage.transaction`, with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for
+an unscoped resource too: a policy on its table may read them, as one on the tenants table reads the
+tenant. An actor without a value for every scope runs no operation: `scopeValues` throws its
+`TypeError` before any statement.
 
 | Operation                  | Runs                                                                                                                                                       | Resolves to           |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
@@ -3476,10 +3511,14 @@ what `report` itself throws; neither reaches the operation's caller, whose write
 
 - Unit tests, colocated: read forms of every type of 5.1, each element of a `bool` array, and each
   value without a read form; parameter text and array literals; the statements of each operation;
-  every static problem and warning of 18.3 against catalog fixtures, among them `all` and
-  per-command policies, a policy without `WITH CHECK`, restrictive policies, a permissive policy
-  that does not read the parameter, and parameter names in another case; the keyset refusal mapping;
-  and the lifecycle of each operation, a test per step and per failure path, on PGlite.
+  every static problem and warning of 18.3 against a catalog `pg-catalog` extracts from migrations,
+  among them `all` and per-command policies, a policy without `WITH CHECK`, restrictive policies, a
+  permissive policy that does not read the parameter, parameter names in another case, a quoted name
+  that only starts as the parameter's, and unique indexes that keep to the scope through a reference
+  or a predicate, or do not; the connected checks on PGlite as a superuser, a role with `BYPASSRLS`,
+  a role that owns a table with and without `FORCE`, and a role row security applies to; the types
+  of `Domain` for typed and wide behaviors; the keyset refusal mapping; and the lifecycle of each
+  operation, a test per step and per failure path, on PGlite.
 - The storage contract (12.9) over `createKyselyStorage`, on PGlite in the package and on PGlite and
   a PostgreSQL server in `e2e/resource` (`RESOURCE_PG_URL`), with obligation 12: a cursor issued in
   one workspace is refused in another.
@@ -3506,7 +3545,7 @@ what `report` itself throws; neither reaches the operation's caller, whose write
   types the options name), `@netvark/kysely-keyset` (keyset-core's planner and errors, and the
   renderers), `@netvark/jsonapi-core`, and `@netvark/ban-core`. Peer dependency: `kysely`
   `>=0.28.0`, as kysely-keyset's. Development: `kysely`, `zod`, and `@electric-sql/pglite` from the
-  workspace catalog.
+  workspace catalog, and `@netvark/pg-catalog`, whose extraction the boot tests read.
 - Runs wherever Kysely reaches PostgreSQL: Node.js 22.12 and later, Bun, Deno, and Cloudflare
   Workers through a driver that runs there.
 

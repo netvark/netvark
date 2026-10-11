@@ -10,36 +10,16 @@
 import type { Operation } from '@netvark/resource-core';
 import type {
   DomainShape,
-  PublicRow,
   ResourceBehavior,
-  StorageListRequest,
-  StoragePage,
 } from '@netvark/resource-core/server';
 
-import type { ListOptions } from '../storage/types';
 import type { Run } from './operation';
-import type { DomainOptions, ResourceInput } from './types';
+import type { ResourceOperations } from './operations-types';
+import type { DomainOptions } from './types';
 
 import { storageConfigOf } from '../storage/registry';
 import { getRow, includeRows, listRows } from './reads';
 import { createRow, removeRow, updateRow } from './writes';
-
-/** The operations of one resource, as one actor runs them; only the declared ones are present. */
-export interface ResourceOperations {
-  readonly list?: (
-    request?: StorageListRequest,
-    options?: ListOptions,
-  ) => Promise<StoragePage>;
-  readonly get?: (id: string) => Promise<PublicRow>;
-  readonly create?: (input: ResourceInput) => Promise<PublicRow>;
-  readonly update?: (id: string, input: ResourceInput) => Promise<PublicRow>;
-  readonly remove?: (id: string) => Promise<void>;
-  /** The rows of the target `rows` link to over `relationship`. */
-  readonly include?: (
-    relationship: string,
-    rows: ReadonlyArray<PublicRow>,
-  ) => Promise<ReadonlyArray<PublicRow>>;
-}
 
 type Operations = {
   -readonly [K in keyof ResourceOperations]: ResourceOperations[K];
