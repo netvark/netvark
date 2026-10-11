@@ -25,21 +25,26 @@ function spec(record: Record) {
   return found;
 }
 
+/** An id the schema takes, alone when it outputs the text itself, else with the spelling the server sends. */
+type Accepted = string | readonly [value: string, sent: string];
+
 function idRow(
   label: string,
   schema: ReturnType<typeof idSchema>,
-  accepts: ReadonlyArray<string>,
+  accepts: ReadonlyArray<Accepted>,
   refuses: ReadonlyArray<Refusal>,
 ): void {
   describe(label, () => {
-    // The id is the text itself: `schema.id` and `validate.id` output what they take.
-    it.each(accepts.map((value) => [value]))(
-      'accepts %j as itself',
-      (value) => {
-        expect(issuesOf(schema, value)).toEqual([]);
-        expect(schema.parse(value)).toBe(value);
-      },
-    );
+    it.each(
+      accepts.map((accepted) =>
+        typeof accepted === 'string' ? [accepted, accepted] : accepted,
+      ),
+    )('accepts %j as %j', (value, sent) => {
+      expect(issuesOf(schema, value)).toEqual([]);
+      expect(schema.parse(value)).toBe(sent);
+      // The output is in the form and outputs itself: parsing an id the server sent changes nothing.
+      expect(schema.parse(sent)).toBe(sent);
+    });
     it.each(refuses)('refuses %j as %s %s', (value, code, expected) => {
       expect(issuesOf(schema, value)).toEqual([
         expected === undefined
@@ -99,12 +104,21 @@ describe('resource ids in the wire form of their column (SPEC 3.4)', () => {
     ],
   );
   idRow(
-    'float4: storable in single precision',
+    'float4: storable in single precision, output as PostgreSQL prints the float32',
     idSchema(spec({ type: 'float4' }), 'refs.id'),
-    ['0.1', '3.4e+38'],
+    [
+      '0.1',
+      '0.3',
+      ['3.4e+38', '3.4e+38'],
+      ['0.30000000000000004', '0.3'],
+      ['16777217', '16777216'],
+      ['3.4028234663852886e+38', '3.4028235e+38'],
+      ['1.401298464324817e-45', '1e-45'],
+    ],
     [
       ['3.5e+38', 'format', 'float'],
       ['1e-50', 'format', 'float'],
+      ['0.30', 'format', 'float'],
     ],
   );
   idRow(
@@ -136,10 +150,37 @@ describe('resource ids in the wire form of their column (SPEC 3.4)', () => {
     [['9223372036854775808', 'maximum', '9223372036854775807']],
   );
   idRow(
-    'numeric(5, 2)',
+    'numeric(5, 2): output with two fraction digits, as PostgreSQL prints it',
     idSchema(spec({ type: 'numeric', precision: 5, scale: 2 }), 'refs.id'),
-    ['1.25'],
-    [['1.005', 'multipleOf', '0.01']],
+    [
+      '1.25',
+      ['1.5', '1.50'],
+      ['1', '1.00'],
+      ['1.500', '1.50'],
+      ['-0.5', '-0.50'],
+    ],
+    [
+      ['1.005', 'multipleOf', '0.01'],
+      ['01.5', 'format', 'decimal'],
+    ],
+  );
+  idRow(
+    'numeric(5, 0) and numeric(3, -2): output without a fraction',
+    idSchema(spec({ type: 'numeric', precision: 5, scale: 0 }), 'refs.id'),
+    ['12', ['12.0', '12']],
+    [['12.5', 'multipleOf', '1']],
+  );
+  idRow(
+    'numeric(3, -2)',
+    idSchema(spec({ type: 'numeric', precision: 3, scale: -2 }), 'refs.id'),
+    ['1200', ['1200.00', '1200']],
+    [['1250', 'multipleOf', '100']],
+  );
+  idRow(
+    'numeric without a scale keeps the digits sent, as PostgreSQL does',
+    idSchema(spec({ type: 'numeric' }), 'refs.id'),
+    ['1', '1.0', '1.00'],
+    [['+1', 'format', 'decimal']],
   );
   idRow(
     'varchar(3)',
@@ -148,10 +189,70 @@ describe('resource ids in the wire form of their column (SPEC 3.4)', () => {
     [['abcd', 'maxLength', '3']],
   );
   idRow(
-    'uuid',
+    'bpchar(4): output padded to four code points',
+    idSchema(spec({ type: 'bpchar', maxLength: 4 }), 'refs.id'),
+    ['abcd', ['ab', 'ab  '], ['a ', 'a   '], ['\u{1F44D}', '\u{1F44D}   ']],
+    [['abcde', 'maxLength', '4']],
+  );
+  idRow(
+    'bpchar without a length and citext keep the text sent',
+    idSchema(spec({ type: 'bpchar' }), 'refs.id'),
+    ['a ', 'a'],
+    [],
+  );
+  idRow(
+    'citext',
+    idSchema(spec({ type: 'citext' }), 'refs.id'),
+    ['ABC', 'abc'],
+    [],
+  );
+  idRow(
+    'uuid: either case, as RFC 9562 allows, output in lower case',
     idSchema(spec({ type: 'uuid' }), 'refs.id'),
-    ['7C1B0C6E-2A4B-4D0B-9F3A-1E2D3C4B5A69'],
-    [['7c1b0c6e', 'format', 'uuid']],
+    [
+      '7c1b0c6e-2a4b-4d0b-9f3a-1e2d3c4b5a69',
+      [
+        '7C1B0C6E-2A4B-4D0B-9F3A-1E2D3C4B5A69',
+        '7c1b0c6e-2a4b-4d0b-9f3a-1e2d3c4b5a69',
+      ],
+      [
+        '7c1B0c6E-2a4b-4D0b-9f3A-1e2d3c4b5a69',
+        '7c1b0c6e-2a4b-4d0b-9f3a-1e2d3c4b5a69',
+      ],
+    ],
+    [
+      ['7c1b0c6e', 'format', 'uuid'],
+      ['7c1b0c6e2a4b4d0b9f3a1e2d3c4b5a69', 'format', 'uuid'],
+      ['{7c1b0c6e-2a4b-4d0b-9f3a-1e2d3c4b5a69}', 'format', 'uuid'],
+    ],
+  );
+  idRow(
+    'timestamp(3): output as PostgreSQL prints it',
+    idSchema(spec({ type: 'timestamp', precision: 3 }), 'refs.id'),
+    [
+      '2024-01-31T10:20:30.5',
+      ['2024-01-31T10:20:30.500', '2024-01-31T10:20:30.5'],
+      ['2024-01-31t10:20:30.000000', '2024-01-31T10:20:30'],
+    ],
+    [
+      ['2024-01-31T10:20:30.0005', 'format', 'date-time-local'],
+      ['2024-01-31T10:20:30Z', 'format', 'date-time-local'],
+    ],
+  );
+  idRow(
+    'timestamptz: output as the instant in UTC with Z',
+    idSchema(spec({ type: 'timestamptz' }), 'refs.id'),
+    [
+      '2024-01-31T10:20:30Z',
+      ['2024-01-31T12:20:30+02:00', '2024-01-31T10:20:30Z'],
+      ['2024-01-31T00:20:30.50+02:00', '2024-01-30T22:20:30.5Z'],
+      ['2024-12-31T23:30:00-01:00', '2025-01-01T00:30:00Z'],
+      ['2024-01-31t10:20:30z', '2024-01-31T10:20:30Z'],
+    ],
+    [
+      ['2024-01-31T10:20:30', 'format', 'date-time'],
+      ['9999-12-31T23:30:00-01:00', 'format', 'date-time'],
+    ],
   );
   idRow(
     'date',

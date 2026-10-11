@@ -279,6 +279,7 @@ server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶
 | 0008 | A host-free core with a server subpath and a storage contract                                      |
 | 0009 | Messages are functions; the i18n library owns the locale                                           |
 | 0010 | The database resolves the violations a partition raises                                            |
+| 0011 | An id takes what its key's write form takes and is sent in the spelling the server reads back      |
 
 ## 6. Later
 

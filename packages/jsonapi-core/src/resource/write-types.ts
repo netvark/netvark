@@ -1,7 +1,7 @@
 /**
  * What a resource definition accepts on write (SPEC 5, 9.2): the Standard
- * Schema validators of a create's and an update's attributes and of a
- * client-generated id, and the fields each write may carry.
+ * Schema validators of a create's and an update's attributes and of the
+ * resource id, and the fields each write may carry.
  * @ref https://jsonapi.org/format/1.1/#crud-creating
  * @ref https://jsonapi.org/format/1.1/#crud-updating
  * @packageDocumentation
@@ -14,10 +14,14 @@ export interface ResourceValidators<TCreate, TUpdate> {
   /** Validates the attributes of a `PATCH` or atomic `update`. */
   readonly update?: StandardSchema<unknown, TUpdate> | undefined;
   /**
-   * A create's client-generated id, run only with `clientIds`: an issue is
-   * a 422 at the id. JSON:API asks for a universally unique identifier,
-   * and the server's keys say which spelling it takes.
+   * The id's form, whose output is the server's spelling of the key. A
+   * create's client-generated id must pass it (with `clientIds`; an issue
+   * is a 422 at the id), and an update's id names the request's resource
+   * when it is the same text or both pass with one output. JSON:API asks
+   * for a universally unique identifier, and the server's keys say which
+   * spellings it takes.
    * @ref https://jsonapi.org/format/1.1/#crud-creating-client-ids
+   * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-409
    */
   readonly id?: StandardSchema<unknown, string> | undefined;
 }

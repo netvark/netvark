@@ -1,15 +1,21 @@
 /**
  * A declared resource's id schema (SPEC 3.4, 6.2, 6.5): `schema.id` and
- * `validate.id` take an id in its key's one spelling and refuse any other
- * with the `ResourceIssue` of the id itself, at the empty path. The JSON:API
- * definition validates a create's client id with it only when the
- * declaration accepts client ids (SPEC 11.1), so such an id is a 422 at
- * `/data/id` instead of a value PostgreSQL refuses.
+ * `validate.id` take an id its key's form takes, output it in the spelling
+ * the server sends, and refuse any other text with the `ResourceIssue` of
+ * the id itself, at the empty path. The JSON:API definition carries it
+ * (SPEC 11.1): a create's client id outside it is a 422 at `/data/id`
+ * instead of a value PostgreSQL refuses, when the declaration accepts
+ * client ids, and an update's id in another spelling of the URL's key
+ * names the URL's resource.
  */
 import { describe, expect, it } from 'vitest';
 
 import { isBanError } from '@netvark/ban-core';
-import { errorObjects, parseCreateDocument } from '@netvark/jsonapi-core';
+import {
+  errorObjects,
+  parseCreateDocument,
+  parseUpdateDocument,
+} from '@netvark/jsonapi-core';
 
 import { untypedDeclare } from '../test-support/catalog-builder';
 import { issuesOf, outputOf } from '../test-support/validation';
@@ -62,11 +68,28 @@ describe('schema.id and validate.id', () => {
   });
 });
 
-describe("the JSON:API definition's client id", () => {
-  it('is validated by the key only with clientIds', () => {
+describe("the JSON:API definition's id", () => {
+  it("is the key's, with client ids or without", () => {
     expect(Meetings.resource.validate.id).toBe(Meetings.validate.id);
-    expect(Numbered.resource.validate.id).toBeUndefined();
-    expect(Contacts.resource.validate.id).toBeUndefined();
+    expect(Numbered.resource.validate.id).toBe(Numbered.validate.id);
+    expect(Contacts.resource.validate.id).toBe(Contacts.validate.id);
+  });
+
+  it("names the URL's resource in an update's id in another spelling", async () => {
+    const parsed = await parseUpdateDocument(
+      Contacts.resource,
+      { data: { type: 'contacts', id: UUID } },
+      UUID.toUpperCase(),
+    );
+    expect(parsed.id).toBe(UUID);
+    const refusal = await parseUpdateDocument(
+      Contacts.resource,
+      { data: { type: 'contacts', id: UUID } },
+      UUID.replaceAll('-', ''),
+    ).catch((error: unknown) => error);
+    expect(isBanError(refusal) ? errorObjects(refusal) : []).toMatchObject([
+      { code: 'CONFLICT', source: { pointer: '/data/id' } },
+    ]);
   });
 
   it("refuses an id outside the key's form with a 422 at the id", async () => {

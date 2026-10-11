@@ -1,8 +1,9 @@
 /**
  * The `uuid` wire form (SPEC 5.1): 8-4-4-4-12 hexadecimal digits in either
- * case; PostgreSQL prints lower case. It also accepts braces and missing
- * hyphens, the same value spelled differently, which the wire form leaves
- * out so every id has one spelling.
+ * case, RFC 9562's string representation; PostgreSQL prints lower case,
+ * the spelling an id is sent in (SPEC 3.4). PostgreSQL also accepts braces
+ * and missing hyphens, which the wire form leaves out.
+ * @ref https://www.rfc-editor.org/rfc/rfc9562#section-4
  * @ref https://www.postgresql.org/docs/18/datatype-uuid.html
  * @packageDocumentation
  */

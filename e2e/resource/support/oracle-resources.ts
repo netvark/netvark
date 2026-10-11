@@ -1,7 +1,9 @@
 /**
  * The oracle's declarations (resource SPEC 15.3): every column of the
  * oracle's tables as a writable field, and one relationship per key type,
- * so `schema.update` and `linkage.update` hold a schema for each.
+ * so `schema.update` and `linkage.update` hold a schema for each; `KEYS`
+ * holds the key tables' resources, whose ids the id suite checks (SPEC
+ * 3.4).
  */
 import { createDeclareResource } from '@netvark/resource-core';
 
@@ -83,6 +85,33 @@ const KeyUuids = declareResource('key_uuids', key);
 const KeyDates = declareResource('key_dates', key);
 const KeyInstants = declareResource('key_instants', key);
 const KeyMoods = declareResource('key_moods', key);
+const KeyLocals = declareResource('key_locals', key);
+const KeyCodes = declareResource('key_codes', key);
+const KeyNames = declareResource('key_names', key);
+const KeyAmounts = declareResource('key_amounts', key);
+const KeyWholes = declareResource('key_wholes', key);
+const KeyIntegers = declareResource('key_integers', key);
+
+/** Every key table's resource. */
+export const KEYS = [
+  KeySmallints,
+  KeyIntegers,
+  KeyBigints,
+  KeyNumerics,
+  KeyWholes,
+  KeyAmounts,
+  KeyReals,
+  KeyDoubles,
+  KeyBooleans,
+  KeyTexts,
+  KeyCodes,
+  KeyNames,
+  KeyUuids,
+  KeyDates,
+  KeyLocals,
+  KeyInstants,
+  KeyMoods,
+] as const;
 
 export const Links = declareResource('links', {
   operations: ['update'],
@@ -99,5 +128,11 @@ export const Links = declareResource('links', {
     date_id: { target: () => KeyDates, access: 'readWrite' },
     instant_id: { target: () => KeyInstants, access: 'readWrite' },
     mood_id: { target: () => KeyMoods, access: 'readWrite' },
+    local_id: { target: () => KeyLocals, access: 'readWrite' },
+    code_id: { target: () => KeyCodes, access: 'readWrite' },
+    name_id: { target: () => KeyNames, access: 'readWrite' },
+    amount_id: { target: () => KeyAmounts, access: 'readWrite' },
+    whole_id: { target: () => KeyWholes, access: 'readWrite' },
+    integer_id: { target: () => KeyIntegers, access: 'readWrite' },
   },
 });

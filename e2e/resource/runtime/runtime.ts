@@ -11,11 +11,12 @@
  * `constraintError` finds, a partition's through the adapter's
  * `partitionRoot` (`failure.ts`), and a row the actor cannot see
  * `NOT_FOUND`, built as a denied `get` builds it, as is an id outside the
- * key's form, refused before any query. A list asks the policy,
- * then pages with the keyset request `keysetRequest` maps; an include asks
- * the policy for the relationship, then reads each linked row in the
- * actor's scope, in a transaction of its own, where a host's would share
- * the list's or the get's.
+ * key's form, refused before any query; an id in the form is looked up as
+ * `schema.id` outputs it, the spelling the row's id has. A list asks the
+ * policy, then pages with the keyset request `keysetRequest` maps; an
+ * include asks the policy for the relationship, then reads each linked row
+ * in the actor's scope, in a transaction of its own, where a host's would
+ * share the list's or the get's.
  */
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
@@ -86,14 +87,17 @@ function notFound(): BanError {
 }
 
 /**
- * Refuses an id outside the key's form as a missing row, without a query:
- * no row has it, and PostgreSQL would refuse the text or read another
- * spelling of a key as that key (resource SPEC 3.4, 12.3).
+ * The id as the server spells it, or a missing row, without a query, for
+ * an id outside the key's form: no row has it, and PostgreSQL would refuse
+ * the text or read another spelling of a key as that key (resource SPEC
+ * 3.4, 12.3).
  */
-function assertKnownId(behavior: Behavior, id: string): void {
-  if (!behavior.resource.schema.id.safeParse(id).success) {
+function knownId(behavior: Behavior, id: string): string {
+  const known = behavior.resource.schema.id.safeParse(id);
+  if (!known.success) {
     throw notFound();
   }
+  return known.data;
 }
 
 /** The runtime over `adapter`, handing `services` to policies, rules, effects, and quotas. */
@@ -196,8 +200,8 @@ export function createRuntime<TTransaction>(
         return row;
       });
     },
-    get: async (actor, behavior, id) => {
-      assertKnownId(behavior, id);
+    get: async (actor, behavior, requested) => {
+      const id = knownId(behavior, requested);
       return scoped(actor, behavior, 'get', async (tx) => {
         const row = await adapter.get(tx, behavior.resource, id);
         if (row === undefined) {
@@ -207,8 +211,8 @@ export function createRuntime<TTransaction>(
         return row;
       });
     },
-    update: async (actor, behavior, id, request) => {
-      assertKnownId(behavior, id);
+    update: async (actor, behavior, requested, request) => {
+      const id = knownId(behavior, requested);
       const input = parsed(behavior, 'update', request);
       const update = behavior.operations.update;
       return scoped(actor, behavior, 'update', async (tx) => {
@@ -227,8 +231,8 @@ export function createRuntime<TTransaction>(
         return row;
       });
     },
-    remove: async (actor, behavior, id) => {
-      assertKnownId(behavior, id);
+    remove: async (actor, behavior, requested) => {
+      const id = knownId(behavior, requested);
       const remove = behavior.operations.remove;
       await scoped(actor, behavior, 'remove', async (tx) => {
         const row = await locked(tx, behavior, id, 'remove');

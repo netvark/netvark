@@ -112,6 +112,36 @@ const value = {
     }
   },
   "tables": {
+    "key_amounts": {
+      "schema": "public",
+      "name": "key_amounts",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_amounts_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
     "key_bigints": {
       "schema": "public",
       "name": "key_bigints",
@@ -165,6 +195,36 @@ const value = {
       },
       "constraints": {
         "key_booleans_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
+    "key_codes": {
+      "schema": "public",
+      "name": "key_codes",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_codes_pkey": {
           "kind": "primaryKey",
           "columns": [
             "id"
@@ -262,6 +322,66 @@ const value = {
         }
       }
     },
+    "key_integers": {
+      "schema": "public",
+      "name": "key_integers",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_integers_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
+    "key_locals": {
+      "schema": "public",
+      "name": "key_locals",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "timestamp",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp(3) without time zone",
+          "maxLength": null,
+          "precision": 3,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_locals_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
     "key_moods": {
       "schema": "public",
       "name": "key_moods",
@@ -285,6 +405,36 @@ const value = {
       },
       "constraints": {
         "key_moods_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
+    "key_names": {
+      "schema": "public",
+      "name": "key_names",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "citext",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "citext",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_names_pkey": {
           "kind": "primaryKey",
           "columns": [
             "id"
@@ -435,6 +585,36 @@ const value = {
       },
       "constraints": {
         "key_uuids_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
+    "key_wholes": {
+      "schema": "public",
+      "name": "key_wholes",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric(4,0)",
+          "maxLength": null,
+          "precision": 4,
+          "scale": 0,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "key_wholes_pkey": {
           "kind": "primaryKey",
           "columns": [
             "id"
@@ -604,9 +784,100 @@ const value = {
           "default": null,
           "identity": null,
           "generated": null
+        },
+        "local_id": {
+          "type": "timestamp",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp(3) without time zone",
+          "maxLength": null,
+          "precision": 3,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "code_id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "name_id": {
+          "type": "citext",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "citext",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "amount_id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "whole_id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric(4,0)",
+          "maxLength": null,
+          "precision": 4,
+          "scale": 0,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "integer_id": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
         }
       },
       "constraints": {
+        "links_amount_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "amount_id"
+          ],
+          "references": {
+            "table": "key_amounts",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
         "links_bigint_id_fkey": {
           "kind": "foreignKey",
           "columns": [
@@ -627,6 +898,19 @@ const value = {
           ],
           "references": {
             "table": "key_booleans",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "links_code_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "code_id"
+          ],
+          "references": {
+            "table": "key_codes",
             "columns": [
               "id"
             ]
@@ -672,6 +956,32 @@ const value = {
           },
           "enforced": true
         },
+        "links_integer_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "integer_id"
+          ],
+          "references": {
+            "table": "key_integers",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "links_local_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "local_id"
+          ],
+          "references": {
+            "table": "key_locals",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
         "links_mood_id_fkey": {
           "kind": "foreignKey",
           "columns": [
@@ -679,6 +989,19 @@ const value = {
           ],
           "references": {
             "table": "key_moods",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "links_name_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "name_id"
+          ],
+          "references": {
+            "table": "key_names",
             "columns": [
               "id"
             ]
@@ -750,6 +1073,19 @@ const value = {
           ],
           "references": {
             "table": "key_uuids",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "links_whole_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "whole_id"
+          ],
+          "references": {
+            "table": "key_wholes",
             "columns": [
               "id"
             ]
