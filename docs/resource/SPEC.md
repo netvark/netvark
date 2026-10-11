@@ -3437,7 +3437,8 @@ https://www.postgresql.org/docs/18/view-pg-roles.html
 JavaScript mistakes in the options themselves throw `TypeError` before any check
 (`createResourceRuntime` rejects with it), among them
 `createResourceRuntime: options.storage must come from createKyselyStorage` and
-`createResourceRuntime: resources.contacts must be a behavior defineResource returned`.
+`createResourceRuntime: resources.contacts must be a behavior defineResource returned (a second installed copy of @netvark/resource-core also fails this)`:
+a behavior is recognized by the copy that made it (root ADR 0006).
 
 ### 18.4 The domain: `runtime.as(actor)` and `runtime.transaction(actor, work)`
 
@@ -3648,11 +3649,15 @@ what `report` itself throws; neither reaches the operation's caller, whose write
 - ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
   `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run in the build. One
   entry, `index`.
-- Dependencies, each `workspace:^`: `@netvark/resource-core`, `@netvark/catalog-core` (whose catalog
-  types the options name), `@netvark/kysely-keyset` (keyset-core's planner and errors, and the
-  renderers), `@netvark/jsonapi-core`, and `@netvark/ban-core`. Peer dependency: `kysely`
-  `>=0.28.0`, as kysely-keyset's. Development: `kysely`, `zod`, and `@electric-sql/pglite` from the
-  workspace catalog, and `@netvark/pg-catalog`, whose extraction the boot tests read.
+- Dependencies, each `workspace:^`: `@netvark/catalog-core` (whose catalog types the options name),
+  `@netvark/kysely-keyset` (the renderers), `@netvark/jsonapi-core`, and `@netvark/ban-core`.
+- Peer dependencies: `kysely` `>=0.28.0`, as kysely-keyset's, and `@netvark/resource-core` and
+  `@netvark/keyset-core`, each a `workspace:^` development dependency too. The application declares
+  its resources, behaviors, and scopes and makes the keyset definer with its own copies, and the
+  runtime must work with those same copies: a declaration and a behavior are recognized by the copy
+  that made them, and a keyset's refusal by `instanceof` (18.5, root ADR 0006).
+- Development: `kysely`, `zod`, and `@electric-sql/pglite` from the workspace catalog, and
+  `@netvark/pg-catalog`, whose extraction the boot tests read.
 - Runs wherever Kysely reaches PostgreSQL: Node.js 22.12 and later, Bun, Deno, and Cloudflare
   Workers through a driver that runs there.
 

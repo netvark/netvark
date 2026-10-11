@@ -618,22 +618,22 @@ importers:
       '@netvark/jsonapi-core':
         specifier: workspace:^
         version: link:../jsonapi-core
-      '@netvark/keyset-core':
-        specifier: workspace:^
-        version: link:../keyset-core
       '@netvark/kysely-keyset':
         specifier: workspace:^
         version: link:../kysely-keyset
-      '@netvark/resource-core':
-        specifier: workspace:^
-        version: link:../resource-core
     devDependencies:
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8
+      '@netvark/keyset-core':
+        specifier: workspace:^
+        version: link:../keyset-core
       '@netvark/pg-catalog':
         specifier: workspace:^
         version: link:../pg-catalog
+      '@netvark/resource-core':
+        specifier: workspace:^
+        version: link:../resource-core
       kysely:
         specifier: 'catalog:'
         version: 0.29.6

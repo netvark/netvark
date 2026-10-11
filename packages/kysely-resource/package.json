@@ -56,17 +56,19 @@
     "@netvark/ban-core": "workspace:^",
     "@netvark/catalog-core": "workspace:^",
     "@netvark/jsonapi-core": "workspace:^",
-    "@netvark/keyset-core": "workspace:^",
-    "@netvark/kysely-keyset": "workspace:^",
-    "@netvark/resource-core": "workspace:^"
+    "@netvark/kysely-keyset": "workspace:^"
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@netvark/keyset-core": "workspace:^",
     "@netvark/pg-catalog": "workspace:^",
+    "@netvark/resource-core": "workspace:^",
     "kysely": "catalog:",
     "zod": "catalog:"
   },
   "peerDependencies": {
+    "@netvark/keyset-core": "^0.1.0",
+    "@netvark/resource-core": "^0.1.0",
     "kysely": ">=0.28.0"
   },
   "engines": {

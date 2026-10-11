@@ -42,7 +42,7 @@ describe('boot: options (resource SPEC 18.3)', () => {
         ...options,
         resources: { ...BEHAVIORS, tasks: { ...BEHAVIORS.tasks } },
       }),
-      'resources.tasks must be a behavior defineResource returned',
+      'resources.tasks must be a behavior defineResource returned (a second installed copy of @netvark/resource-core also fails this)',
     ],
     [
       'scopes',

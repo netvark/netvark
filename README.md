@@ -26,21 +26,22 @@ each other (`@netvark/jsonapi-core` is built on `@netvark/ban-core`, and `@netva
 the catalog, jsonapi, and keyset cores). A binding takes its host as a peer dependency, and also
 each `@netvark` package whose values the application hands it
 ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)):
-`@netvark/hono-jsonapi` takes `@netvark/hono-ban`, and `@netvark/hono-resource` takes
+`@netvark/hono-jsonapi` takes `@netvark/hono-ban`, `@netvark/kysely-resource` takes
+`@netvark/resource-core` and `@netvark/keyset-core`, and `@netvark/hono-resource` takes
 `@netvark/hono-jsonapi` and `@netvark/resource-core`. `@netvark/pg-catalog` depends on `pg` and
 takes PGlite and `@netvark/resource-core` as optional peers.
 
 ## Install
 
 ```bash
-pnpm add @netvark/hono-ban hono                             # errors on Hono
-pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban       # JSON:API on Hono
-pnpm add @netvark/kysely-keyset kysely                      # keyset pagination on Kysely
-pnpm add -D @netvark/pg-catalog @electric-sql/pglite        # your PostgreSQL schema as a typed catalog
-pnpm add @netvark/resource-core                             # resources declared over that catalog
-pnpm add @netvark/kysely-resource kysely                    # those resources run on PostgreSQL through Kysely
-pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono  # and served on Hono
-pnpm add @netvark/ban-core                                  # a core on its own: a fetch handler, a worker, another framework
+pnpm add @netvark/hono-ban hono                                # errors on Hono
+pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban          # JSON:API on Hono
+pnpm add @netvark/kysely-keyset kysely                         # keyset pagination on Kysely
+pnpm add -D @netvark/pg-catalog @electric-sql/pglite           # your PostgreSQL schema as a typed catalog
+pnpm add @netvark/resource-core                                # resources declared over that catalog
+pnpm add @netvark/kysely-resource @netvark/keyset-core kysely  # those resources run on PostgreSQL through Kysely
+pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono     # and served on Hono
+pnpm add @netvark/ban-core                                     # a core on its own: a fetch handler, a worker, another framework
 ```
 
 ## Naming
