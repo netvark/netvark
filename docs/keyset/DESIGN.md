@@ -60,7 +60,7 @@ It is a library for teams who paginate large tables and want the hard cases hand
 2. **Spec-driven.** The profile fixes the page semantics; PostgreSQL's documentation fixes ordering,
    pattern matching, arrays, and text search; RFCs fix HMAC, base64url, and canonical JSON. Each
    behavior is a cited clause, and the test names the rule. Where a choice is the library's, it is
-   an ADR (ADR-0005 to ADR-0009, ADR-0012 to ADR-0015).
+   an ADR (ADR-0005 to ADR-0009, ADR-0012 to ADR-0016).
 3. **Every identifier from the definition, every value a parameter.** No request data reaches SQL
    except as a bound parameter. The one literal, the text search configuration, is validated against
    `regconfig`'s name syntax at definition time.
@@ -71,16 +71,19 @@ It is a library for teams who paginate large tables and want the hard cases hand
 5. **The order is total.** The key is appended to every sort, `NULL`s have a fixed place, and the
    seek predicate is built so that walking forward and backward visits the same rows in the same
    order (ADR-0008). The e2e suite proves it over sorts with ties and nulls on three databases.
-6. **Report, never drop.** An unknown sort field, an operator the field does not accept, a bad
+6. **A page costs one page.** The seek leads with a range on the first key and the order matches a
+   plain index, so an index on the sort starts its scan at the cursor whatever the page's depth
+   (ADR-0016). A server-only e2e test reads the plans to prove it.
+7. **Report, never drop.** An unknown sort field, an operator the field does not accept, a bad
    value, a malformed filter node, a cursor from another request: each is a typed error with the
    detail in a field. Nothing is ignored.
-7. **Nothing about the data reaches a message.** Error messages are constant; the request's values
+8. **Nothing about the data reaches a message.** Error messages are constant; the request's values
    go in structured fields the API layer decides what to do with.
-8. **Web standards only. No ambient environment.** Web Crypto, `btoa`, `TextEncoder`; nothing reads
+9. **Web standards only. No ambient environment.** Web Crypto, `btoa`, `TextEncoder`; nothing reads
    `process` (ADR-0002). The same code runs on Node, Bun, Deno, and workerd.
-9. **Client input is hostile.** Field, relation, and operator names are looked up in `ReadonlyMap`s
-   or after a prototype-key check; never in a plain object by the request's key.
-10. **Every non-obvious decision cites its source** with `@ref` in code and an ADR in docs.
+10. **Client input is hostile.** Field, relation, and operator names are looked up in `ReadonlyMap`s
+    or after a prototype-key check; never in a plain object by the request's key.
+11. **Every non-obvious decision cites its source** with `@ref` in code and an ADR in docs.
 
 ## 3. The API by example
 
@@ -279,7 +282,7 @@ enforced.
 request ──plan()──▶ resolveSort ▶ normalizeFilter ▶ search ▶ resolvePage ▶ context
                     decode cursors (verify, version, expiry, context) ▶ seekPredicate ▶ keys
         ──paginate()──▶ where(filter) ▶ [count(*) as total] ▶ where(seek)
-                        ▶ select cast(key as text) as keysetN ▶ order by keys nulls last|first
+                        ▶ select cast(key as text) as keysetN ▶ order by keys [nulls last|first]
                         ▶ limit size + 1 ▶ execute ▶ split aliases from rows
         ──page()──▶ reverse a backward page ▶ sign a cursor per row ▶ prev, next, total, rangeTruncated
 ```
@@ -287,13 +290,18 @@ request ──plan()──▶ resolveSort ▶ normalizeFilter ▶ search ▶ res
 ### 4.3 Null ordering and backward pages
 
 PostgreSQL sorts `NULL` last on `ASC` and first on `DESC` by default; a seek over a nullable key
-needs one fixed rule. Every key is ordered `NULLS LAST` in the request's direction. A page before a
-cursor runs the query inverted (`ASC` becomes `DESC`, `NULLS LAST` becomes `NULLS FIRST`), so the
-rows closest to the cursor come first and `limit` cuts the right end; `finishPage` reverses them
-back. The seek predicate is a disjunction of prefix-equality conjunctions whose last term knows what
-lies beyond a value or a null in each direction (SPEC 6.2). The e2e invariants walk eight sorts,
-with ties and nulls, forward and backward on PGlite, node-postgres, and a PostgreSQL server, and
-check that each walk visits every row once in the expected order.
+needs one fixed rule. Every nullable key is ordered `NULLS LAST` in the request's direction. A page
+before a cursor runs the query inverted (`ASC` becomes `DESC`, `NULLS LAST` becomes `NULLS FIRST`),
+so the rows closest to the cursor come first and `limit` cuts the right end; `finishPage` reverses
+them back. A key that is not nullable gets no placement: PostgreSQL's default is then the order of
+an index declared in the sort's directions, which an explicit placement would not match (ADR-0016).
+The seek predicate is a disjunction of prefix-equality conjunctions whose last term knows what lies
+beyond a value or a null in each direction; over several keys it leads with a range on the first key
+that every row of the disjunction lies in, which PostgreSQL uses as the index condition that starts
+the scan at the cursor (SPEC 6.2). The definition's `nullable` decides both, so `finishPage` refuses
+a null sort value on a key declared not nullable. The e2e invariants walk eight sorts, with ties and
+nulls, forward and backward on PGlite, node-postgres, and a PostgreSQL server, and check that each
+walk visits every row once in the expected order.
 
 ### 4.4 Cursor values
 
@@ -334,3 +342,4 @@ the caller's query, so `Page<TRow>` is the selection's row type.
 | 0013 | Page size bounds, defaults, and range requests                                                              |
 | 0014 | Definer defaults are merged member by member                                                                |
 | 0015 | Cursors can be bound to a caller-supplied context                                                           |
+| 0016 | The seek leads with a range on the first key; declared nullability shapes seek and order                    |

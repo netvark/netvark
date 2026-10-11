@@ -89,6 +89,17 @@ function conjunction(items: ReadonlyArray<Predicate | null>): Predicate | null {
   return present.length === 1 ? first : { kind: 'and', items: present };
 }
 
+/**
+ * `NULLS LAST` forward and `NULLS FIRST` on a backward page (ADR 0008), on
+ * a nullable key only (ADR 0016).
+ */
+function placement(nullable: boolean, reversed: boolean): PlanKey['nulls'] {
+  if (!nullable) {
+    return null;
+  }
+  return reversed ? 'first' : 'last';
+}
+
 function invert(direction: SortDirection): SortDirection {
   return direction === 'asc' ? 'desc' : 'asc';
 }
@@ -142,6 +153,7 @@ export function createPlanner(
         field: item.field,
         target: targetOf(definition.table, field, definition.relations),
         direction: item.direction,
+        nullable: field.nullable,
       };
     });
     const afterValues = await decode(
@@ -171,7 +183,8 @@ export function createPlanner(
       field: key.field,
       target: key.target,
       direction: reversed ? invert(key.direction) : key.direction,
-      nulls: reversed ? 'first' : 'last',
+      nulls: placement(key.nullable, reversed),
+      nullable: key.nullable,
     }));
     return {
       table: definition.table,

@@ -18,7 +18,10 @@ const inWorkspace = (workspace: string) =>
 const titles = (rows: ReadonlyArray<PublicRow>) =>
   rows.map((row) => row['title']);
 
-const database = contractDatabase();
+const statements: Array<string> = [];
+const database = contractDatabase([], (event) => {
+  statements.push(event.query.sql);
+});
 const storage = createKyselyStorage(storageOptions(database.db));
 const created = new Map<string, string>();
 
@@ -44,6 +47,51 @@ beforeEach(async () => {
 });
 afterAll(async () => {
   await database.close();
+});
+
+describe('the order of list (SPEC 18.2, keyset ADR 0016)', () => {
+  it('places nulls on a nullable key only, so a plain index matches the order', async () => {
+    statements.length = 0;
+    await storage.transaction(inWorkspace('1'), async (tx) => {
+      await storage.list(tx, tasks, { sort: ['-title'], page: { size: 2 } });
+      await storage.list(tx, tasks, { sort: ['-points'], page: { size: 2 } });
+    });
+    const orders = statements
+      .filter((statement) => statement.includes(' limit '))
+      .map((statement) => statement.slice(statement.indexOf(' order by ')));
+    expect(orders).toEqual([
+      expect.stringMatching(
+        /^ order by "tasks"\."title" desc, "tasks"\."id" asc limit \$\d+$/u,
+      ),
+      expect.stringMatching(
+        /^ order by "tasks"\."points" desc nulls last, "tasks"\."id" asc limit \$\d+$/u,
+      ),
+    ]);
+  });
+
+  it('leads the seek with a range on a first key that is not nullable', async () => {
+    const after = await storage.transaction(inWorkspace('1'), async (tx) => {
+      const page = await storage.list(tx, tasks, {
+        sort: ['title'],
+        page: { size: 2 },
+      });
+      return page.next ?? '';
+    });
+    statements.length = 0;
+    const rows = await storage.transaction(inWorkspace('1'), async (tx) => {
+      const page = await storage.list(tx, tasks, {
+        sort: ['title'],
+        page: { size: 2, after },
+      });
+      return page.rows;
+    });
+    expect(titles(rows)).toEqual(['c', 'd']);
+    expect(
+      statements.find((statement) => statement.includes(' limit ')),
+    ).toMatch(
+      /\("tasks"\."title" >= \$\d+ and \("tasks"\."title" > \$\d+ or /u,
+    );
+  });
 });
 
 describe('the total of list (SPEC 18.2)', () => {

@@ -119,7 +119,14 @@ export interface PlanKey {
   readonly target: ColumnTarget | AggregateTarget;
   /** The effective direction of the query (inverted on a backward page). */
   readonly direction: SortDirection;
-  readonly nulls: 'first' | 'last';
+  /**
+   * Where nulls sort, or `null` on a key that is not nullable: the order
+   * then leaves the placement to PostgreSQL's default, which an index
+   * declared in the sort's directions matches (ADR 0016).
+   */
+  readonly nulls: 'first' | 'last' | null;
+  /** Whether the field is declared nullable, which the seek and `finishPage` trust (ADR 0016). */
+  readonly nullable: boolean;
 }
 
 export interface QueryPlan {

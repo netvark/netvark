@@ -37,6 +37,39 @@ describe('createDefineKeyset types', () => {
     });
   });
 
+  it('requires nullable: true for a column whose type includes null', () => {
+    defineKeyset({
+      table: 'contacts',
+      key: ['id'],
+      fields: {
+        id: { column: 'id', type: 'uuid' },
+        age: { column: 'age', type: 'integer', nullable: true },
+        firstName: { column: 'first_name', type: 'text', nullable: true },
+      },
+      cursor: { secret: SECRET },
+    });
+    defineKeyset({
+      table: 'contacts',
+      key: ['id'],
+      fields: {
+        id: { column: 'id', type: 'uuid' },
+        // @ts-expect-error age is nullable in DB, so the seek must see its nulls
+        age: { column: 'age', type: 'integer' },
+      },
+      cursor: { secret: SECRET },
+    });
+    defineKeyset({
+      table: 'contacts',
+      key: ['id'],
+      fields: {
+        id: { column: 'id', type: 'uuid' },
+        // @ts-expect-error birthday is nullable in DB
+        birthday: { column: 'birthday', type: 'date', nullable: false },
+      },
+      cursor: { secret: SECRET },
+    });
+  });
+
   it('checks relation tables, join columns, relation fields, and aggregate columns', () => {
     defineKeyset({
       table: 'contacts',

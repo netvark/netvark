@@ -181,16 +181,16 @@ column names are the database's and are opaque non-empty strings here; the adapt
 Field types: the scalar types `text`, `integer`, `bigint`, `decimal`, `float`, `boolean`, `uuid`,
 `enum`, `date`, `time`, `timestamp`, `timestamptz`, and `array`.
 
-| Member      | Rule                                                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `column`    | A non-empty string                                                                                                                               |
-| `type`      | One of the field types                                                                                                                           |
-| `nullable`  | Boolean; default `false`. A nullable field accepts `isNull` (4.2)                                                                                |
-| `sortable`  | Boolean; default `true`, except `array`, where it defaults to `false` and MUST NOT be `true`                                                     |
-| `operators` | A subset of the operators the type accepts (4.2), plus `isNull` when nullable; default all of them. An operator outside the set is a `TypeError` |
-| `collation` | `default` or `insensitive`; `insensitive` is allowed on `text` only and compares, matches, and sorts through `lower()` (4.2, 10.2)               |
-| `values`    | `enum` only, required: a non-empty array of distinct strings, the accepted labels                                                                |
-| `of`        | `array` only, required: the element type, a scalar type other than `enum`                                                                        |
+| Member      | Rule                                                                                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `column`    | A non-empty string                                                                                                                                                                                                                                     |
+| `type`      | One of the field types                                                                                                                                                                                                                                 |
+| `nullable`  | Boolean; default `false`. A nullable field accepts `isNull` (4.2). A field that is not nullable is trusted to hold no nulls: its seek has no null branch, its order no null placement (6.1, 6.2), and a null sort value from it is a `TypeError` (7.2) |
+| `sortable`  | Boolean; default `true`, except `array`, where it defaults to `false` and MUST NOT be `true`                                                                                                                                                           |
+| `operators` | A subset of the operators the type accepts (4.2), plus `isNull` when nullable; default all of them. An operator outside the set is a `TypeError`                                                                                                       |
+| `collation` | `default` or `insensitive`; `insensitive` is allowed on `text` only and compares, matches, and sorts through `lower()` (4.2, 10.2)                                                                                                                     |
+| `values`    | `enum` only, required: a non-empty array of distinct strings, the accepted labels                                                                                                                                                                      |
+| `of`        | `array` only, required: the element type, a scalar type other than `enum`                                                                                                                                                                              |
 
 The normalized `ColumnField` is
 `{ kind: 'column', name, column, type, nullable, sortable, operators (a ReadonlySet), values (labels or null), of (element type or null), collation }`.
@@ -418,23 +418,26 @@ Tests: `resolve-sort.test.ts`.
 identifier from the definition and every value a validated request value, so an adapter renders it
 without re-checking anything.
 
-| Member            | Meaning                                                                                        |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `table`           | The definition's table                                                                         |
-| `keys`            | The sort keys in order, the tie-breaker included: `{ alias, field, target, direction, nulls }` |
-| `reversed`        | `true` on a backward page: the query runs inverted and `finishPage` reverses the rows          |
-| `filter`          | The request's filter and search as one predicate, or `null`; what a total counts               |
-| `seek`            | The cursor predicate(s), or `null` on a first page; never counted                              |
-| `limit`           | `size + 1`                                                                                     |
-| `size`            | The used page size                                                                             |
-| `range`           | Whether both cursors were given                                                                |
-| `after`, `before` | The cursors as given, or `null`                                                                |
-| `sort`            | The resolved sort in the request's directions                                                  |
-| `context`         | The hash cursors are bound to (8)                                                              |
+| Member            | Meaning                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| `table`           | The definition's table                                                                                   |
+| `keys`            | The sort keys in order, the tie-breaker included: `{ alias, field, target, direction, nulls, nullable }` |
+| `reversed`        | `true` on a backward page: the query runs inverted and `finishPage` reverses the rows                    |
+| `filter`          | The request's filter and search as one predicate, or `null`; what a total counts                         |
+| `seek`            | The cursor predicate(s), or `null` on a first page; never counted                                        |
+| `limit`           | `size + 1`                                                                                               |
+| `size`            | The used page size                                                                                       |
+| `range`           | Whether both cursors were given                                                                          |
+| `after`, `before` | The cursors as given, or `null`                                                                          |
+| `sort`            | The resolved sort in the request's directions                                                            |
+| `context`         | The hash cursors are bound to (8)                                                                        |
 
 A `PlanKey`'s `alias` is `keyset<index>` (`keyAlias`), `direction` is the effective direction of the
-query (inverted on a backward page), and `nulls` is `last` forward and `first` on a backward page.
-`CursorValue` is `string | null`: a key's value as the database returns it cast to text.
+query (inverted on a backward page), `nullable` is the field's declaration (3.1, 3.2), and `nulls`
+is `last` forward and `first` on a backward page on a nullable key, and `null` on a key that is not
+nullable: the adapter then renders no placement, and PostgreSQL's default is the order of an index
+declared in the sort's directions (ADR 0016). `CursorValue` is `string | null`: a key's value as the
+database returns it cast to text.
 
 Targets: `{ kind: 'column', table, column, type, lower }` (a column, through `lower()` when
 `lower`); `{ kind: 'aggregate', relation, fn, column, type }` (a scalar subquery over the relation's
@@ -485,9 +488,10 @@ members binds nothing. Then validation runs in the order a client would want to 
    sort keys (8); a rejection is `InvalidCursorError(parameter, reason)`;
 7. the seek: `seekPredicate` for `after`, for `before`, both joined with `and` when both are present
    (6.2);
-8. the keys: for each sort item, its alias, its target (`targetOf`), and its direction and null
-   placement: the request's direction with `nulls: 'last'`, or, when `reversed` (`before` without
-   `after`), the inverted direction with `nulls: 'first'`.
+8. the keys: for each sort item, its alias, its target (`targetOf`), its field's `nullable`, and its
+   direction and null placement: the request's direction with `nulls: 'last'`, or, when `reversed`
+   (`before` without `after`), the inverted direction with `nulls: 'first'`; `nulls` is `null` on a
+   key that is not nullable (ADR 0016).
 
 `limit` is `size + 1`.
 
@@ -496,25 +500,34 @@ context in any member order, rejection under another or none, the unchanged bind
 context, bigint and number binding, the context checked before the request), `context.test.ts`
 (every accepted and rejected context).
 
-### 6.2 The seek predicate (`seek.ts`, ADR 0008)
+### 6.2 The seek predicate (`seek.ts`, ADR 0008, ADR 0016)
 
 `seekPredicate(keys, values, side)` takes the keys with the request's directions (not the inverted
-ones), the cursor's value per key, and `after` or `before`, and returns "rows after (before) the
-cursor" in a total order with nulls last on every key:
+ones) and their fields' `nullable`, the cursor's value per key, and `after` or `before`, and returns
+"rows after (before) the cursor" in a total order with nulls last on every nullable key:
 
 ```
-OR over i = 1..n of ( AND over j < i of equal(key_j, v_j) ) AND beyond(key_i, v_i)
+range(key_1, v_1) AND ( OR over i = 1..n of ( AND over j < i of equal(key_j, v_j) ) AND beyond(key_i, v_i) )
 ```
 
 - `equal(key, v)` is `key = v`, or `key is null` when `v` is null.
 - `beyond(key, v, 'after')`: when `v` is null, `false` (nothing sorts after a null on that key);
-  otherwise `key > v or key is null` on an ascending key, `key < v or key is null` on a descending
-  one.
+  otherwise `key > v` on an ascending key, `key < v` on a descending one, with `or key is null` on a
+  nullable key.
 - `beyond(key, v, 'before')`: when `v` is null, `key is not null` (every value sorts before a null);
   otherwise `key < v` on an ascending key, `key > v` on a descending one.
+- `range(key, v, 'after')`: when `v` is null, `key is null`; on a key that is not nullable,
+  `key >= v` ascending and `key <= v` descending; on a nullable key, none (the rows after a value
+  include the nulls).
+- `range(key, v, 'before')`: when `v` is null, none; otherwise `key <= v` ascending and `key >= v`
+  descending, nullable or not, since no null sorts before a value.
 
-A single key yields its `beyond` term alone. The predicate does not consult nullability; on a
-non-nullable key the `is null` branch is never true.
+Every row the disjunction selects lies in the range, so the range changes no result; it is the
+condition joined by `and` that PostgreSQL uses to start an index scan at the cursor, which it never
+takes from inside an `or`. Without a range the predicate is the disjunction alone. A single key
+yields its `beyond` term alone, which is its own range. A null value on a key that is not nullable
+cannot reach the seek: `finishPage` never signs one (7.2). @ref
+https://use-the-index-luke.com/sql/partial-results/fetch-next-page
 
 Tests: `seek.test.ts`.
 
@@ -548,7 +561,9 @@ or `null` (a `TypeError` otherwise). It:
 
 1. notes whether more than `plan.size` rows were fetched (`more`) and keeps the first `plan.size`;
 2. reverses them when `plan.reversed`, back into request order;
-3. encodes a cursor per row (8) with `plan.context`;
+3. encodes a cursor per row (8) with `plan.context`, after checking its values: a `null` on a key
+   that is not nullable is a `TypeError` naming the field, since the seek and the order treat that
+   key as holding no nulls (ADR 0016);
 4. decides the links: on a range request `hasPrev` and `hasNext` are both `true`; on a backward page
    `hasNext` is `true` and `hasPrev` is `more`; otherwise `hasPrev` is whether `after` was given and
    `hasNext` is `more`;
@@ -642,7 +657,8 @@ Returns a `DefineKeyset<DB>`: `defineKeyset` with `TypedKeysetInit<DB, TTable, T
 as its argument, which checks at compile time that `table` is a key of `DB`, every column field's
 `column` is a column of that table, every relation's `table` is a table of `DB` and each `on` key a
 column of it with a column of the main table as value, every aggregate's `column` a column of its
-relation's table, and the search `columns` or `vector` columns of the main table. The runtime is the
+relation's table, and the search `columns` or `vector` columns of the main table; a column field
+whose column's type includes `null` MUST declare `nullable: true` (ADR 0016). The runtime is the
 definer of the core's `createDefineKeyset(defaults)` (3.6) unchanged (same validation, same merge,
 same definition); `RelationsOf` erases the typed `on` to the core's `Record<string, string>`. With a
 `cursor` in the defaults the result is a `DefineDefaultedKeyset<DB>`, whose
@@ -654,7 +670,8 @@ its own queries, and the plugin maps the references the adapter emits (10.2).
 
 Tests: `define-keyset.test.ts` (the core's merge, paginating with the default page size, secret, and
 search configuration, a missing secret, startup validation), `define-keyset.test-d.ts` (name checks,
-`cursor` optional only with a cursor default).
+`nullable: true` required for a column whose type includes `null`, `cursor` optional only with a
+cursor default).
 
 ### 10.2 Rendering (`render/target.ts`, `render/predicate.ts`)
 
@@ -686,7 +703,8 @@ Tests: `target.test.ts`, `predicate.test.ts` (exact SQL and parameters).
    `Number(total)`, `0` without a row.
 4. The page query: the seek added with `where` when there is one; `order by` and `offset` cleared;
    for each key in order, `cast(<target> as text) as "<alias>"` added to the selection and
-   `order by <target> <direction> nulls <first|last>` appended; `limit plan.limit`.
+   `order by <target> <direction>` appended, with `nulls <first|last>` when the key's `nulls` is not
+   `null`; `limit plan.limit`.
 5. Rows: each fetched row MUST be an object (`TypeError` otherwise); the alias members are read (a
    non-string is `null`) and removed, and the remaining members are the caller's row.
 6. `keyset.page(plan, rows, values, { total })`.
@@ -702,12 +720,13 @@ states: its `order by`, `limit`, and `offset` are replaced, its `where` is kept,
 
 ```sql
 select *, cast("contacts"."id" as text) as "keyset0" from "contacts"
-order by "contacts"."id" asc nulls last limit $1
+order by "contacts"."id" asc limit $1
 ```
 
-Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, backward, and camelCase pages;
-the base query's clauses; row splitting; the context rejecting a foreign cursor before querying; the
-dummy driver).
+Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, and camelCase pages; the base
+query's clauses; row splitting; the context rejecting a foreign cursor before querying; the dummy
+driver), `paginate-order.test.ts` (the seek after the filter, the inverted backward page, and nulls
+placed on nullable keys only).
 
 ---
 
@@ -727,7 +746,7 @@ answers canned rows while recording the compiled queries; no module of the packa
 | Filter                             | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                                                       |
 | Sort, plan, page, cursor           | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks |
 | Errors                             | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                      |
-| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                                                | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                          |
+| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                      | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                          |
 
 ### 11.1 End-to-end suite and invariants (`e2e/keyset/`)
 
@@ -763,6 +782,7 @@ it came from.
 | `defaults.e2e.test.ts`        | a configured definer: the default page size and max, every row walked with the default secret, the default text-search configuration (English stemming) against a definition's own; on PGlite and, when `KEYSET_PG_URL` is set, the server                                                               |
 | `pg-driver.e2e.test.ts`       | section 11.2                                                                                                                                                                                                                                                                                             |
 | `postgres.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
+| `index-seek.e2e.test.ts`      | section 11.3                                                                                                                                                                                                                                                                                             |
 
 ### 11.2 node-postgres (`pg-driver.e2e.test.ts`)
 
@@ -778,6 +798,13 @@ The invariants, filters, relations, search, and range requests on the planner an
 production uses; `defaults.e2e.test.ts` and `context.e2e.test.ts` run there too. The file runs only
 when `KEYSET_PG_URL` names a server and skips itself otherwise; it creates a throwaway schema,
 scopes its connections to it with `search_path`, and drops it. CI provides PostgreSQL 14 and 18.
+
+`index-seek.e2e.test.ts` reads the planner's choice with `EXPLAIN (ANALYZE, FORMAT JSON)` on 10 000
+rows with an index on `(name, id)` (ADR 0016): the page after, and the page before, a cursor halfway
+down a `name` sort is an index scan whose index condition bounds `name` from the cursor and that
+reads at most a page, the row that tells whether another follows, and the cursor's own row; `-name`
+reads the same index backward with an incremental sort of the ties; and a nullable sort walks every
+row with its nulls last. It runs only against a server.
 
 ### 11.4 Runtime smoke test (`e2e/keyset/smoke/`)
 

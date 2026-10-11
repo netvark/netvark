@@ -77,7 +77,7 @@ describe('PGlite: page shape', () => {
     );
     expect(events.map((event) => event.kind)).toEqual(['total', 'page']);
     expect(events[0]?.sql).toContain('count(*)');
-    expect(events[1]?.sql).toContain('nulls last');
+    expect(events[1]?.sql).toContain('order by "contacts"."id" asc limit');
     expect(events[1]?.rowCount).toBe(4);
     expect(events[1]?.durationMs).toBeGreaterThan(0);
   });

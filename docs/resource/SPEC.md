@@ -1953,8 +1953,11 @@ predicate, the plan's `filter` and `seek`, each key selected as text under its a
 ordered with their directions and null placement, and the plan's `limit`; then
 `page(plan, rows, values)` over the rows read. Every value of the plan is a parameter of its
 column's type, a cursor's included: its values are the text each key was selected as, so a
-`timestamptz` keeps its microseconds and an `int8` its digits. The plan orders nulls last on a
-forward page, where PostgreSQL's default puts them first when descending. @ref
+`timestamptz` keeps its microseconds and an `int8` its digits. The plan orders a nullable key's
+nulls last on a forward page, where PostgreSQL's default puts them first when descending, and gives
+a key that is not nullable no placement (`nulls` is `null`), so the order is that of an index
+declared in the sort's directions; the keyset definition takes each field's nullability from the
+catalog, which the seek's leading range depends on (keyset ADR 0016). @ref
 https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC order)
 
 An adapter MUST:

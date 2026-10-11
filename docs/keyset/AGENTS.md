@@ -62,7 +62,8 @@ configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.js
   selections, ordering, limit; rows split from the private aliases
 - `render/` `renderTarget` (columns, correlated aggregates, `concat_ws`) and `renderPredicate`
   (every predicate kind as a Kysely expression)
-- `test-support/` a compile-only Kysely and a canned-rows driver for the unit tests; not published
+- `test-support/` a compile-only Kysely, a canned-rows driver, and the rows it answers, for the unit
+  tests; not published
 
 `e2e/keyset/`: end-to-end suite, a private workspace package that consumes the built
 `@netvark/keyset-core` and `@netvark/kysely-keyset` through `workspace:*`; never imports from

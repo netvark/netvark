@@ -174,16 +174,23 @@ quota's.
 `(organization_id, ...)` serves both the predicate and the policy.
 
 **Index the sorts you page by behind the scope column.** A page orders by its sort keys and then by
-the key, so an index of the scope column, the sort keys with their directions, and the key lets
-PostgreSQL read the page in order and stop at its last row instead of sorting every row of the
-tenant:
+the key, and its seek leads with a range on the first sort key (keyset ADR 0016), so an index of the
+scope column, the sort keys in their directions, and the key lets PostgreSQL start at the cursor,
+read one page in order, and stop, however deep the page:
 
 ```sql
 create index contacts_organization_name on contacts (organization_id, name, id);
+create index contacts_organization_created on contacts (organization_id, created_at desc, id);
 ```
 
-On PostgreSQL 14, with 20 000 contacts in one organization, the second page by `name` is an index
-scan on this index without a sort; without it, a sort over every row of the organization.
+On PostgreSQL 14, with 20 000 contacts in one organization, the page 10 000 rows down by `name`
+reads 102 index entries of the first index in 0.13 ms; `-name` reads it backward with an incremental
+sort of each tie, 103 entries. Without an index the page sorts every row of the organization. A
+column the catalog reports nullable keeps `nulls last` in the order, so a descending index on it
+needs the same placement, `(organization_id, title desc nulls last, id)`, and after a value it has
+no range: sort by `NOT NULL` columns with few ties where lists grow long. A first key with many
+equal values still reads the entries of its tie before the cursor: `-createdAt` over 20 000 equal
+timestamps reads 10 101 at the same depth.
 
 **Pool freely.** Settings and parameters are local to their transaction, so a pooled connection
 carries nothing into the next one: CI checks it on four connections of a node-postgres pool on
