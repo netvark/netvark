@@ -7,10 +7,17 @@
  * resource from the behaviors it is given.
  */
 import type { Page } from '@netvark/kysely-keyset';
-import type { PublicRowOf } from '@netvark/resource-core/server';
+import type {
+  PublicRowOf,
+  StorageListRequest,
+} from '@netvark/resource-core/server';
 
 import type { Member, TestDomain } from '../test-support/domain';
-import type { Domain, ResourceOperations } from './operations-types';
+import type {
+  Domain,
+  ResourceOperations,
+  ResourceRuntime,
+} from './operations-types';
 import type { RuntimeOptions } from './types';
 
 import { describe, expectTypeOf, it } from 'vitest';
@@ -57,6 +64,8 @@ const WorkspacesBehavior = defineResource(Workspaces, {
 
 type TaskOperations = ResourceOperations<typeof Tasks>;
 declare const tasks: TaskOperations;
+declare const otherTasks: TaskOperations;
+declare const wide: ResourceOperations;
 declare const options: RuntimeOptions<TestDomain>;
 
 describe('ResourceOperations (resource SPEC 18.4)', () => {
@@ -99,6 +108,19 @@ describe('ResourceOperations (resource SPEC 18.4)', () => {
     >();
     expectTypeOf<undefined>().toExtend<ResourceOperations['get']>();
   });
+
+  it('holds its operations read-only', () => {
+    // @ts-expect-error list is read-only
+    tasks.list = otherTasks.list;
+    // @ts-expect-error an operation of a resource typed wide is read-only too
+    wide.get = tasks.get;
+  });
+
+  it('lists a resource typed wide by any field, as the storage takes it', () => {
+    expectTypeOf<
+      Parameters<NonNullable<ResourceOperations['list']>>[0]
+    >().toEqualTypeOf<StorageListRequest | undefined>();
+  });
 });
 
 describe('Domain (resource SPEC 18.4)', () => {
@@ -124,5 +146,17 @@ describe('Domain (resource SPEC 18.4)', () => {
       .resolves.toHaveProperty('as')
       .returns.toHaveProperty('tasks')
       .toEqualTypeOf<TaskOperations>();
+  });
+
+  it('passes where a host takes the domain typed wide, down to each operation', () => {
+    type Resources = {
+      readonly tasks: typeof TasksBehavior;
+      readonly workspaces: typeof WorkspacesBehavior;
+    };
+    expectTypeOf<TaskOperations>().toExtend<ResourceOperations>();
+    expectTypeOf<Domain<Resources>>().toExtend<Domain>();
+    expectTypeOf<ResourceRuntime<TestDomain, Resources>>().toExtend<
+      ResourceRuntime<TestDomain>
+    >();
   });
 });

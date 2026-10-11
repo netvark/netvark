@@ -292,6 +292,9 @@ grant select, insert, update, delete on contacts, organizations to api;
 
 **Run `checkResourceRuntime` in CI.** It needs no database, so a behavior keyed by the wrong type, a
 missing binding, or a policy that forgets the parameter fails the test suite instead of the deploy.
+It reads the catalog `pg-catalog extract` writes from your migrations, so create every table it
+checks in them, the outbox included: an outbox a setup script creates is missing from the catalog,
+and boot refuses it though the table exists.
 
 **Put the scope column in every unique index on a value clients write.** PostgreSQL checks
 uniqueness without row security, so `unique (email)` answers a 409 for an email another tenant
@@ -344,7 +347,8 @@ consumer by `position`, such as a table of handled positions or a queue's dedupl
 **Grant the outbox per role.** The outbox holds every tenant's events and has no row security, so
 the API's role gets `insert` only, which an identity column needs no sequence grant for, and never
 reads an event. The relay's role gets `select`, `update`, and `delete`: `FOR UPDATE` needs the
-`update` privilege.
+`update` privilege. CI runs the end-to-end suite's API role with `insert` alone on the outbox and no
+sequence grant, on PostgreSQL 14 and 18.
 
 ```sql
 grant insert on outbox to api;

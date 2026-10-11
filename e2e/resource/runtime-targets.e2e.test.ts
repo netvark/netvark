@@ -5,22 +5,24 @@
  * no row is fails it. The runtime looks the contact up as the actor,
  * under the scope predicate and the policy of `contacts`, and answers
  * Grace exactly as a missing contact, before anything is written, so the
- * answer tells Acme nothing of Globex's ids.
+ * answer tells Acme nothing of Globex's ids. On PGlite and on the server
+ * `RESOURCE_PG_URL` names, through the domain alone.
  */
+import type { ResourceInput } from '@netvark/kysely-resource';
+
 import type { RuntimeDatabase } from './runtime/database.ts';
-import type { ResourceInput } from './runtime/input.ts';
-import type { Runtime } from './runtime/runtime.ts';
+import type { AppRuntime } from './runtime/fixture.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ADA, GRACE } from './runtime/database.ts';
-import { CallsBehavior } from './runtime/domain.ts';
+import { runtimeDatabases } from './runtime/database.ts';
 import {
   editor,
   globex,
   openRuntime,
   visibleError,
 } from './runtime/fixture.ts';
+import { ADA, GRACE } from './runtime/seed.ts';
 
 const NO_CONTACT = '00000000-0000-4000-8000-00000000dead';
 const CALL = '00000000-0000-4000-8000-0000000000c1';
@@ -35,45 +37,48 @@ function call(contact: string, id = CALL): ResourceInput {
   };
 }
 
-describe("the runtime looks relationship targets up in the actor's scope", () => {
-  let database: RuntimeDatabase;
-  let runtime: Runtime;
+describe.each(runtimeDatabases())(
+  "on %s, the runtime looks relationship targets up in the actor's scope",
+  (_name, open) => {
+    let database: RuntimeDatabase;
+    let runtime: AppRuntime;
 
-  beforeAll(async () => {
-    ({ database, runtime } = await openRuntime());
-  });
-  beforeEach(async () => {
-    await database.reset();
-  });
-  afterAll(async () => {
-    await database.close();
-  });
-
-  it("answers another organization's contact exactly as a missing one, and writes nothing", async () => {
-    const foreign = await visibleError(
-      runtime.create(editor, CallsBehavior, call(GRACE)),
-    );
-    expect(foreign).toEqual(
-      await visibleError(
-        runtime.create(editor, CallsBehavior, call(NO_CONTACT)),
-      ),
-    );
-    expect(foreign).toMatchObject({
-      status: 404,
-      code: 'CALLS_CONTACT_ID_FKEY',
-      errors: [{ path: ['data', 'relationships', 'contact'] }],
+    beforeAll(async () => {
+      database = await open();
+      runtime = await openRuntime(database.db);
     });
-    await expect(
-      runtime.get(editor, CallsBehavior, CALL),
-    ).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
-  });
+    beforeEach(async () => {
+      await database.reset();
+    });
+    afterAll(async () => {
+      await database.close();
+    });
 
-  it("writes a call naming a contact of the actor's organization", async () => {
-    await expect(
-      runtime.create(globex, CallsBehavior, call(GRACE)),
-    ).resolves.toMatchObject({ id: CALL, contact: GRACE });
-    await expect(
-      runtime.create(editor, CallsBehavior, call(ADA, OTHER_CALL)),
-    ).resolves.toMatchObject({ id: OTHER_CALL, contact: ADA });
-  });
-});
+    it("answers another organization's contact exactly as a missing one, and writes nothing", async () => {
+      const foreign = await visibleError(
+        runtime.as(editor).calls.create(call(GRACE)),
+      );
+      expect(foreign).toEqual(
+        await visibleError(runtime.as(editor).calls.create(call(NO_CONTACT))),
+      );
+      expect(foreign).toMatchObject({
+        status: 404,
+        code: 'CALLS_CONTACT_ID_FKEY',
+        errors: [{ path: ['data', 'relationships', 'contact'] }],
+      });
+      await expect(runtime.as(editor).calls.get(CALL)).rejects.toMatchObject({
+        status: 404,
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it("writes a call naming a contact of the actor's organization", async () => {
+      await expect(
+        runtime.as(globex).calls.create(call(GRACE)),
+      ).resolves.toMatchObject({ id: CALL, contact: GRACE });
+      await expect(
+        runtime.as(editor).calls.create(call(ADA, OTHER_CALL)),
+      ).resolves.toMatchObject({ id: OTHER_CALL, contact: ADA });
+    });
+  },
+);

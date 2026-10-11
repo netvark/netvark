@@ -1,59 +1,72 @@
 /**
- * The contacts application's database for the runtime (resource SPEC 12):
- * PGlite with the application's migrations and an outbox. Every runtime
- * transaction runs as `contacts_app`, a role without superuser rights, as
- * an application's connections would, so the row security policy of
- * `V6__row_security.sql` applies to each statement the adapter runs, on
- * top of the adapter's own scope predicate; the checks of the tests run
- * as the superuser, past it. Acme (organization 1) has Ada, who has a
- * meeting, and an archived contact; Globex (organization 2) has Grace.
+ * The contacts application's database for the runtime (resource SPEC 12,
+ * 18.3, 18.7): its migrations, the outbox among them, on PGlite and on a
+ * throwaway database of the server `RESOURCE_PG_URL` names. The runtime
+ * connects as the application's role, which is no superuser, has no
+ * BYPASSRLS, and owns no table, as an application's connections would, so
+ * the row security policies of `V6__row_security.sql` and
+ * `V14__calls_row_security.sql` bind every statement the storage runs, on
+ * top of its own scope predicate. The seed and the tests' checks run as
+ * the database's owner, past them. Boot's tests connect as the superuser,
+ * as a role with BYPASSRLS, and as the owner of `calls`, which does not
+ * force row security. PGlite has one connection, the superuser's, so each
+ * role is the session's `SET ROLE`, and the owner's work runs in a
+ * transaction of `SET LOCAL ROLE NONE`; on the server each role logs in
+ * with a password of its own, since CI's server authenticates with SCRAM,
+ * and is dropped with the database. `seed.ts` holds what each one holds.
  * @ref https://www.postgresql.org/docs/18/ddl-rowsecurity.html
- * @ref https://pglite.dev/docs/api#transaction
+ * @ref https://www.postgresql.org/docs/18/sql-set-role.html
+ * @ref https://www.postgresql.org/docs/18/auth-password.html
  */
 import type { DomainEvent } from '@netvark/resource-core/server';
 
-import type { Transact } from '../support/reference-adapter.ts';
-import type { Row } from '../support/reference-sql.ts';
+import type { Owner, Role } from './seed.ts';
 
-import { CONTACTS_SCHEMA, migratedPglite } from '../support/oracle-database.ts';
+import { randomBytes } from 'node:crypto';
 
-/** The reference adapter's outbox table. */
-export const OUTBOX = 'outbox';
+import { Kysely, PGliteDialect, PostgresDialect } from 'kysely';
+import pg from 'pg';
 
-export const ADA = '00000000-0000-4000-8000-000000000001';
-export const GRACE = '00000000-0000-4000-8000-000000000002';
-/** A key with hex letters, which a client may spell in upper case (RFC 9562 section 4). */
-export const ARCHIVED = '00000000-0000-4000-8000-00000000000a';
+import {
+  CONTACTS_SCHEMA,
+  migratedPglite,
+  migrationScripts,
+  onServer,
+  throwawayDatabase,
+} from '../support/oracle-database.ts';
+import { connectionsClosed } from '../support/pool-closed.ts';
+import { ownerSide, roleStatements, SEED } from './seed.ts';
 
-const SETUP = [
-  `create table ${OUTBOX} (
-    position int8 generated always as identity primary key,
-    name text not null,
-    version int4 not null,
-    payload jsonb not null
-  )`,
-  'create role contacts_app',
-  'grant select, insert, update, delete on all tables in schema public to contacts_app',
-  'grant usage on all sequences in schema public to contacts_app',
-];
-const SEED = [
-  `truncate table organizations, ${OUTBOX} restart identity cascade`,
-  "insert into organizations (name, slug, handle) values ('Acme', 'acme', 'acme'), ('Globex', 'globex', 'globex')",
-  `insert into contacts (id, organization_id, name, email, status) values
-    ('${ADA}', 1, 'Ada', 'ada@example.com', 'active'),
-    ('${GRACE}', 2, 'Grace', 'grace@example.com', 'active'),
-    ('${ARCHIVED}', 1, 'Old Name', null, 'archived')`,
-  `insert into meetings (organization_id, contact_id, room, during)
-    values (1, '${ADA}', 'a-1', '[2026-01-05 09:00+00,2026-01-05 10:00+00)')`,
-];
-const EVENTS = `select name, version, payload::text as payload from ${OUTBOX} order by position`;
-const COUNT =
-  'select count(*)::int as "count" from contacts where organization_id = $1::int8';
+// oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Client, Pool } = pg` for ESM
+const { Client, Pool } = pg;
 
-/** The database, and what the tests read from it as the superuser. */
+/** The roles boot's tests connect as, in place of the application's. */
+export type BootRole = 'superuser' | 'bypass' | 'owner';
+
+type Row = Readonly<Record<string, unknown>>;
+
+/** Connections of the application's pool on the server: enough for operations to run side by side. */
+const POOL_SIZE = 4;
+const NAME_BYTES = 8;
+const PASSWORD_BYTES = 24;
+const PGLITE_ROLES: Readonly<Record<Role, string>> = {
+  app: 'contacts_app',
+  bypass: 'contacts_bypass',
+  owner: 'contacts_owner',
+};
+
+/** The database: the application's connections, and the owner's, past row security. */
 export interface RuntimeDatabase {
-  /** A transaction of the application's role. */
-  readonly transact: Transact;
+  /** Kysely connected as the application's role. */
+  readonly db: Kysely<unknown>;
+  /** Runs `run` with Kysely connected as `role` in place of the application's role. */
+  readonly as: <TResult>(
+    role: BootRole,
+    run: (db: Kysely<unknown>) => Promise<TResult>,
+  ) => Promise<TResult>;
+  /** Runs SQL text of one or more statements as the database's owner. */
+  readonly exec: (script: string) => Promise<void>;
+  /** Seeds the organizations, their contacts, and Ada's meeting, over an empty outbox. */
   readonly reset: () => Promise<void>;
   /** The committed outbox, in order. */
   readonly events: () => Promise<ReadonlyArray<DomainEvent>>;
@@ -62,50 +75,146 @@ export interface RuntimeDatabase {
   readonly close: () => Promise<void>;
 }
 
-function eventOf(row: Row): DomainEvent {
-  const { name, version, payload } = row;
-  if (
-    typeof name !== 'string' ||
-    typeof version !== 'number' ||
-    typeof payload !== 'string'
-  ) {
-    throw new TypeError('the outbox returned a row of another shape');
+/** PGlite with the schema and the roles, its session acting as the application's role. */
+export async function openPgliteDatabase(): Promise<RuntimeDatabase> {
+  const pglite = await migratedPglite(CONTACTS_SCHEMA);
+  for (const statement of roleStatements(PGLITE_ROLES, '')) {
+    await pglite.exec(statement);
   }
-  const parsed: unknown = JSON.parse(payload);
-  return { name, version, payload: parsed };
+  const sessionRole = async (role: string): Promise<void> => {
+    await pglite.exec(`set role ${role}`);
+  };
+  await sessionRole(PGLITE_ROLES.app);
+  const db = new Kysely<unknown>({ dialect: new PGliteDialect({ pglite }) });
+  const owner: Owner = {
+    exec: async (script) => {
+      await pglite.transaction(async (tx) => {
+        await tx.exec(`set local role none;\n${script}`);
+      });
+    },
+    query: async (sql, parameters = []) =>
+      pglite.transaction(async (tx) => {
+        await tx.exec('set local role none');
+        return (await tx.query<Row>(sql, [...parameters])).rows;
+      }),
+  };
+  await owner.exec(SEED);
+  return {
+    db,
+    as: async (role, run) => {
+      await sessionRole(role === 'superuser' ? 'none' : PGLITE_ROLES[role]);
+      try {
+        return await run(db);
+      } finally {
+        await sessionRole(PGLITE_ROLES.app);
+      }
+    },
+    ...ownerSide(owner),
+    close: async () => {
+      await db.destroy();
+      if (!pglite.closed) {
+        await pglite.close();
+      }
+    },
+  };
 }
 
-/** PGlite with the contacts schema, the outbox, the role, and the seed. */
-export async function openRuntimeDatabase(): Promise<RuntimeDatabase> {
-  const pglite = await migratedPglite(CONTACTS_SCHEMA);
-  for (const sql of SETUP) {
-    await pglite.exec(sql);
+/** Destroys `db`, then waits until every connection of its pool has closed. */
+async function destroy(db: Kysely<unknown>, pool: pg.Pool): Promise<void> {
+  // Kysely's destroy ends the pool when a query opened it, without waiting for its connections.
+  const closed = connectionsClosed(pool);
+  await db.destroy();
+  if (!pool.ended) {
+    await pool.end();
   }
-  const reset = async () => {
-    for (const sql of SEED) {
-      await pglite.exec(sql);
+  await closed;
+}
+
+/** `url` with the role's name and password in place of its user's. */
+function urlAs(url: string, name: string, password: string): string {
+  const target = new URL(url);
+  target.username = name;
+  target.password = password;
+  return target.toString();
+}
+
+/** A throwaway database on the server at `url`, with login roles of its own, all dropped by `close`. */
+async function openServerDatabase(url: string): Promise<RuntimeDatabase> {
+  const database = await throwawayDatabase(url);
+  const suffix = randomBytes(NAME_BYTES).toString('hex');
+  const names: Readonly<Record<Role, string>> = {
+    app: `contacts_app_${suffix}`,
+    bypass: `contacts_bypass_${suffix}`,
+    owner: `contacts_owner_${suffix}`,
+  };
+  const password = randomBytes(PASSWORD_BYTES).toString('hex');
+  const admin = new Client({ connectionString: database.url });
+  const drop = async () => {
+    await admin.end();
+    await database.drop();
+    await onServer(
+      url,
+      `drop role if exists ${Object.values(names).join(', ')}`,
+    );
+  };
+  try {
+    await admin.connect();
+    for (const statement of [
+      ...(await migrationScripts(CONTACTS_SCHEMA)),
+      ...roleStatements(names, `login password '${password}'`),
+      SEED,
+    ]) {
+      await admin.query(statement);
     }
+  } catch (error) {
+    await drop();
+    throw error;
+  }
+  const connect = (role: BootRole | 'app') =>
+    role === 'superuser'
+      ? database.url
+      : urlAs(database.url, names[role], password);
+  const pool = new Pool({ connectionString: connect('app'), max: POOL_SIZE });
+  const db = new Kysely<unknown>({ dialect: new PostgresDialect({ pool }) });
+  const owner: Owner = {
+    exec: async (script) => {
+      await admin.query(script);
+    },
+    query: async (sql, parameters = []) =>
+      (await admin.query<Row>(sql, [...parameters])).rows,
   };
-  await reset();
   return {
-    transact: async (run) =>
-      pglite.transaction(async (tx) => {
-        await tx.query('set local role contacts_app');
-        return run({
-          query: async (sql, parameters) =>
-            (await tx.query<Row>(sql, [...parameters])).rows,
-        });
-      }),
-    reset,
-    events: async () =>
-      (await pglite.query<Row>(EVENTS)).rows.map((row) => eventOf(row)),
-    contacts: async (organization) => {
-      const [row] = (await pglite.query<Row>(COUNT, [String(organization)]))
-        .rows;
-      return Number(row?.['count']);
+    db,
+    as: async (role, run) => {
+      const rolePool = new Pool({ connectionString: connect(role), max: 1 });
+      const roleDb = new Kysely<unknown>({
+        dialect: new PostgresDialect({ pool: rolePool }),
+      });
+      try {
+        return await run(roleDb);
+      } finally {
+        await destroy(roleDb, rolePool);
+      }
     },
+    ...ownerSide(owner),
     close: async () => {
-      await pglite.close();
+      await destroy(db, pool);
+      await drop();
     },
   };
+}
+
+/** The databases: PGlite always, and the server `RESOURCE_PG_URL` names when it is set. */
+export function runtimeDatabases(): ReadonlyArray<
+  readonly [string, () => Promise<RuntimeDatabase>]
+> {
+  const url = process.env['RESOURCE_PG_URL'];
+  return [
+    ['PGlite', openPgliteDatabase],
+    ...(url === undefined
+      ? []
+      : [
+          ['a PostgreSQL server', async () => openServerDatabase(url)] as const,
+        ]),
+  ];
 }

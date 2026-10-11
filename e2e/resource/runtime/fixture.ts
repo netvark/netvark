@@ -1,21 +1,46 @@
 /**
- * What the runtime's tests share (resource SPEC 12): the plans, the
- * actors, a contact as a parsed resource object, and the runtime over the
- * reference adapter on the runtime's database. Acme's plan holds three
- * contacts and no companies; Globex's holds ten and companies.
+ * What the runtime's tests share (resource SPEC 12, 18.3): the plans, the
+ * actors, a contact as a create's or an update's input, and the runtime
+ * over a database's connections, booted by `createResourceRuntime` as a
+ * host boots it, with the full catalog `pg-catalog extract` wrote. Acme's
+ * plan holds three contacts and no companies; Globex's holds ten and
+ * companies.
  */
-import type { RuntimeDatabase } from './database.ts';
-import type { AppActor, Permission, Plan, Services } from './domain.ts';
-import type { ResourceInput } from './input.ts';
-import type { Runtime } from './runtime.ts';
+import type { Kysely } from 'kysely';
+
+import type { Catalog } from '@netvark/catalog-core';
+import type {
+  ResourceInput,
+  ResourceRuntime,
+  RuntimeOptions,
+} from '@netvark/kysely-resource';
+
+import type {
+  AppActor,
+  AppDomain,
+  Permission,
+  Plan,
+  Services,
+} from './domain.ts';
 
 import { BanError } from '@netvark/ban-core';
+import {
+  createKyselyStorage,
+  createResourceRuntime,
+} from '@netvark/kysely-resource';
 
+import { catalog } from '../fixtures/contacts/catalog.ts';
 import { publicCatalog } from '../fixtures/contacts/public-catalog.ts';
 import { DEFINE_KEYSET } from '../support/keyset-definer.ts';
-import { referenceAdapter } from '../support/reference-adapter.ts';
-import { OUTBOX, openRuntimeDatabase } from './database.ts';
-import { createRuntime } from './runtime.ts';
+import {
+  APP_ERRORS,
+  CallsBehavior,
+  ContactsBehavior,
+  OrganizationsBehavior,
+  QUOTAS,
+  SCOPES,
+} from './domain.ts';
+import { OUTBOX } from './seed.ts';
 
 const PLANS: ReadonlyMap<number, Plan> = new Map([
   [1, { contacts: 3, companies: false }],
@@ -34,6 +59,23 @@ const services: Services = {
     },
   },
 };
+
+/** Each resource's behavior, keyed by its type. */
+export const RESOURCES = {
+  contacts: ContactsBehavior,
+  calls: CallsBehavior,
+  organizations: OrganizationsBehavior,
+};
+
+/** The application's runtime, typed by its behaviors. */
+export type AppRuntime = ResourceRuntime<AppDomain, typeof RESOURCES>;
+
+/** What may differ from the application's own composition. */
+export interface Composition {
+  /** In place of the catalog `pg-catalog extract` wrote for the migrations. */
+  readonly catalog?: Catalog | undefined;
+  readonly resources?: typeof RESOURCES | undefined;
+}
 
 function member(
   organization: number,
@@ -63,20 +105,34 @@ export function contact(attributes: Record<string, unknown>): ResourceInput {
   return { attributes, relationships: {} };
 }
 
-/** The runtime over the reference adapter on a fresh database. */
-export async function openRuntime(): Promise<{
-  readonly database: RuntimeDatabase;
-  readonly runtime: Runtime;
-}> {
-  const database = await openRuntimeDatabase();
-  const adapter = referenceAdapter({
-    catalog: publicCatalog,
-    codecs: {},
-    outbox: OUTBOX,
-    defineKeyset: DEFINE_KEYSET,
-    transact: database.transact,
-  });
-  return { database, runtime: createRuntime(adapter, services) };
+/** The application's composition over `db`, its storage included. */
+export function runtimeOptions(
+  db: Kysely<unknown>,
+  composition: Composition = {},
+): RuntimeOptions<AppDomain, typeof RESOURCES> {
+  return {
+    storage: createKyselyStorage({
+      db,
+      catalog: publicCatalog,
+      defineKeyset: DEFINE_KEYSET,
+      outbox: { table: OUTBOX },
+    }),
+    catalog: composition.catalog ?? catalog,
+    resources: composition.resources ?? RESOURCES,
+    unscoped: ['organizations'],
+    scopes: SCOPES,
+    quotas: QUOTAS,
+    services,
+    errors: APP_ERRORS,
+  };
+}
+
+/** The runtime over `db`, booted as a host boots it. */
+export async function openRuntime(
+  db: Kysely<unknown>,
+  composition: Composition = {},
+): Promise<AppRuntime> {
+  return createResourceRuntime(runtimeOptions(db, composition));
 }
 
 /** What a client sees of an error the runtime threw. */

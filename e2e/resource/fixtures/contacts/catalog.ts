@@ -764,9 +764,19 @@ const value = {
         }
       },
       "rowSecurity": {
-        "enabled": false,
+        "enabled": true,
         "forced": false,
-        "policies": {}
+        "policies": {
+          "calls_tenant_isolation": {
+            "command": "all",
+            "permissive": true,
+            "roles": [
+              "public"
+            ],
+            "using": "(organization_id = (current_setting('app.organization_id'::text))::bigint)",
+            "withCheck": null
+          }
+        }
       }
     },
     "contact_phones": {
@@ -2248,6 +2258,104 @@ const value = {
           "include": [],
           "predicate": null,
           "definition": "CREATE UNIQUE INDEX organizations_slug_key ON public.organizations USING btree (slug)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "outbox": {
+      "schema": "public",
+      "name": "outbox",
+      "comment": null,
+      "primaryKey": [
+        "position"
+      ],
+      "columns": {
+        "position": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": "always",
+          "generated": null,
+          "comment": null
+        },
+        "name": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "version": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "payload": {
+          "type": "jsonb",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "jsonb",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "outbox_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "position"
+          ],
+          "definition": "PRIMARY KEY (\"position\")"
+        }
+      },
+      "indexes": {
+        "outbox_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "position"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX outbox_pkey ON public.outbox USING btree (\"position\")"
         }
       },
       "rowSecurity": {

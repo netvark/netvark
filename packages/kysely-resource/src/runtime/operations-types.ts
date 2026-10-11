@@ -34,24 +34,30 @@ type ListRequestOf<TResource extends AnyDeclaredResource> = TResource extends {
   ? KeysetRequestOf<TFields, NoRelations>
   : StorageListRequest;
 
-/** Every operation a resource may declare, typed by it. */
+/**
+ * Every operation a resource may declare, typed by it. They are methods,
+ * whose parameters TypeScript compares both ways, so the operations of a
+ * resource typed by its behavior pass where a host or a worker takes them
+ * typed wide, as `ResourceOperations` or in a `Domain`; what the wide type
+ * lets through, such as a sort the keyset does not declare, the runtime
+ * refuses when it plans the page. `ResourceOperations` makes them
+ * read-only, which a method cannot be declared.
+ * @ref https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-6.html#strict-function-types ("methods are excluded")
+ */
 interface Operations<TResource extends AnyDeclaredResource> {
-  readonly list: (
+  list(
     request?: ListRequestOf<TResource>,
     options?: ListOptions,
-  ) => Promise<Page<PublicRowOf<TResource>>>;
-  readonly get: (id: string) => Promise<PublicRowOf<TResource>>;
-  readonly create: (input: ResourceInput) => Promise<PublicRowOf<TResource>>;
-  readonly update: (
-    id: string,
-    input: ResourceInput,
-  ) => Promise<PublicRowOf<TResource>>;
-  readonly remove: (id: string) => Promise<void>;
+  ): Promise<Page<PublicRowOf<TResource>>>;
+  get(id: string): Promise<PublicRowOf<TResource>>;
+  create(input: ResourceInput): Promise<PublicRowOf<TResource>>;
+  update(id: string, input: ResourceInput): Promise<PublicRowOf<TResource>>;
+  remove(id: string): Promise<void>;
   /** The rows of the target `rows` link to over `relationship`, each once. */
-  readonly include: (
+  include(
     relationship: IncludableOf<TResource>,
     rows: ReadonlyArray<PublicRow>,
-  ) => Promise<ReadonlyArray<PublicRow>>;
+  ): Promise<ReadonlyArray<PublicRow>>;
 }
 
 /** `include` when `TResource` has an includable relationship. */
@@ -65,8 +71,10 @@ type IncludeOf<TResource extends AnyDeclaredResource> = [
 export type ResourceOperations<
   TResource extends AnyDeclaredResource = AnyDeclaredResource,
 > = string extends TResource['table']
-  ? Partial<Operations<TResource>>
-  : Pick<Operations<TResource>, OperationOf<TResource> | IncludeOf<TResource>>;
+  ? Readonly<Partial<Operations<TResource>>>
+  : Readonly<
+      Pick<Operations<TResource>, OperationOf<TResource> | IncludeOf<TResource>>
+    >;
 
 /** The resource `defineResource` was given for `TBehavior`. */
 type ResourceOf<TBehavior> =

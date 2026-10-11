@@ -2521,22 +2521,22 @@ whose text the database refuses, and a catalog older than the migrations (`rules
 the built bin's output (`rules-cli.e2e.test.ts`); the package surface (every value export listed);
 and the runtime smoke test on Bun, Deno, and workerd for the root, `server`, `testing`, and
 `openapi` entries. The OpenAPI document is proven against the contacts application's HTTP API
-(`runtime/api.ts`: the runtime of 12 behind Hono and `@netvark/hono-jsonapi`): the document passes
-an independent validator (`@seriousme/openapi-schema-validator`) with every reference resolved, is
-the same on every build, puts the application's codes where its options name them, and holds each
-error object and each response a status of one code references once
-(`openapi-document.e2e.test.ts`); every exchange, success paths (`openapi-exchanges.e2e.test.ts`)
-and refusals of reads, writes, a client-keyed resource, members a write does not accept (9.4), and
-ids outside the key's form (3.4) (`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of
-the key, a get, an update, and a remove by a `uuid` in upper case and a call created under one
-(`openapi-id-spellings.e2e.test.ts`), answers with a status, media type, body, and codes the
-document lists for its operation, read where a response's reference points, a 201's `Location`
-matching its header's schema, while the request schema refuses exactly the requests the server
-refuses as documents (`support/openapi-contract.ts`, Ajv 2020-12 with the formats the document
-names); and the surface, recorded in a reviewed snapshot (`snapshots/surface.json`), diffs an edited
-declaration into exactly its four changes (`openapi-surface.e2e.test.ts`), and the built
-`pg-catalog surface` writes that snapshot byte for byte and `surface --check` prints those changes
-and exits 1 (`surface-cli.e2e.test.ts`).
+(`runtime/api.ts`: the runtime `createResourceRuntime` boots (18.3) behind Hono and
+`@netvark/hono-jsonapi`): the document passes an independent validator
+(`@seriousme/openapi-schema-validator`) with every reference resolved, is the same on every build,
+puts the application's codes where its options name them, and holds each error object and each
+response a status of one code references once (`openapi-document.e2e.test.ts`); every exchange,
+success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, a client-keyed
+resource, members a write does not accept (9.4), and ids outside the key's form (3.4)
+(`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of the key, a get, an update, and a
+remove by a `uuid` in upper case and a call created under one (`openapi-id-spellings.e2e.test.ts`),
+answers with a status, media type, body, and codes the document lists for its operation, read where
+a response's reference points, a 201's `Location` matching its header's schema, while the request
+schema refuses exactly the requests the server refuses as documents (`support/openapi-contract.ts`,
+Ajv 2020-12 with the formats the document names); and the surface, recorded in a reviewed snapshot
+(`snapshots/surface.json`), diffs an edited declaration into exactly its four changes
+(`openapi-surface.e2e.test.ts`), and the built `pg-catalog surface` writes that snapshot byte for
+byte and `surface --check` prints those changes and exits 1 (`surface-cli.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 
@@ -3374,11 +3374,15 @@ relationship. `createResourceRuntime` infers the domain's definer and each behav
 `resources`, so for a typed declaration `Domain` holds exactly those operations, each resolving to
 its public rows, `PublicRowOf` (11.1), with `list` taking a request in the declaration's keyset
 fields (`KeysetRequestOf`) and `include` the names of its includable relationships; for a behavior
-typed wide every operation is optional. Each operation runs the lifecycle of 12.3 in one transaction
-of `storage.transaction`, with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for
-an unscoped resource too: a policy on its table may read them, as one on the tenants table reads the
-tenant. An actor without a value for every scope runs no operation: `scopeValues` throws its
-`TypeError` before any statement.
+typed wide every operation is optional, and `list` takes any `StorageListRequest`. The operations
+are read-only methods, whose parameters TypeScript compares both ways, so those of a runtime typed
+by its behaviors pass where a host or a worker takes them typed wide, as `ResourceOperations`, a
+`Domain`, or a `ResourceRuntime<TDomain>`; what the wide type lets through, such as a sort the
+keyset does not declare, the runtime refuses when it plans the page (18.5). Each operation runs the
+lifecycle of 12.3 in one transaction of `storage.transaction`, with every scope the actor has,
+`scopeValues(scopes, actor)` (12.5), for an unscoped resource too: a policy on its table may read
+them, as one on the tenants table reads the tenant. An actor without a value for every scope runs no
+operation: `scopeValues` throws its `TypeError` before any statement.
 
 | Operation                  | Runs                                                                                                                                                       | Resolves to           |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
@@ -3527,13 +3531,19 @@ what `report` itself throws; neither reaches the operation's caller, whose write
   SERIALIZABLE: a second run delivers the rows the first does not hold, without waiting for it, both
   commit, and a run whose delivery rejects leaves its rows to the next.
 - `e2e/resource` drives the domain alone, with no HTTP, over the contacts application on PGlite and
-  the server, as a role that is neither superuser nor `BYPASSRLS`: one organization never sees
-  another's rows with row security on and the policy allowing everything, and with the predicate
-  alone; defaults apply on create; an update leaves omitted members as they were; a unique violation
-  is its declared code; a foreign cursor is refused; boot refuses a superuser, a table without row
-  security, a permissive policy that does not read the parameter, and a table its role owns without
-  `FORCE`. The HTTP API the OpenAPI exchanges run against (15.4) runs on `createResourceRuntime`, so
-  a worker's call and a request take the same path.
+  the server (`runtime-*.e2e.test.ts`), booted by `createResourceRuntime` as a role that is neither
+  superuser nor `BYPASSRLS`, owns no table, and may only insert into the outbox: one organization
+  never reads, changes, or links to another's rows, under the application's policies and under a
+  policy that reads the parameter but lets every row through, which boot passes, so the predicate
+  alone keeps them apart; defaults apply on create; an update leaves omitted members as they were; a
+  unique violation is its declared code; a cursor issued in another organization is refused as one
+  the keyset cannot read; boot warns of exactly the sorts no index serves, and refuses a superuser,
+  a role with `BYPASSRLS`, and the owner of a table without `FORCE`, and, in catalogs extracted
+  after a migration that makes them, a scoped table without row security and a permissive policy
+  that does not read the parameter, through `checkResourceRuntime` and `createResourceRuntime`
+  alike. The HTTP API the OpenAPI exchanges run against (15.4) runs on `createResourceRuntime`, and
+  each failure the domain throws, rendered by the API's error handler, is the API's answer to the
+  same request (`runtime-parity.e2e.test.ts`), so a worker's call and a request take the same path.
 - Real catalogs: the static checks and a boot against stern's migrations (15.5).
 
 ### 18.8 Packaging

@@ -2,10 +2,12 @@
  * The contacts application's server domain (resource SPEC 12): who acts,
  * what they may do, the plans the runtime hands over as services, the
  * application's own codes, the events, the contacts quota, the tenant
- * scope bound to the session, and the behavior of contacts and calls. A
- * plan may leave out company contacts, which a rule refuses with 402; an
+ * scope bound to the session, and the behavior of each resource. A plan
+ * may leave out company contacts, which a rule refuses with 402; an
  * archived contact keeps its name; every write of a contact records an
- * event. Calls are stored in partitions.
+ * event. Calls are stored in partitions. Organizations, the tenants, run
+ * without a scope: a member who may read them reads every one, and only
+ * the application's own provisioning, outside the runtime, writes them.
  * @ref https://www.rfc-editor.org/rfc/rfc9110#section-15.5.3 (402 Payment Required)
  */
 import type {
@@ -27,6 +29,7 @@ import {
 
 import { Calls } from '../resources/calls.ts';
 import { Contacts } from '../resources/contacts.ts';
+import { Organizations } from '../resources/organizations.ts';
 
 export type Permission =
   | 'contacts:read'
@@ -163,5 +166,14 @@ export const CallsBehavior = defineResource(Calls, {
   policy: definePolicy(Calls, {
     get: ({ actor }) => actor.can('contacts:read'),
     create: ({ actor }) => actor.can('contacts:write'),
+  }),
+});
+
+export const OrganizationsBehavior = defineResource(Organizations, {
+  policy: definePolicy(Organizations, {
+    list: ({ actor }) => actor.can('organizations:read'),
+    get: ({ actor }) => actor.can('organizations:read'),
+    create: () => false,
+    update: () => false,
   }),
 });

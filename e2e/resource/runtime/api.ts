@@ -2,12 +2,14 @@
  * The contacts application's HTTP API (resource SPEC 12.3, 13.1), as
  * `@netvark/hono-resource` will mount it: Hono with `@netvark/hono-jsonapi`
  * for negotiation, the request validators, `respond`, and the error
- * handler, and the runtime behind each declared operation of contacts and
- * calls. The `X-Actor` header names the member a request acts as, in
- * place of the application's authentication, which answers `UNAUTHORIZED`
- * without a member it knows. Every response is built by the published
- * packages, so the OpenAPI tests hold the document against what a host
- * answers.
+ * handler, and behind each declared operation of contacts and calls the
+ * runtime `createResourceRuntime` booted, typed wide as a host takes any
+ * application's, each request running `runtime.as(member)`. The runtime
+ * maps a keyset refusal to the request's error itself (SPEC 18.5). The
+ * `X-Actor` header names the member a request acts as, in place of the
+ * application's authentication, which answers `UNAUTHORIZED` without a
+ * member it knows. Every response is built by the published packages, so
+ * the OpenAPI tests hold the document against what a host answers.
  * @ref https://jsonapi.org/format/1.1/#crud
  * @ref https://jsonapi.org/format/1.1/#fetching-includes
  */
@@ -18,12 +20,14 @@ import type {
   JsonApiVariables,
   ParsedQuery,
 } from '@netvark/hono-jsonapi';
+import type {
+  ResourceOperations,
+  ResourceRuntime,
+} from '@netvark/kysely-resource';
 import type { DeclaredResource } from '@netvark/resource-core';
 import type { PublicRow } from '@netvark/resource-core/server';
 
-import type { AppActor } from './domain.ts';
-import type { Behavior } from './input.ts';
-import type { Runtime } from './runtime.ts';
+import type { AppActor, AppDomain } from './domain.ts';
 
 import { Hono } from 'hono';
 
@@ -32,7 +36,6 @@ import {
   CURSOR_PAGINATION_PROFILE,
   errorHandler,
   include,
-  invalidCursor,
   jsonApi,
   jsonApiError,
   notFoundHandler,
@@ -41,10 +44,6 @@ import {
   resourceDocument,
   respond,
 } from '@netvark/hono-jsonapi';
-import {
-  InvalidCursorError,
-  InvalidFilterValueError,
-} from '@netvark/keyset-core';
 import { keysetRequest } from '@netvark/resource-core/server';
 
 import { Calls } from '../resources/calls.ts';
@@ -52,7 +51,6 @@ import { Contacts } from '../resources/contacts.ts';
 import { Meetings } from '../resources/meetings.ts';
 import { Notes } from '../resources/notes.ts';
 import { Organizations } from '../resources/organizations.ts';
-import { CallsBehavior, ContactsBehavior } from './domain.ts';
 import { editor, globex, manager, stranger, viewer } from './fixture.ts';
 
 /** The application's registry: every resource its document lists, each linked under `/api`. */
@@ -93,27 +91,6 @@ function actorOf(header: string | undefined): AppActor {
   return actor;
 }
 
-/**
- * A refusal of the keyset plan as the request's error (keyset DESIGN 3.6):
- * a cursor the engine cannot read, and a filter value outside its field's
- * type, which `parseQuery` leaves to the engine (resource SPEC 11.2), are
- * `INVALID_QUERY_PARAMETER` at their parameter. `parseQuery` has refused
- * every other request keyset-core would, so anything else stays thrown.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#errors
- */
-function planRefusal(error: unknown): unknown {
-  if (error instanceof InvalidCursorError) {
-    return invalidCursor(`page[${error.parameter}]`);
-  }
-  if (error instanceof InvalidFilterValueError) {
-    return jsonApiError('INVALID_QUERY_PARAMETER', {
-      detail: 'The filter value is not valid for its field.',
-      source: { parameter: `filter[${error.field}][${error.operator}]` },
-    });
-  }
-  return error;
-}
-
 /** The `:id` Hono matched on a member route. */
 function memberId(c: Context<AppEnv>): string {
   const id = c.req.param('id');
@@ -123,15 +100,44 @@ function memberId(c: Context<AppEnv>): string {
   return id;
 }
 
+/** The application's runtime as a host takes it: any resource may have any operation. */
+type AppRuntime = ResourceRuntime<AppDomain>;
+
+/** `name` of `operations`, which a route runs only when the declaration declares it. */
+function operation<TName extends keyof ResourceOperations>(
+  operations: ResourceOperations,
+  name: TName,
+): NonNullable<ResourceOperations[TName]> {
+  const found = operations[name];
+  if (found === undefined) {
+    throw new TypeError(`the runtime has no ${name} for a declared operation`);
+  }
+  return found;
+}
+
+/** The operations of `resource` as the request's member runs them. */
+function operationsOf(
+  runtime: AppRuntime,
+  c: Context<AppEnv>,
+  resource: DeclaredResource,
+): ResourceOperations {
+  const operations = runtime.as(c.get('actor'))[resource.names.type];
+  if (operations === undefined) {
+    throw new TypeError(
+      `${resource.names.type} has no behavior in the runtime`,
+    );
+  }
+  return operations;
+}
+
 /**
  * The rows each requested relationship links `rows` to. Only a declared
  * resource's own relationships are includable, so every path `parseQuery`
  * accepted here has one segment.
  */
 async function included(
-  runtime: Runtime,
-  c: Context<AppEnv>,
-  behavior: Behavior,
+  operations: ResourceOperations,
+  declared: DeclaredResource,
   rows: ReadonlyArray<PublicRow>,
   query: ParsedQuery,
 ): Promise<Array<Included>> {
@@ -140,27 +146,24 @@ async function included(
     const definition =
       relationship === undefined
         ? undefined
-        : behavior.resource.resource.relationships[relationship];
+        : declared.resource.relationships[relationship];
     const target =
       definition === undefined ? undefined : BY_TYPE.get(definition.type);
     if (relationship === undefined || target === undefined) {
       throw new TypeError('an accepted include names no listed resource');
     }
-    const linked = await runtime.include(
-      c.get('actor'),
-      behavior,
-      relationship,
-      target,
-      rows,
-    );
+    const linked = await operation(operations, 'include')(relationship, rows);
     out.push(include(target.resource, linked));
   }
   return out;
 }
 
-/** The routes of `behavior`'s declared operations, at `/api/<type>`. */
-function mount(app: Hono<AppEnv>, runtime: Runtime, behavior: Behavior): void {
-  const declared = behavior.resource;
+/** The routes of `declared`'s operations, at `/api/<type>`. */
+function mount(
+  app: Hono<AppEnv>,
+  runtime: AppRuntime,
+  declared: DeclaredResource,
+): void {
   const { resource } = declared;
   const operations: ReadonlySet<string> = new Set(
     declared.declaration.operations,
@@ -170,13 +173,12 @@ function mount(app: Hono<AppEnv>, runtime: Runtime, behavior: Behavior): void {
   if (operations.has('list')) {
     app.get(collection, queryValidator(resource), async (c) => {
       const query = c.req.valid('query');
-      const request = keysetRequest(declared, query);
-      const page = await runtime
-        .list(c.get('actor'), behavior, request)
-        .catch((error: unknown) => {
-          throw planRefusal(error);
-        });
-      const linked = await included(runtime, c, behavior, page.rows, query);
+      const domain = operationsOf(runtime, c, declared);
+      const page = await operation(
+        domain,
+        'list',
+      )(keysetRequest(declared, query));
+      const linked = await included(domain, declared, page.rows, query);
       return respond(
         c,
         paginatedDocument(resource, page, {
@@ -190,19 +192,17 @@ function mount(app: Hono<AppEnv>, runtime: Runtime, behavior: Behavior): void {
   if (operations.has('create')) {
     const body = bodyValidator(resource, { operation: 'create' });
     app.post(collection, body, async (c) => {
-      const row = await runtime.create(
-        c.get('actor'),
-        behavior,
-        c.req.valid('json'),
-      );
+      const domain = operationsOf(runtime, c, declared);
+      const row = await operation(domain, 'create')(c.req.valid('json'));
       return respond(c, resourceDocument(resource, row), CREATED);
     });
   }
   if (operations.has('get')) {
     app.get(member, queryValidator(resource), async (c) => {
       const query = c.req.valid('query');
-      const row = await runtime.get(c.get('actor'), behavior, memberId(c));
-      const linked = await included(runtime, c, behavior, [row], query);
+      const domain = operationsOf(runtime, c, declared);
+      const row = await operation(domain, 'get')(memberId(c));
+      const linked = await included(domain, declared, [row], query);
       return respond(
         c,
         resourceDocument(resource, row, { query, included: linked }),
@@ -212,9 +212,8 @@ function mount(app: Hono<AppEnv>, runtime: Runtime, behavior: Behavior): void {
   if (operations.has('update')) {
     const body = bodyValidator(resource, { operation: 'update' });
     app.patch(member, body, async (c) => {
-      const row = await runtime.update(
-        c.get('actor'),
-        behavior,
+      const domain = operationsOf(runtime, c, declared);
+      const row = await operation(domain, 'update')(
         memberId(c),
         c.req.valid('json'),
       );
@@ -223,14 +222,15 @@ function mount(app: Hono<AppEnv>, runtime: Runtime, behavior: Behavior): void {
   }
   if (operations.has('remove')) {
     app.delete(member, async (c) => {
-      await runtime.remove(c.get('actor'), behavior, memberId(c));
+      const domain = operationsOf(runtime, c, declared);
+      await operation(domain, 'remove')(memberId(c));
       return c.body(null, NO_CONTENT);
     });
   }
 }
 
 /** The API over `runtime`: negotiation first, then the member, then the routes. */
-export function createApi(runtime: Runtime): Hono<AppEnv> {
+export function createApi(runtime: AppRuntime): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   app.use(jsonApi({ profiles: [CURSOR_PAGINATION_PROFILE] }));
   app.use('/api/*', async (c, next) => {
@@ -239,8 +239,8 @@ export function createApi(runtime: Runtime): Hono<AppEnv> {
   });
   app.onError(errorHandler());
   app.notFound(notFoundHandler());
-  for (const behavior of [ContactsBehavior, CallsBehavior]) {
-    mount(app, runtime, behavior);
+  for (const declared of [Contacts, Calls]) {
+    mount(app, runtime, declared);
   }
   return app;
 }
