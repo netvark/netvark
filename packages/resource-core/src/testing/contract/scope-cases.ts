@@ -1,16 +1,31 @@
 /**
  * The cases of obligations 2 and 7 (SPEC 12.8): every statement on a
  * scoped table carries the scope's predicate, so a row of another scope
- * is absent for `get`, `lock`, `update`, and `remove`, and `count` counts the
- * transaction's scope only. The fixture has no row security, so only the
- * adapter's predicate keeps a row in its scope.
+ * is absent for `get`, `lock`, `update`, and `remove`, `count` counts the
+ * transaction's scope only, and every page of `list` holds its rows only.
+ * The fixture has no row security, so only the adapter's predicate keeps a
+ * row in its scope.
  * @packageDocumentation
  */
+import type { PublicRow } from '../../server/storage';
 import type { Contract } from './context';
 import type { ContractCase } from './types';
 
 import { assertEqual } from './assert';
 import { taskUpdate } from './context';
+import { createListTasks } from './list-data';
+import { walk } from './list-walk';
+
+/** Each workspace's titles in title order, among tasks of both workspaces between them. */
+const SCOPED_TITLES = [
+  ['1', ['alpha', 'bravo', 'charlie', 'delta', 'echo alpha']],
+  ['2', ['apex', 'cobra alpha']],
+] as const;
+
+/** A task as a scope case shows it: its title and its workspace. */
+function titleAndWorkspace(row: PublicRow): unknown {
+  return [row['title'], row['workspace']];
+}
 
 /** The cases of obligations 2 and 7. */
 export function scopeCases<TTransaction>(
@@ -86,6 +101,26 @@ export function scopeCases<TTransaction>(
           1,
           'count in workspace 9, whose one task has a value with no read form',
         );
+      },
+    },
+    {
+      name: "obligation 2: every page of list holds the rows of the transaction's scope only",
+      run: async () => {
+        await createListTasks(contract);
+        for (const [workspace, titles] of SCOPED_TITLES) {
+          const listing = {
+            contract,
+            workspace,
+            resource: tasks,
+            label: titleAndWorkspace,
+          };
+          const what = `tasks of workspace ${workspace} sorted by title`;
+          assertEqual(
+            await walk(listing, { sort: ['title'] }, what),
+            titles.map((title) => [title, workspace]),
+            what,
+          );
+        }
       },
     },
   ];

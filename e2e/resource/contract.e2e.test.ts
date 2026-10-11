@@ -21,6 +21,7 @@ import {
   OUTBOX,
   POINT_TEXT,
 } from './support/contract-database.ts';
+import { DEFINE_KEYSET } from './support/keyset-definer.ts';
 import { referenceAdapter } from './support/reference-adapter.ts';
 
 describe.each(contractDatabases())(
@@ -38,6 +39,7 @@ describe.each(contractDatabases())(
         catalog: contractFixture.catalog,
         codecs: { point: POINT_TEXT },
         outbox: OUTBOX,
+        defineKeyset: DEFINE_KEYSET,
         transact: async (run) => current().transact(run),
       }),
       reset: async () => current().reset(),

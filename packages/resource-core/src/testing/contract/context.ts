@@ -91,6 +91,8 @@ export function defaultTask(
     hasSecret: false,
     createdBy: CREATOR,
     createdIn: workspace,
+    priority: 'normal',
+    rank: null,
     workspace,
     parent: null,
   };

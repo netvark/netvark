@@ -16,6 +16,7 @@ import type { ReferenceTransaction, Row, SqlClient } from './reference-sql.ts';
 import { contractFixture } from '@netvark/resource-core/testing';
 
 import { OUTBOX, POINT_TEXT } from './contract-database.ts';
+import { DEFINE_KEYSET } from './keyset-definer.ts';
 import { referenceAdapter } from './reference-adapter.ts';
 
 /** The reference adapter's type. */
@@ -46,6 +47,7 @@ export function reference(transact: Transact): Adapter {
     catalog: contractFixture.catalog,
     codecs: { point: POINT_TEXT },
     outbox: OUTBOX,
+    defineKeyset: DEFINE_KEYSET,
     transact,
   });
 }

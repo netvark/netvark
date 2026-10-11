@@ -2,8 +2,6 @@
  * `storageContract(harness)` (SPEC 12.9): the cases a storage adapter runs
  * to show it keeps the obligations of SPEC 12.8, one or more per
  * obligation, each named after it. Every case resets the database first.
- * The cases of obligation 5, paging `list` with the keyset definition,
- * arrive with that definition (SPEC 11.2).
  * @packageDocumentation
  */
 import type { ContractCase, ContractHarness } from './contract/types';
@@ -11,7 +9,9 @@ import type { ContractCase, ContractHarness } from './contract/types';
 import { contractOf } from './contract/context';
 import { errorCases } from './contract/error-cases';
 import { eventCases } from './contract/event-cases';
+import { listCases } from './contract/list-cases';
 import { lockCases } from './contract/lock-cases';
+import { pageCases } from './contract/page-cases';
 import { partitionCases } from './contract/partition-cases';
 import { quotaCases } from './contract/quota-cases';
 import { readCases } from './contract/read-cases';
@@ -33,6 +33,8 @@ export function storageContract<TTransaction>(
     ...scopeCases(contract),
     ...readCases(contract),
     ...writeCases(contract),
+    ...listCases(contract),
+    ...pageCases(contract),
     ...errorCases(contract),
     ...quotaCases(contract),
     ...eventCases(contract),

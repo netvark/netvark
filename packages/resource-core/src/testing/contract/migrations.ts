@@ -8,12 +8,18 @@
  * to `logs_low`, the rest to `contract_archive.logs_high_rest`, a partition
  * of `logs_high`, which is attached with its own primary key, so what a
  * partition raises names a table two levels down, in another schema, and
- * an index PostgreSQL named after that table.
+ * an index PostgreSQL named after that table. The third adds to tasks what
+ * `list` filters and sorts besides (SPEC 12.8, obligation 5): an enum,
+ * which sorts in the order of its labels, an `int4`, and a `tsvector`
+ * generated from the title with the `simple` configuration, which search
+ * reads.
  * `public-catalog.ts` is what `pg-catalog extract` writes for these
  * migrations; `e2e/resource` proves it current. The schema has no row
  * security, so only the adapter's scope predicate keeps a row in its scope.
  * @ref https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADMIN-SET
  * @ref https://www.postgresql.org/docs/18/sql-altertable.html (ATTACH PARTITION: the table must have the target's CHECK constraints)
+ * @ref https://www.postgresql.org/docs/18/datatype-enum.html#DATATYPE-ENUM-ORDERING
+ * @ref https://www.postgresql.org/docs/18/textsearch-tables.html#TEXTSEARCH-TABLES-INDEX (a generated tsvector column)
  * @packageDocumentation
  */
 
@@ -67,6 +73,13 @@ create table contract_archive.logs_high_rest partition of contract_archive.logs_
   for values from (1000) to (maxvalue);
 
 alter table logs attach partition contract_archive.logs_high for values from (1000) to (maxvalue);
+`,
+  `create type task_priority as enum ('low', 'normal', 'high');
+
+alter table tasks
+  add column priority task_priority not null default 'normal',
+  add column rank int4,
+  add column search tsvector generated always as (to_tsvector('simple', title)) stored;
 `,
 ];
 

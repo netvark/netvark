@@ -18,7 +18,8 @@
  *    (ADR 0004): an update without members changes nothing;
  * 5. page `list` with the declared resource's keyset definition and
  *    `@netvark/keyset-core`'s planner, filters and sorts addressed by
- *    public names;
+ *    public names, every value of the plan a parameter of its column's
+ *    type, a cursor's included, never by counting rows;
  * 6. let every PostgreSQL error raised inside an operation reach the
  *    runtime with its fields, as thrown or as the `cause` of what is
  *    thrown, so the runtime's `constraintError` (SPEC 9.5) maps it;
@@ -39,9 +40,10 @@
  * `storageContract` (`@netvark/resource-core/testing`) checks them.
  * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/transam/xact.c (EndTransactionBlock: "Since COMMIT may actually do a ROLLBACK")
  * @ref https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/ (offset pages shift when a row of an earlier page goes away)
  * @packageDocumentation
  */
-import type { KeysetRequest, Page } from '@netvark/keyset-core';
+import type { KeysetRequest, NoRelations, Page } from '@netvark/keyset-core';
 
 import type { DeclaredResource } from '../declare/declared-resource';
 import type { DomainEvent } from './event';
@@ -70,8 +72,12 @@ export interface StorageWrite {
   readonly values?: Readonly<Record<string, unknown>> | undefined;
 }
 
-/** A `list` request: filters, sorts, search, and page, addressed by public names. */
-export type StorageListRequest = KeysetRequest;
+/**
+ * A `list` request: filters, sorts, search, and page, addressed by public
+ * names. It is what the declared resource's keyset definition plans, which
+ * has no relations (SPEC 11.2), so no filter reaches through one.
+ */
+export type StorageListRequest = KeysetRequest<string, string, NoRelations>;
 
 /** A page of public rows, with the cursors `@netvark/keyset-core` signs. */
 export type StoragePage = Page<PublicRow>;

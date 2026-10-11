@@ -19,6 +19,7 @@ import {
   withNulls,
   wrapping,
 } from './faulty-adapters.ts';
+import { LIST_FAULTS } from './list-faults.ts';
 
 /** A defect: what it breaks, the cases that must fail, and the adapter that has it. */
 export interface Fault {
@@ -107,6 +108,7 @@ export const FAULTS: ReadonlyArray<Fault> = [
     fails: [
       'obligation 7: a row of another scope is absent for get, lock, update, and remove',
       "obligation 2: count counts the rows of the transaction's scope only",
+      "obligation 2: every page of list holds the rows of the transaction's scope only",
     ],
     adapter: rewriting((sql) =>
       sql.replaceAll(SCOPE_PREDICATE, '$1::text is not null'),
@@ -203,6 +205,7 @@ export const FAULTS: ReadonlyArray<Fault> = [
           : adapter.update(tx, resource, id, input),
     })),
   },
+  ...LIST_FAULTS,
   {
     name: 'counts without the quota lock',
     fails: [

@@ -1753,6 +1753,20 @@ needs from the declared resource's public members, `names` (the table, the key c
 (each member's column, kind, access, and codec), and `declaration.scope`, from the public catalog
 (schemas and types), and from its own storage codecs (7.1).
 
+A `StorageListRequest` is keyset-core's `KeysetRequest` without relation filters,
+`KeysetRequest<string, string, NoRelations>`: what the declared resource's keyset definition plans,
+since it has no relations (11.2). An adapter defines that keyset once per resource with the server's
+configured `createDefineKeyset({ cursor })`, which holds the cursor secret the declaration leaves
+out, and pages with it as `@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request)`;
+one statement over the schema-qualified table with the scope's predicate, the plan's `filter` and
+`seek`, each key selected as text under its alias, the keys ordered with their directions and null
+placement, and the plan's `limit`; then `page(plan, rows, values)` over the rows read. Every value
+of the plan is a parameter of its column's type, a cursor's included: its values are the text each
+key was selected as, so a `timestamptz` keeps its microseconds and an `int8` its digits. The plan
+orders nulls last on a forward page, where PostgreSQL's default puts them first when descending.
+@ref https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC
+order)
+
 An adapter MUST:
 
 1. Run each operation in one transaction that begins by setting every scope's parameter for that
@@ -1769,7 +1783,11 @@ An adapter MUST:
    values on create, and nothing else (ADR 0004): a member left out keeps its value, or its default
    on create; `null` clears a member; an update without members changes nothing and returns the row.
 5. Page `list` with the declared resource's keyset definition and `@netvark/keyset-core`'s planner,
-   filters and sorts addressed by public names.
+   filters and sorts addressed by public names, as above: never by counting rows, which shifts every
+   later page when a row of an earlier one goes away. @ref
+   https://jsonapi.org/profiles/ethanresnick/cursor-pagination/ ("with offset–limit pagination, if
+   an item from a prior page is deleted while the client is paginating, all subsequent results will
+   be shifted forward by one")
 6. Let every PostgreSQL error raised inside an operation reach the runtime with its fields, as
    thrown or as the `cause` of what is thrown, so the runtime's `constraintError` (9.5) maps it;
    never replace it with an error of its own.
@@ -1808,33 +1826,50 @@ interface ContractHarness<TTransaction> {
 
 `contractFixture` is the suite's own fixture: `migrations` as SQL text, the `seed`, the public
 `catalog` `pg-catalog extract` reads from the migrations, the `point` codec, the `workspace` scope
-(session parameter `contract.workspace_id`), and two declarations: `workspaces`, unscoped with an
-identity key, and `tasks`, scoped to a workspace, with client ids, the server value `created_by`, a
+(session parameter `contract.workspace_id`), and three declarations: `workspaces`, unscoped with an
+identity key; `tasks`, scoped to a workspace, with client ids, the server value `created_by`, a
 field of every wire form, an array, JSON, a codec field, generated columns, a `write` field, and a
 self-reference; and `logs`, partitioned by its id with client ids, whose ids below 1000 go to
 `logs_low` and the rest to `contract_archive.logs_high_rest`, a partition of a table attached with
-its own primary key. A column default reads `current_setting('contract.workspace_id', true)`, so a
-case reads back what the transaction set, and the schema has no row security, so only the adapter's
-predicate keeps a row in its scope. The values are the ones drivers get wrong by default: an `int8`
-past 2^53, a `numeric` read as a float, a `timestamptz` at millisecond precision or in the local
-zone, array elements that need quoting, `NULL` and the empty string among them. A harness gives its
-adapter the catalog and a storage codec for `point`; on a server, it gives the adapter at least two
+its own primary key. A third migration adds to tasks what `list` filters and sorts besides: an enum,
+which sorts in the order of its labels, an `int4`, and a `tsvector` generated from the title with
+`simple`. `tasks` filters with operators of every keyset type, sorts by its scalars, searches that
+column, sorts by `['-priority', 'due_on']` by default, and pages two to three rows at a time; `logs`
+lists, filtered by its owner. A column default reads
+`current_setting('contract.workspace_id', true)`, so a case reads back what the transaction set, and
+the schema has no row security, so only the adapter's predicate keeps a row in its scope. The values
+are the ones drivers get wrong by default: an `int8` past 2^53, a `numeric` read as a float, a
+`timestamptz` at millisecond precision or in the local zone, array elements that need quoting,
+`NULL` and the empty string among them. A harness gives its adapter the catalog, a storage codec for
+`point`, and a keyset definer with a cursor secret; on a server, it gives the adapter at least two
 connections, so the concurrent cases of obligations 8 and 10 run two transactions at once: the first
 takes its lock, the second starts, and the first finishes only after the second had time to reach
 the database. An adapter that serializes its transactions, as PGlite's does, passes them without a
-lock. The cases of obligation 5 arrive with the keyset definition (11.2).
+lock.
+
+The cases of obligation 5 list five tasks of workspace 1, created between two of workspace 2, two
+rows a page, each request walked forward with `next` from the first page and back with `prev` from
+the last, which must give the same pages: the declared default sort; every sortable field in both
+directions, nulls last, ties broken by the key; every declared operator on a value of its keyset
+type; search in websearch mode, with a filter; the page flags and each row's cursor; a cursor that
+resumes after its row though the row was removed since; the page bounds, a size past the max refused
+with keyset-core's `PAGE_SIZE_EXCEEDED`; and logs, which declare no sort, ordered by their `int8`
+key past 2^53 across both partitions, and filtered by their owner. A case of obligation 2 walks each
+workspace's pages. A `list` that rejects fails its case, with the error as the failure's `cause`.
 
 Tests: `domain.test-d.ts` (permissions, quotas, codes, fields, and server values as compile errors),
 `policy.test.ts`, `behavior.test.ts`, `scope.test.ts`, `quota.test.ts`, `event.test.ts`,
 `reject.test.ts`, `server-values.test.ts`, and `constraint-error.test.ts`, with
-`contract/assert.test.ts`, `contract/concurrency.test.ts`, and `contract/fixture.test.ts`. The
+`contract/assert.test.ts`, `contract/concurrency.test.ts`, `contract/fixture.test.ts`, and
+`contract/list-requests.test.ts` (a request for every declared operator and sortable field). The
 contract suite itself is proven in `e2e/resource` against a reference adapter written in plain SQL,
 over PGlite and over PostgreSQL through a node-postgres pool (`contract.e2e.test.ts`), so the
 contract is shown implementable before `@netvark/kysely-resource` exists.
 `contract-faults.e2e.test.ts` gives the reference adapter one defect at a time, from parameters set
-for the session to a missing quota or row lock and a partition resolved to its own names, and checks
-that the cases about it fail, and `extract.e2e.test.ts` checks that the fixture's catalog is what
-extraction gives for its migrations.
+for the session to a missing quota or row lock, a partition resolved to its own names, pages counted
+by offset, filters and sorts named by column, PostgreSQL's default null placement, and sort keys
+selected as a driver reads them by default, and checks that the cases about it fail, and
+`extract.e2e.test.ts` checks that the fixture's catalog is what extraction gives for its migrations.
 
 ---
 
@@ -2378,6 +2413,22 @@ and back with `prev`, gave the order of one page of all six rows (2,127 and 2,64
 ran on PostgreSQL 18.3 (PGlite) and on a 14.19 server without a disagreement. The declarations'
 instantiations did not change (489,983 and 580,496): TypeScript computes the two members' types only
 where they are read.
+
+The twelfth record covers obligation 5 of 12.8. The reference adapter of 12.9, whose `list` renders
+keyset-core's plan as plain SQL, ran against `@netvark/kysely-keyset`, an independent renderer of
+the same plan, on the eleventh record's per-table declarations. In a transaction rolled back after,
+each table was replaced by a copy without constraints holding six rows with ties and NULLs in every
+member the keyset filters or sorts, keys past 2^53 where the key is an `int8`, and a `tsvector` in
+stern's search columns. The reference adapter's pages, walked two rows at a time forwards with
+`next` and back with `prev`, gave kysely-keyset's one page of all rows for the default sort and for
+every sortable name in both directions, the key's included (2,349 walks on stern and 2,760 on the
+GitLab slice); its one page held kysely-keyset's rows for every declared operator, `isNull` both
+ways (13,812 and 13,930 requests), and for 9 searches on stern. Everything ran on PostgreSQL 18.3
+(PGlite) and on a 14.19 server without a disagreement. The comparison catches what it is about: keys
+ordered without their null placement disagreed 752 times on stern, and `nin` rendered as `in` 1,131
+times. The script's first run computed the GitLab slice's `int8` keys as JavaScript numbers, so
+9007199254740993 went in as a second 9007199254740992, into a key without its constraint, and 609
+walks lost or repeated a row: the values the contract's cases are made of.
 
 ### 15.6 The Zod floor
 
