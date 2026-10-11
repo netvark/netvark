@@ -12,8 +12,9 @@ section 18, and the decisions behind it in
 
 Status: in development and unreleased. The storage adapter has its transaction protocol, scopes,
 reads and writes, keyset pages with totals, `many` for includes, quotas, row locks, and the outbox
-insert; failure mapping, the domain (`runtime.as(actor)`), boot checks, and the outbox relay follow
-in the 0.x line.
+insert, and the runtime maps what an operation throws to the client's error (a rule's rejection, a
+keyset refusal, a PostgreSQL integrity violation through its declared code, partitions included);
+the domain (`runtime.as(actor)`), boot checks, and the outbox relay follow in the 0.x line.
 
 ## Install
 
