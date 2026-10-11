@@ -4,8 +4,9 @@
  * validator of the OpenAPI Initiative's schema accepts, every `$ref`
  * resolved; the same document on every build; the application's codes on
  * the operations that raise them and on every operation for `codes.all`;
- * and each resource's schemas and each error object a response references
- * in `components` once. `openapi-exchanges` holds a running API to it.
+ * and in `components` once each resource's schemas, each error object a
+ * response references, and each response a status of one code references.
+ * `openapi-exchanges` holds a running API to it.
  * @ref https://spec.openapis.org/oas/v3.1.2.html
  * @ref https://github.com/seriousme/openapi-schema-validator
  */
@@ -35,6 +36,8 @@ const PAYMENT_REQUIRED = 402;
 const FORBIDDEN = 403;
 const CONFLICT = 409;
 const ERROR_KEY = '_error.';
+const ERROR_RESPONSE = /#\/components\/responses\/_error\.([A-Z0-9_]+)"/gu;
+const ERROR_OBJECT = /#\/components\/schemas\/_error\.([A-Z0-9_]+)"/gu;
 const JSON_API = 'application/vnd.api+json';
 const CALL = '00000000-0000-4000-8000-00000000c001';
 const NOT_FOUND: Sent = {
@@ -45,6 +48,13 @@ const NOT_FOUND: Sent = {
 };
 
 const contract = contractOf(APP_DOCUMENT);
+
+/** The code of each error reference `pattern` finds in `node`, once. */
+function codesIn(node: unknown, pattern: RegExp): Set<string | undefined> {
+  return new Set(
+    [...JSON.stringify(node).matchAll(pattern)].map(([, code]) => code),
+  );
+}
 
 /** Every operation of the document as `[method, path]`. */
 function operations(): Array<readonly [Method, string]> {
@@ -105,13 +115,8 @@ describe("the contacts application's OpenAPI document", () => {
     const errors = keys
       .filter((key) => key.startsWith(ERROR_KEY))
       .map((key) => key.slice(ERROR_KEY.length));
-    const referenced = new Set(
-      [
-        ...JSON.stringify(APP_DOCUMENT.paths).matchAll(
-          /#\/components\/schemas\/_error\.([A-Z0-9_]+)"/gu,
-        ),
-      ].map(([, code]) => code),
-    );
+    const { paths, components } = APP_DOCUMENT;
+    const referenced = codesIn([paths, components.responses], ERROR_OBJECT);
     expect(new Set(errors)).toEqual(referenced);
     expect(errors).toHaveLength(referenced.size);
     expect(keys.filter((key) => !key.startsWith(ERROR_KEY))).toEqual([
@@ -135,6 +140,16 @@ describe("the contacts application's OpenAPI document", () => {
       'calls.identifier',
       'calls.create',
     ]);
+  });
+
+  it('holds each response a status of one code references once', () => {
+    const keys = Object.keys(APP_DOCUMENT.components.responses);
+    const referenced = codesIn(APP_DOCUMENT.paths, ERROR_RESPONSE);
+    expect(keys.every((key) => key.startsWith(ERROR_KEY))).toBe(true);
+    expect(new Set(keys.map((key) => key.slice(ERROR_KEY.length)))).toEqual(
+      referenced,
+    );
+    expect(referenced).toContain('NOT_FOUND');
   });
 
   it('refuses a code of the options that the catalog lacks', () => {

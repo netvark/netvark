@@ -1003,10 +1003,11 @@ app.get('/openapi.json', (c) => c.json(document));
 
 Every operation the declarations serve has its path, parameters, request and response documents, and
 an error response for each status it can answer with, listing its codes; each code's error object is
-a component, written once and referenced. Paths come from each resource's links, and an absolute
-base becomes the document's server. The schemas admit every request the server accepts, and may
-admit more: what JSON Schema cannot state compactly, such as a validator or a date-time's range,
-stays with the server, whose refusals the error responses document. An example that the server would
+a component, written once and referenced, and so is the response of a status that carries one code,
+`components.responses['_error.<code>']`. Paths come from each resource's links, and an absolute base
+becomes the document's server. The schemas admit every request the server accepts, and may admit
+more: what JSON Schema cannot state compactly, such as a validator or a date-time's range, stays
+with the server, whose refusals the error responses document. An example that the server would
 refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the build fails instead of
 the document lying.
 
@@ -1111,6 +1112,7 @@ option, operator, or code, a loosened limit, and a new default page size break n
 - **Test exchanges against the document.** Validate the status, the media type, the body, and the
   codes of every response your API tests receive against the document's operation, with a JSON
   Schema 2020-12 validator that knows the OpenAPI formats (`int16`, `decimal`, `date-time-local`). A
+  status of one code is a `$ref` into `components.responses`: read the response where it points. A
   response outside the document is a bug in one of them.
 - **Answer the planner's refusals as the parser's.** Map keyset-core's `InvalidCursorError` to
   `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and `InvalidFilterValueError` at its

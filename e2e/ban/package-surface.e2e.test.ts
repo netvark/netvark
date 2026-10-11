@@ -109,6 +109,7 @@ describe('package surface', () => {
       sorted([
         'errorObjectSchemas',
         'errorResponse',
+        'errorResponseObjects',
         'errorResponses',
         'errorSchema',
         'validationResponse',

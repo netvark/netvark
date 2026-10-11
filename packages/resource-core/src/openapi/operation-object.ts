@@ -2,13 +2,17 @@
  * The parts every operation of the document shares (SPEC 13.1): its id,
  * `<type>.<operation>`, unique since types are; its tag, the type; its
  * bodies under the JSON:API media type; and its responses, the success
- * the operation names with the error responses of its codes.
+ * the operation names with the error responses of its codes, a status that
+ * carries one code a reference to that code's response.
  * @ref https://spec.openapis.org/oas/v3.1.2.html#operation-object
  * @ref https://jsonapi.org/format/1.1/#content-negotiation
  * @packageDocumentation
  */
 import type { JsonSchema } from '@netvark/ban-core';
-import type { ResponseObject } from '@netvark/ban-core/openapi';
+import type {
+  ReferenceObject,
+  ResponseObject,
+} from '@netvark/ban-core/openapi';
 
 import type { DeclaredInternals } from '../declare/declared-resource';
 import type { DocumentOperation } from './operation-codes';
@@ -51,7 +55,9 @@ export interface OperationObject {
   readonly tags: ReadonlyArray<string>;
   readonly parameters?: ReadonlyArray<ParameterObject>;
   readonly requestBody?: RequestBody;
-  readonly responses: Readonly<Record<string, SuccessObject | ResponseObject>>;
+  readonly responses: Readonly<
+    Record<string, SuccessObject | ResponseObject | ReferenceObject>
+  >;
 }
 
 /** An OpenAPI Path Item Object, by lowercase method. */
@@ -64,7 +70,7 @@ export interface OperationContext {
   readonly errors: (
     internals: DeclaredInternals,
     operation: DocumentOperation,
-  ) => Readonly<Record<string, ResponseObject>>;
+  ) => Readonly<Record<string, ResponseObject | ReferenceObject>>;
   readonly examples: (
     type: string,
     body: ExampleBody,

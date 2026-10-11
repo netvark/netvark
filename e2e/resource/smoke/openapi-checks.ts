@@ -1,10 +1,10 @@
 /**
  * Checks of the built `@netvark/resource-core/openapi` entry (resource
  * SPEC 13, 15.4): the contacts application's resources make an OpenAPI
- * 3.1.2 document whose responses reference error objects in its
- * components, and two surfaces diff with a removed type as a breaking
- * change. No Node.js API, so the same module runs on Bun, Deno, and
- * workerd.
+ * 3.1.2 document whose responses reference error objects and lone
+ * responses in its components, and two surfaces diff with a removed type
+ * as a breaking change. No Node.js API, so the same module runs on Bun,
+ * Deno, and workerd.
  */
 import type { Checks } from './report.ts';
 
@@ -35,6 +35,11 @@ export const openapiChecks: Checks = {
       Object.hasOwn(document.components.schemas, NOT_FOUND) &&
         text.includes(`"#/components/schemas/${NOT_FOUND}"`),
       'NOT_FOUND is not a referenced component',
+    );
+    check(
+      Object.hasOwn(document.components.responses, NOT_FOUND) &&
+        text.includes(`"#/components/responses/${NOT_FOUND}"`),
+      "NOT_FOUND's response is not a referenced component",
     );
   },
   'diffs two surfaces': () => {

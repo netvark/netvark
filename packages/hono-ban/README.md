@@ -376,6 +376,21 @@ for (const [key, schema] of Object.entries(errorObjectSchemas(ban, codes))) {
 // In each createRoute: responses: { ...errorResponses(ban, codes, { objectRef }) }
 ```
 
+A status that carries one code answers the same on every route that lists it. Register that response
+once too, with any format: `responseRef` makes such a status a reference, and `errorResponseObjects`
+gives the responses to register. A status that carries several codes, such as a combined 400 or 500,
+stays inline:
+
+```ts
+import { errorResponseObjects, errorResponses } from '@netvark/hono-ban/openapi';
+
+const responseRef = (key: string) => `#/components/responses/${name(key)}`;
+for (const [key, response] of Object.entries(errorResponseObjects(ban, codes, { objectRef }))) {
+  app.openAPIRegistry.registerComponent('responses', name(key), response);
+}
+// In each createRoute: responses: { ...errorResponses(ban, codes, { objectRef, responseRef }) }
+```
+
 Hooks for `@hono/zod-validator` (`hook` from `@netvark/hono-ban/zod`), `@hono/valibot-validator`
 (`@netvark/hono-ban/valibot`), and `@hono/standard-validator` (`@netvark/hono-ban/standard-schema`)
 work the same way: they throw into `onError`, so validation failures get the same id, header, and
@@ -480,7 +495,7 @@ recognizing other frameworks' exceptions the way `@netvark/hono-ban` recognizes 
 | `@netvark/hono-ban`                                                                                                                                                                              | everything `@netvark/ban-core` exports, with `createBan` adding `onError`; plus `fromHttpException`, `assert`, `defineFormat`, `bearerChallenge`, `BanError`, `isBanError`, `problemDetails` |
 | `@netvark/hono-ban/formats/problem-details`, `@netvark/hono-ban/formats/json-api`, `@netvark/hono-ban/formats/plain`, `@netvark/hono-ban/formats/google-api`, `@netvark/hono-ban/formats/stripe` | the built-in wire formats                                                                                                                                                                    |
 | `@netvark/hono-ban/zod`, `@netvark/hono-ban/valibot`, `@netvark/hono-ban/standard-schema`                                                                                                        | validator hooks and issue converters                                                                                                                                                         |
-| `@netvark/hono-ban/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                                   |
+| `@netvark/hono-ban/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponseObjects`, `errorObjectSchemas`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                     |
 | `@netvark/hono-ban/otel`                                                                                                                                                                         | `traceIdFromOtel`                                                                                                                                                                            |
 | `@netvark/hono-ban/postgresql`                                                                                                                                                                   | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                                  |
 | `@netvark/hono-ban/testing`                                                                                                                                                                      | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                                   |

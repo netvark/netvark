@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   errorDocument,
   include,
+  jsonApiError,
   paginatedDocument,
   parseCreateDocument,
   resourceDocument,
@@ -12,6 +13,7 @@ import {
 import { Contacts, Organizations } from '../test-support/definition-resources';
 import { openApiErrors } from '../test-support/openapi-conformance';
 import { documentValidator } from '../test-support/openapi-document';
+import { errorKey, errorResponseRef } from './component-names';
 import { openapi } from './document';
 
 const DOCUMENT = openapi([Organizations, Contacts], {
@@ -19,6 +21,8 @@ const DOCUMENT = openapi([Organizations, Contacts], {
 });
 const schemaAt = documentValidator(DOCUMENT);
 const MEDIA = 'application/vnd.api+json';
+const SCHEMAS = '#/components/schemas/';
+const RESPONSES = '#/components/responses/';
 
 const ADA = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -49,6 +53,25 @@ function responseOf(
     MEDIA,
     'schema',
   ]);
+}
+
+/** Every `$ref` under `node`. */
+function refsIn(node: unknown): Array<string> {
+  if (typeof node !== 'object' || node === null) {
+    return [];
+  }
+  return Object.entries(node).flatMap(([key, member]: [string, unknown]) =>
+    key === '$ref' && typeof member === 'string' ? [member] : refsIn(member),
+  );
+}
+
+/** Whether `ref` names a component the document holds. */
+function resolves(ref: string): boolean {
+  const { schemas, responses } = DOCUMENT.components;
+  return ref.startsWith(SCHEMAS)
+    ? Object.hasOwn(schemas, ref.slice(SCHEMAS.length))
+    : ref.startsWith(RESPONSES) &&
+        Object.hasOwn(responses, ref.slice(RESPONSES.length));
 }
 
 function requestOf(path: string, method: string): (value: unknown) => boolean {
@@ -177,5 +200,33 @@ describe('openapi', () => {
     expect(responseOf('/api/contacts', 'post', '422')(rendered)).toBe(true);
     expect(responseOf('/api/contacts', 'post', '400')(rendered)).toBe(true);
     expect(responseOf('/api/contacts', 'post', '409')(rendered)).toBe(false);
+  });
+
+  it("describes a status of one code with a reference to that code's response", () => {
+    expect(DOCUMENT.paths['/api/contacts/{id}']?.get?.responses['404']).toEqual(
+      { $ref: errorResponseRef('NOT_FOUND') },
+    );
+    const notFound = schemaAt([
+      'components',
+      'responses',
+      errorKey('NOT_FOUND'),
+      'content',
+      MEDIA,
+      'schema',
+    ]);
+    expect(notFound(errorDocument(jsonApiError('NOT_FOUND')))).toBe(true);
+    expect(notFound(errorDocument(jsonApiError('CONFLICT')))).toBe(false);
+  });
+
+  it('holds each referenced response once, and every reference resolves', () => {
+    const referenced = new Set(
+      refsIn(DOCUMENT.paths).filter((ref) => ref.startsWith(RESPONSES)),
+    );
+    expect(
+      Object.keys(DOCUMENT.components.responses)
+        .map((key) => `${RESPONSES}${key}`)
+        .toSorted(),
+    ).toEqual([...referenced].toSorted());
+    expect(refsIn(DOCUMENT).filter((ref) => !resolves(ref))).toEqual([]);
   });
 });

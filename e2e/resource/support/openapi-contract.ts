@@ -12,7 +12,10 @@ import type { ErrorObject } from 'ajv/dist/2020.js';
  * OpenAPI Format Registry. The document is added whole under an `$id`, its
  * OpenAPI members declared as vocabulary, so a schema anywhere in it
  * compiles by its JSON Pointer with its `$ref`s resolved in the document.
+ * A response that is a Reference Object is read where it points, in
+ * `components.responses`.
  * @ref https://spec.openapis.org/oas/v3.1.2.html#responses-object
+ * @ref https://spec.openapis.org/oas/v3.1.2.html#reference-object
  * @ref https://spec.openapis.org/registry/format/
  * @ref https://ajv.js.org/api.html#ajv-addvocabulary-vocabulary-ajv
  * @ref https://www.rfc-editor.org/rfc/rfc6901
@@ -30,6 +33,8 @@ const DOCUMENT_ID = 'https://e2e.netvark.test/openapi.json';
 const OPENAPI_MEMBERS = ['openapi', 'info', 'servers', 'paths', 'components'];
 /** The prefix of an error object's component; the application's codes are spelled as they are. */
 const ERROR_REF = '#/components/schemas/_error.';
+/** The prefix of a reference inside the document. */
+const LOCAL_REF = '#/';
 const CREATED = '201';
 
 export type Method = 'get' | 'post' | 'patch' | 'delete';
@@ -75,6 +80,29 @@ function at(root: unknown, segments: ReadonlyArray<string>): unknown {
         : undefined;
   }
   return node;
+}
+
+/** The segments of a reference inside the document, its RFC 6901 tokens decoded; `undefined` for another reference. */
+function refSegments(ref: string): Array<string> | undefined {
+  return ref.startsWith(LOCAL_REF)
+    ? ref
+        .slice(LOCAL_REF.length)
+        .split('/')
+        .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+    : undefined;
+}
+
+/** Where the response of `status` is: the operation's own entry, or the component its reference names. */
+function responseSegments(
+  document: OpenApiDocument,
+  method: Method,
+  path: string,
+  status: string,
+): ReadonlyArray<string> {
+  const own = ['paths', path, method, 'responses', status];
+  const entry = at(document, own);
+  const ref = isRecord(entry) ? entry['$ref'] : undefined;
+  return typeof ref === 'string' ? (refSegments(ref) ?? own) : own;
 }
 
 /** Every `$ref` under `node` that names an error object, as its code. */
@@ -133,14 +161,16 @@ export function contractOf(document: OpenApiDocument): Contract {
     }
     return compiled(value) === true ? [] : described(compiled.errors);
   };
-  const responses = (method: Method, path: string): unknown =>
-    at(document, ['paths', path, method, 'responses']);
   const codes = (
     method: Method,
     path: string,
     status: number,
   ): Array<string> => [
-    ...new Set(referencedCodes(at(responses(method, path), [String(status)]))),
+    ...new Set(
+      referencedCodes(
+        at(document, responseSegments(document, method, path, String(status))),
+      ),
+    ),
   ];
   return {
     codes,
@@ -162,7 +192,8 @@ export function contractOf(document: OpenApiDocument): Contract {
     },
     response: (method, path, sent) => {
       const status = String(sent.status);
-      const response = at(responses(method, path), [status]);
+      const where = responseSegments(document, method, path, status);
+      const response = at(document, where);
       if (!isRecord(response)) {
         return [`${method} ${path} documents no ${status}`];
       }
@@ -178,34 +209,13 @@ export function contractOf(document: OpenApiDocument): Contract {
       }
       const listed = new Set(codes(method, path, sent.status));
       return [
-        ...validate(
-          [
-            'paths',
-            path,
-            method,
-            'responses',
-            status,
-            'content',
-            media,
-            'schema',
-          ],
-          sent.body,
-        ),
+        ...validate([...where, 'content', media, 'schema'], sent.body),
         ...sentCodes(sent.body)
           .filter((code) => !listed.has(code))
           .map((code) => `${status} does not list ${code}`),
         ...(status === CREATED
           ? validate(
-              [
-                'paths',
-                path,
-                method,
-                'responses',
-                status,
-                'headers',
-                'Location',
-                'schema',
-              ],
+              [...where, 'headers', 'Location', 'schema'],
               sent.headers.get('Location'),
             )
           : []),
