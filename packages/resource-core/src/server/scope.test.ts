@@ -21,13 +21,26 @@ describe('defineScope (SPEC 12.5)', () => {
     expect(Object.isFrozen(organization)).toBe(true);
   });
 
+  // What PGlite (PostgreSQL 18.3) and a PostgreSQL 14.19 server accept
+  // from set_config, name by name.
   it.each([
     ['_app.org_1', true],
     ['App.Org', true],
+    ['app.organization_id', true],
+    ['app.user.organization_id', true],
+    ['a.b.c.d', true],
+    ['app.x$', true],
+    ['app.größe', true],
+    ['größe.x', true],
     ['app', false],
-    ['app.org.id', false],
+    ['app.', false],
+    ['.app', false],
+    ['app..x', false],
     ['1app.org', false],
+    ['app.1x', false],
+    ['app.$x', false],
     ['app.org-id', false],
+    ['app.org id', false],
     ["app.org'; drop table x; --", false],
   ])('takes %s as a session parameter: %s', (session, valid) => {
     const define = () =>
@@ -37,7 +50,7 @@ describe('defineScope (SPEC 12.5)', () => {
     } else {
       expect(define).toThrow(
         new TypeError(
-          'defineScope: organization_id: session must be two dotted identifiers, such as app.organization_id',
+          'defineScope: organization_id: session must be two or more identifiers joined by dots, such as app.organization_id',
         ),
       );
     }
