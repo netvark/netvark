@@ -21,12 +21,23 @@ const INT8 = {
 const INT4 = { minimum: '-2147483648', maximum: '2147483647' };
 const INT2 = { minimum: '-32768', maximum: '32767' };
 
+/**
+ * `10^exponent` as decimal text. Floating-point `10 ** -4` is
+ * `0.00009999999999999999` in V8 before Node.js 24, so the limits are
+ * written out digit by digit.
+ */
+function powerOfTenText(exponent: number): string {
+  return exponent >= 0
+    ? `1${'0'.repeat(exponent)}`
+    : `0.${'0'.repeat(-exponent - 1)}1`;
+}
+
 function numeric(precision: number, scale: number): Partial<FieldLimits> {
-  const bound = 10 ** (precision - scale);
+  const bound = powerOfTenText(precision - scale);
   return {
-    exclusiveMinimum: `-${String(bound)}`,
-    exclusiveMaximum: String(bound),
-    multipleOf: String(10 ** -scale),
+    exclusiveMinimum: `-${bound}`,
+    exclusiveMaximum: bound,
+    multipleOf: powerOfTenText(-scale),
   };
 }
 
