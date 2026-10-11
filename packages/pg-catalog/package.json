@@ -64,15 +64,21 @@
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
     "@electric-sql/pglite-socket": "catalog:",
+    "@netvark/resource-core": "workspace:^",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "kysely": "catalog:"
+    "kysely": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
-    "@electric-sql/pglite": "^0.5.0"
+    "@electric-sql/pglite": "^0.5.0",
+    "@netvark/resource-core": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@electric-sql/pglite": {
+      "optional": true
+    },
+    "@netvark/resource-core": {
       "optional": true
     }
   },

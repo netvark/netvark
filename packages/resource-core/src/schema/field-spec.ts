@@ -66,6 +66,7 @@ function specContext(context: DefinerContext): SpecContext {
             name: rule.validator,
             validator,
             code: domainCode(constraint, rule),
+            check: { domain, constraint },
           };
     },
   };
@@ -103,6 +104,7 @@ function declaredValidator(
         name,
         validator,
         code: source.names.rules.get(constraint) ?? deriveCode(constraint),
+        check: { domain: null, constraint },
       };
 }
 

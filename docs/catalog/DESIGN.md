@@ -25,8 +25,8 @@ TypeScript value:
    expressions) become rules; everything else is marked `null` for a validator to cover (ADR-0006).
 4. **Keep the loop closed.** `extract --check` proves the committed files current in CI, and `drift`
    compares a live database with the committed catalog on a schedule (ADR-0008). The oracle
-   (`rules --check`), which runs rules and validators through Zod and through the database, joins
-   when `@netvark/resource-core` exists.
+   (`rules --check`) runs the fixtures of the declared resources through their Zod schemas and
+   through the replayed database, and reports each value they disagree on (ADR-0012).
 
 ### Who it is for
 
@@ -312,3 +312,4 @@ committed catalog.ts ──parse──▶ Catalog ◀──diffCatalogs──▶
 | 0009 | A unique index that no constraint backs is a public unique constraint                           |
 | 0010 | A NOT ENFORCED constraint is public and marked as such                                          |
 | 0011 | The catalog's type is a named interface, so compile errors print its name                       |
+| 0012 | The oracle writes fixtures into copies of the columns, catching refusals in the database        |

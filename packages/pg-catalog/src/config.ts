@@ -92,6 +92,31 @@ export interface DriftEnvironment {
   readonly url: string | (() => string | undefined);
 }
 
+/**
+ * A storage codec over text (resource SPEC 7.1): `write` gives the text
+ * PostgreSQL reads for a value of its codec, and `read` takes the text
+ * PostgreSQL prints, in a session in UTC with ISO dates. `write` takes
+ * `never` here, so a codec's own typed `write` fits.
+ */
+export interface RulesStorageCodec {
+  readonly read: (stored: string) => unknown;
+  readonly write: (value: never) => string;
+}
+
+/**
+ * What `rules --check` runs (SPEC 10.3). `registry` returns the declared
+ * resources of `@netvark/resource-core`; it is called only when the
+ * command runs, since the declarations import the catalog `extract`
+ * writes. `storage` gives each codec a declared field names its storage
+ * codec over text, by codec name.
+ */
+export interface RulesConfig {
+  readonly registry: () =>
+    | ReadonlyArray<object>
+    | Promise<ReadonlyArray<object>>;
+  readonly storage?: Readonly<Record<string, RulesStorageCodec>>;
+}
+
 /** An extraction: the migrations, where they replay, which schemas to read, and the files to write. */
 export interface ExtractionConfig {
   /** A directory of `.sql` files, or a function returning the migrations in order. */
@@ -103,6 +128,8 @@ export interface ExtractionConfig {
   readonly out: OutputConfig;
   /** The live databases `drift` can compare, by environment name. */
   readonly drift?: Readonly<Record<string, DriftEnvironment>>;
+  /** The declared resources and storage codecs `rules --check` runs. */
+  readonly rules?: RulesConfig;
 }
 
 /** The schemas read when the configuration names none (SPEC 15). */
@@ -123,7 +150,9 @@ export function catalogFile(
  * duplicate, or overlong schema name, an empty or duplicate
  * `out.public.tables`, an interface name outside `^[A-Z][A-Za-z0-9_]*$` or
  * shared by both modules, or a drift environment name outside
- * `^[A-Za-z0-9][A-Za-z0-9_-]*$`. URL functions are not called.
+ * `^[A-Za-z0-9][A-Za-z0-9_-]*$`, or a `rules.registry` or storage codec
+ * member that is not a function. URL functions and the registry function
+ * are not called.
  */
 export function defineExtraction(config: ExtractionConfig): ExtractionConfig {
   validateConfig(config);

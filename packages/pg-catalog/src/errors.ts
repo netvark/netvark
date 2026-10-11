@@ -21,9 +21,11 @@ export type PgCatalogErrorCode =
   | 'name_collision'
   | 'camel_case_mismatch'
   | 'catalog_unreadable'
-  | 'catalog_format';
+  | 'catalog_format'
+  | 'resource_core_missing'
+  | 'registry_invalid';
 
-/** A failure of an extraction, check, or drift command. */
+/** A failure of an extraction, check, drift, or rules command. */
 export class PgCatalogError extends Error {
   readonly code: PgCatalogErrorCode;
 

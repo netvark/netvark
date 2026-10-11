@@ -49,6 +49,7 @@ describe('package surface (SPEC 1)', () => {
     expect(Object.keys(testing).toSorted()).toEqual([
       'boundaryFixtures',
       'contractFixture',
+      'oracleCases',
       'storageContract',
     ]);
   });

@@ -33,13 +33,14 @@ Contents
 
 Two packages (ADR 0002). `@netvark/catalog-core` is the model and the pure functions over it; it has
 no dependencies and runs anywhere the other cores run. `@netvark/pg-catalog` replays, extracts,
-renders, compares, and runs the CLI; it depends on `@netvark/catalog-core` (and re-exports all of
-it) and on `pg`, and takes `@electric-sql/pglite` as an optional peer dependency.
+renders, compares, checks declared resources against the database (10.3), and runs the CLI; it
+depends on `@netvark/catalog-core` (and re-exports all of it) and on `pg`, and takes
+`@electric-sql/pglite` and `@netvark/resource-core` as optional peer dependencies.
 
-| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `toCamelCase`, `toSnakeCase`, `CATALOG_FORMAT`; and the types of sections 2 to 4 and 9.2 (`CamelCaseOptions`, `Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`) |
-| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `CatalogFileConfig`, `PublicFileConfig`, `CatalogModuleOptions`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `PgCatalogErrorCode`; and the `pg-catalog` bin                                                                                            |
+| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `toCamelCase`, `toSnakeCase`, `CATALOG_FORMAT`; and the types of sections 2 to 4 and 9.2 (`CamelCaseOptions`, `Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`)                                            |
+| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `checkRules`, `formatRules`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `CatalogFileConfig`, `PublicFileConfig`, `CatalogModuleOptions`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `RulesConfig`, `RulesStorageCodec`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `RulesOptions`, `RulesReport`, `RuleCaseReport`, `RuleDisagreement`, `PgCatalogErrorCode`; and the `pg-catalog` bin |
 
 `e2e/catalog/package-surface.e2e.test.ts` asserts the exact value export lists against the built
 packages and that the re-exports are the core's own bindings.
@@ -64,6 +65,7 @@ packages/pg-catalog/src/
   errors.ts                    PgCatalogError, isPgCatalogError() (12)
   config.ts                    defineExtraction(), the config types (11.1)
   config-validate.ts           validateConfig(): the checks defineExtraction runs (11.1)
+  config-options.ts            the option checks validateConfig() composes (11.1)
   config-file.ts               findConfigFile(), loadConfigFile() (11.1)
   migrations/order.ts          orderMigrations(), naturalCompare() (5)
   migrations/load.ts           loadMigrations() (5)
@@ -71,6 +73,8 @@ packages/pg-catalog/src/
   target/session.ts            SqlSession, SESSION_SETTINGS, useSession() (6, 7.1)
   target/pglite.ts             openPglite() (6.1)
   target/server.ts             openThrowawayDatabase(), openLiveDatabase() (6.2, 10.2)
+  target/open-target.ts        openTarget(): the replay target a configuration names (6)
+  target/failure.ts            failureOf(), failureMessage(): a PostgreSQL error's fields (6.3, 10.3)
   replay.ts                    replay(), lineAndColumn() (6.3)
   extract/names.ts             referenceName(), assertSafeKey(), sortedRecord() (2.1, 2.10)
   extract/queries.ts           the extraction SQL by server version (7.2)
@@ -100,6 +104,15 @@ packages/pg-catalog/src/
   commands/extract.ts          extractCatalog(), extract() (10.1)
   commands/drift.ts            introspectCatalog(), drift() (10.2)
   commands/format-diff.ts      formatDiff() (10.2)
+  commands/rules.ts            checkRules() (10.3)
+  commands/format-rules.ts     formatRules() (10.3)
+  commands/show-value.ts       showValue(): a fixture's value in a report (10.3)
+  oracle/oracle-module.ts      OracleModule, importOracle(): the optional resource-core peer (10.3)
+  oracle/probe-sql.ts          the probe, template, and attempt function SQL (10.3)
+  oracle/probe.ts              buildProbe(), dropProbe() (10.3)
+  oracle/attempt.ts            installAttempt(), attempt(): the database's verdicts (10.3)
+  oracle/run-cases.ts          runCases() (10.3)
+  oracle/report.ts             RulesReport, RuleCaseReport, RuleDisagreement (10.3)
   cli/arguments.ts             parseCommand(), USAGE, UsageError (11.2)
   cli/main.ts                  runCli() (11.2)
 ```
@@ -981,12 +994,110 @@ six spaces, with its path inside the object and `expected <json>, actual <json>`
 Catalog. The text is for people and may change between minor versions; the CLI's `--json` output
 (the `CatalogDiff` itself) is the stable machine format.
 
-### 10.3 rules --check (planned, #19)
+### 10.3 rules --check (`commands/rules.ts`, `oracle/`, `commands/format-rules.ts`, ADR 0012)
 
-The oracle runs every rule's generated boundary values and every validator's fixtures through Zod
-and through `SELECT (<expression with the subject replaced by $1::type>)` in a replayed database. It
-reads fixtures from the resource registry, so it ships after `@netvark/resource-core`, with its own
-section here.
+`checkRules(config, { cwd })` runs the fixtures of the declared resources through their schemas and
+through the database the migrations build, and reports where the two disagree. The cases come from
+`oracleCases` of `@netvark/resource-core/testing` (resource SPEC 7.3): each names a probe (copies of
+a table's columns holding some of its CHECKs, or a value of a domain), and each fixture carries the
+texts to write and a judge of the database's verdict. This package builds the probes, writes the
+texts, and hands each verdict to its judge; what the schemas say is resource-core's to decide.
+
+1. Without `config.rules`, it fails with `config_invalid`
+   (`rules is not configured: set rules.registry to a function that returns the declared resources`).
+2. It imports `@netvark/resource-core/testing`; an optional peer dependency (14) that cannot be
+   loaded fails with `resource_core_missing`
+   (`rules --check needs @netvark/resource-core, whose declarations it checks: <reason>`).
+3. It calls and awaits `rules.registry()`. Anything but an array of objects is `registry_invalid`
+   (`rules.registry must return an array of declared resources`); what the function throws is
+   thrown.
+4. `oracleCases(resources, { storage: rules.storage })` builds the cases. A `TypeError` whose
+   message starts with `oracleCases:` or `oracleCases.`, a registry the checks of resource SPEC 4.2
+   refuse or a codec without a storage codec, becomes `registry_invalid` with the message
+   `rules: <message>`; anything else is thrown.
+5. It loads the migrations (5), opens the target (6), replays (6.3), reads the catalog (7) under the
+   configured schemas, runs the cases in order, and closes the target, dropping a server's throwaway
+   database. It returns `{ cases, unusedTables }`.
+
+**The attempt function** (`oracle/probe-sql.ts`, `oracle/attempt.ts`). Before the first case it
+creates `pg_temp.netvark_attempt(template text, fixtures json) returns json` in PL/pgSQL. For each
+fixture, an array of texts and nulls, it runs `execute format(template, variadic texts)` in a block
+with an `exception when others` handler, which PL/pgSQL runs as a subtransaction, and records
+`{ "accepted": true, "stored": [...] }` or `{ "accepted": false, "code": ..., "constraint": ... }`
+from `get stacked diagnostics` (`returned_sqlstate`, `constraint_name`, an empty name read as
+`null`). A case's fixtures take one query, and no refusal reaches the client: PGlite fails every
+statement after about 1,800 errors returned to the client on one instance, and the tests run 3,000
+refusals through one. @ref
+https://www.postgresql.org/docs/18/plpgsql-control-structures.html#PLPGSQL-ERROR-TRAPPING @ref
+https://github.com/electric-sql/pglite/issues/1115
+
+**The template** is
+`insert into pg_temp.netvark_probe ("a", "b") values (%L, %L) returning array["a"::text, "b"::text]`,
+with `%` doubled in quoted identifiers. `format`'s `%L` writes each text as a quoted literal, or
+`NULL`, so the column reads it with its input function and assignment semantics, as it reads an
+untyped parameter: `'abcd'` into `varchar(3)` is refused with 22001, `'1.005'` into `numeric(5,2)`
+is stored as `1.01`. An explicit cast would truncate the first. @ref
+https://www.postgresql.org/docs/18/functions-string.html#FUNCTIONS-STRING-FORMAT
+
+**The probe** (`oracle/probe.ts`) is `create temporary table netvark_probe (...)`, read from the
+replayed database rather than the catalog file:
+
+- for a `columns` probe, one column per case column,
+  `"name" <format_type> [collate "schema"."collation"] [not null]`: the column's type with its
+  modifier, so a domain brings its CHECKs and NOT NULL; its collation when it differs from the
+  type's; and NOT NULL when the case keeps it (`notNull`) and the column has it. Each named CHECK
+  follows as `constraint "name" check (<expression>)`, the expression
+  `pg_get_expr(conbin, conrelid)` deparses under the search path extraction pinned (7.1), so a
+  function the CHECK calls resolves as it did. The table's other CHECKs, its keys, and its foreign
+  keys are not copied;
+- for a `domain` probe, one column `"value"` of the domain, qualified, so its CHECKs and NOT NULL
+  judge every fixture.
+
+A table, column, CHECK (a CHECK constraint of the table by that name), or domain the replayed
+database does not hold is the case's `problem`, reported instead of run:
+`the replayed database has no table <t>`, `no column <t>.<c>`, `no CHECK <name> on <t>`, or
+`no domain <d>`. A probe PostgreSQL refuses to create is
+`the probe could not be built: <message> (SQLSTATE <code>)`. The probe is dropped after its case.
+
+**Fixtures** (`oracle/run-cases.ts`). An unwritable fixture (resource SPEC 7.3) is a disagreement
+with its own reason and is never sent. A writable fixture's texts go as the drivers send a
+parameter: as UTF-8, so an unpaired surrogate arrives as U+FFFD; a text holding U+0000 gets the
+verdict PostgreSQL gives it on arrival, `22021` with no constraint, without being sent, since JSON
+could not carry it into a text either. Each verdict goes to the fixture's judge, and a reason it
+returns is a disagreement. @ref https://www.postgresql.org/docs/18/multibyte.html
+
+```ts
+interface RulesReport {
+  readonly cases: ReadonlyArray<RuleCaseReport>; // in the order of oracleCases
+  readonly unusedTables: ReadonlyArray<string>;
+}
+interface RuleCaseReport {
+  readonly subject: string; // `contacts.email`, `meetings.during (codec timeRange)`
+  readonly kind: 'field' | 'relationship' | 'validator' | 'codec';
+  readonly fixtures: number;
+  readonly problem: string | null; // why the case could not run
+  readonly disagreements: ReadonlyArray<RuleDisagreement>;
+}
+interface RuleDisagreement {
+  readonly label: string; // `maxLength 40, plus one`, `reject[0]`
+  readonly value: unknown; // the fixture as the schema saw it
+  readonly reason: string; // `the schema accepts it; the database refuses it (23514 teams_name_check)`
+}
+```
+
+`unusedTables` lists, in configuration order, the tables of `out.public.tables` that no declared
+resource reads: the public catalog ships them to browsers, but no resource serves them.
+
+`formatRules(report)` gives the summary line, `<n> cases, <m> fixtures: no disagreements`, or with
+`<d> disagreements` and `<c> cases could not run` joined by `, `; then, after a blank line, each
+case with a problem or a disagreement: its subject, then `  could not run: <problem>` or one line
+per disagreement, `  <label> <value>: <reason>`; then, after a blank line,
+`warning: out.public.tables lists <table>, which no declared resource reads` for each unused table.
+A value is JSON where JSON writes it as itself, and JavaScript's notation where it does not (`NaN`,
+`-0`, `10n`, `undefined`, `Symbol(x)`, `[function f]`, `Date(2026-01-05T09:00:00.000Z)`, `[cycle]`
+where an object holds itself; `commands/show-value.ts`), since a registry's fixtures are any values;
+it is cut after 60 code points with `…`, and a string's with its length, `(70 characters)`. The text
+is for people and may change between minor versions; the report is the format for machines.
 
 ---
 
@@ -1001,6 +1112,7 @@ interface ExtractionConfig {
   readonly schemas?: ReadonlyArray<string>; // default ['public']; the first is the default schema
   readonly out: OutputConfig;
   readonly drift?: Readonly<Record<string, DriftEnvironment>>;
+  readonly rules?: RulesConfig;
 }
 type MigrationSource = () => ReadonlyArray<Migration> | Promise<ReadonlyArray<Migration>>;
 interface Migration {
@@ -1047,7 +1159,21 @@ interface CamelCaseOptions {
 interface DriftEnvironment {
   readonly url: string | (() => string | undefined);
 }
+interface RulesConfig {
+  readonly registry: () => ReadonlyArray<object> | Promise<ReadonlyArray<object>>; // the declared resources
+  readonly storage?: Readonly<Record<string, RulesStorageCodec>>; // by codec name
+}
+interface RulesStorageCodec {
+  readonly read: (stored: string) => unknown; // the text PostgreSQL prints, to the codec's value
+  readonly write: (value: never) => string; // the codec's value, to the text PostgreSQL reads
+}
 ```
+
+`rules.registry` returns the resources `declareResource` built, typically by importing the module
+that lists them, so only `rules --check` loads the declarations and the schemas they import.
+`rules.storage` gives a storage codec over text for every codec a declared field names (resource
+SPEC 7.1): the oracle writes text and reads text, whatever the driver of the application's own
+storage adapter converts.
 
 `defineExtraction` validates eagerly and returns the config unchanged; a mistake throws `TypeError`
 naming the option. It rejects unknown keys at every level (a misspelled `postgres:` fails instead of
@@ -1056,12 +1182,14 @@ that are empty, longer than 63 bytes, starting with `pg_`, or equal to `informat
 duplicate schemas or public tables, an empty `public.tables`, an interface name outside
 `INTERFACE_NAME` (9.1) or one both modules share
 (`out.public.interface must differ from the catalog's interface, ExtractedCatalog`), and environment
-names outside `^[A-Za-z0-9][A-Za-z0-9_-]*$`. Each message starts with `defineExtraction: ` and names
-the option by its path (`out.types.camelCase.upperCase must be a boolean`); an option set to
-`undefined` counts as absent, as a JavaScript configuration may write it. URL functions are called
-only when a command needs the URL, so a missing environment variable only fails the command that
-needs it. Relative paths resolve against the configuration file's directory, or the `cwd` option of
-the programmatic API.
+names outside `^[A-Za-z0-9][A-Za-z0-9_-]*$`, a `rules.registry` that is not a function, and a
+storage codec whose `read` or `write` is not one (`rules.storage.vector.write must be a function`);
+the registry is not called. Each message starts with `defineExtraction: ` and names the option by
+its path (`out.types.camelCase.upperCase must be a boolean`); an option set to `undefined` counts as
+absent, as a JavaScript configuration may write it. URL functions are called only when a command
+needs the URL, so a missing environment variable only fails the command that needs it. Relative
+paths resolve against the configuration file's directory, or the `cwd` option of the programmatic
+API.
 
 The CLI loads `--config <file>`, or else the first of `netvark.config.ts`, `netvark.config.mts`,
 `netvark.config.js`, and `netvark.config.mjs` in the working directory, with a dynamic `import()`;
@@ -1077,6 +1205,7 @@ the message says what to do instead. @ref https://nodejs.org/api/typescript.html
 ```
 pg-catalog extract [--check] [--config <file>]
 pg-catalog drift --env <name> [--json] [--config <file>]
+pg-catalog rules --check [--config <file>]
 pg-catalog --help
 pg-catalog --version
 ```
@@ -1093,16 +1222,19 @@ https://nodejs.org/api/util.html#utilparseargsconfig
   directory, and the configuration's own paths against its directory.
 - `drift` prints `formatDiff` (10.2), or with `--json` the `CatalogDiff` as JSON indented by two
   spaces.
+- `rules --check` prints `formatRules` (10.3). `rules` has no form that writes, so without `--check`
+  it is a usage error (`rules needs --check`), as are `--env` and `--json`.
 - A missing or unknown command, an extra argument, an option the command does not take, and `drift`
   without `--env` are usage errors, followed by `Run pg-catalog --help for usage.` A
   `PgCatalogError` prints its message. Any other error, such as one a function of the configuration
   throws, prints its stack.
 
-| Command           | 0                        | 1                          | 2                                                       |
-| ----------------- | ------------------------ | -------------------------- | ------------------------------------------------------- |
-| `extract`         | files written or current | (never)                    | usage error, configuration, replay, or database failure |
-| `extract --check` | every file current       | a file is stale or missing | as above                                                |
-| `drift`           | no differences           | differences                | as above, or an unreadable committed catalog            |
+| Command           | 0                        | 1                                            | 2                                                            |
+| ----------------- | ------------------------ | -------------------------------------------- | ------------------------------------------------------------ |
+| `extract`         | files written or current | (never)                                      | usage error, configuration, replay, or database failure      |
+| `extract --check` | every file current       | a file is stale or missing                   | as above                                                     |
+| `drift`           | no differences           | differences                                  | as above, or an unreadable committed catalog                 |
+| `rules --check`   | no disagreements         | a disagreement, or a case that could not run | as `extract`, or a registry that cannot be loaded or checked |
 
 ---
 
@@ -1112,22 +1244,24 @@ Commands throw `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a
 object or file involved, and the PostgreSQL error as `cause` where there is one. The CLI exits 2 on
 all of them. `defineExtraction` and `toPublicCatalog` throw `TypeError` for programming mistakes.
 
-| `code`                 | Raised when                                                                                                                                                                                                            |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config_invalid`       | no configuration file, a file that fails to load or validate, an unknown environment, a URL function returning nothing, or a malformed contrib extension name                                                          |
-| `pglite_missing`       | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist                                                                                                      |
-| `migrations_invalid`   | the directory is missing or holds no migrations, or two Flyway migrations share a version or a repeatable description                                                                                                  |
-| `migration_failed`     | a migration fails during replay                                                                                                                                                                                        |
-| `connection_failed`    | connecting, creating, or dropping a database fails; the message ends with the driver's or the server's reason (`connect ECONNREFUSED 127.0.0.1:5432`, `database "app" does not exist`), which never holds the password |
-| `unsupported_server`   | the server is older than PostgreSQL 14, or returns a catalog code this version does not know                                                                                                                           |
-| `schema_usage`         | the drift role lacks `USAGE` on a configured schema                                                                                                                                                                    |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                                                                                  |
-| `duplicate_key`        | two objects map to the same reference name                                                                                                                                                                             |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                                                                            |
-| `name_collision`       | two objects map to the same TypeScript name                                                                                                                                                                            |
-| `camel_case_mismatch`  | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                                                                                  |
-| `catalog_unreadable`   | the committed catalog file is missing or not a catalog module                                                                                                                                                          |
-| `catalog_format`       | the committed catalog was written in another `format`                                                                                                                                                                  |
+| `code`                  | Raised when                                                                                                                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config_invalid`        | no configuration file, a file that fails to load or validate, an unknown environment, a URL function returning nothing, or a malformed contrib extension name                                                          |
+| `pglite_missing`        | the PGlite target is used and `@electric-sql/pglite` is not installed, or a contrib extension name does not exist                                                                                                      |
+| `migrations_invalid`    | the directory is missing or holds no migrations, or two Flyway migrations share a version or a repeatable description                                                                                                  |
+| `migration_failed`      | a migration fails during replay                                                                                                                                                                                        |
+| `connection_failed`     | connecting, creating, or dropping a database fails; the message ends with the driver's or the server's reason (`connect ECONNREFUSED 127.0.0.1:5432`, `database "app" does not exist`), which never holds the password |
+| `unsupported_server`    | the server is older than PostgreSQL 14, or returns a catalog code this version does not know                                                                                                                           |
+| `schema_usage`          | the drift role lacks `USAGE` on a configured schema                                                                                                                                                                    |
+| `unsafe_name`           | an object to be written as a key is named `__proto__`                                                                                                                                                                  |
+| `duplicate_key`         | two objects map to the same reference name                                                                                                                                                                             |
+| `public_table_unknown`  | `out.public.tables` names a table the catalog does not hold                                                                                                                                                            |
+| `name_collision`        | two objects map to the same TypeScript name                                                                                                                                                                            |
+| `camel_case_mismatch`   | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                                                                                  |
+| `catalog_unreadable`    | the committed catalog file is missing or not a catalog module                                                                                                                                                          |
+| `catalog_format`        | the committed catalog was written in another `format`                                                                                                                                                                  |
+| `resource_core_missing` | `rules --check` cannot import `@netvark/resource-core/testing`; the message ends with the reason                                                                                                                       |
+| `registry_invalid`      | `rules.registry` returns anything but an array of objects, or `oracleCases` refuses the registry or the storage codecs, with its message after `rules: `                                                               |
 
 ---
 
@@ -1138,15 +1272,16 @@ thresholds of 90% over `packages/*/src/`. Every test names the rule or choice it
 database code, so `@netvark/pg-catalog`'s own tests run it against PGlite in-process, a real
 PostgreSQL 18; nothing is mocked.
 
-| Area                  | Files                                                                                                                                                                                                                                     | What is pinned                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core                  | `public.test.ts`, `public-unique-indexes.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                      | every kept and dropped member, `enforced: false` on NOT ENFORCED, the unique indexes that join the constraints, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                                                                                                                                               |
-| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                           | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                                                                                                                                                                                                                                     |
-| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                         | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                                                                                                                                                                                                                            |
-| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                      | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                                                                                                               |
-| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts` | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                                                                                                        |
-| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                            | exact output text, the named interface and the names refused, parse round trip, the module shape before the interface, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out |
-| Commands, config, CLI | `extract.test.ts`, `extract-interfaces.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `config-validate.test.ts`, `config-validate-out.test.ts`, `config-file.test.ts`, `arguments.test.ts`, `main.test.ts`           | statuses, writes only on change, the configured interfaces, every validation message, loading each kind of configuration file, every usage error, output and exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                                                                        |
+| Area                  | Files                                                                                                                                                                                                                                                                                  | What is pinned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Core                  | `public.test.ts`, `public-unique-indexes.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                                   | every kept and dropped member, `enforced: false` on NOT ENFORCED, the unique indexes that join the constraints, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                                                                                                                                                                                                                     |
+| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                                                                        | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                                                                      | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                                                                   | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                                                                                                                                                                                     |
+| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts`                                              | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                                                                                                                                                                              |
+| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                                                                         | exact output text, the named interface and the names refused, parse round trip, the module shape before the interface, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out                                                                       |
+| Commands, config, CLI | `extract.test.ts`, `extract-interfaces.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `config-validate.test.ts`, `config-validate-out.test.ts`, `config-validate-rules.test.ts`, `config-file.test.ts`, `arguments.test.ts`, `main.test.ts`, `main-rules.test.ts` | statuses, writes only on change, the configured interfaces, every validation message, loading each kind of configuration file, every usage error, output and exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                                                                                                                                              |
+| Rules oracle          | `probe.test.ts`, `attempt.test.ts`, `run-cases.test.ts`, `rules.test.ts`, `format-rules.test.ts`, `show-value.test.ts`                                                                                                                                                                 | a probe's types, modifiers, collations, NOT NULL kept or left out, only the named CHECKs, an application function a CHECK calls, quoted and `%` names, a domain, and each problem; assignment semantics, every refusal's SQLSTATE and constraint, U+0000 and unpaired surrogates, 3,000 refusals on one PGlite; `checkRules` over a registry of every case kind finding no disagreement, then a faulty validator, a faulty codec, and stale migrations, each error, on PGlite and a server; the exact report text and every value notation |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -1169,6 +1304,11 @@ produce for them, reviewed by hand, and `db-camel.ts`, the types rendered with `
 | `rules.e2e.test.ts`           | the public catalog's rules enforced as a client would: each value's verdict equals the database's evaluation of the recorded CHECK, for tables and domains, and the rules are literal types                                                                                                                                                                                           |
 | `cli.e2e.test.ts`             | the built bin run as a package manager runs it, in a temporary project whose configuration imports `defineExtraction`: `--version`, the three files byte for byte, `--check` passing and then failing on a hand edit, `drift` output and exit codes on PGlite over a socket and on the server, a missing URL variable, and a TypeScript configuration with and without type stripping |
 
+`rules --check` reads declarations, so its end-to-end tests live with `@netvark/resource-core`'s
+(resource SPEC 15.4): `e2e/resource/rules.e2e.test.ts` runs `checkRules` over the oracle's and the
+contacts application's declarations, on PGlite and on the server, and finds no disagreement, and
+finds each fault it plants; `rules-cli.e2e.test.ts` runs the built bin.
+
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `drift` against
 PGlite behind a socket server, and `toPublicCatalog` and `diffCatalogs` in workerd. CI runs the
 suite on Node.js 22 and 24, and again with `CATALOG_PG_URL` against PostgreSQL 14 and 18 services,
@@ -1183,8 +1323,9 @@ where `server.e2e.test.ts`, `kysely.e2e.test.ts`, and `drift.e2e.test.ts` reach 
 - `@netvark/catalog-core`: `platform: 'neutral'`, no dependencies, `sideEffects: false`.
 - `@netvark/pg-catalog`: `platform: 'node'`, two entries (`index` and `cli`), `bin` `pg-catalog`
   pointing at `dist/cli.mjs` with a `#!/usr/bin/env node` line, dependencies `@netvark/catalog-core`
-  (`workspace:^`) and `pg`, `@electric-sql/pglite` `^0.5.0` as an optional peer dependency, and
-  `sideEffects` listing only the bin.
+  (`workspace:^`) and `pg`, `@electric-sql/pglite` `^0.5.0` and `@netvark/resource-core` `^0.1.0` as
+  optional peer dependencies (`rules --check` imports the latter on demand, so `extract` and `drift`
+  never load it), and `sideEffects` listing only the bin.
 - The `exports` maps, `source` conditions, `publishConfig`, `files`, and release flow follow the
   keyset family (its SPEC 12).
 

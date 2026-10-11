@@ -47,11 +47,19 @@ export type ValueForm =
   | { readonly kind: 'array'; readonly element: ValueSpec }
   | { readonly kind: 'codec'; readonly name: string; readonly codec: Codec };
 
-/** A validator a value runs through, and the code its issues carry (SPEC 6.4). */
+/** The CHECK a validator stands for: a table's, or a domain's. */
+interface ValidatorCheck {
+  /** The domain's reference name, or `null` for a table's CHECK. */
+  readonly domain: string | null;
+  readonly constraint: string;
+}
+
+/** A validator a value runs through, the code its issues carry (SPEC 6.4), and the CHECK it stands for. */
 export interface ValidatorUse {
   readonly name: string;
   readonly validator: Validator;
   readonly code: string;
+  readonly check: ValidatorCheck;
 }
 
 /** A value's base, its folded limits, its options, and its validators. */

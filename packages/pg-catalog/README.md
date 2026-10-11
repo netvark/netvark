@@ -4,7 +4,8 @@ Your PostgreSQL schema as committed TypeScript. It replays your SQL migrations i
 (PGlite in-process, or a throwaway database on a server), reads PostgreSQL's own catalog, and writes
 it as an `as const` module: every table, column, constraint, index, row security policy, enum, and
 domain, written deterministically so the file is reviewed with the migration that changed it. From
-the same catalog it writes your Kysely types, and `drift` compares a live database with it. Every
+the same catalog it writes your Kysely types, `drift` compares a live database with it, and
+`rules --check` proves that the schemas of your declared resources agree with the database. Every
 choice is specified in
 [`docs/catalog/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/catalog/SPEC.md).
 
@@ -17,8 +18,8 @@ pnpm add -D @netvark/pg-catalog @electric-sql/pglite
 Node 22.12+, Bun, and Deno. It depends on [`pg`](https://node-postgres.com) and on
 [`@netvark/catalog-core`](https://www.npmjs.com/package/@netvark/catalog-core), which it re-exports
 in full. `@electric-sql/pglite` (0.5, PostgreSQL 18) is an optional peer dependency: leave it out
-when you extract against a server. The generated files import nothing, so neither package reaches
-your application bundle.
+when you extract against a server. So is `@netvark/resource-core`, which only `rules --check` loads.
+The generated files import nothing, so neither package reaches your application bundle.
 
 ## Quick start
 
@@ -63,20 +64,24 @@ catalog.tables.contacts.constraints.contacts_organization_id_fkey.references;
 ```text
 pg-catalog extract [--check] [--config <file>]
 pg-catalog drift --env <name> [--json] [--config <file>]
+pg-catalog rules --check [--config <file>]
 pg-catalog --help
 pg-catalog --version
 ```
 
-| Command           | Exits 0                  | Exits 1                    | Exits 2          |
-| ----------------- | ------------------------ | -------------------------- | ---------------- |
-| `extract`         | files written or current | never                      | it could not run |
-| `extract --check` | every file current       | a file is stale or missing | it could not run |
-| `drift`           | no differences           | differences                | it could not run |
+| Command           | Exits 0                  | Exits 1                                      | Exits 2          |
+| ----------------- | ------------------------ | -------------------------------------------- | ---------------- |
+| `extract`         | files written or current | never                                        | it could not run |
+| `extract --check` | every file current       | a file is stale or missing                   | it could not run |
+| `drift`           | no differences           | differences                                  | it could not run |
+| `rules --check`   | no disagreements         | a disagreement, or a case that could not run | it could not run |
 
 `extract` prints one line per file: its status (`written`, `unchanged`, `stale`, or `missing`) and
 its path. `drift` prints the differences, or with `--json` the `CatalogDiff` itself (see
-[Drift](#drift)). Failures go to standard error as `pg-catalog: <message>`, and a mistake in the
-arguments adds a pointer to `--help`.
+[Drift](#drift)). `rules --check` prints each disagreement (see
+[Checking declarations against the database](#checking-declarations-against-the-database)). Failures
+go to standard error as `pg-catalog: <message>`, and a mistake in the arguments adds a pointer to
+`--help`.
 
 Without `--config`, the CLI loads the first of `netvark.config.ts`, `netvark.config.mts`,
 `netvark.config.js`, and `netvark.config.mjs` in the working directory. Relative paths in it resolve
@@ -422,28 +427,106 @@ and qualifies every name in it, so `drift` stops with `schema_usage` instead of 
 drift. Unknown environments, URL functions that return nothing, and an unreadable committed catalog
 fail before any connection is made.
 
+## Checking declarations against the database
+
+`pg-catalog rules --check` proves that the declared resources of
+[`@netvark/resource-core`](https://www.npmjs.com/package/@netvark/resource-core) agree with the
+database your migrations build. It replays the migrations, writes each fixture into a temporary copy
+of the columns it belongs to, with their types, collations, and the CHECKs that apply, and holds
+PostgreSQL's verdict against the schema's:
+
+- each field's and relationship's boundary values (the empty string, `maxLength` and one past it, a
+  type's limits, an unpaired surrogate): a value the schema accepts must be stored as itself, and
+  one it refuses must be refused;
+- each validator's fixtures: an `accept` fixture must be stored, and a `reject` fixture refused by
+  the CHECK the validator stands for, not by the column's type;
+- each codec's fixtures: written through its storage codec, stored, and read back as the same value.
+
+```ts
+// netvark.config.ts
+import { defineExtraction } from '@netvark/pg-catalog';
+
+import { timeRangeText } from './src/storage/time-range-text.ts';
+
+export default defineExtraction({
+  migrations: 'db/migrations',
+  out: {
+    catalog: 'src/generated/catalog.ts',
+    public: { file: 'src/generated/public-catalog.ts', tables: ['meetings', 'contact_phones'] },
+  },
+  rules: {
+    registry: async () => (await import('./src/resources/index.ts')).resources,
+    storage: { timeRange: timeRangeText },
+  },
+});
+```
+
+```bash
+pnpm add -D @netvark/resource-core   # if it is not a dependency already
+pnpm exec pg-catalog rules --check   # exit 1 on a disagreement
+```
+
+On the repository's contacts application, with a `lowercase` validator that also refuses digits and
+a codec fixture written with an offset, it reports:
+
+```text
+3 cases, 12 fixtures: 2 disagreements
+
+meetings CHECK meetings_room_lowercase (validator lowercase)
+  reject[1] "lobby-2": the validator refuses it; the database accepts it
+meetings.during (codec timeRange)
+  fixtures[0] {"start":"2026-03-02T09:00:00+01:00","end":"2026-03-02T10:30…: the database stores ["2026-03-02 08:00:00+00","2026-03-02 09:30:00+00"), which reads back as {"start":"2026-03-02T08:00:00Z","end":"2026-03-02T09:30:00Z"}
+
+warning: out.public.tables lists contact_phones, which no declared resource reads
+```
+
+The CHECK `room = lower(room)` holds `lobby-2`, so the validator would tell a client that a room the
+database takes is invalid; and `tstzrange` keeps instants, not offsets, so the fixture does not read
+back as written. Each line gives the fixture's label, its value, and how the two disagree. A case
+whose table, column, CHECK, or domain the migrations do not create, as with a catalog older than the
+migrations, is reported as `could not run` and fails the check too. A table of `out.public.tables`
+that no declaration reads gets a warning, which does not.
+
+A storage codec over text does what your storage adapter's codec does, in the text PostgreSQL reads
+and prints rather than the driver's values: `write` turns the codec's value into the text a column
+of its type reads, and `read` turns the text it prints, in a UTC session with ISO dates, back into
+the value. For pgvector's `vector`:
+
+```ts
+const vectorText = {
+  write: (values: ReadonlyArray<number>): string => `[${values.join(',')}]`,
+  read: (stored: string): unknown => JSON.parse(stored), // [0.25,-1,3]
+};
+```
+
+From code, `checkRules(config, { cwd })` returns the report, `{ cases, unusedTables }`, with each
+case's subject, fixture count, problem, and disagreements, and `formatRules(report)` gives the text,
+which may change between minor versions.
+
 ## Errors
 
 Every failure is a `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a message naming
 the object or file, and PostgreSQL's error as `cause` where there is one. The CLI prints the message
 and exits 2. `defineExtraction` throws a `TypeError` instead, since its mistakes are in the code:
 
-| `code`                 | When                                                                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `config_invalid`       | no configuration file, a file that fails to load or validate, a URL function returned nothing, an unknown drift environment, or a malformed contrib extension name |
-| `pglite_missing`       | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                                                                        |
-| `migrations_invalid`   | the directory is missing or empty, or two Flyway migrations share a version                                                                                        |
-| `migration_failed`     | a migration fails during replay                                                                                                                                    |
-| `connection_failed`    | connecting to the server, or creating or dropping the throwaway database, fails; the message gives the reason, never the URL                                       |
-| `unsupported_server`   | the server is older than PostgreSQL 14                                                                                                                             |
-| `schema_usage`         | the role `drift` connects as lacks `USAGE` on a configured schema                                                                                                  |
-| `unsafe_name`          | an object to be written as a key is named `__proto__`                                                                                                              |
-| `duplicate_key`        | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                                                                               |
-| `public_table_unknown` | `out.public.tables` names a table the catalog does not hold                                                                                                        |
-| `name_collision`       | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                                                                                |
-| `camel_case_mismatch`  | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                                                                      |
-| `catalog_unreadable`   | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module                                                   |
-| `catalog_format`       | `parseCatalogModule` was given a catalog written in another format                                                                                                 |
+| `code`                  | When                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config_invalid`        | no configuration file, a file that fails to load or validate, a URL function returned nothing, an unknown drift environment, or a malformed contrib extension name |
+| `pglite_missing`        | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                                                                        |
+| `migrations_invalid`    | the directory is missing or empty, or two Flyway migrations share a version                                                                                        |
+| `migration_failed`      | a migration fails during replay                                                                                                                                    |
+| `connection_failed`     | connecting to the server, or creating or dropping the throwaway database, fails; the message gives the reason, never the URL                                       |
+| `unsupported_server`    | the server is older than PostgreSQL 14                                                                                                                             |
+| `schema_usage`          | the role `drift` connects as lacks `USAGE` on a configured schema                                                                                                  |
+| `unsafe_name`           | an object to be written as a key is named `__proto__`                                                                                                              |
+| `duplicate_key`         | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                                                                               |
+| `public_table_unknown`  | `out.public.tables` names a table the catalog does not hold                                                                                                        |
+| `name_collision`        | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                                                                                |
+| `camel_case_mismatch`   | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                                                                      |
+| `catalog_unreadable`    | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module                                                   |
+| `catalog_format`        | `parseCatalogModule` was given a catalog written in another format                                                                                                 |
+| `resource_core_missing` | `rules --check` cannot load `@netvark/resource-core`                                                                                                               |
+| `registry_invalid`      | `rules.registry` returned anything but a list of declared resources, or the declarations or storage codecs are refused, such as a codec without a storage codec    |
 
 ## Best practices
 
@@ -452,8 +535,23 @@ and exits 2. `defineExtraction` throws a `TypeError` instead, since its mistakes
   flags the empty interface that names the catalog.
 - **Name the interfaces after the application.** `interface: 'ContactsCatalog'` says which catalog a
   compile error is about, which matters once a repository holds more than one.
-- **Run the check in CI.** `pg-catalog extract --check` writes nothing and exits 1 when a migration
-  changed and the files were not extracted again.
+- **Run the checks in CI.** `pg-catalog extract --check` writes nothing and exits 1 when a migration
+  changed and the files were not extracted again, and `pg-catalog rules --check` exits 1 when a
+  schema and the database disagree. Both run against PGlite with no secrets.
+- **Load the registry lazily.** Import the declarations inside `rules.registry`, as in
+  `async () => (await import('./src/resources/index.ts')).resources`: then only `rules --check`
+  loads them, Zod, and what they import, and `extract` and `drift` stay fast.
+- **Write codec fixtures as the database gives them back.** A codec's fixture is a round-trip value:
+  write instants in UTC (`2026-03-02T08:00:00Z`, not `09:00:00+01:00`), numbers at the precision the
+  column keeps, and a vector with the dimensions its column declares.
+- **Write storage codecs over PostgreSQL's text.** The check writes literals and reads `::text`, so
+  a storage codec in `rules.storage` handles `{a,b}`, `\x0102`, and `2026-03-02 08:00:00+00`,
+  whatever your driver parses them into.
+- **Give validators values of their column.** A `reject` fixture the column's type refuses, such as
+  `'x'` for an `integer`, says nothing of the CHECK, so it is reported; a fixture with no text form,
+  such as a symbol, is reported as unwritable, never sent.
+- **Treat a warning as a review question.** A public table that no declaration reads ships its
+  structure to browsers without an API to serve it: declare it, or drop it from `public.tables`.
 - **Keep URLs and passwords out of the configuration file.** Write `url: () => process.env['X']`:
   the function runs only in the command that needs it, so extraction and the check need no secrets,
   and the file can be committed.

@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util';
 export const USAGE: string = `Usage:
   pg-catalog extract [--check] [--config <file>]
   pg-catalog drift --env <name> [--json] [--config <file>]
+  pg-catalog rules --check [--config <file>]
   pg-catalog --help
   pg-catalog --version
 
@@ -20,12 +21,16 @@ Commands:
   drift    Compare the database of a drift environment with the committed
            catalog, and exit 1 when they differ. --json prints the
            differences as JSON.
+  rules    With --check, run every fixture of the declared resources
+           through their schemas and through the replayed database, and
+           exit 1 when they disagree.
 
 Options:
   --config <file>  The configuration file. Default: the first of
                    netvark.config.ts, .mts, .js, and .mjs here.
 
-Exit codes: 0 current or no drift, 1 stale or drift, 2 could not run.
+Exit codes: 0 current, no drift, or no disagreement; 1 stale, drift, or
+a disagreement; 2 could not run.
 `;
 
 /** What the arguments ask for; `config` is the `--config` path as given. */
@@ -42,7 +47,8 @@ export type CliCommand =
       readonly environment: string;
       readonly json: boolean;
       readonly config: string | undefined;
-    };
+    }
+  | { readonly name: 'rules'; readonly config: string | undefined };
 
 /** A mistake in the arguments, reported with a pointer to `--help`. */
 export class UsageError extends Error {
@@ -124,6 +130,13 @@ export function parseCommand(args: ReadonlyArray<string>): CliCommand {
       json: values.json === true,
       config: values.config,
     };
+  }
+  if (command === 'rules') {
+    refuse(values, ['env', 'json'], 'rules');
+    if (values.check !== true) {
+      throw new UsageError('rules needs --check');
+    }
+    return { name: 'rules', config: values.config };
   }
   throw new UsageError(
     command === undefined ? 'missing command' : `unknown command ${command}`,

@@ -2,8 +2,9 @@
  * `runCli` (SPEC 11.2): runs the command the arguments name, writes results
  * to standard output and errors to standard error as
  * `pg-catalog: <message>`, and returns the exit code: 0 when the files are
- * current or nothing drifted, 1 when a file is stale or the database
- * drifted, 2 when the command could not run.
+ * current, nothing drifted, or the declarations and the database agree; 1
+ * when a file is stale, the database drifted, or they disagree; 2 when the
+ * command could not run.
  * @packageDocumentation
  */
 import type { ExtractionConfig } from '../config';
@@ -15,6 +16,8 @@ import { dirname, relative, resolve } from 'node:path';
 import { drift } from '../commands/drift';
 import { extract } from '../commands/extract';
 import { formatDiff } from '../commands/format-diff';
+import { formatRules } from '../commands/format-rules';
+import { checkRules } from '../commands/rules';
 import { findConfigFile, loadConfigFile } from '../config-file';
 import { isPgCatalogError, PgCatalogError } from '../errors';
 import { parseCommand, USAGE, UsageError } from './arguments';
@@ -97,6 +100,19 @@ async function runDrift(
   return diff.changes.length === 0 ? EXIT_OK : EXIT_DIFFERENT;
 }
 
+async function runRules(
+  command: Extract<CliCommand, { name: 'rules' }>,
+  io: CliIo,
+): Promise<number> {
+  const { config, directory } = await loadConfig(command.config, io.cwd);
+  const report = await checkRules(config, { cwd: directory });
+  io.stdout(`${formatRules(report)}\n`);
+  const failed = report.cases.some(
+    (each) => each.problem !== null || each.disagreements.length > 0,
+  );
+  return failed ? EXIT_DIFFERENT : EXIT_OK;
+}
+
 async function run(args: ReadonlyArray<string>, io: CliIo): Promise<number> {
   const command = parseCommand(args);
   if (command.name === 'help') {
@@ -106,6 +122,9 @@ async function run(args: ReadonlyArray<string>, io: CliIo): Promise<number> {
   if (command.name === 'version') {
     io.stdout(`${version()}\n`);
     return EXIT_OK;
+  }
+  if (command.name === 'rules') {
+    return runRules(command, io);
   }
   return command.name === 'extract'
     ? runExtract(command, io)

@@ -57,8 +57,8 @@ https://tc39.es/ecma262/#sec-regexp-regular-expression-objects
   for the integer types and `numeric`, as the nearest double for `float8`.
 - Every shape has a table-driven test with the exact text PostgreSQL 14 and 18 deparse. An oracle
   test runs values around every bound through the rule and through the database, and every accepted
-  pattern through both engines' matchers; `rules --check` (#19) will run the same comparison over an
-  application's own schema.
+  pattern through both engines' matchers; `rules --check` runs the same comparison over an
+  application's own schema and declarations (ADR 0012).
 
 ## Consequences
 

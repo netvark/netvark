@@ -23,11 +23,13 @@ const CORE = [
 
 const PG_CATALOG = [
   'PgCatalogError',
+  'checkRules',
   'defineExtraction',
   'drift',
   'extract',
   'extractCatalog',
   'formatDiff',
+  'formatRules',
   'introspectCatalog',
   'isPgCatalogError',
   'parseCatalogModule',

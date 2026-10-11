@@ -1,7 +1,9 @@
 // The extraction configuration of the oracle's schema (resource SPEC 15.3).
 // `pg-catalog extract` run in this directory writes catalog.ts and
 // public-catalog.ts; the suite runs `pg-catalog extract --check` here to
-// prove they are current.
+// prove they are current, and `pg-catalog rules --check` to prove the
+// declarations agree with the database. The registry is imported only when
+// rules runs, since the declarations import the catalog extract writes.
 import { defineExtraction } from '@netvark/pg-catalog';
 
 export default defineExtraction({
@@ -35,6 +37,13 @@ export default defineExtraction({
         'others',
         'texts',
       ],
+    },
+  },
+  rules: {
+    registry: async () => {
+      const { KEYS, Links, Numbers, Others, Texts } =
+        await import('../../support/oracle-resources.ts');
+      return [Texts, Numbers, Others, Links, ...KEYS];
     },
   },
 });

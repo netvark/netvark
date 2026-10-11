@@ -142,7 +142,7 @@ async function onServer(
 }
 
 /** The server's `server_version_num`. */
-async function serverVersion(url: string): Promise<number> {
+export async function serverVersion(url: string): Promise<number> {
   const [row] = await onServer(
     url,
     "select current_setting('server_version_num')::int as version",
