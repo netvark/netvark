@@ -213,10 +213,36 @@ export const contacts = defineResource(Contacts, {
 });
 ```
 
-`@netvark/kysely-resource` runs the operations against the storage contract: one transaction per
-operation that sets `app.organization_id` for row security, adds the scope predicate to every
-statement, locks the row an update or a remove decides on, writes only the members a request
-carried, and maps every PostgreSQL rejection to its declared code.
+`@netvark/kysely-resource` runs them on PostgreSQL:
+
+```ts
+const storage = createKyselyStorage({
+  db,
+  catalog: publicCatalog,
+  codecs,
+  defineKeyset,
+  outbox: { table: 'outbox' },
+});
+const runtime = await createResourceRuntime({
+  storage,
+  catalog, // the full catalog: row security policies, indexes, the outbox table
+  resources: { contacts, organizations },
+  unscoped: ['organizations'],
+  scopes: SCOPE_BINDINGS,
+  quotas: QUOTAS,
+  services,
+  errors: APP_ERRORS,
+});
+
+const created = await runtime.as(actor).contacts.create({ attributes: { name: 'Ada' } });
+```
+
+Boot refuses a database where row security would not hold: a scoped table without it, a policy that
+does not read `app.organization_id`, a superuser connection, or a table the role owns without
+`FORCE`. Each operation is one transaction that sets the parameter for that transaction only, adds
+the scope predicate to every statement, locks the row an update or a remove decides on, writes only
+the members a request carried, records its events in an outbox table, and maps every PostgreSQL
+rejection to its declared code. Workers call the same domain HTTP does.
 
 ### 3.7 A migration
 
@@ -265,6 +291,19 @@ codecs, validators, scopes ──createDeclareResource──────┘     
 server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶ hono-resource ──▶ clients
 ```
 
+### 4.4 The runtime
+
+`@netvark/kysely-resource` is two layers. `createKyselyStorage` is the storage adapter of the
+contract: values cross the driver as text both ways, in a session whose printing settings it fixes,
+so no driver parser or client serialization changes a value, and the contract suite proves it on
+PGlite and on servers. `createResourceRuntime` runs the lifecycle over it and is where the tenant
+boundary is enforced three times: the session parameter row security reads, the predicate on every
+statement, and the boot checks, static ones that CI runs from the catalog through
+`checkResourceRuntime` and connected ones at startup that ask the server whether row security
+applies to the role. Effects write events to an outbox table in the operation's transaction;
+`relayOutbox` delivers them after commit, at least once. Cursors are bound to the scope values, so a
+cursor from one tenant is refused in another. ADR 0012 records why.
+
 ## 5. Decisions
 
 | ADR  | Decision                                                                                           |
@@ -280,6 +319,7 @@ server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶
 | 0009 | Messages are functions; the i18n library owns the locale                                           |
 | 0010 | The database resolves the violations a partition raises                                            |
 | 0011 | An id takes what its key's write form takes and is sent in the spelling the server reads back      |
+| 0012 | The runtime runs declared resources over the storage contract, in text, inside row security        |
 
 ## 6. Later
 

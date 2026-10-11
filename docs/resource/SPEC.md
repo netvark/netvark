@@ -1,8 +1,9 @@
 # resource: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/resource-core`; `docs/resource/DESIGN.md` explains
-  the why. The bindings (`@netvark/kysely-resource`, `@netvark/hono-resource`,
-  `@netvark/react-resource`) add their sections when their epics start.
+- Status: normative for the 0.x line of `@netvark/resource-core` and `@netvark/kysely-resource`;
+  `docs/resource/DESIGN.md` explains the why. Each binding adds its sections after the core's when
+  its epic starts, from 18 on, so the core's numbering stays stable: `@netvark/kysely-resource`
+  holds 18, and `@netvark/hono-resource` and `@netvark/react-resource` follow.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source files that implement it and the tests that prove it. When this document and the code
@@ -30,6 +31,7 @@ Contents
 15. Test plan
 16. Packaging
 17. Constants
+18. The Kysely runtime
 
 ---
 
@@ -1945,11 +1947,12 @@ A `StorageListRequest` is keyset-core's `KeysetRequest` without relation filters
 since it has no relations, and what `keysetRequest` builds from a parsed query (11.2). An adapter
 defines that keyset once per resource with the server's configured `createDefineKeyset({ cursor })`,
 which holds the cursor secret the declaration leaves out, and pages with it as
-`@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request)`; one statement over the
-schema-qualified table with the scope's predicate, the plan's `filter` and `seek`, each key selected
-as text under its alias, the keys ordered with their directions and null placement, and the plan's
-`limit`; then `page(plan, rows, values)` over the rows read. Every value of the plan is a parameter
-of its column's type, a cursor's included: its values are the text each key was selected as, so a
+`@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request, { context })` with the
+scope values (obligation 12); one statement over the schema-qualified table with the scope's
+predicate, the plan's `filter` and `seek`, each key selected as text under its alias, the keys
+ordered with their directions and null placement, and the plan's `limit`; then
+`page(plan, rows, values)` over the rows read. Every value of the plan is a parameter of its
+column's type, a cursor's included: its values are the text each key was selected as, so a
 `timestamptz` keeps its microseconds and an `int8` its digits. The plan orders nulls last on a
 forward page, where PostgreSQL's default puts them first when descending. @ref
 https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC order)
@@ -1993,6 +1996,11 @@ An adapter MUST:
     and that table's name for `names.constraint`, or no `constraint` when the table has none; for a
     table that is not a partition, the partitioned table itself included, `undefined`. A
     `constraint` is a string or absent, never `null`, so a SQL `NULL` is left out.
+12. Bind the cursors of `list` to the transaction's scope values: plan with `{ context }`, each
+    scope's name mapped to its value, so a cursor issued in one scope is refused in any other with
+    keyset-core's `INVALID_CURSOR`, reason `context`. Two tenants asking for the same page send the
+    same request, and only the context tells their cursors apart (keyset ADR 0015, resource ADR
+    0012).
 
 ### 12.9 The contract suite (`testing/storage-contract.ts`)
 
@@ -2042,7 +2050,9 @@ type; search in websearch mode, with a filter; the page flags and each row's cur
 resumes after its row though the row was removed since; the page bounds, a size past the max refused
 with keyset-core's `PAGE_SIZE_EXCEEDED`; and logs, which declare no sort, ordered by their `int8`
 key past 2^53 across both partitions, and filtered by their owner. A case of obligation 2 walks each
-workspace's pages. A `list` that rejects fails its case, with the error as the failure's `cause`.
+workspace's pages, and the case of obligation 12 sends a cursor of workspace 1's pages in workspace
+2, where it must be refused with reason `context`. A `list` that rejects fails its case, with the
+error as the failure's `cause`.
 
 Tests: `domain.test-d.ts` (permissions, quotas, codes, fields, and server values as compile errors),
 `policy.test.ts`, `behavior.test.ts`, `scope.test.ts`, `quota.test.ts`, `event.test.ts`,
@@ -3000,3 +3010,417 @@ A CI job runs the package's unit tests with `zod` 4.5.0, the floor of the peer r
 | date years                                   | 0001 to 9999                                                                                                 | no       |
 | Standard Schema vendor                       | `netvark`                                                                                                    | no       |
 | `QUOTA_EXCEEDED`                             | 403, `Quota Exceeded`                                                                                        | no       |
+
+---
+
+## 18. The Kysely runtime (`@netvark/kysely-resource`, `packages/kysely-resource/src/`, ADR 0012)
+
+The runtime runs declared resources on PostgreSQL through Kysely: the storage adapter of 12.8 over
+Kysely, and the lifecycle of 12.3 over that adapter, behind one domain object that HTTP hosts
+(`@netvark/hono-resource`) and workers call alike. Sections 1 to 17 belong to the core and keep
+their numbers; this section holds the runtime's own test plan, packaging, and constants (18.7 to
+18.9).
+
+### 18.1 Public surface and module map
+
+```
+@netvark/kysely-resource
+├── createKyselyStorage(options)    storage/create-storage.ts   the adapter of 12.8 over Kysely (18.2)
+├── checkResourceRuntime(options)   boot/check-runtime.ts       the static boot checks, for CI (18.3)
+├── createResourceRuntime(options)  runtime/create-runtime.ts   every boot check, then the domain (18.3, 18.4)
+└── relayOutbox(options)            outbox/relay.ts             delivery after commit (18.6)
+```
+
+| Module     | Holds                                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `storage/` | the transaction protocol, statements, read forms and parameter text, `list`, quotas, the outbox insert, partitions      |
+| `boot/`    | the static checks (bindings, scopes, row security policies, the outbox table, quotas), index warnings, connected checks |
+| `runtime/` | the domain, input validation, the lifecycle of each operation, includes, and failures                                   |
+| `outbox/`  | `relayOutbox`                                                                                                           |
+
+Types exported: `KyselyStorage`, `KyselyStorageOptions`, `KyselyTransaction`, `TextCodec`,
+`OutboxTable`, `RuntimeOptions`, `ResourceRuntime`, `Domain`, `ResourceOperations`, `ResourceInput`,
+`ListOptions`, `BootReport`, `BootError`, `RelayOptions`, `OutboxEvent`.
+
+### 18.2 The storage adapter: `createKyselyStorage(options)`
+
+```ts
+const storage = createKyselyStorage({
+  db, // the application's Kysely<DB> over PostgreSQL 14 or later, or PGlite
+  catalog: publicCatalog, // the public catalog the declarations are built from
+  codecs: STORAGE_CODECS, // one storage codec per codec name, over PostgreSQL's text (7.1)
+  defineKeyset, // the server's definer with the cursor secret: createDefineKeyset({ cursor })
+  outbox: { table: 'outbox' }, // in the catalog's default schema unless `schema` names another
+});
+```
+
+`KyselyStorage` is `StorageAdapter<KyselyTransaction>` (12.8) plus `many` (18.4), the `total` option
+of `list`, and the `db`, `catalog`, and `outbox` it was created with. A `TextCodec` is
+`{ read(text: string): unknown; write(value: unknown): string }`, the shape of `resources.storage`
+in `netvark.config` (catalog SPEC 10.3), so one object of storage codecs serves `rules --check` and
+the runtime. A codec field without a storage codec throws `Error('no storage codec <name>')` the
+first time the adapter reads or writes it. Creating the adapter runs no query.
+
+Every statement runs on `db.withoutPlugins()`, so an application's plugins, such as
+`CamelCasePlugin`, never rename the adapter's identifiers or result keys. @ref
+https://kysely-org.github.io/kysely-apidoc/classes/Kysely.html#withoutplugins
+
+**Transactions** (obligations 1 and 2). `transaction(scopes, run)` runs
+`db.transaction().setIsolationLevel('read committed').execute(callback)`. Kysely commits when the
+callback resolves, and rolls back and rejects with its error otherwise. The lifecycle's row locks
+(12.3) assume READ COMMITTED, so the level is set rather than inherited from
+`default_transaction_isolation`; PGlite runs one transaction at a time at its default, READ
+COMMITTED, and Kysely's PGlite dialect does not pass a level on. The callback:
+
+1. runs
+   `select set_config('TimeZone', 'UTC', true), set_config('DateStyle', 'ISO, YMD', true), set_config('IntervalStyle', 'postgres', true), set_config('extra_float_digits', '1', true), set_config('bytea_output', 'hex', true)`,
+   so every value prints one way (ADR 0012);
+2. runs `select set_config($1::text, $2::text, true)` for each scope, with its `session` and
+   `String(value)`;
+3. calls `run(tx)`. Each statement the adapter runs on `tx` records the first error it raised. When
+   `run` resolves after such an error, the callback throws that error, since PostgreSQL turns the
+   COMMIT of an aborted transaction into a ROLLBACK that reports no error. When `run` rejects, its
+   error is thrown unchanged.
+
+@ref https://kysely-org.github.io/kysely-apidoc/classes/Kysely.html#transaction @ref
+https://www.postgresql.org/docs/18/sql-set-transaction.html @ref
+https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADMIN-SET @ref
+https://www.postgresql.org/docs/18/runtime-config-client.html
+
+**Statements.** Names are `sql.id` parts, which Kysely's PostgreSQL compiler quotes by doubling `"`;
+a table is `"schema"."name"`. Every value of the adapter's own statements is a parameter sent as a
+string and cast to its column's type, `$n::text::<type>`: the type's reference quoted part by part,
+with `[]` for an array column, so the type's input function reads it as it would read a literal.
+Every selected value is cast to text, `"column"::text as "<public name>"`, and the key as `"id"`. A
+statement on a scoped table carries `"column" = $n::text::<type>` for the transaction's value of the
+resource's scope. A resource without a scope gets no predicate, and runs only when boot allowed it
+(18.3).
+
+**Read forms** (obligation 3). A selected text becomes the read form of 5.1 by its column's type,
+followed through its domains to the base type. A value outside the read form fails the read with
+`Error('<type>.<member>: the stored value has no read form')`; no other value is emitted.
+
+| Type                                                   | Read form                                                                                                        |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `int2`, `int4`                                         | `Number(text)`                                                                                                   |
+| `int8`                                                 | the text                                                                                                         |
+| `numeric`                                              | the text; `NaN` and the infinities have none                                                                     |
+| `float4`, `float8`                                     | `Number(text)`; `NaN` and the infinities have none                                                               |
+| `bool`                                                 | `true` for `true` and `t`, `false` for `false` and `f`: a cast prints the words, an array's elements the letters |
+| `date`                                                 | the text when it is `YYYY-MM-DD`; a BC date, a year past 9999, and the infinities have none                      |
+| `timestamp`                                            | `YYYY-MM-DD HH:MM:SS[.f]` with `T` for the space; anything else has none                                         |
+| `timestamptz`                                          | `YYYY-MM-DD HH:MM:SS[.f]+00` as `YYYY-MM-DDTHH:MM:SS[.f]Z`; anything else has none                               |
+| `json`, `jsonb`                                        | `JSON.parse(text)`; the JSON value `null` at the top has none                                                    |
+| `text`, `varchar`, `bpchar`, `citext`, `uuid`, an enum | the text                                                                                                         |
+| an array of any of these but `json` and `jsonb`        | the array literal read element by element; a `NULL` element or a nested array has none                           |
+
+A codec field's text goes through its storage codec's `read`; a relationship's is the target's id.
+@ref https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO @ref
+https://www.postgresql.org/docs/18/datatype-boolean.html
+
+**Parameter text** (obligation 4). A write's value becomes the text its column's input function
+reads: a string as it is; a number with `String`; a boolean as `true` or `false`; a `json` or
+`jsonb` value with `JSON.stringify`; an array as an array literal whose elements are each
+double-quoted with `\` and `"` escaped; a codec field's value through its storage codec's `write`.
+The write schemas (6) have already refused every value outside the write forms of 5.1, so the
+adapter converts and never validates.
+
+**Rows** (obligations 4, 7, and 10). `get` and `lock` select the public row (12.8) where
+`"key" = $n::text::<key type>` and the scope holds; `lock` appends `for no key update` before an
+update and `for update` before a remove. `create` inserts exactly the members present in the input,
+the client id, the server values, and the scope columns from the transaction's values, and returns
+the public row with `returning`; with nothing to insert it runs `insert into ... default values`.
+`update` sets exactly the members present and returns the public row; without members it returns
+`get` of the row. `remove` deletes the row and answers whether one was deleted.
+
+**List** (obligations 5 and 12). The adapter defines each resource's keyset once, with
+`defineKeyset(resource.keyset)` (keyset-core's `createDefineKeyset`, 11.2), and then:
+
+1. plans: `plan = await keyset.plan(request, { context })`, where `context` maps each of the
+   transaction's scopes to its value, `{ organization: 7 }`, so a cursor issued in one scope is
+   refused in another (keyset ADR 0015); without scopes it is empty and binds nothing;
+2. runs one statement built on `tx` with Kysely's query builder: the public row and each plan key as
+   `cast(<target> as text)` under its alias, from `"schema"."name" as "name"`, where the scope
+   predicate, the plan's `filter`, and its `seek` hold, ordered by each key with its direction and
+   null placement, limited to the plan's `limit`. Targets and predicates are kysely-keyset's
+   `renderTarget` and `renderPredicate` with `{ table: plan.table }` (keyset SPEC 10.2), which bind
+   the plan's values as keyset-core validated them, strings for every temporal and
+   arbitrary-precision value, so PostgreSQL types each from the column it is compared with (keyset
+   SPEC 4.3);
+3. pages: `keyset.page(plan, rows, values, { total })` over the public rows read from the result,
+   with each row's key texts as its values. With `total: true` a second statement counts the rows of
+   the scope that the filter selects, without the seek.
+
+`list` never counts rows to find a page. @ref https://www.postgresql.org/docs/18/queries-order.html
+
+**Quotas** (obligation 8). `count` runs
+`select pg_advisory_xact_lock(hashtextextended($1::text, 0))` with the key
+`JSON.stringify([type, quota, scope value or null])`, then counts the resource's rows in the scope.
+The lock holds until the transaction ends, so the count and the insert after it are atomic per quota
+and scope value. @ref
+https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS
+
+**Events** (obligation 9). `record` inserts each event into the outbox table in the operation's
+transaction, in order: `insert into "schema"."outbox" ("name", "version", "payload")` with
+`$1::text`, `$2::text::int4`, and `$3::text::jsonb`.
+
+**Partitions** (obligation 11). `partitionRoot(names)` runs `PARTITION_ROOT_SQL` (9.5) in a
+transaction of its own and returns the names of its row, without a `constraint` member when the root
+has none, or `undefined` when no row comes back.
+
+**Errors** (obligation 6). A PostgreSQL error reaches the caller as the driver raised it, with its
+fields; Kysely does not wrap it, and neither does the adapter.
+
+### 18.3 Boot: `checkResourceRuntime(options)` and `createResourceRuntime(options)`
+
+```ts
+const options = {
+  storage,
+  catalog, // the full catalog pg-catalog extract writes: row security, indexes, the outbox table
+  resources: {
+    contacts: ContactsBehavior,
+    calls: CallsBehavior,
+    organizations: OrganizationsBehavior,
+  },
+  scopes: SCOPE_BINDINGS, // 12.5
+  unscoped: ['organizations'], // the resources that run without a scope, by type
+  quotas: QUOTAS, // 12.6
+  services, // handed to policies, values, rules, quotas, and effects
+  errors: APP_ERRORS, // the application's codes, for rejectionError (12.4)
+  afterCommit: (events) => relay.wake(), // optional (18.6)
+  report: (error) => logger.error(error), // optional: what afterCommit threw
+};
+
+const report = checkResourceRuntime(options); // in the application's test suite: no connection
+const runtime = await createResourceRuntime(options); // at startup: the same checks, then connected ones
+```
+
+`resources` holds what `defineResource` returned (12.3), keyed by type. `checkResourceRuntime` runs
+the static checks and returns `BootReport`, `{ problems, warnings }`, each a list of messages that
+start with the resource's type; it runs no query, so CI runs it without a database.
+`createResourceRuntime` runs the same checks, then the connected ones, and rejects with a
+`BootError` whose `problems` lists them all and whose message joins them, one per line; otherwise it
+resolves to the runtime, whose `warnings` are the report's. A message names tables, columns, roles,
+and session parameters, never a connection string.
+
+Static problems:
+
+- a key of `resources` that is not its behavior's type;
+- a resource whose table is not in `catalog`;
+- a scoped resource whose scope has no binding in `scopes`;
+- a resource without a scope that `unscoped` does not list, and a name in `unscoped` that is not an
+  unscoped resource of `resources`;
+- a relationship declared with `include: true` whose target type has no behavior in `resources`;
+- a create quota that `quotas` does not hold;
+- when any behavior has effects, an outbox table that is not in `catalog`, or lacks one of
+  `position` (an `int8` primary key with a default or an identity), `name` (`text`), `version`
+  (`int4`), and `payload` (`jsonb`);
+- for each scoped resource, a table without row security enabled, and each command below whose
+  policies do not read the scope's session parameter.
+
+The commands a resource needs follow from its operations, and the expressions each applies follow
+PostgreSQL's table of policies applied by command type:
+
+| Operation                                             | Command and expression                                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| every resource (`list`, `get`, and every `returning`) | SELECT: `USING`                                                                    |
+| `create`                                              | INSERT: `WITH CHECK`                                                               |
+| `update`                                              | UPDATE: `USING`, which `lock`'s `FOR NO KEY UPDATE` also applies, and `WITH CHECK` |
+| `remove`                                              | DELETE: `USING`; UPDATE: `USING`, which `lock`'s `FOR UPDATE` applies              |
+
+A policy applies to a command when its command is that one or `all`, and an `all` or `update` policy
+without `WITH CHECK` checks new rows with its `USING`. For each command and expression, the policies
+pass when at least one permissive policy applies, since without one PostgreSQL denies every row, and
+either a restrictive policy's expression reads the parameter or every permissive policy's does,
+since permissive policies combine with `OR` and restrictive ones with `AND`. An expression reads the
+parameter when it calls `current_setting` with the scope's `session` as its first argument, which
+`pg_get_expr` prints as `current_setting('app.organization_id'::text, true)`; the name compares
+without regard to case, as PostgreSQL compares parameter names. Policies count whatever roles they
+are granted to: whether one applies to the runtime's role through membership is known only to the
+server, so the check is strict rather than blind. `FORCE ROW LEVEL SECURITY` is not required (ADR
+0012). @ref https://www.postgresql.org/docs/18/sql-createpolicy.html (Policies Applied by Command
+Type; Application of Multiple Policies) @ref https://www.postgresql.org/docs/18/ddl-rowsecurity.html
+
+Warnings: for each field a declaration makes sortable, no btree index whose key columns begin with
+the scope column and then the field's column, or with the field's column for an unscoped resource.
+
+Connected problems, at `createResourceRuntime` only, through `storage.db`:
+
+- the role (`current_user`) is a superuser or has `BYPASSRLS`, which bypass row security on every
+  table: `select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
+- for each scoped resource's table, `select row_security_active($1::text::regclass)` is false: row
+  security does not apply to the role, most often because the role owns the table and the table does
+  not force it. The message names the role and the table, and the two ways out: force row security
+  on the table, or connect as a role that does not own it.
+
+@ref https://www.postgresql.org/docs/18/functions-info.html (`row_security_active`) @ref
+https://www.postgresql.org/docs/18/view-pg-roles.html
+
+JavaScript mistakes in the options themselves throw `TypeError` before any check, among them
+`createResourceRuntime: options.storage must come from createKyselyStorage` and
+`createResourceRuntime: resources.contacts must be a behavior defineResource returned`.
+
+### 18.4 The domain: `runtime.as(actor)`
+
+```ts
+const domain = runtime.as(actor);
+const page = await domain.contacts.list({ sort: ['-createdAt'], page: { size: 50 } });
+const owners = await domain.contacts.include('organization', page.rows);
+const created = await domain.contacts.create({
+  attributes: { name: 'Ada', kind: 'person' },
+  relationships: { organization: { type: 'organizations', id: '7' } },
+});
+const renamed = await domain.contacts.update(created.id, { attributes: { name: 'Ada L.' } });
+await domain.contacts.remove(created.id);
+```
+
+`as(actor)` returns a `Domain`: one `ResourceOperations` per resource, keyed by type, holding the
+operations the declaration declares (3.3), and `include` when it declares an includable
+relationship. Each operation runs the lifecycle of 12.3 in one transaction of `storage.transaction`,
+with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for an unscoped resource too: a
+policy on its table may read them, as one on the tenants table reads the tenant. An actor without a
+value for every scope runs no operation.
+
+| Operation                  | Runs                                                                                                                                 | Resolves to           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| `list(request?, options?)` | policy `list`; `storage.list` with the request and `options.total`                                                                   | `Page` of public rows |
+| `get(id)`                  | `storage.get`; policy `get` with the row                                                                                             | the public row        |
+| `create(input)`            | input validation; policy `create`; rules; quota; server values; `storage.create`; effects, whose events `storage.record` writes      | the created row       |
+| `update(id, input)`        | input validation; `storage.lock(..., 'update')`; policy `update`; rules; `storage.update`; effects with the row and the previous row | the updated row       |
+| `remove(id)`               | `storage.lock(..., 'remove')`; policy `remove`; rules; `storage.remove`; effects                                                     | `undefined`           |
+| `include(name, rows)`      | policy `include` for the relationship; the target rows the rows link to, each id once, with `storage.many`                           | the target's rows     |
+
+- `request` is a keyset request addressed by public names (12.8), typed by the declaration
+  (`KeysetRequestOf`); a host builds it from `parseQuery` with `keysetRequest` (11.2).
+- `input` is `{ id?, attributes?, relationships? }`, a resource object as `@netvark/jsonapi-core`
+  parses it, each relationship as its linkage; a missing member is `{}`. `write.create` or
+  `write.update` validates it (6.2). A create's `id` is validated by `schema.id` when the
+  declaration takes client ids, and stored as that schema outputs it; on any other resource it is
+  refused.
+- The id of `get`, `update`, and `remove` is refused as `NOT_FOUND` before the transaction when
+  `schema.id` refuses it, and otherwise looked up as `schema.id` outputs it (3.4, 12.3).
+- `include` reads in a transaction of its own. `many(tx, resource, ids)` selects the public rows
+  whose key is any of `ids`, in the scope, in one statement,
+  `where "key" = any($1::text::<key type>[])`; a linked row the actor cannot see is left out, as a
+  `get` of it would answer `NOT_FOUND`. JSON:API requires every included resource to be linked from
+  the primary data and none that was not requested, and does not require every linked one. @ref
+  https://jsonapi.org/format/1.1/#document-compound-documents @ref
+  https://jsonapi.org/format/1.1/#fetching-includes
+- After the transaction commits, the events it recorded go to `afterCommit` (18.6).
+
+### 18.5 Failures
+
+What an operation rejects with, each a `BanError` a host renders as it is:
+
+| Cause                                                                                    | Error                                                                                                                |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| input the write schema refuses                                                           | `VALIDATION_FAILED` (422), one item per issue at `/data/...`, with the issue's message and kind (6.4, 9.3)           |
+| a create's `id` on a resource without client ids                                         | `CLIENT_GENERATED_ID_NOT_SUPPORTED` (403), at `/data/id`                                                             |
+| a policy that denies `list` or `create`                                                  | `FORBIDDEN` (403), without detail (12.2)                                                                             |
+| a policy that denies `get`, `update`, or `remove`; a missing row; an id outside the form | `NOT_FOUND` (404), without detail                                                                                    |
+| a policy that denies an include                                                          | `FORBIDDEN` (403) at the `include` parameter (12.2)                                                                  |
+| a rule's `Rejection`                                                                     | `rejectionError` with `errors` (12.4)                                                                                |
+| a quota used up                                                                          | `QUOTA_EXCEEDED` (403) (12.6)                                                                                        |
+| a PostgreSQL integrity violation                                                         | `constraintError` (9.5), with `partitionRoot`'s names for a violation a partition raised, once the transaction ended |
+| a keyset refusal (keyset SPEC 9)                                                         | the Cursor Pagination profile's errors, below                                                                        |
+
+Keyset refusals map as keyset's design maps them to `@netvark/jsonapi-core` (keyset DESIGN 3.6):
+`UNSUPPORTED_SORT` to one `UNSUPPORTED_SORT` item per field, `PAGE_SIZE_EXCEEDED` to
+`MAX_PAGE_SIZE_EXCEEDED` with the maximum, `RANGE_NOT_SUPPORTED` to
+`RANGE_PAGINATION_NOT_SUPPORTED`, `INVALID_CURSOR`, whatever its reason, to `invalidCursor` at
+`page[after]` or `page[before]`, and every other code to `INVALID_QUERY_PARAMETER` at the parameter
+it names: `filter[<field>][<operator>]` for `INVALID_FILTER_VALUE`, `filter` for
+`UNSUPPORTED_FILTER` and `INVALID_FILTER`, `filter[q]` for `UNSUPPORTED_SEARCH`, and `page[size]`
+for `INVALID_PAGE_SIZE`. A detail the runtime writes itself names the parameter, never its value.
+Anything else an operation throws (a lost connection, a statement the adapter got wrong) is rethrown
+unchanged, so the host's ban renders it as a 500 without detail. @ref
+https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
+
+### 18.6 Events and the outbox
+
+The outbox is an application table:
+
+```sql
+create table outbox (
+  position bigint generated always as identity primary key,
+  name text not null,
+  version integer not null,
+  payload jsonb not null,
+  recorded_at timestamptz not null default now()
+);
+```
+
+Effects return events (12.7); the adapter writes them with the operation, in its transaction, so an
+event exists exactly when its write committed. Delivery is the relay's:
+
+```ts
+const delivered = await relayOutbox({
+  db,
+  outbox: { table: 'outbox' },
+  deliver: async (events) => queue.sendBatch(events), // throws to leave them for the next run
+  limit: 100,
+});
+```
+
+`relayOutbox` runs one transaction: it selects the oldest `limit` rows,
+`select "position"::text, "name", "version"::text, "payload"::text ... order by "position" limit $1 for update skip locked`,
+calls `deliver` with them in that order as `OutboxEvent`s, `{ position, name, version, payload }`
+with `position` as text, deletes them, `where "position" = any($1::text::int8[])`, and commits; it
+resolves to the number delivered, and the application calls it on a timer or when woken. When
+`deliver` rejects, the transaction rolls back and `relayOutbox` rejects with that error, leaving the
+rows for the next run. Delivery is therefore at least once: a consumer deduplicates by `position`.
+Rows another relay holds are skipped, so concurrent relays never deliver one row at once, and each
+run delivers in `position` order. The outbox table should have no row security, or the relay's role
+must read every row. @ref https://www.postgresql.org/docs/18/sql-select.html#SQL-FOR-UPDATE-SHARE
+@ref https://microservices.io/patterns/data/transactional-outbox.html
+
+`afterCommit(events)` is called after an operation's transaction committed, with the events it
+recorded, when there are any, and awaited before the operation resolves. It is a best-effort wake-up
+for the relay, never the delivery: a process that stops between the commit and the call loses only
+the call. What it throws or rejects with goes to `report` when given and is otherwise dropped; it
+never reaches the operation's caller, whose write has committed.
+
+### 18.7 Test plan
+
+- Unit tests, colocated: read forms of every type of 5.1, each element of a `bool` array, and each
+  value without a read form; parameter text and array literals; the statements of each operation;
+  every static problem and warning of 18.3 against catalog fixtures, among them `all` and
+  per-command policies, a policy without `WITH CHECK`, restrictive policies, a permissive policy
+  that does not read the parameter, and parameter names in another case; the keyset refusal mapping;
+  and the lifecycle of each operation, a test per step and per failure path, on PGlite.
+- The storage contract (12.9) over `createKyselyStorage`, on PGlite in the package and on PGlite and
+  a PostgreSQL server in `e2e/resource` (`RESOURCE_PG_URL`), with obligation 12: a cursor issued in
+  one workspace is refused in another.
+- `e2e/resource` drives the domain alone, with no HTTP, over the contacts application on PGlite and
+  the server, as a role that is neither superuser nor `BYPASSRLS`: one organization never sees
+  another's rows with row security on and the policy allowing everything, and with the predicate
+  alone; defaults apply on create; an update leaves omitted members as they were; a unique violation
+  is its declared code; a foreign cursor is refused; boot refuses a superuser, a table without row
+  security, a permissive policy that does not read the parameter, and a table its role owns without
+  `FORCE`. The HTTP API the OpenAPI exchanges run against (15.4) runs on `createResourceRuntime`, so
+  a worker's call and a request take the same path.
+- Real catalogs: the static checks and a boot against stern's migrations (15.5).
+
+### 18.8 Packaging
+
+- ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
+  `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run in the build. One
+  entry, `index`.
+- Dependencies, each `workspace:^`: `@netvark/resource-core`, `@netvark/catalog-core` (whose catalog
+  types the options name), `@netvark/kysely-keyset` (keyset-core's planner and errors, and the
+  renderers), `@netvark/jsonapi-core`, and `@netvark/ban-core`. Peer dependency: `kysely`
+  `>=0.28.0`, as kysely-keyset's. Development: `kysely`, `zod`, and `@electric-sql/pglite` from the
+  workspace catalog.
+- Runs wherever Kysely reaches PostgreSQL: Node.js 22.12 and later, Bun, Deno, and Cloudflare
+  Workers through a driver that runs there.
+
+### 18.9 Constants
+
+| Name             | Value                                                                                                                | Exported |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- | -------- |
+| session settings | `TimeZone` `UTC`, `DateStyle` `ISO, YMD`, `IntervalStyle` `postgres`, `extra_float_digits` `1`, `bytea_output` `hex` | no       |
+| isolation level  | READ COMMITTED                                                                                                       | no       |
+| quota lock key   | `JSON.stringify([type, quota, scope value or null])`, hashed by `hashtextextended(key, 0)`                           | no       |
+| row locks        | `FOR NO KEY UPDATE` before an update, `FOR UPDATE` before a remove                                                   | no       |
+| outbox columns   | `position` `int8`, `name` `text`, `version` `int4`, `payload` `jsonb`                                                | no       |
+| relay `limit`    | 100 by default                                                                                                       | no       |
