@@ -158,6 +158,15 @@ describe('the typed members of a declared resource', () => {
     expectTypeOf(Contacts.schema.create.shape.name).toExtend<ZodType<string>>();
   });
 
+  it('types the id schema and its validator as strings', () => {
+    expectTypeOf(Contacts.schema.id.parse('')).toEqualTypeOf<string>();
+    type Id = NonNullable<(typeof Contacts.validate.id)['~standard']['types']>;
+    expectTypeOf<Id>().toEqualTypeOf<{
+      readonly input: string;
+      readonly output: string;
+    }>();
+  });
+
   it('types the Standard Schema validators by input and output', () => {
     type Create = NonNullable<
       (typeof Contacts.validate.create)['~standard']['types']

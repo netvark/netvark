@@ -98,11 +98,12 @@ function schemaOf<TKind extends IdKind>(
  * names the column only in an error that cannot happen through
  * `declareResource`.
  */
-export function idSchema(spec: ValueSpec, path: string): z.ZodType {
+export function idSchema(spec: ValueSpec, path: string): z.ZodType<string> {
   if (!isIdForm(spec.form)) {
     throw new TypeError(
       `${path}: a ${spec.form.kind} value cannot carry a resource id`,
     );
   }
-  return schemaOf(spec, spec.form);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: every id form's schema parses a string to that same string (SPEC 3.4, id-schema.test.ts), which the value schemas it reuses do not state in their types
+  return schemaOf(spec, spec.form) as z.ZodType<string>;
 }

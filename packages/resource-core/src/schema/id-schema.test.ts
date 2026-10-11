@@ -32,9 +32,14 @@ function idRow(
   refuses: ReadonlyArray<Refusal>,
 ): void {
   describe(label, () => {
-    it.each(accepts.map((value) => [value]))('accepts %j', (value) => {
-      expect(issuesOf(schema, value)).toEqual([]);
-    });
+    // The id is the text itself: `schema.id` and `validate.id` output what they take.
+    it.each(accepts.map((value) => [value]))(
+      'accepts %j as itself',
+      (value) => {
+        expect(issuesOf(schema, value)).toEqual([]);
+        expect(schema.parse(value)).toBe(value);
+      },
+    );
     it.each(refuses)('refuses %j as %s %s', (value, code, expected) => {
       expect(issuesOf(schema, value)).toEqual([
         expected === undefined
