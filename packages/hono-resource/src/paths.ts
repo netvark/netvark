@@ -12,15 +12,24 @@
  * @packageDocumentation
  */
 import type { DeclaredResource } from '@netvark/resource-core';
+import type { ResourcePaths } from '@netvark/resource-core/openapi';
 
 import { tryDecodeURI } from 'hono/utils/url';
 
 import { resourcePaths } from '@netvark/resource-core/openapi';
 
+/** A relationship's routes: its relationship link's and its related link's, where the definition builds them. */
+interface RelationshipRoutes {
+  readonly self?: string | undefined;
+  readonly related?: string | undefined;
+}
+
 /** One resource's routes, as Hono matches them. */
 interface RoutePaths {
   readonly collection: string;
   readonly resource: string;
+  /** By relationship name. */
+  readonly relationships: ReadonlyMap<string, RelationshipRoutes>;
 }
 
 /** A resource and where its routes sit. */
@@ -63,11 +72,36 @@ function shared(
   return value;
 }
 
+/** `links`' paths as routes, each paired with the path its links spell. */
+function routesOf(links: ResourcePaths): {
+  readonly paths: RoutePaths;
+  readonly pairs: ReadonlyArray<readonly [string, string]>;
+} {
+  const pairs: Array<readonly [string, string]> = [];
+  const route = (path: string): string => {
+    const routed = routeOf(path);
+    pairs.push([path, routed]);
+    return routed;
+  };
+  const collection = route(links.collection);
+  const resource = route(links.resource);
+  const relationships = new Map(
+    [...links.relationships].map(([name, link]) => [
+      name,
+      {
+        ...(link.self === undefined ? {} : { self: route(link.self) }),
+        ...(link.related === undefined ? {} : { related: route(link.related) }),
+      },
+    ]),
+  );
+  return { paths: { collection, resource, relationships }, pairs };
+}
+
 /**
  * Each resource's routes and the base they share. Throws `TypeError` when
  * there is no resource, when a resource's links give no paths
  * (`resourcePaths`), when the links have different origins or bases, or
- * when two resources name one path.
+ * when two routes have one path.
  */
 export function planPaths(
   resources: ReadonlyArray<DeclaredResource>,
@@ -95,18 +129,10 @@ export function planPaths(
   );
   const seen = new Set<string>();
   const mounted = located.map(({ declared, links }) => {
-    const paths = {
-      collection: routeOf(links.collection),
-      resource: routeOf(links.resource),
-    };
-    for (const [path, route] of [
-      [links.collection, paths.collection],
-      [links.resource, paths.resource],
-    ] as const) {
+    const { paths, pairs } = routesOf(links);
+    for (const [path, route] of pairs) {
       if (seen.has(route)) {
-        throw new TypeError(
-          `jsonApiRoutes: two resources have the path ${path}`,
-        );
+        throw new TypeError(`jsonApiRoutes: two routes have the path ${path}`);
       }
       seen.add(route);
     }

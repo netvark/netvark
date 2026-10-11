@@ -24,10 +24,11 @@ import { Hono } from 'hono';
 
 import { actors } from './actor';
 import { collectionRoutes } from './collection';
-import { includeTargets } from './context';
+import { targetsOf } from './context';
 import { memberRoutes } from './member';
 import { refuseOtherMethods } from './methods';
 import { planPaths } from './paths';
+import { relationshipRoutes } from './relationships';
 
 /** What `jsonApiRoutes` takes. */
 export interface JsonApiRoutesOptions<
@@ -96,11 +97,12 @@ export function jsonApiRoutes<TEnv extends Env, TDomain extends DomainShape>(
     runtime,
     actors: actors(options.actor),
     methods: new Map(),
-    targets: includeTargets(runtime.resources),
+    targets: targetsOf(runtime.resources),
   };
   for (const mounted of plan.resources) {
     collectionRoutes(context, mounted);
     memberRoutes(context, mounted);
+    relationshipRoutes(context, mounted);
   }
   refuseOtherMethods(app, context.methods);
   return app;

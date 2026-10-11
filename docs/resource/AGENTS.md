@@ -94,7 +94,9 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 - `routes.ts` `jsonApiRoutes` and its options; `paths.ts` and `methods.ts` where each resource is
   served, and the 405 of any other method
 - `actor.ts` the request's actor, resolved once; `context.ts` what every route reads
-- `collection.ts` and `member.ts` the routes of each operation
+- `collection.ts` and `member.ts` the routes of each operation; `relationships.ts` each
+  relationship's link and related link; `pointers.ts` moving a refusal's items to where the request
+  held the input
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted

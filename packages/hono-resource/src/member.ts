@@ -9,7 +9,7 @@
  * @ref https://jsonapi.org/format/1.1/#crud-deleting-responses-204
  * @packageDocumentation
  */
-import type { Context, Env } from 'hono';
+import type { Env } from 'hono';
 
 import type { DomainShape } from '@netvark/resource-core/server';
 
@@ -23,19 +23,10 @@ import {
   respond,
 } from '@netvark/hono-jsonapi';
 
-import { includedOf, notRun, operationsOf } from './context';
+import { idOf, includedOf, notRun, operationsOf } from './context';
 import { allow } from './methods';
 
 const HTTP_NO_CONTENT = 204;
-
-/** The `:id` of a resource route. */
-function idOf(c: Context): string {
-  const id = c.req.param('id');
-  if (id === undefined) {
-    throw new TypeError('jsonApiRoutes: a resource route has no :id');
-  }
-  return id;
-}
 
 /** Mounts `get`, `update`, and `remove` of `mounted` at its resource path. */
 export function memberRoutes<TEnv extends Env, TDomain extends DomainShape>(
