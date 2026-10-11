@@ -224,10 +224,20 @@ export interface TypedObjectSchemas<TRead, TCreate, TUpdate> {
   readonly update: z.ZodObject<ShapeOf<TUpdate>, $strict>;
 }
 
-/** Typed Standard Schema validators of create and update. */
+/** Typed attribute schemas, and the schema of an id (SPEC 3.4). */
+export interface TypedAttributeSchemas<
+  TRead,
+  TCreate,
+  TUpdate,
+> extends TypedObjectSchemas<TRead, TCreate, TUpdate> {
+  readonly id: z.ZodType<string>;
+}
+
+/** Typed Standard Schema validators of create and update, and of an id. */
 export interface TypedValidators<TCreate, TUpdate> {
   readonly create: ResourceValidator<InputOf<TCreate>, TCreate>;
   readonly update: ResourceValidator<InputOf<TUpdate>, TUpdate>;
+  readonly id: ResourceValidator<string>;
 }
 
 /** A write's two parts. */

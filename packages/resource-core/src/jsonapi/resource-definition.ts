@@ -5,7 +5,8 @@
  * public name, `write` fields included, so requests may carry them;
  * `writable` lists the members each write carries by their access, so the
  * parser refuses a `read` member on create or update and an `immutable`
- * one on update with 403 (SPEC 9.4); `serialize` turns a public row into
+ * one on update with 403 (SPEC 9.4), and a client id is validated by the
+ * key's form (SPEC 3.4); `serialize` turns a public row into
  * its readable fields and relationship ids and never emits a `write` field;
  * its filters, sorts, and page are the ones the keyset definition beside it
  * holds (`keyset-definition.ts`). It reads every relationship's target for
@@ -153,6 +154,7 @@ export function resourceDefinition(source: ResourceSource): AnyResource {
     validate: {
       ...(operations.has('create') ? { create: validate.create } : {}),
       ...(operations.has('update') ? { update: validate.update } : {}),
+      ...(declaration.clientIds === true ? { id: validate.id } : {}),
     },
     writable: writableMembers(specs),
     clientIds: declaration.clientIds === true,

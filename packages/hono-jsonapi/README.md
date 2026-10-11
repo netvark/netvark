@@ -146,6 +146,20 @@ update; `relationshipValidator` and atomic operations refuse it the same way. Li
 than let a validator strip what it does not know: a stripped field answers 201 or 200 for a write
 that never happened.
 
+A create carries a client-generated id only with `clientIds: true`. Give the form your keys take as
+`validate.id`, any Standard Schema that produces a string, so an id outside it is a 422 at
+`/data/id` rather than a value the database refuses or stores under another spelling:
+
+```ts
+const Calls = defineResource({
+  type: 'calls',
+  attributes: ['minutes'],
+  serialize: (row: CallRow) => ({ id: row.id, attributes: { minutes: row.minutes } }),
+  clientIds: true,
+  validate: { id: z.uuid() },
+});
+```
+
 `serialize` returns ids for relationships and the package builds the identifier objects with the
 declared type; identifier objects pass through for polymorphic relationships. The attribute and
 relationship names it may return are the declared ones: a typo is a type error.

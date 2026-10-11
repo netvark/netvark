@@ -303,12 +303,13 @@ Every declared resource carries Zod schemas built from the catalog and the decla
 public names (SPEC 5 and 6). A field's schema is its column's wire form, narrowed by its domain, the
 CHECKs the catalog translates, its nullability, and its validators:
 
-| Member                                             | Validates                                                                               | Issues           |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------- |
-| `schema.read`, `schema.create`, `schema.update`    | the attributes of a response, a create, or an update                                    | Zod's            |
-| `linkage.read`, `linkage.create`, `linkage.update` | the relationships, each `{ type, id }`, or `null` where the foreign key is nullable     | Zod's            |
-| `validate.create`, `validate.update`               | the attributes, as Standard Schema validators                                           | `ResourceIssue`s |
-| `write.create`, `write.update`                     | a resource object as `@netvark/jsonapi-core` parses it, `{ attributes, relationships }` | `ResourceIssue`s |
+| Member                                             | Validates                                                                               | Issues                  |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------- |
+| `schema.read`, `schema.create`, `schema.update`    | the attributes of a response, a create, or an update                                    | Zod's                   |
+| `schema.id`, `validate.id`                         | a resource id in its key's one spelling: a URL's, or a create's client id               | Zod's, `ResourceIssue`s |
+| `linkage.read`, `linkage.create`, `linkage.update` | the relationships, each `{ type, id }`, or `null` where the foreign key is nullable     | Zod's                   |
+| `validate.create`, `validate.update`               | the attributes, as Standard Schema validators                                           | `ResourceIssue`s        |
+| `write.create`, `write.update`                     | a resource object as `@netvark/jsonapi-core` parses it, `{ attributes, relationships }` | `ResourceIssue`s        |
 
 `create` requires exactly the columns PostgreSQL requires on insert, `update` requires none, and
 both reject unknown keys; over JSON:API a declared member the operation does not write never reaches
@@ -626,11 +627,11 @@ A declared resource derives the two definitions a collection endpoint needs, fro
 and under the same public names (SPEC 11):
 
 - `Contacts.resource` is a `@netvark/jsonapi-core` resource: the attributes, the relationships,
-  `serialize` for public rows, the create and update validators of the served operations, the
-  members each write accepts (`writable`), and the capabilities `parseQuery` holds a request to: the
-  declared sorts, the filters with their operators, the includes, `filter[q]` when the declaration
-  has `search`, and the page bounds. It is built on first read, since it names each relationship
-  target's type.
+  `serialize` for public rows, the create and update validators of the served operations, the client
+  id's validator with `clientIds`, the members each write accepts (`writable`), and the capabilities
+  `parseQuery` holds a request to: the declared sorts, the filters with their operators, the
+  includes, `filter[q]` when the declaration has `search`, and the page bounds. It is built on first
+  read, since it names each relationship target's type.
 - `Contacts.keyset` is a `@netvark/keyset-core` definition without the cursor: the same filters and
   sorts with each column's keyset type, the search column and its configuration, the key `id`, the
   default sort, and the same page bounds.
@@ -942,6 +943,7 @@ and effects, so any failure rolls back everything, events included. An update, c
 
 ```ts
 const update = async (actor: AppActor, behavior: Behavior, id: string, request: ResourceInput) => {
+  if (!behavior.resource.schema.id.safeParse(id).success) throw notFound(); // no row has it
   const input = parsed(behavior, 'update', request); // behavior.resource.write.update
   try {
     return await adapter.transaction(scopeValues(SCOPES, actor), async (tx) => {
@@ -1067,6 +1069,10 @@ option, operator, or code, a loosened limit, and a new default page size break n
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
   `jsonb` cannot, even though PostgreSQL accepts them as keys. Use `clientIds: true` with a key that
   accepts a client value, such as `uuid default gen_random_uuid()` or an identity `BY DEFAULT`.
+- **Check a URL's id before querying.** Answer `NOT_FOUND` when `schema.id` refuses it, as the
+  runtime above does: PostgreSQL would refuse the text with a 500, or read `042` or a `uuid` without
+  hyphens as an existing key and serve a resource whose id differs from the URL's. A create's client
+  id needs nothing: the JSON:API resource validates it, a 422 at `/data/id`.
 - **Name foreign keys `<thing>_id`.** The relationship is then `<thing>` without `as`. Keep `type`,
   `id`, and `lid` for the members JSON:API gives them, and rename such a column with `as` (`kind`).
 - **Give codes to the errors clients handle.** A derived code follows the constraint's name, which

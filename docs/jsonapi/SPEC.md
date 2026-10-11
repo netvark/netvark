@@ -84,6 +84,7 @@ packages/jsonapi-core/src/
     linkage.ts                   assertFullLinkage() (7.3)
   resource/
     types.ts                     section 5
+    write-types.ts               ResourceValidators, WritableFieldsInit, WritableFields (5)
     define-resource.ts           defineResource(), relatedResource() (5.1)
     links.ts                     resolveLinks(): the links convention and its types (5.1)
     create-define-resource.ts    createDefineResource() (5.1)
@@ -339,18 +340,18 @@ order, a foreign @netvark/ban-core validation error, `getResponse` with the erro
 
 `ResourceDefinition<TType, TAttribute, TRelationship, TRow, TSort, TFilter, TCreate, TUpdate>`:
 
-| Member          | Meaning                                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`          | The resource type; a member name                                                                                                             |
-| `attributes`    | Declared attribute names                                                                                                                     |
-| `relationships` | By name: `{ type, cardinality: 'one' \| 'many', resource?: () => AnyResource }`                                                              |
-| `fields`        | `ReadonlySet` of attribute and relationship names                                                                                            |
-| `serialize`     | `(row: TRow) => { id; attributes?; relationships?; links?; meta? }`; attributes and relationships are restricted to the declared names       |
-| `links`         | `{ self?: (id) => string; relationship?: (id, name) => { self?; related? } }`, resolved from `ResourceLinksInit` (5.1)                       |
-| `query`         | Resolved capabilities (5.2)                                                                                                                  |
-| `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate> }`                                                   |
-| `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                              |
-| `writable`      | `WritableFields = { create; update }`: each a `ReadonlySet` of the fields that operation accepts; every field when the init lists none (9.2) |
+| Member          | Meaning                                                                                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`          | The resource type; a member name                                                                                                                                                                         |
+| `attributes`    | Declared attribute names                                                                                                                                                                                 |
+| `relationships` | By name: `{ type, cardinality: 'one' \| 'many', resource?: () => AnyResource }`                                                                                                                          |
+| `fields`        | `ReadonlySet` of attribute and relationship names                                                                                                                                                        |
+| `serialize`     | `(row: TRow) => { id; attributes?; relationships?; links?; meta? }`; attributes and relationships are restricted to the declared names                                                                   |
+| `links`         | `{ self?: (id) => string; relationship?: (id, name) => { self?; related? } }`, resolved from `ResourceLinksInit` (5.1)                                                                                   |
+| `query`         | Resolved capabilities (5.2)                                                                                                                                                                              |
+| `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate>; id?: StandardSchema<unknown, string> }`: the attributes of each write, and a create's client-generated id (9.2) |
+| `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                                                                                          |
+| `writable`      | `WritableFields = { create; update }`: each a `ReadonlySet` of the fields that operation accepts; every field when the init lists none (9.2)                                                             |
 
 `serialize` may return relationships as an id, `null`, an array of ids, an identifier object, an
 array of identifier objects, or `{ data?, links?, meta? }`. `AnyResource` erases every parameter;
@@ -367,11 +368,13 @@ namespace with them, `#document-resource-object-fields`), or is declared twice o
 relationship whose `type` is not a member name or whose `cardinality` is not `one` or `many`; a
 `serialize` that is not a function; a validator that is not a Standard Schema V1 object (`~standard`
 read with `in`, since zod 4, Valibot, and ArkType expose it as a prototype getter; `version` 1 and a
-`validate` function); a `writable.create` or `writable.update` name that is not a declared field or
-is listed twice. Fills `links`, `query`, `validate`, `clientIds`, and `writable` (each operation
-without a list accepts every field) with defaults. The literal types of `type`, the field names, and
-the sort and filter names are inferred (`const` type parameters) and `NoInfer` keeps names flowing
-from the declarations into `serialize` and `writable`, never the other way.
+`validate` function); a `validate.id` without `clientIds: true`
+(`validate.id needs clientIds: true`), since no other create carries an id; a `writable.create` or
+`writable.update` name that is not a declared field or is listed twice. Fills `links`, `query`,
+`validate`, `clientIds`, and `writable` (each operation without a list accepts every field) with
+defaults. The literal types of `type`, the field names, and the sort and filter names are inferred
+(`const` type parameters) and `NoInfer` keeps names flowing from the declarations into `serialize`
+and `writable`, never the other way.
 
 Writable fields. `writable: WritableFieldsInit = { create?, update? }` lists, typed as the declared
 names, the fields each operation accepts, so a read-only field (`createdAt`, a counter) or one set
@@ -701,7 +704,8 @@ object at `pointer` (default `/data`):
    `#crud-creating-responses-409`, `#crud-updating-responses-409`).
 4. `id`, when present, MUST be a string. On `create`, an `id` is `CLIENT_GENERATED_ID_NOT_SUPPORTED`
    (403) unless the definition sets `clientIds` (`#crud-creating-client-ids`). On `update`, `id`
-   MUST be present (400) and MUST equal `options.id` when given (409).
+   MUST be present (400) and MUST equal `options.id` when given (409); it is the URL's id, which the
+   host resolves (a missing resource is its 404), so no validator runs over it.
 5. `lid` is a 400 unless `lids` is true; with `lids`, an update MAY identify the resource by `lid`
    instead of `id`.
 6. `attributes`, when present, MUST be an object; each name MUST be a declared attribute (400 at
@@ -714,13 +718,16 @@ object at `pointer` (default `/data`):
    type, `lids` passed through (`#crud-updating-resource-relationships`). The 403 items join the
    others in one error: a document refused only for the fields it writes answers 403, and one with
    any other refusal answers 400 with every item (4.3).
-8. With no structural errors, the attributes (an empty object when absent) are validated by the
-   definition's `create` or `update` Standard Schema; each issue becomes a `VALIDATION_FAILED` (422)
-   object whose pointer is `pointer/attributes` plus the issue path. The issue's `code` and
-   `expected`, when they are strings, become the item's `reason` and `expected`, which
-   `@netvark/ban-core`'s JSON:API format renders as `meta.code` and `meta.expected`; nothing else of
-   a vendor's issue is kept, so no value from the request reaches the response. Without a validator
-   the attributes pass through.
+8. With no structural errors, a create's client-generated id is validated by `validate.id`, when the
+   definition has it, and the attributes (an empty object when absent) by the definition's `create`
+   or `update` Standard Schema; each issue becomes a `VALIDATION_FAILED` (422) object whose pointer
+   is `pointer/id` or `pointer/attributes` plus the issue path, the id's first. JSON:API asks a
+   client-generated id to be "a universally unique identifier" and leaves its spelling to the
+   server, whose keys decide it (`#crud-creating-client-ids`); the parsed `id` and `attributes` are
+   the validators' output. The issue's `code` and `expected`, when they are strings, become the
+   item's `reason` and `expected`, which `@netvark/ban-core`'s JSON:API format renders as
+   `meta.code` and `meta.expected`; nothing else of a vendor's issue is kept, so no value from the
+   request reaches the response. Without a validator the attributes pass through.
 
 Returns
 `ParsedResourceObject<TAttributes, TLinkage> = { type, id, lid, attributes, relationships, meta }`
@@ -1017,19 +1024,19 @@ its `*.test-d.ts`; `@netvark/hono-jsonapi`'s project resolves `@netvark/jsonapi-
 choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of the
 packages' own modules.
 
-| Area                           | Files                                                                                                                                                            | What is pinned                                                                                                                                                                                   |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Internal                       | `object.test.ts`, `pointer.test.ts`                                                                                                                              | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                           |
-| Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                              | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
-| Negotiation                    | `negotiate.test.ts`                                                                                                                                              | each rule of 3.3                                                                                                                                                                                 |
-| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                               | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                                  |
-| Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                               | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
-| Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`                    | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets                                                                              |
-| Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
-| Pagination                     | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                                           | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
-| Requests                       | `resource-document.test.ts`, `resource-update.test.ts`, `resource-writable.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                      | pointers for every structural error, 403/409/422 cases, the fields each operation writes, lids                                                                                                   |
-| Hono (`@netvark/hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts`              | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
-| Atomic                         | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `writable.test.ts`, `process-coverage.test.ts` | the extension's examples, the host context, and every processing rule                                                                                                                            |
+| Area                           | Files                                                                                                                                                                     | What is pinned                                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal                       | `object.test.ts`, `pointer.test.ts`                                                                                                                                       | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                           |
+| Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                                       | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
+| Negotiation                    | `negotiate.test.ts`                                                                                                                                                       | each rule of 3.3                                                                                                                                                                                 |
+| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                                        | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                                  |
+| Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                                        | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
+| Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`                             | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets                                                                              |
+| Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                         | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
+| Pagination                     | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                                                    | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
+| Requests                       | `resource-document.test.ts`, `resource-update.test.ts`, `resource-writable.test.ts`, `resource-client-id.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts` | pointers for every structural error, 403/409/422 cases, the fields each operation writes, a client id's validation, lids                                                                         |
+| Hono (`@netvark/hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts`                       | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
+| Atomic                         | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `writable.test.ts`, `process-coverage.test.ts`          | the extension's examples, the host context, and every processing rule                                                                                                                            |
 
 ### 14.1 End-to-end suite (`e2e/jsonapi/`)
 

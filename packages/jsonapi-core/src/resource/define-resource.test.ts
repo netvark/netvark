@@ -205,6 +205,18 @@ describe('defineResource', () => {
     ).toThrow(TypeError);
   });
 
+  it('takes a client id validator only with clientIds', () => {
+    expect(
+      articles({ clientIds: true, validate: { id: schema } }).validate.id,
+    ).toBe(schema);
+    expect(() => articles({ validate: { id: schema } })).toThrow(
+      new TypeError('validate.id needs clientIds: true'),
+    );
+    expect(() =>
+      articles({ clientIds: true, validate: { id: { parse: () => 1 } } }),
+    ).toThrow(/validate\.id is not a Standard Schema V1 object/u);
+  });
+
   it('resolves the fields each write accepts, every field without a list', () => {
     expect(articles().writable).toEqual({
       create: new Set(['title', 'author']),

@@ -10,7 +10,8 @@
  * code's error, a PostgreSQL integrity violation the declared code
  * `constraintError` finds, a partition's through the adapter's
  * `partitionRoot` (`failure.ts`), and a row the actor cannot see
- * `NOT_FOUND`, built as a denied `get` builds it. A list asks the policy,
+ * `NOT_FOUND`, built as a denied `get` builds it, as is an id outside the
+ * key's form, refused before any query. A list asks the policy,
  * then pages with the keyset request `keysetRequest` maps; an include asks
  * the policy for the relationship, then reads each linked row in the
  * actor's scope, in a transaction of its own, where a host's would share
@@ -82,6 +83,17 @@ export interface Runtime {
 /** The error of a missing row, which a denied `get`, `update`, or `remove` also is. */
 function notFound(): BanError {
   return new BanError({ ...BUILTIN_CATALOG.NOT_FOUND, code: 'NOT_FOUND' });
+}
+
+/**
+ * Refuses an id outside the key's form as a missing row, without a query:
+ * no row has it, and PostgreSQL would refuse the text or read another
+ * spelling of a key as that key (resource SPEC 3.4, 12.3).
+ */
+function assertKnownId(behavior: Behavior, id: string): void {
+  if (!behavior.resource.schema.id.safeParse(id).success) {
+    throw notFound();
+  }
 }
 
 /** The runtime over `adapter`, handing `services` to policies, rules, effects, and quotas. */
@@ -184,16 +196,19 @@ export function createRuntime<TTransaction>(
         return row;
       });
     },
-    get: async (actor, behavior, id) =>
-      scoped(actor, behavior, 'get', async (tx) => {
+    get: async (actor, behavior, id) => {
+      assertKnownId(behavior, id);
+      return scoped(actor, behavior, 'get', async (tx) => {
         const row = await adapter.get(tx, behavior.resource, id);
         if (row === undefined) {
           throw notFound();
         }
         await behavior.policy.authorize('get', { actor, services, row });
         return row;
-      }),
+      });
+    },
     update: async (actor, behavior, id, request) => {
+      assertKnownId(behavior, id);
       const input = parsed(behavior, 'update', request);
       const update = behavior.operations.update;
       return scoped(actor, behavior, 'update', async (tx) => {
@@ -213,6 +228,7 @@ export function createRuntime<TTransaction>(
       });
     },
     remove: async (actor, behavior, id) => {
+      assertKnownId(behavior, id);
       const remove = behavior.operations.remove;
       await scoped(actor, behavior, 'remove', async (tx) => {
         const row = await locked(tx, behavior, id, 'remove');

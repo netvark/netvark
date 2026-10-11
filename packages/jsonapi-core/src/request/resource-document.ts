@@ -93,27 +93,33 @@ function issueItem(issue: StandardSchemaIssue, pointer: string): ErrorItem {
   });
 }
 
-/** Runs the Standard Schema validator; issues become 422 error items (`issueItem`). */
-async function validateAttributes(
-  schema: StandardSchema<unknown, unknown> | undefined,
-  attributes: Record<string, unknown>,
+/** A validator's output, or the value as given with an item per issue. */
+interface Validated<TValue> {
+  readonly value: TValue;
+  readonly items: ReadonlyArray<ErrorItem>;
+}
+
+/** Runs a Standard Schema validator, when there is one; issues become 422 items (`issueItem`). */
+async function validated<TValue>(
+  schema: StandardSchema<unknown, TValue> | undefined,
+  value: TValue,
   pointer: string,
-): Promise<unknown> {
+): Promise<Validated<TValue>> {
   if (schema === undefined) {
-    return attributes;
+    return { value, items: [] };
   }
-  const result = await schema['~standard'].validate(attributes);
-  if (result.issues === undefined) {
-    return result.value;
-  }
-  throw jsonApiError(result.issues.map((issue) => issueItem(issue, pointer)));
+  const result = await schema['~standard'].validate(value);
+  return result.issues === undefined
+    ? { value: result.value, items: [] }
+    : { value, items: result.issues.map((issue) => issueItem(issue, pointer)) };
 }
 
 /**
  * Parses the resource object at `options.pointer` (default `/data`). Throws
  * `BanError`: 400 for structure, 403 for a client-generated id or a field
  * the definition does not accept for the operation, 409 for a type or id
- * mismatch, 422 for attribute validation issues.
+ * mismatch, 422 for the issues of the attributes and of a client-generated
+ * id, which `validate.id` checks.
  */
 export async function parseResourceObject(
   resource: AnyResource,
@@ -159,19 +165,27 @@ export async function parseResourceObject(
   if (errors.length > 0) {
     throw jsonApiError(errors);
   }
-  const schema =
-    options.operation === 'create'
-      ? resource.validate.create
-      : resource.validate.update;
+  const creates = options.operation === 'create';
+  const { validate } = resource;
+  const id = await validated(
+    creates && identity.id !== undefined ? validate.id : undefined,
+    identity.id,
+    `${pointer}/id`,
+  );
+  const fields = await validated<unknown>(
+    creates ? validate.create : validate.update,
+    attributes,
+    `${pointer}/attributes`,
+  );
+  const items = [...id.items, ...fields.items];
+  if (items.length > 0) {
+    throw jsonApiError(items);
+  }
   return {
     type: resource.type,
-    id: identity.id,
+    id: id.value,
     lid: identity.lid,
-    attributes: await validateAttributes(
-      schema,
-      attributes,
-      `${pointer}/attributes`,
-    ),
+    attributes: fields.value,
     relationships,
     meta: isRecord(meta) ? meta : undefined,
   };

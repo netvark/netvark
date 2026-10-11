@@ -26,10 +26,10 @@ export type ResourceValidator<
 > = SyncStandardSchema<TInput, TOutput, ResourceIssue>;
 
 /** `schema` as a Standard Schema V1 validator; `findMember` reads the members of its issue paths. */
-export function standardValidator(
-  schema: z.ZodType,
+export function standardValidator<TOutput>(
+  schema: z.ZodType<TOutput>,
   findMember: FindMember,
-): ResourceValidator {
+): ResourceValidator<unknown, TOutput> {
   return Object.freeze({
     '~standard': Object.freeze({
       version: 1,

@@ -17,10 +17,14 @@ import type { ResourceOf } from '../jsonapi/resource-definition-types';
 import type { TypedFields } from '../meta/field-meta-types';
 import type { FieldMeta } from '../meta/types';
 import type { ResourceNames } from '../names/types';
-import type { AttributeValidators } from '../schema/attribute-schemas';
+import type {
+  AttributeSchemas,
+  AttributeValidators,
+} from '../schema/attribute-schemas';
 import type { ObjectSchemas } from '../schema/object-schemas';
 import type { ResourceSpecs } from '../schema/resource-specs';
 import type {
+  TypedAttributeSchemas,
   TypedObjectSchemas,
   TypedValidators,
   TypedWrite,
@@ -59,17 +63,20 @@ export interface DeclaredResource<
     Readonly<Record<string, ErrorEntry>>,
     ResourceErrors<TContext, TTable, TDecl>
   >;
-  /** The read, create, and update schemas of the attributes (SPEC 6.2), built on first read. */
+  /**
+   * The read, create, and update schemas of the attributes, and `id`, the
+   * schema of a resource id (SPEC 3.4, 6.2), built on first read.
+   */
   readonly schema: Typed<
     TTable,
-    ObjectSchemas,
-    TypedObjectSchemas<
+    AttributeSchemas,
+    TypedAttributeSchemas<
       Types<TContext, TTable, TDecl>['read'],
       Types<TContext, TTable, TDecl>['create'],
       Types<TContext, TTable, TDecl>['update']
     >
   >;
-  /** `schema.create` and `schema.update` as Standard Schema validators (SPEC 6.5). */
+  /** `schema.create`, `schema.update`, and `schema.id` as Standard Schema validators (SPEC 6.5). */
   readonly validate: Typed<
     TTable,
     AttributeValidators,

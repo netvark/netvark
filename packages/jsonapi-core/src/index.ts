@@ -132,7 +132,6 @@ export type {
   RelationshipNameOf,
   ResourceDefinition,
   ResourceDefinitionInit,
-  ResourceValidators,
   RowOf,
   SearchParameter,
   SerializedAttributes,
@@ -140,9 +139,12 @@ export type {
   SerializedRelationships,
   SerializedResource,
   UpdateAttributesOf,
+} from './resource/types';
+export type {
+  ResourceValidators,
   WritableFields,
   WritableFieldsInit,
-} from './resource/types';
+} from './resource/write-types';
 
 export { BanError, isBanError } from '@netvark/ban-core';
 

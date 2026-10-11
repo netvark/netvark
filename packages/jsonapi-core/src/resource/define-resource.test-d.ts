@@ -119,6 +119,24 @@ describe('defineResource types', () => {
     });
   });
 
+  it('takes a client id validator whose output is a string', () => {
+    const numbered = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'test',
+        validate: () => ({ value: 1 }),
+      },
+    };
+    defineResource({
+      type: 'calls',
+      attributes: [],
+      serialize: (row: { id: string }) => ({ id: row.id }),
+      clientIds: true,
+      // @ts-expect-error an id is a string
+      validate: { id: numbered },
+    });
+  });
+
   it('is assignable to AnyResource', () => {
     const any: AnyResource = Article;
     expectTypeOf(any.type).toEqualTypeOf<string>();

@@ -98,7 +98,9 @@ export function declareResourceIn(
   });
   const members = checkFilters(table, frozen, specs);
   checkExamples(table, frozen, specs.fields);
-  const schema = lazy(() => attributeSchemas(specs.fields, specs.checks));
+  const schema = lazy(() =>
+    attributeSchemas(specs.fields, specs.checks, specs.id),
+  );
   const validate = lazy(() => attributeValidators(specs.fields, schema()));
   const linkage = lazy(() => linkageSchemas(specs.relationships, specs.checks));
   const write = lazy(() => writeValidators(specs, schema(), linkage()));

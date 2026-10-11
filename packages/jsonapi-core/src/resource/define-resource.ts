@@ -13,10 +13,12 @@ import type {
   RelationshipDefinition,
   ResourceDefinition,
   ResourceDefinitionInit,
+} from './types';
+import type {
   ResourceValidators,
   WritableFields,
   WritableFieldsInit,
-} from './types';
+} from './write-types';
 
 import { assertMemberName } from '../document/member-name';
 import { isRecord, ownEntry } from '../internal/object';
@@ -60,7 +62,6 @@ function assertRelationships(
   }
 }
 
-/** The Standard Schema V1 shape: `~standard` with `version: 1` and `validate`. */
 /**
  * Structural check for Standard Schema V1. `~standard` is read with `in`
  * rather than as an own property: zod 4, valibot, and ArkType define it as
@@ -180,6 +181,9 @@ export function defineResource(
   }
   const validate = init.validate ?? {};
   assertValidators(validate);
+  if (validate.id !== undefined && init.clientIds !== true) {
+    throw new TypeError('validate.id needs clientIds: true');
+  }
   const relationshipNames = new Set(Object.keys(relationships));
   const fields = new Set([...attributes, ...relationshipNames]);
   return {
