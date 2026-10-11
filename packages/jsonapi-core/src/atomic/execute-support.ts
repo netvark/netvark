@@ -19,6 +19,7 @@ import type {
 import { serializeResource } from '../document/serialize';
 import { jsonApiError } from '../errors/json-api-error';
 import { isRecord, ownMember } from '../internal/object';
+import { quotable } from '../internal/quotable';
 import { invalidDocument } from '../request/identifiers';
 import { parseResourceObject } from '../request/resource-document';
 
@@ -48,7 +49,9 @@ export function handlersFor<TTransaction, TContext>(
   const handlers = execution.handlers.get(type);
   if (handlers === undefined) {
     throw jsonApiError('NOT_FOUND', {
-      detail: `No resource type "${type}" exists`,
+      detail: quotable(type)
+        ? `No resource type "${type}" exists`
+        : 'No resource type by this name exists',
       source: { pointer },
     });
   }

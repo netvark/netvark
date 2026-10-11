@@ -8,7 +8,8 @@
  *   disjunction group `n`
  * - the definition's search parameter when it lives in this family
  *
- * Fields and operators must be declared; anything else is a 400.
+ * Fields and operators must be declared; anything else is a 400, whose
+ * detail quotes the request's text only when it is a plain token (ADR 0016).
  * @ref https://jsonapi.org/format/1.1/#fetching-filtering
  * @packageDocumentation
  */
@@ -16,6 +17,7 @@ import type { ParseState } from './parse-families';
 import type { FilterCondition, ParameterValue, ParsedFilter } from './types';
 
 import { ownEntry } from '../internal/object';
+import { quotable } from '../internal/quotable';
 import { FILTER_OR_MEMBER } from '../resource/query-capabilities';
 import { invalid, unknown } from './parse-families';
 
@@ -56,7 +58,9 @@ function condition(
     state.errors.push(
       invalid(
         parameter,
-        `Filter field "${field}" is not supported by this endpoint`,
+        quotable(field)
+          ? `Filter field "${field}" is not supported by this endpoint`
+          : 'The filter field of this parameter is not supported by this endpoint',
       ),
     );
     return undefined;
@@ -65,7 +69,9 @@ function condition(
     state.errors.push(
       invalid(
         parameter,
-        `Operator "${operator}" is not supported for filter field "${field}"`,
+        quotable(operator)
+          ? `Operator "${operator}" is not supported for filter field "${field}"`
+          : `The operator of this parameter is not supported for filter field "${field}"`,
       ),
     );
     return undefined;

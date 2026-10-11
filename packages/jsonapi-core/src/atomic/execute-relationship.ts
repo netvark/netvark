@@ -19,6 +19,7 @@ import type {
 } from './types';
 
 import { jsonApiError } from '../errors/json-api-error';
+import { quotable } from '../internal/quotable';
 import { invalidDocument, parseLinkage } from '../request/identifiers';
 import {
   forbidden,
@@ -40,7 +41,9 @@ function relationshipDefinition<TTransaction, TContext>(
     throw jsonApiError(
       invalidDocument(
         `${operation.pointer}/ref/relationship`,
-        `"${resource.type}" has no relationship "${name}"`,
+        quotable(name)
+          ? `"${resource.type}" has no relationship "${name}"`
+          : `"${resource.type}" has no relationship by this name`,
       ),
     );
   }
@@ -83,7 +86,7 @@ export async function relationship<TTransaction, TContext>(
   const unsupported = (): BanError =>
     forbidden(
       operation.pointer,
-      `"${target.type}.${name}" does not support ${operation.op}`,
+      `"${handlers.resource.type}.${name}" does not support ${operation.op}`,
     );
   // A relationship the definition's updates do not write takes no change,
   // whatever handlers the host registered (SPEC 9.2, `writable`).

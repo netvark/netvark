@@ -65,6 +65,18 @@ export const EXTENSION_NAMESPACE_PATTERN: RegExp = /^[A-Za-z0-9]+$/u;
 export const PAGE_SIZE_PATTERN: RegExp = /^[0-9]+$/u;
 
 /**
+ * Request text an error detail may quote (ADR 0016): letters, digits, `_`,
+ * `-`, `.`, and the square brackets of a query parameter family, at most 64
+ * characters. A member name, a member path, a parameter name such as
+ * `page[size]`, an integer, or a UUID passes; a quote, markup, whitespace, a
+ * control character, a URL, or a long text does not. The same character
+ * set as the request id `@netvark/ban-core` echoes (ban ADR 0007), with the
+ * brackets added and a shorter bound.
+ * @ref https://jsonapi.org/format/1.1/#query-parameters-families
+ */
+export const QUOTABLE_PATTERN: RegExp = /^[A-Za-z0-9_.[\]-]{1,64}$/u;
+
+/**
  * Property names that reach `Object.prototype` through an ordinary assignment
  * or lookup. Every parser that turns client input into object keys rejects
  * them; every lookup into a client-shaped object uses `Object.hasOwn`.

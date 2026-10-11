@@ -59,7 +59,7 @@ app.notFound(notFoundHandler());
 app.get('/articles/:id', queryValidator(Articles), async (c) => {
   const row = await articles.find(c.req.param('id'));
   if (row === undefined) {
-    throw jsonApiError('NOT_FOUND', { detail: `Article ${c.req.param('id')} does not exist` });
+    throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
   }
   return respond(c, resourceDocument(Articles, row, { query: c.req.valid('query') }));
 });
@@ -104,7 +104,7 @@ export default {
       const query = parseQuery(Articles, url.search.slice(1));
       const row = await articles.find(id);
       if (row === undefined) {
-        throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+        throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
       }
       const document = resourceDocument(Articles, row, { query });
       return send(document, 200, formatJsonApiMediaType({ profile: document.jsonapi?.profile }));

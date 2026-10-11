@@ -10,6 +10,7 @@
 import type { BanError, ErrorItem } from '@netvark/ban-core';
 
 import { errorItem, jsonApiError } from '../errors/json-api-error';
+import { quotable } from '../internal/quotable';
 
 export {
   MAX_SIZE_EXCEEDED_TYPE,
@@ -28,9 +29,12 @@ export function maxPageSizeExceededError(
   });
 }
 
+/** `field` is the request's text; the detail quotes it only when it is a plain token (ADR 0016). */
 export function unsupportedSortError(field: string): ErrorItem {
   return errorItem('UNSUPPORTED_SORT', {
-    detail: `Sort field "${field}" is not supported by this endpoint`,
+    detail: quotable(field)
+      ? `Sort field "${field}" is not supported by this endpoint`
+      : 'A sort field is not supported by this endpoint',
     source: { parameter: 'sort' },
   });
 }

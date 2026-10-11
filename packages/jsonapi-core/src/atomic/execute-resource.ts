@@ -11,6 +11,7 @@ import type { RawOperation } from './parse-document';
 import type { ResolvedResourceObject } from './types';
 
 import { jsonApiError } from '../errors/json-api-error';
+import { quotable } from '../internal/quotable';
 import { conflict, invalidDocument } from '../request/identifiers';
 import {
   dataType,
@@ -46,7 +47,10 @@ export async function create<TTransaction, TContext>(
     `${operation.pointer}/${target === undefined ? 'data' : 'ref'}/type`,
   );
   if (handlers.create === undefined) {
-    throw forbidden(operation.pointer, `"${type}" does not support add`);
+    throw forbidden(
+      operation.pointer,
+      `"${handlers.resource.type}" does not support add`,
+    );
   }
   const data = await parseData(
     execution,
@@ -114,7 +118,10 @@ export async function update<TTransaction, TContext>(
     `${operation.pointer}/${target === undefined ? 'data' : 'ref'}/type`,
   );
   if (handlers.update === undefined) {
-    throw forbidden(operation.pointer, `"${type}" does not support update`);
+    throw forbidden(
+      operation.pointer,
+      `"${handlers.resource.type}" does not support update`,
+    );
   }
   const targeted =
     target === undefined
@@ -135,7 +142,9 @@ export async function update<TTransaction, TContext>(
     throw jsonApiError(
       conflict(
         `${operation.pointer}/data/lid`,
-        `The document's lid "${data.lid}" does not match the target's lid "${target.lid}"`,
+        quotable(data.lid) && quotable(target.lid)
+          ? `The document's lid "${data.lid}" does not match the target's lid "${target.lid}"`
+          : "The document's lid does not match the target's lid",
       ),
     );
   }
@@ -166,7 +175,7 @@ export async function remove<TTransaction, TContext>(
   if (handlers.remove === undefined) {
     throw forbidden(
       operation.pointer,
-      `"${target.type}" does not support remove`,
+      `"${handlers.resource.type}" does not support remove`,
     );
   }
   const id = targetId(execution, target, `${operation.pointer}/ref`);

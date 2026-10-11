@@ -63,7 +63,7 @@ app.notFound(notFoundHandler());
 app.get('/articles/:id', queryValidator(Articles), async (c) => {
   const row = await articles.find(c.req.param('id'));
   if (row === undefined) {
-    throw jsonApiError('NOT_FOUND', { detail: `Article ${c.req.param('id')} does not exist` });
+    throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
   }
   return respond(c, resourceDocument(Articles, row, { query: c.req.valid('query') }));
 });
@@ -358,7 +358,7 @@ of `errorItem`s reports several problems at once, each object with its own ident
 status the specification derives from them.
 
 ```ts
-throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
 throw jsonApiError('CONFLICT', {
   detail: 'The article was modified by another request',
   source: { pointer: '/data' },
@@ -374,6 +374,12 @@ throw jsonApiError([
   }),
 ]); // 400, two error objects
 ```
+
+The details the package writes quote what the client sent only when it is a plain token, such as a
+member name or an id, and otherwise name the value without it; `source` still says where it was
+([ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)).
+Write yours the same way: a 404 for `/articles/<script>` says the article does not exist, not which
+text the client typed.
 
 `errorHandler()` is [@netvark/hono-ban](https://github.com/netvark/netvark)'s handler over the same
 catalog. It renders anything thrown: a `BanError` as is (this package's, the rejections the

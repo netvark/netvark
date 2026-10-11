@@ -76,7 +76,7 @@ export default {
       const query = parseQuery(Articles, url.search.slice(1));
       const row = await articles.find(id);
       if (row === undefined) {
-        throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+        throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
       }
       const document = resourceDocument(Articles, row, { query });
       return send(document, 200, formatJsonApiMediaType({ profile: document.jsonapi?.profile }));
@@ -316,8 +316,10 @@ and types), run the Standard Schema validator over the attributes, and return a
 `ParsedResourceObject` with `attributes` typed as the validator's output. Every problem carries an
 RFC 6901 pointer: `/data/attributes/title`, `/data/relationships/author/data/type`. A validator
 issue's `code` and `expected`, when they are strings, appear under `meta`, so a client can tell one
-failed rule from another without parsing the `detail`; nothing else of the issue is kept, so no
-value from the request reaches the response:
+failed rule from another without parsing the `detail`; nothing else of the issue is kept. The
+`detail` is the issue's `message`, your validator's text: Zod 4's messages name what was expected,
+never the value, but Valibot's defaults quote the received value verbatim (`received "<b>x</b>"`),
+so give a Valibot schema messages of your own:
 
 ```json
 {
@@ -356,7 +358,7 @@ reports several problems at once, each object with its own identity and the resp
 specification derives from them.
 
 ```ts
-throw jsonApiError('NOT_FOUND', { detail: `Article ${id} does not exist` });
+throw jsonApiError('NOT_FOUND', { detail: 'The article does not exist' });
 throw jsonApiError('CONFLICT', {
   detail: 'The article was modified by another request',
   source: { pointer: '/data' },
@@ -373,6 +375,17 @@ throw jsonApiError([
 ]); // 400, two error objects
 throw jsonApiError('METHOD_NOT_ALLOWED', { detail: 'Use POST', headers: { Allow: 'POST' } });
 ```
+
+A detail is shown to people and logged as it is, so the package's own details quote what the client
+sent only when it is a plain token: letters, digits, `_`, `-`, `.`, and square brackets, at most 64
+characters, such as a member name, a parameter name, or an id. Anything else, markup, a line break,
+a URL, or 10 kB, is named without its value, and `source` still says where it was. `sort=nme`
+answers `Sort field "nme" is not supported by this endpoint`; `sort=<b>nme</b>` answers
+`A sort field is not supported by this endpoint`, with `source.parameter` `sort` in both.
+
+Write your own details the same way: say what was wrong and leave the value to `source.pointer` or
+`source.parameter`, which JSON:API defines for programs to read
+([ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)).
 
 `isBanError` narrows a caught error; `error.status` is the response status, `error.headers` the
 headers it carries (`Allow`, `Vary`), `errorDocument(error)` the document to send, and

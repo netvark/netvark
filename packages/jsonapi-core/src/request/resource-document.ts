@@ -29,6 +29,7 @@ import { isAtMember } from '../document/member-name';
 import { errorItem, jsonApiError } from '../errors/json-api-error';
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
 import { pointer as toPointer } from '../internal/pointer';
+import { quotable } from '../internal/quotable';
 import { invalidDocument } from './identifiers';
 import {
   RESOURCE_MEMBERS,
@@ -144,7 +145,9 @@ export async function parseResourceObject(
       errors.push(
         invalidDocument(
           `${pointer}/${toPointer([name]).slice(1)}`,
-          `"${name}" is not a resource object member`,
+          quotable(name)
+            ? `"${name}" is not a resource object member`
+            : 'This member is not a resource object member',
         ),
       );
     }

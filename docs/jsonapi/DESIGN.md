@@ -243,16 +243,17 @@ Every error is a `BanError` from `jsonApiBan`, the package's @netvark/ban-core i
 `ERROR_CATALOG` over @netvark/ban-core's built-in catalog, rendered by @netvark/ban-core's JSON:API
 format with `mixedEntries` on so one document can combine entries. A parser accumulates
 `ErrorItem`s, each with the entry's identity and the occurrence's `detail` and address, and throws
-once; the response status is the shared entry's, else the "most generally applicable" one.
-Everything in the adapter throws: the validators, `jsonApi()`, `readDocument`, and
-`atomicOperations()`. Hono hands a thrown error to `app.onError`, where `errorHandler()`, a
-@netvark/hono-ban handler over the same catalog, renders it with an error id in the header and the
-body, `Cache-Control: no-store`, the trace id from `traceparent`, and a report; Hono's
-`HTTPException` is adopted by status and anything else is a constant 500. Without `errorHandler()`,
-Hono's default handler still answers a thrown `BanError` through its `getResponse()`, so a rejection
-is a JSON:API document either way (ADR-0014). An application with entries of its own spreads
-`ERROR_CATALOG` into its `createBan` and installs that instance's `onError`; the package's errors
-render through it unchanged.
+once; a detail quotes what the client sent only when it is a plain token, such as a member name or
+an id, and otherwise names the value without it (ADR-0016). The response status is the shared
+entry's, else the "most generally applicable" one. Everything in the adapter throws: the validators,
+`jsonApi()`, `readDocument`, and `atomicOperations()`. Hono hands a thrown error to `app.onError`,
+where `errorHandler()`, a @netvark/hono-ban handler over the same catalog, renders it with an error
+id in the header and the body, `Cache-Control: no-store`, the trace id from `traceparent`, and a
+report; Hono's `HTTPException` is adopted by status and anything else is a constant 500. Without
+`errorHandler()`, Hono's default handler still answers a thrown `BanError` through its
+`getResponse()`, so a rejection is a JSON:API document either way (ADR-0014). An application with
+entries of its own spreads `ERROR_CATALOG` into its `createBan` and installs that instance's
+`onError`; the package's errors render through it unchanged.
 
 ### 4.5 Types
 
@@ -295,6 +296,8 @@ a cited clause with a test.
   point at the operation that failed.
 - Driver and policy error text reached clients as `detail`; now unexpected errors are a
   constant 500.
+- Details quoted the client's text verbatim, markup, line breaks, and 10 kB included; now a detail
+  quotes a value only when it is a plain token and otherwise names it without it.
 - Node-only `crypto` and `Buffer` imports; now web standards only, verified on Bun, Deno, and
   workerd.
 
@@ -317,3 +320,4 @@ a cited clause with a test.
 | 0013 | Two packages: the framework-neutral core `@netvark/jsonapi-core` and the Hono adapter `@netvark/hono-jsonapi` |
 | 0014 | Errors are @netvark/ban-core errors; the adapter renders through @netvark/hono-ban; everything throws         |
 | 0015 | Resource links by convention: opt-in `base`, a configured definer, no implicit defaults                       |
+| 0016 | Error details quote request text only as a plain token; `source` locates the rest                             |

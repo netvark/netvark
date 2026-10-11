@@ -67,6 +67,7 @@ packages/jsonapi-core/src/
     constants.ts                 section 13
     object.ts                    isRecord(), ownMember(), hasOwnMember(), ownEntry(), ownKeys(), compact(): prototype-safe reads
     pointer.ts                   pointer(), escapePointerToken(), pathFromPointer(): RFC 6901
+    quotable.ts                  quotable(): the request text a detail may quote (4.4)
     standard-schema-types.ts     vendored Standard Schema V1 interfaces
   media-type/
     parse.ts                     parseMediaType(), parseAccept() (3.1)
@@ -229,7 +230,7 @@ Content-Type:
    acceptable is the endpoint's call (`readDocument` rejects it, section 10.3).
 3. JSON:API with any parameter other than `ext` and `profile`: 415 (`source.header` is
    `Content-Type`).
-4. JSON:API with an `ext` URI not in `extensions`: 415.
+4. JSON:API with an `ext` URI not in `extensions`: 415, whose detail does not quote the URI (4.4).
 5. Otherwise `request = { mediaType, jsonApi: true, extensions, profiles }` as sent.
 
 Accept:
@@ -330,9 +331,34 @@ An error object is an `ErrorItem` on `error.errors`:
 unregistered status is a `TypeError` in @netvark/ban-core at construction (ADR 0009). The adapter
 hands `error.status` to `c.json` without assertions.
 
+### 4.4 Request text in details (`internal/quotable.ts`, ADR 0016)
+
+A detail is shown to people and logged as it is, so a detail the package writes quotes a text from
+the request only when `quotable(value)` holds: the value matches `QUOTABLE_PATTERN` (section 13),
+letters, digits, `_`, `-`, `.`, and square brackets, 1 to 64 characters. A member name, a member
+path, a parameter name such as `page[size]`, an integer, and a UUID pass. Otherwise the detail says
+what the value was without it, and `source` locates it:
+`Sort field "nme" is not supported by this endpoint` against
+`A sort field is not supported by this endpoint`,
+`Query parameter "fields[x]" is specified more than once` against
+`This query parameter is specified more than once`.
+
+- A detail about two request values (two ids, two `lid`s) quotes both or neither.
+- A value the server declared, such as a type a lookup matched or a declared field, is the server's
+  text and is quoted as it is.
+- An extension URI is never quoted (3.3): a URI has a scheme and a colon.
+- `source.parameter` and `source.pointer` keep the request's names, as JSON:API defines them; they
+  are for programs, escaped by JSON and RFC 6901.
+- A validator's issue message is the application's text and stays the detail (9.2).
+
 Tests: `json-api-error.test.ts` (catalog closure and spreading into `createBan`, item mapping and
 precedence, both call forms, status derivation for mixed lists), `error-document.test.ts` (document
-order, a foreign @netvark/ban-core validation error, `getResponse` with the error's headers).
+order, a foreign @netvark/ban-core validation error, `getResponse` with the error's headers),
+`quotable.test.ts` (the token's characters and bounds), and the sweeps `errors/request-text.test.ts`
+and `atomic/request-text.test.ts`: quotes, markup, CR LF, C0 and C1 controls, a URL, a bidi
+override, a line separator, an inner space, and 10 kB through every builder and parser that quotes,
+each detail short printable ASCII without angle brackets that quotes none of it, and a plain token
+reaching the same refusal quoted.
 
 ---
 
@@ -434,8 +460,9 @@ validation, inference through the configured definer).
 
 `parseQuery(resource, input): ParsedQuery<TSort, TFilter>` parses every parameter against the
 definition and throws one 400 `BanError` listing every problem, each with `source.parameter` set to
-the parameter name as sent. Nothing is dropped silently: a parameter the endpoint does not know how
-to process is `UNKNOWN_QUERY_PARAMETER` (`#query-parameters`: "MUST return 400 Bad Request").
+the parameter name as sent and a detail that quotes request text only as 4.4 allows. Nothing is
+dropped silently: a parameter the endpoint does not know how to process is `UNKNOWN_QUERY_PARAMETER`
+(`#query-parameters`: "MUST return 400 Bad Request").
 
 Dispatch per parameter name (6.2 gives the grammar; `member` is the first bracket member):
 
@@ -665,8 +692,10 @@ link under `https://jsonapi.org/profiles/ethanresnick/cursor-pagination/`, the c
 | `invalidCursorError(parameter, detail?)`   | `INVALID_QUERY_PARAMETER`        | none                             | for a cursor the engine cannot decode |
 
 `unsupportedSort(field)` and `invalidCursor(parameter, detail?)` wrap them in a `BanError` for
-throwing from an engine. The `type` link is a string, since the profile says "has a `type` link of"
-and a link may be a string (`#document-links-link`).
+throwing from an engine. `unsupportedSortError` quotes `field`, the request's text, only as 4.4
+allows, so an engine passes the fields it refused as they came; a `detail` given to
+`invalidCursorError` is the caller's. The `type` link is a string, since the profile says "has a
+`type` link of" and a link may be a string (`#document-links-link`).
 
 Tests: `links.test.ts`, `paginated.test.ts`, `errors.test.ts`; `pagination.e2e.test.ts` walks pages
 over HTTP.
@@ -676,7 +705,8 @@ over HTTP.
 ## 9. Request documents (`request/`)
 
 Every parser accumulates error items, each with `source.pointer` (RFC 6901, `~` and `/` escaped in
-names), and throws one `BanError` whose status follows 4.2.
+names) and a detail that quotes request text only as 4.4 allows, and throws one `BanError` whose
+status follows 4.2.
 
 ### 9.1 Identifiers and linkage (`identifiers.ts`)
 
@@ -728,8 +758,11 @@ object at `pointer` (default `/data`):
    server, whose keys decide it (`#crud-creating-client-ids`); the parsed `id` and `attributes` are
    the validators' output. The issue's `code` and `expected`, when they are strings, become the
    item's `reason` and `expected`, which `@netvark/ban-core`'s JSON:API format renders as
-   `meta.code` and `meta.expected`; nothing else of a vendor's issue is kept, so no value from the
-   request reaches the response. Without a validator the attributes pass through.
+   `meta.code` and `meta.expected`; nothing else of a vendor's issue is kept. The detail is the
+   issue's `message`, the application's text (4.4): @netvark/resource-core's and Zod 4.6's messages
+   name what was expected, never the value, while Valibot 1.5's defaults quote the received value,
+   so an application on Valibot gives its schemas messages of its own. Without a validator the
+   attributes pass through.
 
 Returns
 `ParsedResourceObject<TAttributes, TLinkage> = { type, id, lid, attributes, relationships, meta }`
@@ -1010,6 +1043,7 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
 | `MEMBER_NAME_PATTERN`                 | section 2.1                                                                                  | no       |
 | `EXTENSION_NAMESPACE_PATTERN`         | `^[A-Za-z0-9]+$`                                                                             | no       |
 | `PAGE_SIZE_PATTERN`                   | `^[0-9]+$`                                                                                   | no       |
+| `QUOTABLE_PATTERN`                    | `^[A-Za-z0-9_.[\]-]{1,64}$` (4.4)                                                            | no       |
 | `PROTO_KEYS`                          | `__proto__`, `constructor`, `prototype`                                                      | no       |
 | `RESERVED_QUERY_FAMILIES`             | `include`, `fields`, `sort`, `page`, `filter`                                                | no       |
 | `CURSOR_PAGE_MEMBERS`                 | `size`, `after`, `before`                                                                    | no       |
@@ -1030,10 +1064,10 @@ packages' own modules.
 
 | Area                           | Files                                                                                                                                                                     | What is pinned                                                                                                                                                                                   |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Internal                       | `object.test.ts`, `pointer.test.ts`                                                                                                                                       | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                           |
+| Internal                       | `object.test.ts`, `pointer.test.ts`, `quotable.test.ts`                                                                                                                   | prototype-safe reads, RFC 6901 escaping and unescaping, the quotable token's characters and bounds                                                                                               |
 | Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                                       | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
 | Negotiation                    | `negotiate.test.ts`                                                                                                                                                       | each rule of 3.3                                                                                                                                                                                 |
-| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                                        | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                                  |
+| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`, `errors/request-text.test.ts`, `atomic/request-text.test.ts`                                                          | catalog closure and spreading, item mapping, both call forms, status derivation, document order, no hostile request text in any detail (4.4)                                                     |
 | Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                                        | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
 | Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`                             | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets                                                                              |
 | Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                         | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |

@@ -114,7 +114,7 @@ describe('include', () => {
       'Relationship path "tags" is not supported by this endpoint',
       'Relationship path "comments.author.company.x" is not supported by this endpoint',
       '"author..company" is not a relationship path',
-      '" author" is not a relationship path',
+      'A path in include is not a relationship path',
     ]);
     expect(errors.every((error) => error.source?.parameter === 'include')).toBe(
       true,

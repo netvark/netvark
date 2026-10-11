@@ -25,6 +25,7 @@ import {
   ownMember,
 } from '../internal/object';
 import { pointer as toPointer } from '../internal/pointer';
+import { quotable } from '../internal/quotable';
 import { conflict, invalidDocument, parseLinkage } from './identifiers';
 
 export const RESOURCE_MEMBERS: ReadonlySet<string> = new Set([
@@ -62,7 +63,9 @@ export function parseIdentity(
     errors.push(
       conflict(
         `${pointer}/type`,
-        `This endpoint accepts resources of type "${resource.type}", received "${type}"`,
+        quotable(type)
+          ? `This endpoint accepts resources of type "${resource.type}", received "${type}"`
+          : `This endpoint accepts resources of type "${resource.type}"`,
       ),
     );
   }
@@ -161,7 +164,9 @@ export async function idConflict(
   }
   return conflict(
     `${pointer}/id`,
-    `The document's id "${id}" does not match the request's id "${requested}"`,
+    quotable(id) && quotable(requested)
+      ? `The document's id "${id}" does not match the request's id "${requested}"`
+      : "The document's id does not match the request's id",
   );
 }
 
@@ -206,7 +211,12 @@ export function parseRelationships(
     }
     if (definition === undefined) {
       errors.push(
-        invalidDocument(at, `"${resource.type}" has no relationship "${name}"`),
+        invalidDocument(
+          at,
+          quotable(name)
+            ? `"${resource.type}" has no relationship "${name}"`
+            : `"${resource.type}" has no relationship by this name`,
+        ),
       );
       continue;
     }
@@ -260,7 +270,12 @@ export function parseAttributeNames(
     const at = `${pointer}/${toPointer([name]).slice(1)}`;
     if (!resource.attributes.includes(name)) {
       errors.push(
-        invalidDocument(at, `"${resource.type}" has no attribute "${name}"`),
+        invalidDocument(
+          at,
+          quotable(name)
+            ? `"${resource.type}" has no attribute "${name}"`
+            : `"${resource.type}" has no attribute by this name`,
+        ),
       );
       continue;
     }
