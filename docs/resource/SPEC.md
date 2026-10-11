@@ -2000,7 +2000,8 @@ resources, after the checks of every list of resources (4.2). The options:
   ASCII, and a code, which may be any string, are spelled with each UTF-16 code unit outside
   `A-Za-z0-9_-` as `.` and four uppercase hexadecimal digits, which is injective. A suffix is a
   lowercase word after the last `.`, and an error key starts with `_`, which no type's spelling
-  does.
+  does. An error key names a code's error object in `components.schemas` and its lone response in
+  `components.responses`, two maps with keys of their own.
 - **Parameters** come from the JSON:API definition's capabilities, which `parseQuery` holds a
   request to: `filter[<member>][<operator>]` per declared operator, whose value is the text
   `@netvark/keyset-core` accepts for the member's keyset type, a list for `in`, `nin`, `between`,
@@ -2016,14 +2017,17 @@ resources, after the checks of every list of resources (4.2). The options:
   of different statuses answers with ban's combined status (ban SPEC 7.2.4), so the 400 lists every
   4xx code of the operation and the 500 every code. Each code's error object is
   `components.schemas['_error.<code>']`, written once and referenced from every response (ban SPEC
-  9). The codes of each operation (`operation-codes.ts`): every request's content negotiation and
-  `INTERNAL_SERVER_ERROR`; a list's or a get's query codes, `FORBIDDEN` for a denied list or include
-  and `NOT_FOUND` for a denied or missing row (12.2); a create's or an update's document codes,
-  `CONFLICT` for a type or an id that differs, `CLIENT_GENERATED_ID_NOT_SUPPORTED` for a create's id
-  without client ids, `FORBIDDEN` for a member the operation does not accept (9.4) and a denied
-  create, and the derived codes the operation can raise (9.1, 9.5); a remove's `NOT_FOUND` and
-  `CONFLICT` for a row still referenced; and `options.codes`. A code `codes` names outside the
-  catalog throws `TypeError`
+  9). A status that carries one code is a Reference Object to that code's response,
+  `components.responses['_error.<code>']`, written once: it depends only on the code, and a 404 or a
+  409 recurs on most operations. A status that combines codes, such as the 400 and the 500, stays in
+  its operation. The codes of each operation (`operation-codes.ts`): every request's content
+  negotiation and `INTERNAL_SERVER_ERROR`; a list's or a get's query codes, `FORBIDDEN` for a denied
+  list or include and `NOT_FOUND` for a denied or missing row (12.2); a create's or an update's
+  document codes, `CONFLICT` for a type or an id that differs, `CLIENT_GENERATED_ID_NOT_SUPPORTED`
+  for a create's id without client ids, `FORBIDDEN` for a member the operation does not accept (9.4)
+  and a denied create, and the derived codes the operation can raise (9.1, 9.5); a remove's
+  `NOT_FOUND` and `CONFLICT` for a row still referenced; and `options.codes`. A code `codes` names
+  outside the catalog throws `TypeError`
   (`openapi: codes: TEAPOT is not a code of the catalog; give it in appErrors`).
 - **Examples**: `options.examples` adds named Example Objects (`summary`, `description`, `value`) to
   a create's and an update's request body and to a get's 200 response. Each MUST pass what the
@@ -2095,10 +2099,11 @@ the registry, next to `rules --check` (catalog SPEC 10.3, 11.2).
 Tests: `document.test.ts` validates the contacts document against the official OpenAPI 3.1 schemas
 with Ajv 2020-12 (`schema-base`, Schema Objects against the OpenAPI dialect with formats asserted,
 `src/test-support/openapi-conformance.ts`), and checks every request the parser accepts and refuses
-against the request schemas and every error the handler renders against its response;
-`document-checks.test.ts` the lists it refuses (two origins, two resources at one path, an unknown
-code) and the endpoints a resource does not serve; `document.test-d.ts` that `openapi` and
-`surfaceOf` take `ReadonlyArray<AnyDeclaredResource>` and refuse a declaration;
+against the request schemas and every error the handler renders against its response, a status of
+one code read where its reference points, every reference resolving and each referenced response
+held once; `document-checks.test.ts` the lists it refuses (two origins, two resources at one path,
+an unknown code) and the endpoints a resource does not serve; `document.test-d.ts` that `openapi`
+and `surfaceOf` take `ReadonlyArray<AnyDeclaredResource>` and refuse a declaration;
 `value-schema-oracle.test.ts` runs the boundary fixtures through each value's Zod schema and its
 JSON Schema: each fixture the Zod schema accepts passes, and each it refuses fails, but those of the
 looseness above; `paths.test.ts`, `parameters.test.ts`, `filter-schemas.test.ts`,
@@ -2317,16 +2322,18 @@ workerd for the root, `server`, `testing`, and `openapi` entries. The OpenAPI do
 against the contacts application's HTTP API (`runtime/api.ts`: the runtime of 12 behind Hono and
 `@netvark/hono-jsonapi`): the document passes an independent validator
 (`@seriousme/openapi-schema-validator`) with every reference resolved, is the same on every build,
-and puts the application's codes where its options name them (`openapi-document.e2e.test.ts`); every
-exchange, success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, a
-client-keyed resource, members a write does not accept (9.4), and ids outside the key's form (3.4)
+puts the application's codes where its options name them, and holds each error object and each
+response a status of one code references once (`openapi-document.e2e.test.ts`); every exchange,
+success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, a client-keyed
+resource, members a write does not accept (9.4), and ids outside the key's form (3.4)
 (`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of the key, a get, an update, and a
 remove by a `uuid` in upper case and a call created under one (`openapi-id-spellings.e2e.test.ts`),
-answers with a status, media type, body, and codes the document lists for its operation, a 201's
-`Location` matching its header's schema, while the request schema refuses exactly the requests the
-server refuses as documents (`support/openapi-contract.ts`, Ajv 2020-12 with the formats the
-document names); and the surface, recorded in a reviewed snapshot (`snapshots/surface.json`), diffs
-an edited declaration into exactly its four changes (`openapi-surface.e2e.test.ts`).
+answers with a status, media type, body, and codes the document lists for its operation, read where
+a response's reference points, a 201's `Location` matching its header's schema, while the request
+schema refuses exactly the requests the server refuses as documents (`support/openapi-contract.ts`,
+Ajv 2020-12 with the formats the document names); and the surface, recorded in a reviewed snapshot
+(`snapshots/surface.json`), diffs an edited declaration into exactly its four changes
+(`openapi-surface.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 
@@ -2654,12 +2661,12 @@ documented by `openapi`, and every document passed the OpenAPI Initiative's `sch
 Schema Object checked against the OpenAPI dialect with formats asserted, and
 `@seriousme/openapi-schema-validator` with every reference resolved:
 
-| Catalog            | Declarations | Paths | Operations | Schemas (error objects) | Size     | Built in |
-| ------------------ | ------------ | ----- | ---------- | ----------------------- | -------- | -------- |
-| stern              | as written   | 590   | 1,056      | 1,204 (760)             | 5,375 KB | 67 ms    |
-| stern              | per table    | 590   | 590        | 232 (10)                | 5,685 KB | 25 ms    |
-| GitLab 17.11 slice | as written   | 172   | 378        | 1,557 (1,317)           | 3,915 KB | 85 ms    |
-| GitLab 17.11 slice | per table    | 172   | 172        | 130 (10)                | 4,355 KB | 24 ms    |
+| Catalog            | Declarations | Paths | Operations | Schemas (error objects) | Responses | Size     | Built in |
+| ------------------ | ------------ | ----- | ---------- | ----------------------- | --------- | -------- | -------- |
+| stern              | as written   | 590   | 1,056      | 1,204 (760)             | 33        | 4,677 KB | 68 ms    |
+| stern              | per table    | 590   | 590        | 232 (10)                | 4         | 5,303 KB | 23 ms    |
+| GitLab 17.11 slice | as written   | 172   | 378        | 1,557 (1,317)           | 23        | 3,675 KB | 102 ms   |
+| GitLab 17.11 slice | per table    | 172   | 172        | 130 (10)                | 4         | 4,245 KB | 21 ms    |
 
 Each field's boundary fixtures (15.3), in a create holding the first accepted fixture of every other
 required member and in an update of that member alone, went through jsonapi-core's parser and the
@@ -2674,11 +2681,18 @@ attribute's schema, `null` included: 8,598 of stern's 12,288 fixtures and 8,220 
 slice's 11,623 were stored, and the document refused none, on PostgreSQL 18.3 (PGlite) and on a
 14.19 server.
 
-Error responses are 2,899 KB of stern's 5,375 KB: 6,215 responses, 1,150 distinct. The 3,408 that
-hold one code (894 KB) are 33 distinct, and sharing them as `components.responses` would save 13
-percent of the document; sharing the 2,807 that combine codes too, mostly the 400 and 500 that list
-every code of their operation, 30 percent. `surfaceOf` took 3 and 7 ms (488 KB and 603 KB), gave the
-same JSON on every call, and diffed empty against itself.
+Error responses were 2,899 KB of stern's 5,375 KB: 6,215 responses, 1,150 distinct. The 3,408 that
+hold one code (894 KB) were 33 distinct, and are now references to the 33 in `components.responses`
+(11 KB), which took the document to 4,677 KB, 13 percent smaller; the GitLab slice's went from 3,915
+KB to 3,675 KB (1,187 references to 23 responses), and the per-table documents from 5,685 KB and
+4,355 KB to 5,303 KB and 4,245 KB. With each reference replaced by the response it names, all four
+documents were the ones built before, byte for byte, and every response in `components.responses`
+was referenced. The 2,807 that combine codes, mostly the 400 and 500 that list every code of their
+operation, stay in their operations: they are 1,117 distinct, and sharing them too would save
+another 17 percent of the 5,375 KB, but each would need a name for its set of codes, which changes
+whenever an operation's codes do. Under gzip, stern's document went from 193 KB to 173 KB and the
+GitLab slice's from 194 KB to 188 KB. `surfaceOf` took 3 and 7 ms (488 KB and 603 KB), gave the same
+JSON on every call, and diffed empty against itself.
 
 Across versions, the GitLab slice's declarations were declared again over the catalog of GitLab's
 master of October 2026 (1,465 tables). 36 of the 60 fit unchanged; 24 were refused with their

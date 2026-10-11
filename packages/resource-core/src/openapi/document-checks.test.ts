@@ -4,14 +4,14 @@
  * at one path; a code in `codes` the catalog lacks; and the endpoints a
  * resource does not serve: no relationship endpoint without a get, no
  * related endpoint when the target has no get. A remove answers 204 with
- * its codes.
+ * its codes, each status of one code a reference to that code's response.
  */
 import { describe, expect, it } from 'vitest';
 
 import { createDeclareResource } from '../declare/create-declare-resource';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
-import { errorRef } from './component-names';
+import { errorKey, errorRef, errorResponseRef } from './component-names';
 import { openapi } from './document';
 
 const INFO = { title: 'Contacts', version: '1' };
@@ -104,8 +104,17 @@ describe('openapi describes what each resource serves', () => {
     expect(remove?.responses['204']).toEqual({
       description: 'The resource was removed.',
     });
-    expect(codesOf(remove?.responses['404'])).toEqual([errorRef('NOT_FOUND')]);
-    expect(codesOf(remove?.responses['409'])).toEqual([errorRef('CONFLICT')]);
+    for (const [status, code] of [
+      ['404', 'NOT_FOUND'],
+      ['409', 'CONFLICT'],
+    ] as const) {
+      expect(remove?.responses[status]).toEqual({
+        $ref: errorResponseRef(code),
+      });
+      expect(codesOf(document.components.responses[errorKey(code)])).toEqual([
+        errorRef(code),
+      ]);
+    }
   });
 
   it('no related endpoint when the target has no get', () => {

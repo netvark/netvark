@@ -469,6 +469,35 @@ Map keys to names the same way in both places. Component names must match `^[a-z
 a catalog key can be any string, so encode keys that might not. Both helpers throw `TypeError` for a
 format that does not combine entries, whose responses have no objects to share.
 
+A status that carries one code answers the same in every operation that lists it, so place that
+response once too, with any format. `responseRef` says where an entry's response alone lives, and
+`errorResponseObjects` gives the responses to put there; a status that carries several codes, such
+as a combined 400 or 500, stays inline:
+
+```ts
+import {
+  errorObjectSchemas,
+  errorResponseObjects,
+  errorResponses,
+} from '@netvark/ban-core/openapi';
+
+const responseRef = (key: string) => `#/components/responses/${name(key)}`;
+const named = <T>(entries: Record<string, T>) =>
+  Object.fromEntries(Object.entries(entries).map(([key, value]) => [name(key), value]));
+
+const document = {
+  openapi: '3.1.2',
+  info: { title: 'Reports', version: '1' },
+  paths: {
+    '/reports': { get: { responses: errorResponses(ban, codes, { objectRef, responseRef }) } },
+  },
+  components: {
+    schemas: named(errorObjectSchemas(ban, codes)),
+    responses: named(errorResponseObjects(ban, codes, { objectRef })),
+  },
+};
+```
+
 ### Observe
 
 ```ts
@@ -523,7 +552,7 @@ match its schemas, with any JSON Schema 2020-12 compiler.
 | `@netvark/ban-core`                                                                                                                                                                              | `createBan`, `assert`, `defineFormat`, `fromRequest`, `bearerChallenge`, `isErrorStatus`, `BanError`, `isBanError`, `problemDetails`, `BUILTIN_CATALOG`, `parseTraceparent`, pointer helpers |
 | `@netvark/ban-core/formats/problem-details`, `@netvark/ban-core/formats/json-api`, `@netvark/ban-core/formats/plain`, `@netvark/ban-core/formats/google-api`, `@netvark/ban-core/formats/stripe` | the built-in wire formats; `json-api` also exports `responseStatus`                                                                                                                          |
 | `@netvark/ban-core/zod`, `@netvark/ban-core/valibot`, `@netvark/ban-core/standard-schema`                                                                                                        | validator hooks and issue converters                                                                                                                                                         |
-| `@netvark/ban-core/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                                                                   |
+| `@netvark/ban-core/openapi`                                                                                                                                                                      | `errorResponses`, `errorResponseObjects`, `errorObjectSchemas`, `errorResponse`, `errorSchema`, `validationResponse`, `validationSchema`                                                     |
 | `@netvark/ban-core/otel`                                                                                                                                                                         | `traceIdFromOtel`                                                                                                                                                                            |
 | `@netvark/ban-core/postgresql`                                                                                                                                                                   | `postgresMapper`, `findPostgresError`, `readPostgresFields`                                                                                                                                  |
 | `@netvark/ban-core/testing`                                                                                                                                                                      | `expectBanError`, `renderError`, `assertFormatConformance`                                                                                                                                   |

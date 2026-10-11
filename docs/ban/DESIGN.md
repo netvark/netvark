@@ -604,11 +604,13 @@ describes each status as the documents whose objects carry any code a body of th
 the statuses chosen as `responseStatus` chooses them, each object pinned to one entry.
 `errorResponses(ban, list, { objectRef })` references each entry's object instead of inlining it in
 every response, and `errorObjectSchemas(ban, list)` gives the objects to place once, typically in
-`components.schemas`, which keeps a document of many operations small. `@hono/zod-openapi` accepts
-raw schema objects in `responses[*].content[*].schema`, so the helpers drop into `createRoute()`
-without any Zod wrapping (verified by a generated-document test). @ref
-https://spec.openapis.org/oas/v3.1.0#schema-object @ref
-https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registry.ts
+`components.schemas`, which keeps a document of many operations small. With `responseRef`, a status
+that carries one entry is a Reference Object to that entry's response, which
+`errorResponseObjects(ban, list)` gives to place once, typically in `components.responses`; a status
+that combines entries stays inline. `@hono/zod-openapi` accepts raw schema objects in
+`responses[*].content[*].schema`, so the helpers drop into `createRoute()` without any Zod wrapping
+(verified by a generated-document test). @ref https://spec.openapis.org/oas/v3.1.0#schema-object
+@ref https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registry.ts
 
 A conformance test in the repository renders every catalog entry in every built-in format and
 validates the body against `format.schema(entry)`.

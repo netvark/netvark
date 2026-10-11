@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { errorKey, errorRef, schemaKey, schemaRef } from './component-names';
+import {
+  errorKey,
+  errorRef,
+  errorResponseRef,
+  schemaKey,
+  schemaRef,
+} from './component-names';
 
 const COMPONENT_KEY = /^[a-zA-Z0-9.\-_]+$/u;
 const SUFFIXES = ['resource', 'identifier', 'create', 'update'] as const;
@@ -60,6 +66,7 @@ describe('errorKey', () => {
   ])('spells %s as a component key', (code, key) => {
     expect(errorKey(code)).toBe(key);
     expect(errorRef(code)).toBe(`#/components/schemas/${key}`);
+    expect(errorResponseRef(code)).toBe(`#/components/responses/${key}`);
   });
 });
 

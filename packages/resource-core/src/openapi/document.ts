@@ -6,7 +6,9 @@
  * the application's, under the JSON:API format with combined entries
  * (jsonapi SPEC 10.5), and refuses a code the options name that this
  * catalog lacks. Each code's error object is in `components.schemas` once,
- * and every response references it (ban SPEC 9). Paths come from each definition's links (`paths.ts`); an
+ * and every response references it; a status that carries one code is a
+ * reference to that code's response, in `components.responses` once (ban
+ * SPEC 9). Paths come from each definition's links (`paths.ts`); an
  * absolute link's origin becomes the document's server, so every resource
  * must share it.
  * @ref https://spec.openapis.org/oas/v3.1.2.html
@@ -15,6 +17,7 @@
  */
 import type { Catalog, JsonSchema } from '@netvark/ban-core';
 import type { JsonApiOptions } from '@netvark/ban-core/formats/json-api';
+import type { ResponseObject } from '@netvark/ban-core/openapi';
 
 import type {
   AnyDeclaredResource,
@@ -26,12 +29,21 @@ import type { OperationContext, PathItem } from './operation-object';
 
 import { createBan } from '@netvark/ban-core';
 import { jsonApi } from '@netvark/ban-core/formats/json-api';
-import { errorObjectSchemas, errorResponses } from '@netvark/ban-core/openapi';
+import {
+  errorObjectSchemas,
+  errorResponseObjects,
+  errorResponses,
+} from '@netvark/ban-core/openapi';
 import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 
 import { errorCatalog } from '../errors/error-catalog';
 import { checkRegistry } from '../registry/check-registry';
-import { errorKey, errorRef, schemaKey } from './component-names';
+import {
+  errorKey,
+  errorRef,
+  errorResponseRef,
+  schemaKey,
+} from './component-names';
 import { checkExamples, exampleObjects } from './examples';
 import { operationCodes } from './operation-codes';
 import { pathItems } from './operations';
@@ -78,6 +90,7 @@ export interface OpenApiDocument {
   readonly paths: Readonly<Record<string, PathItem>>;
   readonly components: {
     readonly schemas: Readonly<Record<string, JsonSchema>>;
+    readonly responses: Readonly<Record<string, ResponseObject>>;
   };
 }
 
@@ -122,11 +135,15 @@ function serverOf(
   return only;
 }
 
-/** The error responses of each operation, and the error objects they reference. */
+/** The error responses of each operation, and the components they reference. */
 interface ErrorDocumentation {
   readonly responses: OperationContext['errors'];
   /** The object of every code a response built so far references, by component key, in catalog order. */
   readonly objects: () => ReadonlyArray<readonly [string, JsonSchema]>;
+  /** The response of every code a status built so far carries alone, by component key, in catalog order. */
+  readonly loneResponses: () => ReadonlyArray<
+    readonly [string, ResponseObject]
+  >;
 }
 
 function errorDocumentation(
@@ -139,6 +156,13 @@ function errorDocumentation(
     format: jsonApi({ ...options.errors?.format, mixedEntries: true }),
   });
   const referenced = new Set<string>();
+  const alone = new Set<string>();
+  const responseRef = (code: string): string => {
+    alone.add(code);
+    return errorResponseRef(code);
+  };
+  const inCatalogOrder = (codes: ReadonlySet<string>): Array<string> =>
+    Object.keys(ban.catalog).filter((code) => codes.has(code));
   return {
     responses: (internals: DeclaredInternals, operation: DocumentOperation) => {
       const codes = operationCodes(internals, operation, options.codes);
@@ -151,15 +175,18 @@ function errorDocumentation(
       for (const code of codes) {
         referenced.add(code);
       }
-      return errorResponses(ban, codes, { objectRef: errorRef });
+      return errorResponses(ban, codes, { objectRef: errorRef, responseRef });
     },
     objects: () =>
+      Object.entries(errorObjectSchemas(ban, inCatalogOrder(referenced))).map(
+        ([code, schema]) => [errorKey(code), schema] as const,
+      ),
+    loneResponses: () =>
       Object.entries(
-        errorObjectSchemas(
-          ban,
-          Object.keys(ban.catalog).filter((code) => referenced.has(code)),
-        ),
-      ).map(([code, schema]) => [errorKey(code), schema] as const),
+        errorResponseObjects(ban, inCatalogOrder(alone), {
+          objectRef: errorRef,
+        }),
+      ).map(([code, response]) => [errorKey(code), response] as const),
   };
 }
 
@@ -210,6 +237,7 @@ export function openapi(
         ...listed.flatMap((internals) => componentSchemas(internals)),
         ...errors.objects(),
       ]),
+      responses: Object.fromEntries(errors.loneResponses()),
     },
   };
 }
