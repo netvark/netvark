@@ -1,18 +1,20 @@
 /**
  * Package surface. `@netvark/resource-core` and its `server`, `testing`, and
- * `openapi` entries must resolve through the published `exports` map at runtime and
- * export exactly the values the SPEC lists (section 1) for what has
- * shipped. Value imports on purpose: a missing dist file or a wrong
- * `exports` entry fails here before any feature test.
+ * `openapi` entries, and `@netvark/kysely-resource`, must resolve through the
+ * published `exports` map at runtime and export exactly the values the SPEC
+ * lists (sections 1 and 18.1) for what has shipped. Value imports on
+ * purpose: a missing dist file or a wrong `exports` entry fails here before
+ * any feature test.
  */
 import { describe, expect, it } from 'vitest';
 
+import * as runtime from '@netvark/kysely-resource';
 import * as core from '@netvark/resource-core';
 import * as openapi from '@netvark/resource-core/openapi';
 import * as server from '@netvark/resource-core/server';
 import * as testing from '@netvark/resource-core/testing';
 
-describe('package surface (SPEC 1)', () => {
+describe('package surface (SPEC 1, 18.1)', () => {
   it('@netvark/resource-core exports the documented values', () => {
     expect(Object.keys(core).toSorted()).toEqual([
       'ISSUE_KINDS',
@@ -64,10 +66,19 @@ describe('package surface (SPEC 1)', () => {
     ]);
   });
 
+  it('@netvark/kysely-resource exports the documented values', () => {
+    expect(Object.keys(runtime).toSorted()).toEqual(['createKyselyStorage']);
+  });
+
   it('resolves package.json through the exports map', async () => {
     const manifest = (await import('@netvark/resource-core/package.json', {
       with: { type: 'json' },
     })) as { default: { name: string } };
     expect(manifest.default.name).toBe('@netvark/resource-core');
+    const runtimeManifest = (await import(
+      '@netvark/kysely-resource/package.json',
+      { with: { type: 'json' } }
+    )) as { default: { name: string } };
+    expect(runtimeManifest.default.name).toBe('@netvark/kysely-resource');
   });
 });

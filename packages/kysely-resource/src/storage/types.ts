@@ -1,0 +1,65 @@
+import type { Kysely } from 'kysely';
+
+/**
+ * The storage adapter's options and handle (SPEC 18.2).
+ * @packageDocumentation
+ */
+import type { PublicCatalog } from '@netvark/catalog-core';
+import type { DefineDefaultedKeyset } from '@netvark/keyset-core';
+import type { ScopeValue } from '@netvark/resource-core/server';
+
+import type { KyselyTransaction } from './transaction';
+
+/**
+ * A storage codec over PostgreSQL's text (resource SPEC 7.1): `read` takes
+ * the text PostgreSQL prints and returns the codec's value, and `write`
+ * takes the codec's value and returns the text PostgreSQL reads. `write`
+ * takes `never`, so the storage codec of any codec fits, and one object of
+ * them serves the adapter and `rules --check` (`resources.storage`,
+ * catalog SPEC 10.3).
+ */
+export interface TextCodec {
+  readonly read: (stored: string) => unknown;
+  readonly write: (value: never) => string;
+}
+
+/** The table events are written to (SPEC 18.6), by schema and name. */
+export interface OutboxTable {
+  readonly table: string;
+  /** Defaults to `public`. */
+  readonly schema?: string | undefined;
+}
+
+/** What `createKyselyStorage` takes. */
+export interface KyselyStorageOptions<TDatabase> {
+  /** The application's Kysely over PostgreSQL 14 or later, or PGlite; the adapter runs without its plugins. */
+  readonly db: Kysely<TDatabase>;
+  /** The public catalog the declarations are built from. */
+  readonly catalog: PublicCatalog;
+  /** A storage codec per codec name the declarations use. */
+  readonly codecs?: Readonly<Record<string, TextCodec>> | undefined;
+  /** The server's keyset definer, which holds the cursor secret: `createDefineKeyset({ cursor })`. */
+  readonly defineKeyset: DefineDefaultedKeyset;
+  /** Where events are written; needed once a behavior has effects. */
+  readonly outbox?: OutboxTable | undefined;
+}
+
+/** The storage adapter of resource SPEC 12.8 over Kysely. */
+export interface KyselyStorage {
+  /** The public catalog it was created with. */
+  readonly catalog: PublicCatalog;
+  /** The outbox table it was created with, its schema resolved; `undefined` without one. */
+  readonly outbox:
+    | { readonly schema: string; readonly table: string }
+    | undefined;
+  /**
+   * Runs `run` in one READ COMMITTED transaction that first fixes how
+   * values print and sets each scope's parameter for the transaction only;
+   * commits when `run` resolves, and rolls back and rejects otherwise, or
+   * when one of the adapter's statements failed though `run` went on.
+   */
+  transaction<TResult>(
+    scopes: ReadonlyArray<ScopeValue>,
+    run: (tx: KyselyTransaction) => Promise<TResult>,
+  ): Promise<TResult>;
+}
