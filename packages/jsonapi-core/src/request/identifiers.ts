@@ -18,6 +18,7 @@ import type { Cardinality } from '../resource/types';
 
 import { errorItem } from '../errors/json-api-error';
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
+import { quotable } from '../internal/quotable';
 
 /** Linkage a request may carry: identifiers that may use `lid`. */
 export type RequestLinkage =
@@ -87,7 +88,9 @@ export function parseIdentifier(
     errors.push(
       conflict(
         `${pointer}/type`,
-        `Expected a resource of type "${options.type}", received "${type}"`,
+        quotable(type)
+          ? `Expected a resource of type "${options.type}", received "${type}"`
+          : `Expected a resource of type "${options.type}"`,
       ),
     );
     return undefined;

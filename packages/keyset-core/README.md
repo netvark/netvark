@@ -339,7 +339,10 @@ mistakes are `TypeError`s thrown by `defineKeyset`.
 They map onto the profile's error objects: `UNSUPPORTED_SORT` is `unsupported-sort`,
 `PAGE_SIZE_EXCEEDED` is `max-size-exceeded` (with `max` for `meta.page.maxSize`),
 `RANGE_NOT_SUPPORTED` is `range-pagination-not-supported`, and the rest are invalid query parameter
-errors with `source.parameter` `sort`, `filter`, `page[size]`, `page[after]`, or `page[before]`.
+errors with `source.parameter` `sort`, `filter`, `page[size]`, `page[after]`, or `page[before]`. The
+fields hold the request's own text (a sort item, a field path, a page size), so a layer that writes
+one into a detail quotes it only when it is a plain token, as `@netvark/jsonapi-core`'s builders do
+([jsonapi ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)).
 
 ```ts
 try {

@@ -1,7 +1,8 @@
 /**
  * Local identities (SPEC 11.3): a `lid` names a resource an earlier `add`
  * created, unique per type within the document. `Lids` records the id each
- * one received and replaces references to it.
+ * one received and replaces references to it. A detail quotes a `lid` only
+ * when it is a plain token (ADR 0016).
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-identification
  * @packageDocumentation
@@ -15,6 +16,7 @@ import type { RequestLinkage } from '../request/identifiers';
 
 import { jsonApiError } from '../errors/json-api-error';
 import { compact } from '../internal/object';
+import { quotable } from '../internal/quotable';
 import { invalidDocument } from '../request/identifiers';
 
 function key(type: string, lid: string): string {
@@ -36,7 +38,9 @@ export class Lids {
       throw jsonApiError(
         invalidDocument(
           pointer,
-          `lid "${lid}" is already used for another "${type}" in this document`,
+          quotable(lid)
+            ? `lid "${lid}" is already used for another "${type}" in this document`
+            : `This lid is already used for another "${type}" in this document`,
         ),
       );
     }
@@ -50,7 +54,9 @@ export class Lids {
       throw jsonApiError(
         invalidDocument(
           pointer,
-          `lid "${lid}" does not refer to a "${type}" created by an earlier operation`,
+          quotable(lid) && quotable(type)
+            ? `lid "${lid}" does not refer to a "${type}" created by an earlier operation`
+            : 'This lid does not refer to a resource created by an earlier operation',
         ),
       );
     }

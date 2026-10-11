@@ -2,6 +2,8 @@
  * Content negotiation (SPEC 3.3): the server responsibilities of the
  * specification as a pure function over the request's `Content-Type` and
  * `Accept` field values and the extensions and profiles an endpoint supports.
+ * A detail quotes the request's text only when it is a plain token
+ * (ADR 0016), so it never carries an extension URI.
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-servers
  * @packageDocumentation
  */
@@ -12,6 +14,7 @@ import type { MediaRange, MediaType } from '../media-type/parse';
 import { isBanError } from '@netvark/ban-core';
 
 import { jsonApiError } from '../errors/json-api-error';
+import { quotable } from '../internal/quotable';
 import { isJsonApiMediaType, jsonApiParameters } from '../media-type/json-api';
 import { parseAccept, parseMediaType } from '../media-type/parse';
 
@@ -87,6 +90,15 @@ const NO_REQUEST: NegotiatedRequest = {
   profiles: [],
 };
 
+/** The detail for parameters other than `ext` and `profile`, naming them when every name is a plain token. */
+function otherParameters(names: ReadonlyArray<string>): string {
+  const refusal =
+    'The JSON:API media type must not carry media type parameters other than ext and profile';
+  return names.every((name) => quotable(name))
+    ? `${refusal}; received ${names.map((name) => `"${name}"`).join(', ')}`
+    : refusal;
+}
+
 /**
  * Checks the request `Content-Type`: 415 when the JSON:API media type carries
  * a parameter other than `ext` or `profile`, or an unsupported extension.
@@ -107,14 +119,11 @@ function negotiateContentType(
   }
   const parameters = jsonApiParameters(mediaType);
   if (parameters.other.length > 0) {
-    return unsupportedMediaType(
-      `The JSON:API media type must not carry media type parameters other than ext and profile; received ${parameters.other.map((name) => `"${name}"`).join(', ')}`,
-    );
+    return unsupportedMediaType(otherParameters(parameters.other));
   }
-  const unsupported = parameters.ext.find((uri) => !supported.has(uri));
-  if (unsupported !== undefined) {
+  if (parameters.ext.some((uri) => !supported.has(uri))) {
     return unsupportedMediaType(
-      `Extension "${unsupported}" is not supported by this endpoint`,
+      'The media type names an extension this endpoint does not support',
     );
   }
   return {

@@ -10,6 +10,7 @@ import type { ParseDocumentOptions } from './parse-support';
 import type { OperationTarget } from './types';
 
 import { hasOwnMember, isRecord, ownMember } from '../internal/object';
+import { quotable } from '../internal/quotable';
 import { invalidDocument } from '../request/identifiers';
 import { unknownMembers } from './parse-support';
 
@@ -93,7 +94,12 @@ function parseHref(
   const target = options.resolveHref(value);
   if (target === undefined) {
     errors.push(
-      invalidDocument(pointer, `"${value}" is not an operation target`),
+      invalidDocument(
+        pointer,
+        quotable(value)
+          ? `"${value}" is not an operation target`
+          : 'This href is not an operation target',
+      ),
     );
   }
   return target;

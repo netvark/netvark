@@ -335,6 +335,11 @@ function toJsonApi(error: unknown): never {
 }
 ```
 
+`error.fields` are the sort items as the client sent them; `unsupportedSortError` quotes one only
+when it is a plain token and otherwise writes `A sort field is not supported by this endpoint`
+([jsonapi ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)),
+so they pass through as they came. The `default` branch's `error.message` is constant.
+
 With `@netvark/jsonapi-core`, the parsed query's `page` is the request's `page`, and the page is the
 document's input:
 `paginatedDocument(Contacts, { rows: page.rows, next: page.next, prev: page.prev, total: page.total, cursor: (row) => page.cursor(row) }, { url, query })`.

@@ -9,6 +9,7 @@ import type { OperationTarget } from './types';
 
 import { isAtMember } from '../document/member-name';
 import { pointer as toPointer } from '../internal/pointer';
+import { quotable } from '../internal/quotable';
 import { invalidDocument } from '../request/identifiers';
 
 export interface ParseDocumentOptions {
@@ -32,7 +33,12 @@ export function unknownMembers(
   for (const name of Object.keys(value)) {
     if (!allowed.has(name) && !isAtMember(name)) {
       errors.push(
-        invalidDocument(member(pointer, name), `"${name}" is not ${what}`),
+        invalidDocument(
+          member(pointer, name),
+          quotable(name)
+            ? `"${name}" is not ${what}`
+            : `This member is not ${what}`,
+        ),
       );
     }
   }

@@ -2,7 +2,8 @@
  * Parsers for the reserved families (SPEC 6.4 to 6.7): `include`, `fields`,
  * `sort`, and `page`. Each reads one parameter, records what it understood,
  * and reports every problem as an error item rather than stopping at the
- * first, so a client sees all of its mistakes in one 400.
+ * first, so a client sees all of its mistakes in one 400. A detail quotes
+ * the request's text only when it is a plain token (ADR 0016).
  * @ref https://jsonapi.org/format/1.1/#fetching-includes
  * @ref https://jsonapi.org/format/1.1/#fetching-sparse-fieldsets
  * @ref https://jsonapi.org/format/1.1/#fetching-sorting
@@ -18,6 +19,7 @@ import type { ParameterValue, SortField } from './types';
 import { isMemberPath } from '../document/member-name';
 import { errorItem } from '../errors/json-api-error';
 import { CURSOR_PAGE_MEMBERS, PAGE_SIZE_PATTERN } from '../internal/constants';
+import { quotable } from '../internal/quotable';
 import {
   maxPageSizeExceededError,
   unsupportedSortError,
@@ -41,11 +43,11 @@ export function invalid(parameter: string, detail: string): ErrorItem {
   });
 }
 
-export function unknown(parameter: string, detail?: string): ErrorItem {
+export function unknown(parameter: string): ErrorItem {
   return errorItem('UNKNOWN_QUERY_PARAMETER', {
-    detail:
-      detail ??
-      `Query parameter "${parameter}" is not supported by this endpoint`,
+    detail: quotable(parameter)
+      ? `Query parameter "${parameter}" is not supported by this endpoint`
+      : 'This query parameter is not supported by this endpoint',
     source: { parameter },
   });
 }
@@ -70,7 +72,9 @@ export function single(
   state.errors.push(
     invalid(
       parameter,
-      `Query parameter "${parameter}" is specified more than once`,
+      quotable(parameter)
+        ? `Query parameter "${parameter}" is specified more than once`
+        : 'This query parameter is specified more than once',
     ),
   );
   return undefined;
@@ -89,7 +93,12 @@ export function parseInclude(
     seen.add(path);
     if (!isMemberPath(path)) {
       state.errors.push(
-        invalid('include', `"${path}" is not a relationship path`),
+        invalid(
+          'include',
+          quotable(path)
+            ? `"${path}" is not a relationship path`
+            : 'A path in include is not a relationship path',
+        ),
       );
       continue;
     }
@@ -98,7 +107,9 @@ export function parseInclude(
       state.errors.push(
         invalid(
           'include',
-          `Relationship path "${path}" is not supported by this endpoint`,
+          quotable(path)
+            ? `Relationship path "${path}" is not supported by this endpoint`
+            : 'A relationship path in include is not supported by this endpoint',
         ),
       );
       continue;
@@ -123,7 +134,9 @@ export function parseFields(
     state.errors.push(
       invalid(
         parameter,
-        `Resource type "${type}" does not appear in responses from this endpoint`,
+        quotable(type)
+          ? `Resource type "${type}" does not appear in responses from this endpoint`
+          : 'The resource type of this parameter does not appear in responses from this endpoint',
       ),
     );
     return;
@@ -132,7 +145,12 @@ export function parseFields(
   for (const field of commaList(value)) {
     if (!resource.fields.has(field)) {
       state.errors.push(
-        invalid(parameter, `"${field}" is not a field of "${type}"`),
+        invalid(
+          parameter,
+          quotable(field)
+            ? `"${field}" is not a field of "${resource.type}"`
+            : `A listed field is not a field of "${resource.type}"`,
+        ),
       );
     } else if (!fields.includes(field)) {
       fields.push(field);
@@ -176,7 +194,9 @@ export function parsePageMember(
       state.errors.push(
         invalid(
           parameter,
-          `page[size] must be a positive integer; got "${value}"`,
+          quotable(value)
+            ? `page[size] must be a positive integer; got "${value}"`
+            : 'page[size] must be a positive integer',
         ),
       );
       return;
@@ -187,7 +207,7 @@ export function parsePageMember(
       return;
     }
   } else if (value === '') {
-    state.errors.push(invalid(parameter, `${parameter} must be a cursor`));
+    state.errors.push(invalid(parameter, `page[${member}] must be a cursor`));
     return;
   }
   state.page.set(member, value);

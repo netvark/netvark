@@ -69,7 +69,11 @@ describe('Content-Type (server responsibilities, paragraphs 1 and 2)', () => {
       ),
     );
     expect(error.status).toBe(415);
-    expect(error.message).toContain(VERSION);
+    // An extension is a URI, never a plain token (ADR 0016), so the detail
+    // says which part of the media type is refused without quoting it.
+    expect(error.message).toBe(
+      'The media type names an extension this endpoint does not support',
+    );
     expect(
       success(
         negotiate(

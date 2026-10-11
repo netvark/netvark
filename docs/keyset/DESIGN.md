@@ -249,7 +249,8 @@ try {
 
 Every request-time error is a `KeysetError` with a stable `code` and the detail in fields
 (ADR-0010). The example maps them to `@netvark/jsonapi-core`'s profile errors; any API layer does
-the same with its own catalog.
+the same with its own catalog. The fields hold the request's text, which `unsupportedSortError`
+quotes only when it is a plain token (jsonapi ADR 0016); a layer of its own does the same.
 
 ## 4. Architecture
 
