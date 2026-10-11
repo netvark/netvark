@@ -18,6 +18,7 @@ body:
           '@netvark/kysely-keyset',
           '@netvark/resource-core',
           '@netvark/kysely-resource',
+          '@netvark/hono-resource',
           a new package,
           the repository or its docs,
         ]

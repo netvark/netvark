@@ -1,0 +1,102 @@
+/**
+ * A resource's routes (resource SPEC 19.3), each only when its operation
+ * is declared: `GET` runs `get`, then each include; `PATCH` runs `update`
+ * with the parsed document, whose `id` must be the path's; `DELETE` runs
+ * `remove` and answers 204. The id is the `:id` path parameter, which
+ * Hono decodes.
+ * @ref https://jsonapi.org/format/1.1/#fetching-resources
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-200
+ * @ref https://jsonapi.org/format/1.1/#crud-deleting-responses-204
+ * @packageDocumentation
+ */
+import type { Context, Env } from 'hono';
+
+import type { DomainShape } from '@netvark/resource-core/server';
+
+import type { RouteContext } from './context';
+import type { MountedResource } from './paths';
+
+import {
+  bodyValidator,
+  queryValidator,
+  resourceDocument,
+  respond,
+} from '@netvark/hono-jsonapi';
+
+import { includedOf, notRun, operationsOf } from './context';
+import { allow } from './methods';
+
+const HTTP_NO_CONTENT = 204;
+
+/** The `:id` of a resource route. */
+function idOf(c: Context): string {
+  const id = c.req.param('id');
+  if (id === undefined) {
+    throw new TypeError('jsonApiRoutes: a resource route has no :id');
+  }
+  return id;
+}
+
+/** Mounts `get`, `update`, and `remove` of `mounted` at its resource path. */
+export function memberRoutes<TEnv extends Env, TDomain extends DomainShape>(
+  context: RouteContext<TEnv, TDomain>,
+  mounted: MountedResource,
+): void {
+  const { app, actors, methods } = context;
+  const { declared, paths } = mounted;
+  const { resource } = declared;
+  const operations: ReadonlySet<string> = new Set(
+    declared.declaration.operations,
+  );
+  if (operations.has('get')) {
+    app.get(
+      paths.resource,
+      actors.resolve,
+      queryValidator(resource),
+      async (c) => {
+        const query = c.req.valid('query');
+        const domain = operationsOf(context, c, declared);
+        if (domain.get === undefined) {
+          throw notRun(declared, 'get');
+        }
+        const row = await domain.get(idOf(c));
+        const included = await includedOf(
+          context,
+          domain,
+          declared,
+          [row],
+          query,
+        );
+        return respond(c, resourceDocument(resource, row, { query, included }));
+      },
+    );
+    allow(methods, paths.resource, 'GET');
+  }
+  if (operations.has('update')) {
+    app.patch(
+      paths.resource,
+      actors.resolve,
+      bodyValidator(resource, { operation: 'update' }),
+      async (c) => {
+        const domain = operationsOf(context, c, declared);
+        if (domain.update === undefined) {
+          throw notRun(declared, 'update');
+        }
+        const row = await domain.update(idOf(c), c.req.valid('json'));
+        return respond(c, resourceDocument(resource, row));
+      },
+    );
+    allow(methods, paths.resource, 'PATCH');
+  }
+  if (operations.has('remove')) {
+    app.delete(paths.resource, actors.resolve, async (c) => {
+      const domain = operationsOf(context, c, declared);
+      if (domain.remove === undefined) {
+        throw notRun(declared, 'remove');
+      }
+      await domain.remove(idOf(c));
+      return c.body(null, HTTP_NO_CONTENT);
+    });
+    allow(methods, paths.resource, 'DELETE');
+  }
+}

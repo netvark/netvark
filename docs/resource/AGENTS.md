@@ -1,8 +1,9 @@
 # resource family: instructions for coding agents
 
 Read with the root [`AGENTS.md`](../../AGENTS.md), which holds the rules every family shares; this
-file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resource`, and the bindings
-that will join them. Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resource`,
+`@netvark/hono-resource`, and the bindings that will join them. Humans: see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Ground rules
 
@@ -56,6 +57,12 @@ that will join them. Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   tests run on PGlite through Kysely's PGlite dialect, never on a mocked database, and what only a
   server shows (the isolation level, pooled connections) runs in `e2e/resource` on PostgreSQL 14
   and 18.
+- The routes bind the runtime contract to Hono and nothing else: `packages/hono-resource/` imports
+  Hono, `@netvark/hono-jsonapi`, and `@netvark/resource-core`, never a runtime, Kysely, or a Node.js
+  module, so any runtime of the contract runs behind it, wherever Hono runs (ADR 0013). The three
+  are peers, since the application hands the routes values made with its own copies (root ADR 0006):
+  never move them to `dependencies`. Its tests drive the routes with `app.request()` over a runtime
+  held in memory; a real runtime behind real HTTP runs in `e2e/resource`.
 
 ## Repository map
 
@@ -75,8 +82,17 @@ that will join them. Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 `packages/kysely-resource/src/` (SPEC 18.1):
 
-- `storage/` `createKyselyStorage`: its options, the transaction protocol, names and casts, and the
-  scope predicate
+- `storage/` `createKyselyStorage`: its options, the transaction protocol, names and casts, `list`,
+  and the scope predicate
+- `boot/` the boot checks and their report; `runtime/` `createResourceRuntime`, the domain, and the
+  lifecycle of each operation; `outbox/` `relayOutbox`
+
+`packages/hono-resource/src/` (SPEC 19.1):
+
+- `routes.ts` `jsonApiRoutes` and its options; `paths.ts` and `methods.ts` where each resource is
+  served, and the 405 of any other method
+- `actor.ts` the request's actor, resolved once; `context.ts` what every route reads
+- `collection.ts` and `member.ts` the routes of each operation
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted

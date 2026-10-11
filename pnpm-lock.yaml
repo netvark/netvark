@@ -436,6 +436,9 @@ importers:
       '@netvark/hono-jsonapi':
         specifier: workspace:*
         version: link:../../packages/hono-jsonapi
+      '@netvark/hono-resource':
+        specifier: workspace:*
+        version: link:../../packages/hono-resource
       '@netvark/jsonapi-core':
         specifier: workspace:*
         version: link:../../packages/jsonapi-core
@@ -551,6 +554,24 @@ importers:
       '@netvark/hono-ban':
         specifier: workspace:^
         version: link:../hono-ban
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+
+  packages/hono-resource:
+    devDependencies:
+      '@netvark/hono-ban':
+        specifier: workspace:^
+        version: link:../hono-ban
+      '@netvark/hono-jsonapi':
+        specifier: workspace:^
+        version: link:../hono-jsonapi
+      '@netvark/resource-core':
+        specifier: workspace:^
+        version: link:../resource-core
       hono:
         specifier: 'catalog:'
         version: 4.13.13

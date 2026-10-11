@@ -2214,7 +2214,8 @@ resources, after the checks of every list of resources (4.2). The options:
   two resources with one path. An operation's id is `<type>.<operation>` (`contacts.list`,
   `contacts.organization.relationship.get`), unique since neither a type nor a member name holds a
   `.`, and its tag is the type. `resourcePaths(definition)` reads them and is exported, so a host
-  mounts its routes at the paths the document lists (19.2).
+  mounts its routes at the paths the document lists (19.2); its `TypeError`s start with
+  `resourcePaths:`, and the same ones start with `openapi:` when `openapi` reads the paths.
 - **Bodies** use `application/vnd.api+json` without parameters, which matches the media type with
   the Cursor Pagination profile a page carries (RFC 9110 media ranges). Documents are those
   `@netvark/jsonapi-core` builds and parses (11.1): a resource document with the includable targets'
@@ -3683,16 +3684,18 @@ and builds documents, the runtime authorizes and runs, and the host's ban render
 └── resourceTypeOf(c)        actor.ts    the type a request's route serves, for localizeErrors (19.6)
 ```
 
-| Module             | Holds                                                                           |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `paths.ts`         | each resource's paths from its links, the base, and the methods each path takes |
-| `actor.ts`         | the request's actor, resolved once, and `resourceTypeOf`                        |
-| `collection.ts`    | `list` and `create`                                                             |
-| `member.ts`        | `get`, `update`, and `remove`                                                   |
-| `relationships.ts` | the relationship and related routes                                             |
-| `operations.ts`    | the Atomic Operations endpoint                                                  |
-| `pointers.ts`      | moving an error's items to where the request held the input                     |
-| `openapi.ts`       | the document's route                                                            |
+| Module             | Holds                                                                         |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `paths.ts`         | each resource's paths from its links, as Hono routes, and the base            |
+| `methods.ts`       | the methods each path answers, and the 405 of any other                       |
+| `actor.ts`         | the request's actor, resolved once, and `resourceTypeOf`                      |
+| `context.ts`       | what every route reads: the runtime, a request's operations, and its includes |
+| `collection.ts`    | `list` and `create`                                                           |
+| `member.ts`        | `get`, `update`, and `remove`                                                 |
+| `relationships.ts` | the relationship and related routes                                           |
+| `operations.ts`    | the Atomic Operations endpoint                                                |
+| `pointers.ts`      | moving an error's items to where the request held the input                   |
+| `openapi.ts`       | the document's route                                                          |
 
 Types exported: `JsonApiRoutesOptions`, `RoutesOpenApiOptions`.
 
@@ -3729,14 +3732,23 @@ with `ATOMIC_OPERATIONS_EXTENSION` among its extensions when the operations endp
 `{id}` written as Hono's `:id`, so the routes, the links, and the document name the same URLs; a
 mount under a prefix would make the links lie, so a host that serves under one sets the definer's
 `links.base` to it. The base is the collection path without its last segment: `/api` for
-`/api/contacts`.
+`/api/contacts`. A route is the path as Hono's router reads a request's: decoded by `decodeURI`,
+which keeps reserved characters encoded, with `%25` kept as Hono's `getPath` keeps it, so a type
+outside ASCII routes at the percent-encoded path its links spell. @ref
+https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath)
 
-`jsonApiRoutes` throws `TypeError` before it serves anything when the runtime runs no resource, when
-a resource's links give no paths (13.1's messages), when two resources' links have different origins
-or bases, or when two resources name one path.
+`jsonApiRoutes` throws `TypeError` before it serves anything for an option a JavaScript caller got
+wrong (one that is not an option, a runtime without `resources` and `as`, an actor that is not a
+function), when the runtime runs no resource, when a resource's links give no paths (13.1's
+messages, starting `resourcePaths:`), when two resources' links have different origins or bases,
+when two resources name one path, or when an includable relationship's target is not among the
+runtime's resources. A runtime that breaks the contract on a request, whose domain lacks a resource
+it lists or an operation a declaration declares, fails that request with a `TypeError` naming it,
+which the host's handler answers with 500.
 
 A path answers the methods its operations take and any other with `METHOD_NOT_ALLOWED` (405), whose
-`Allow` header lists them, `HEAD` beside `GET` since Hono answers `HEAD` with a `GET` route. @ref
+`Allow` header lists them, `HEAD` beside `GET` since Hono answers `HEAD` with a `GET` route. The 405
+answers before the actor resolves, since the document lists every path's methods to anyone. @ref
 https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6 ("The origin server MUST generate an Allow
 header field in a 405 response") @ref https://hono.dev/docs/api/routing
 
@@ -3827,6 +3839,8 @@ related route and the failing operation's on the operations endpoint, or `undefi
   the operation is not declared, the 405 and its `Allow`, the actor's order before the validators,
   includes, the relationship routes' pointers, the operations endpoint's transaction, moved
   pointers, and `resolveHref`, the document route, `resourceTypeOf`, and each `TypeError` of 19.2.
+- Smoke (`e2e/resource/smoke/route-checks.ts`): the built package's routes over a runtime held in
+  memory answer a resource, a 405 with `Allow`, and the actor's refusal on Bun, Deno, and workerd.
 - End to end (`e2e/resource/http/`): the contacts application on `createResourceRuntime` over
   `@hono/node-server`, against PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server: defaults on
   create, omission on update, a 400 with codes, pointers, and localized messages per problem, a 409
@@ -3840,8 +3854,10 @@ related route and the failing operation's on the operations endpoint, or `undefi
 - ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
   `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run in the build. One
   entry, `index`.
-- Dependencies, each `workspace:^`: `@netvark/resource-core` (the contract, `keysetRequest`,
-  `resourcePaths`, `openapi`) and `@netvark/hono-jsonapi`. Peer dependencies: `hono` and
-  `@netvark/hono-ban`, as `@netvark/hono-jsonapi`'s. It imports no runtime: any runtime of the
-  contract runs behind it.
+- Peer dependencies: `hono`, `@netvark/hono-jsonapi`, and `@netvark/resource-core` (the contract,
+  `keysetRequest`, `resourcePaths`, `openapi`), each a `workspace:^` development dependency too. The
+  application declares the resources and mounts `jsonApi()` with its own copies, and the routes must
+  work with those same copies: a declaration is recognized by the copy that made it, and a
+  `BanError` by `instanceof` (root ADR 0006). It imports no runtime: any runtime of the contract
+  runs behind it.
 - Runs wherever Hono runs: Node.js 22.12 and later, Bun, Deno, and Cloudflare Workers.

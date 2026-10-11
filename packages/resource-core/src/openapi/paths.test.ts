@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { defineResource } from '@netvark/jsonapi-core';
 
-import { resourcePaths } from './paths';
+import { readPaths, resourcePaths } from './paths';
 
 const serialize = (row: { readonly id: string }) => ({
   id: row.id,
@@ -116,6 +116,20 @@ describe('resourcePaths', () => {
     'refuses links it cannot read paths from: %o',
     (links, message) => {
       expect(() => resourcePaths(articles(links))).toThrow(message);
+      expect(() => resourcePaths(articles(links))).toThrow(/^resourcePaths: /u);
     },
   );
+
+  it('starts each message with its caller, so openapi names itself', () => {
+    expect(() => resourcePaths(articles({}))).toThrow(
+      new TypeError(
+        'resourcePaths: articles has no links.self, so its paths are unknown; give the definer links.base',
+      ),
+    );
+    expect(() => readPaths('openapi', articles({}))).toThrow(
+      new TypeError(
+        'openapi: articles has no links.self, so its paths are unknown; give the definer links.base',
+      ),
+    );
+  });
 });
