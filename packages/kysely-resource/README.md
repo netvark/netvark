@@ -11,8 +11,9 @@ section 18, and the decisions behind it in
 [ADR 0012](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0012-the-runtime-runs-declarations-over-the-storage-contract.md).
 
 Status: in development and unreleased. The storage adapter has its transaction protocol, scopes,
-reads and writes, quotas, row locks, and the outbox insert; `list`, failure mapping, the domain
-(`runtime.as(actor)`), boot checks, and the outbox relay follow in the 0.x line.
+reads and writes, keyset pages with totals, `many` for includes, quotas, row locks, and the outbox
+insert; failure mapping, the domain (`runtime.as(actor)`), boot checks, and the outbox relay follow
+in the 0.x line.
 
 ## Install
 
@@ -108,6 +109,22 @@ runtime calls it, and you rarely do. What it does to your rows:
   });
   ```
 
+- **Keyset pages, bound to the tenant.** `list` plans the request with the resource's keyset
+  definition from `@netvark/keyset-core` and pages with signed cursors bound to the transaction's
+  scope values: two tenants asking for the same page send the same request, and a cursor of one is
+  refused in the other with `INVALID_CURSOR`, reason `context`. `{ total: true }` adds a count of
+  the rows the filter selects, the same on every page. A page never counts rows to find its place,
+  so removing a row never shifts the next page.
+
+  ```ts
+  const page = await storage.transaction(scopes, async (tx) =>
+    storage.list(tx, Contacts, { sort: ['name'], page: { size: 50, after } }, { total: true }),
+  );
+  ```
+
+- **Includes in one statement.** `many(tx, resource, ids)` reads the rows of the given ids in the
+  scope, each once, with `= any($1::text::<key type>[])`; an id of another tenant is left out, as a
+  `get` of it finds no row.
 - **Row locks before writes.** `lock` takes `FOR NO KEY UPDATE` before an update and `FOR UPDATE`
   before a remove, which also keeps another transaction from adding a reference to the row being
   removed.
@@ -155,6 +172,18 @@ quota's.
 
 **Index each scoped table by its scope column first.** Every statement filters on it, so an index on
 `(organization_id, ...)` serves both the predicate and the policy.
+
+**Index the sorts you page by behind the scope column.** A page orders by its sort keys and then by
+the key, so an index of the scope column, the sort keys with their directions, and the key lets
+PostgreSQL read the page in order and stop at its last row instead of sorting every row of the
+tenant:
+
+```sql
+create index contacts_organization_name on contacts (organization_id, name, id);
+```
+
+On PostgreSQL 14, with 20 000 contacts in one organization, the second page by `name` is an index
+scan on this index without a sort; without it, a sort over every row of the organization.
 
 **Pool freely.** Settings and parameters are local to their transaction, so a pooled connection
 carries nothing into the next one: CI checks it on four connections of a node-postgres pool on

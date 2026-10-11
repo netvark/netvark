@@ -3,8 +3,7 @@
  * `@netvark/kysely-resource`'s `createKyselyStorage`, on PGlite and on the
  * server `RESOURCE_PG_URL` names, where its concurrent cases hold a row
  * lock or a quota's lock in one transaction while a second, on another
- * connection, tries to write past it (SPEC 18.7). The cases that page with
- * `list` wait for the adapter's `list`.
+ * connection, tries to write past it (SPEC 18.7).
  */
 import type { KyselyTransaction } from '@netvark/kysely-resource';
 import type { ContractHarness } from '@netvark/resource-core/testing';
@@ -28,9 +27,6 @@ import {
 import { DEFINE_KEYSET } from './support/keyset-definer.ts';
 import { kyselyDatabases } from './support/kysely-database.ts';
 
-/** The cases that page with `list`, which the adapter does not have yet. */
-const NEEDS_LIST = /^obligation 5:|^obligation 2: every page of list/u;
-
 describe.each(kyselyDatabases())(
   'the storage contract over createKyselyStorage on %s',
   (_name, open) => {
@@ -43,12 +39,7 @@ describe.each(kyselyDatabases())(
       outbox: { table: OUTBOX },
     });
     const harness: ContractHarness<KyselyTransaction> = {
-      adapter: {
-        ...storage,
-        list: () => {
-          throw new Error('list: not implemented yet');
-        },
-      },
+      adapter: storage,
       reset: async () => {
         await database.exec(RESET);
       },
@@ -65,10 +56,7 @@ describe.each(kyselyDatabases())(
     });
 
     for (const contractCase of storageContract(harness)) {
-      it.skipIf(NEEDS_LIST.test(contractCase.name))(
-        contractCase.name,
-        contractCase.run,
-      );
+      it(contractCase.name, contractCase.run);
     }
   },
 );

@@ -7,6 +7,7 @@
 import type { ContractCase, ContractHarness } from './contract/types';
 
 import { contractOf } from './contract/context';
+import { contextCases } from './contract/context-cases';
 import { errorCases } from './contract/error-cases';
 import { eventCases } from './contract/event-cases';
 import { listCases } from './contract/list-cases';
@@ -40,6 +41,7 @@ export function storageContract<TTransaction>(
     ...eventCases(contract),
     ...lockCases(contract),
     ...partitionCases(contract),
+    ...contextCases(contract),
   ];
   return Object.freeze(
     cases.map(({ name, run }) =>

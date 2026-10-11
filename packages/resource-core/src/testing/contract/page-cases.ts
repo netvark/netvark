@@ -19,7 +19,15 @@ import {
   LIST_IDS,
   LOG_KEYS,
 } from './list-data';
-import { labels, listPage, logListing, taskListing, walk } from './list-walk';
+import {
+  keysetCode,
+  labels,
+  listPage,
+  logListing,
+  present,
+  taskListing,
+  walk,
+} from './list-walk';
 
 /** What a page holds: its rows' titles and whether pages lie before and after it. */
 interface PageShape {
@@ -53,19 +61,6 @@ function assertPage<TTransaction>(
     page.cursors,
     `${what}: the cursor of each row`,
   );
-}
-
-/** `cursor`, which must name a page. */
-function present(cursor: string | null, what: string): string {
-  assertThat(cursor !== null, `${what}: expected a cursor, got null`);
-  return cursor ?? '';
-}
-
-/** The code of a keyset-core error, which names it whatever copy of the package threw it. */
-function codeOf(error: unknown): unknown {
-  return typeof error === 'object' && error !== null && 'code' in error
-    ? error.code
-    : undefined;
 }
 
 /** The cases of obligation 5 about paging. */
@@ -210,7 +205,7 @@ export function pageCases<TTransaction>(
           'a page of size 4, past the declared max',
         );
         assertEqual(
-          codeOf(error),
+          keysetCode(error),
           'PAGE_SIZE_EXCEEDED',
           'the code of the rejection of a page past the declared max',
         );

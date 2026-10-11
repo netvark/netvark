@@ -21,10 +21,10 @@ const config: ViteUserConfig = defineConfig({
       // @netvark/hono-ban of each @netvark/ban-core subpath. The nested
       // index files of @netvark/ban-core implement its subpaths and stay in.
       // The pg-catalog bin only hands the process to runCli; the catalog
-      // e2e suite runs it as a built bin. The storage contract's cases need
-      // a database: the resource e2e suite runs each case, and each defect
-      // a case must catch, against its reference adapter through the built
-      // package.
+      // e2e suite runs it as a built bin. The storage contract's cases, and
+      // the list data and walks they page through, need a database: the
+      // resource e2e suite runs each case, and each defect a case must
+      // catch, against its reference adapter through the built package.
       exclude: [
         'packages/*/src/**/*.test.ts',
         'packages/*/src/**/*.test-d.ts',
@@ -32,7 +32,7 @@ const config: ViteUserConfig = defineConfig({
         'packages/*/src/index.ts',
         'packages/pg-catalog/src/cli.ts',
         'packages/resource-core/src/testing/storage-contract.ts',
-        'packages/resource-core/src/testing/contract/{context,*-cases}.ts',
+        'packages/resource-core/src/testing/contract/{context,list-data,list-walk,*-cases}.ts',
         'packages/{jsonapi-core,hono-jsonapi,keyset-core,kysely-keyset}/src/**/index.ts',
         'packages/hono-ban/src/**/index.ts',
         'packages/hono-ban/src/formats/*.ts',

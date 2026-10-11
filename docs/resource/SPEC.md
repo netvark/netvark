@@ -2065,9 +2065,10 @@ over PGlite and over PostgreSQL through a node-postgres pool (`contract.e2e.test
 contract is shown implementable before `@netvark/kysely-resource` exists.
 `contract-faults.e2e.test.ts` gives the reference adapter one defect at a time, from parameters set
 for the session to a missing quota or row lock, a partition resolved to its own names, pages counted
-by offset, filters and sorts named by column, PostgreSQL's default null placement, and sort keys
-selected as a driver reads them by default, and checks that the cases about it fail, and
-`extract.e2e.test.ts` checks that the fixture's catalog is what extraction gives for its migrations.
+by offset, filters and sorts named by column, PostgreSQL's default null placement, sort keys
+selected as a driver reads them by default, and cursors bound to no context, and checks that the
+cases about it fail, and `extract.e2e.test.ts` checks that the fixture's catalog is what extraction
+gives for its migrations.
 
 ---
 
@@ -3166,17 +3167,19 @@ whether one was deleted.
 1. plans: `plan = await keyset.plan(request, { context })`, where `context` maps each of the
    transaction's scopes to its value, `{ organization: 7 }`, so a cursor issued in one scope is
    refused in another (keyset ADR 0015); without scopes it is empty and binds nothing;
-2. runs one statement built on `tx` with Kysely's query builder: the public row and each plan key as
-   `cast(<target> as text)` under its alias, from `"schema"."name" as "name"`, where the scope
-   predicate, the plan's `filter`, and its `seek` hold, ordered by each key with its direction and
-   null placement, limited to the plan's `limit`. Targets and predicates are kysely-keyset's
-   `renderTarget` and `renderPredicate` with `{ table: plan.table }` (keyset SPEC 10.2), which bind
-   the plan's values as keyset-core validated them, strings for every temporal and
+2. runs one statement in Kysely's `sql` template on `tx`: the public row and each plan key as
+   `cast(<target> as text)` under its alias behind a `.`, `".keyset0"`, which no public name holds
+   (4.2), so no member's alias meets it, from `"schema"."name" as "<plan.table>"`, where the scope
+   predicate, the plan's `filter`, and its `seek` hold, each in parentheses, ordered by each key
+   with its direction and null placement, limited to the plan's `limit`. Targets and predicates are
+   kysely-keyset's `renderTarget` and `renderPredicate` with `{ table: plan.table }` (keyset SPEC
+   10.2), which bind the plan's values as keyset-core validated them, strings for every temporal and
    arbitrary-precision value, so PostgreSQL types each from the column it is compared with (keyset
    SPEC 4.3);
 3. pages: `keyset.page(plan, rows, values, { total })` over the public rows read from the result,
-   with each row's key texts as its values. With `total: true` a second statement counts the rows of
-   the scope that the filter selects, without the seek.
+   with each row's key texts as its values, a null key as `null`. With `total: true` a second
+   statement counts the rows of the scope that the filter selects, without the seek, so every page
+   of a request reports the same total.
 
 `list` never counts rows to find a page. @ref https://www.postgresql.org/docs/18/queries-order.html
 
