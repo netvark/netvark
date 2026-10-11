@@ -1,20 +1,22 @@
 /**
  * Package surface. `@netvark/resource-core` and its `server`, `testing`, and
- * `openapi` entries, and `@netvark/kysely-resource`, must resolve through the
- * published `exports` map at runtime and export exactly the values the SPEC
- * lists (sections 1 and 18.1) for what has shipped. Value imports on
+ * `openapi` entries, `@netvark/kysely-resource`, and `@netvark/hono-resource`
+ * must resolve through the published `exports` map at runtime and export
+ * exactly the values the SPEC lists (sections 1, 18.1, and 19.1) for what
+ * has shipped. Value imports on
  * purpose: a missing dist file or a wrong `exports` entry fails here before
  * any feature test.
  */
 import { describe, expect, it } from 'vitest';
 
+import * as routes from '@netvark/hono-resource';
 import * as runtime from '@netvark/kysely-resource';
 import * as core from '@netvark/resource-core';
 import * as openapi from '@netvark/resource-core/openapi';
 import * as server from '@netvark/resource-core/server';
 import * as testing from '@netvark/resource-core/testing';
 
-describe('package surface (SPEC 1, 18.1)', () => {
+describe('package surface (SPEC 1, 18.1, 19.1)', () => {
   it('@netvark/resource-core exports the documented values', () => {
     expect(Object.keys(core).toSorted()).toEqual([
       'ISSUE_KINDS',
@@ -65,8 +67,13 @@ describe('package surface (SPEC 1, 18.1)', () => {
       'diffSurfaces',
       'openapi',
       'parseSurface',
+      'resourcePaths',
       'surfaceOf',
     ]);
+  });
+
+  it('@netvark/hono-resource exports the documented values', () => {
+    expect(Object.keys(routes).toSorted()).toEqual(['jsonApiRoutes']);
   });
 
   it('@netvark/kysely-resource exports the documented values', () => {

@@ -5,7 +5,8 @@
  * `related` links. A link is built for a marker id of unreserved
  * characters, which `encodeURIComponent` keeps, and the marker becomes
  * the template `{id}`. An absolute link splits into its origin, the
- * document's server, and its path.
+ * document's server, and its path. A host mounts its routes at the same
+ * paths (SPEC 19.2).
  * @ref https://jsonapi.org/recommendations/#urls
  * @ref https://spec.openapis.org/oas/v3.1.2.html#path-templating
  * @packageDocumentation
@@ -36,10 +37,10 @@ interface Located {
 }
 
 /** A link's origin and path, which must hold the marker once and no query or fragment. */
-function locate(what: string, link: string): Located {
+function locate(caller: string, what: string, link: string): Located {
   if (!link.startsWith('/') && !URL.canParse(link)) {
     throw new TypeError(
-      `openapi: ${what} must be an absolute URL or a path starting with "/"`,
+      `${caller}: ${what} must be an absolute URL or a path starting with "/"`,
     );
   }
   const url = new URL(link, PLACEHOLDER);
@@ -49,7 +50,7 @@ function locate(what: string, link: string): Located {
     url.pathname.split(MARKER).length !== 2
   ) {
     throw new TypeError(
-      `openapi: ${what} must be a path that holds the id once, without a query or fragment`,
+      `${caller}: ${what} must be a path that holds the id once, without a query or fragment`,
     );
   }
   return {
@@ -58,41 +59,54 @@ function locate(what: string, link: string): Located {
   };
 }
 
-function sameOrigin(what: string, first: Located, other: Located): string {
+function sameOrigin(
+  caller: string,
+  what: string,
+  first: Located,
+  other: Located,
+): string {
   if (first.origin !== other.origin) {
-    throw new TypeError(`openapi: ${what} has another origin than links.self`);
+    throw new TypeError(
+      `${caller}: ${what} has another origin than links.self`,
+    );
   }
   return other.path;
 }
 
-/** The paths of `definition`'s operations; throws `TypeError` when its links cannot give them. */
-export function resourcePaths(definition: AnyResource): ResourcePaths {
+/**
+ * The paths of `definition`'s operations, each message of a link it
+ * cannot read starting with `caller`.
+ */
+export function readPaths(
+  caller: string,
+  definition: AnyResource,
+): ResourcePaths {
   const { type, links } = definition;
   if (links.self === undefined) {
     throw new TypeError(
-      `openapi: ${type} has no links.self, so its paths are unknown; give the definer links.base`,
+      `${caller}: ${type} has no links.self, so its paths are unknown; give the definer links.base`,
     );
   }
-  const self = locate(`${type} links.self`, links.self(MARKER));
+  const self = locate(caller, `${type} links.self`, links.self(MARKER));
   const suffix = `/${TEMPLATE}`;
   if (!self.path.endsWith(suffix) || self.path === suffix) {
     throw new TypeError(
-      `openapi: ${type} links.self must end with the id after the collection's path`,
+      `${caller}: ${type} links.self must end with the id after the collection's path`,
     );
   }
   const relationships = new Map(
     Object.keys(definition.relationships).map((name) => {
       const built = links.relationship?.(MARKER, name) ?? {};
       const what = `${type} links.relationship(id, "${name}")`;
+      const pathOf = (link: string): string =>
+        sameOrigin(caller, what, self, locate(caller, what, link));
       return [
         name,
         {
-          ...(built.self === undefined
-            ? {}
-            : { self: sameOrigin(what, self, locate(what, built.self)) }),
+          ...(built.self === undefined ? {} : { self: pathOf(built.self) }),
           ...(built.related === undefined
             ? {}
-            : { related: sameOrigin(what, self, locate(what, built.related)) }),
+            : { related: pathOf(built.related) }),
         },
       ] as const;
     }),
@@ -103,4 +117,13 @@ export function resourcePaths(definition: AnyResource): ResourcePaths {
     resource: self.path,
     relationships,
   };
+}
+
+/**
+ * The paths of `definition`'s operations, as the OpenAPI document lists
+ * them and a host mounts its routes; throws `TypeError` when its links
+ * cannot give them.
+ */
+export function resourcePaths(definition: AnyResource): ResourcePaths {
+  return readPaths('resourcePaths', definition);
 }

@@ -2,13 +2,14 @@
  * In-process entry for Bun and Deno: the runtime under test loads the
  * package from `node_modules` the way Node does (Deno 2 does so because
  * `package.json` puts it in manual `node_modules` mode) and runs the
- * neutral, the server, and the openapi checks.
+ * neutral, the server, the openapi, and the route checks.
  * @ref https://bun.com/docs/runtime/modules
  * @ref https://docs.deno.com/runtime/fundamentals/node/#control-node_modules
  */
 import { neutralChecks } from './checks.ts';
 import { openapiChecks } from './openapi-checks.ts';
 import { report, runChecks } from './report.ts';
+import { routeChecks } from './route-checks.ts';
 import { serverChecks } from './server-checks.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -38,5 +39,6 @@ report(
     ...neutralChecks,
     ...serverChecks,
     ...openapiChecks,
+    ...routeChecks,
   }),
 );

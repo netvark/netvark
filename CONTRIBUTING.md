@@ -125,8 +125,12 @@ first so the scope is settled before code exists, then:
 
 1. Copy the closest sibling under `packages/` (`keyset-core` for a core, `kysely-keyset` for a
    binding) to `packages/<name>` and set `name`, `description`, `keywords`, `homepage`, and
-   `repository.directory` in its `package.json`. A binding depends on its core through `workspace:^`
-   and declares the host as a peer dependency.
+   `repository.directory` in its `package.json`. A binding declares its host as a peer dependency
+   and depends on its core through `workspace:^`, re-exporting it, unless the application imports
+   the core itself and hands the binding values made with it: then the core, and any other workspace
+   package the application hands it values from, is a peer too, and a `workspace:^` development
+   dependency
+   ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
 2. Keep `tsdown.config.ts` as the one source of the subpaths: `pnpm build` writes the `exports` maps
    into `package.json`, and CI fails on a diff. Name the Vitest project after the package.
 3. Add the package's re-export-only files, if any, to the coverage `exclude` list in the root

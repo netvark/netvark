@@ -1,0 +1,116 @@
+/**
+ * Where the routes sit (resource SPEC 19.2): each resource's paths, read
+ * from its JSON:API links by `resourcePaths` (SPEC 13.1), the function the
+ * OpenAPI document reads, so the routes, the links, and the document name
+ * the same URLs. Every resource shares one origin and one base, the
+ * collection path without its last segment, and no two name one path.
+ * A route is written as Hono's router reads a request's path: `{id}` as
+ * `:id`, and decoded by `decodeURI` but for `%25`, as Hono's `getPath`
+ * decodes, so a type outside ASCII routes as its links spell it.
+ * @ref https://hono.dev/docs/api/routing
+ * @ref https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath: `path.replace(/%25/g, '%2525')`, then `tryDecodeURI`)
+ * @packageDocumentation
+ */
+import type { DeclaredResource } from '@netvark/resource-core';
+
+import { tryDecodeURI } from 'hono/utils/url';
+
+import { resourcePaths } from '@netvark/resource-core/openapi';
+
+/** One resource's routes, as Hono matches them. */
+interface RoutePaths {
+  readonly collection: string;
+  readonly resource: string;
+}
+
+/** A resource and where its routes sit. */
+export interface MountedResource {
+  readonly declared: DeclaredResource;
+  readonly paths: RoutePaths;
+}
+
+/** What the routes mount: each resource, in the runtime's order, and the base they share. */
+export interface PathPlan {
+  /** As Hono matches it: `''` for root-relative links. */
+  readonly base: string;
+  readonly resources: ReadonlyArray<MountedResource>;
+}
+
+const TEMPLATE = '{id}';
+const PARAMETER = ':id';
+
+/** `path`, which holds `{id}` at most once, as a Hono route. */
+export function routeOf(path: string): string {
+  return path
+    .split(TEMPLATE)
+    .map((part) => tryDecodeURI(part.replaceAll('%25', '%2525')))
+    .join(PARAMETER);
+}
+
+/** The one value of `values`, by resource; a `TypeError` naming them all when they differ. */
+function shared(
+  values: ReadonlyArray<string>,
+  what: string,
+  why: string,
+): string {
+  const distinct = [...new Set(values)];
+  const [value] = distinct;
+  if (value === undefined || distinct.length > 1) {
+    throw new TypeError(
+      `jsonApiRoutes: the resources' links have different ${what} (${distinct.join(', ')}); ${why}`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Each resource's routes and the base they share. Throws `TypeError` when
+ * there is no resource, when a resource's links give no paths
+ * (`resourcePaths`), when the links have different origins or bases, or
+ * when two resources name one path.
+ */
+export function planPaths(
+  resources: ReadonlyArray<DeclaredResource>,
+): PathPlan {
+  if (resources.length === 0) {
+    throw new TypeError(
+      'jsonApiRoutes: the runtime runs no resource, so there is nothing to serve',
+    );
+  }
+  const located = resources.map((declared) => ({
+    declared,
+    links: resourcePaths(declared.resource),
+  }));
+  shared(
+    located.map(({ links }) => links.origin ?? 'root-relative'),
+    'origins',
+    'the routes serve one',
+  );
+  const base = shared(
+    located.map(({ links }) =>
+      links.collection.slice(0, links.collection.lastIndexOf('/')),
+    ),
+    'bases',
+    'every collection sits under one',
+  );
+  const seen = new Set<string>();
+  const mounted = located.map(({ declared, links }) => {
+    const paths = {
+      collection: routeOf(links.collection),
+      resource: routeOf(links.resource),
+    };
+    for (const [path, route] of [
+      [links.collection, paths.collection],
+      [links.resource, paths.resource],
+    ] as const) {
+      if (seen.has(route)) {
+        throw new TypeError(
+          `jsonApiRoutes: two resources have the path ${path}`,
+        );
+      }
+      seen.add(route);
+    }
+    return { declared, paths };
+  });
+  return { base: routeOf(base), resources: mounted };
+}

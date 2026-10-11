@@ -1,0 +1,69 @@
+{
+  "name": "@netvark/hono-resource",
+  "version": "0.0.0",
+  "description": "Hono routes for a runtime of @netvark/resource-core declarations: every declared operation at the path its JSON:API links name, negotiated, validated, and answered by @netvark/hono-jsonapi, with no handler written per resource.",
+  "keywords": [
+    "api",
+    "hono",
+    "json-api",
+    "jsonapi",
+    "openapi",
+    "rest",
+    "routes"
+  ],
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/hono-resource#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/hono-resource"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@netvark/hono-ban": "workspace:^",
+    "@netvark/hono-jsonapi": "workspace:^",
+    "@netvark/resource-core": "workspace:^",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@netvark/hono-jsonapi": "^0.1.0",
+    "@netvark/resource-core": "^0.1.0",
+    "hono": ">=4.12.34"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

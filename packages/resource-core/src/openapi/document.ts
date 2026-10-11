@@ -47,7 +47,7 @@ import {
 import { checkExamples, exampleObjects } from './examples';
 import { operationCodes } from './operation-codes';
 import { pathItems } from './operations';
-import { resourcePaths } from './paths';
+import { readPaths } from './paths';
 import {
   identifierSchema,
   requestObjectSchema,
@@ -215,7 +215,7 @@ export function openapi(
   };
   const located = listed.map((internals) => ({
     internals,
-    paths: resourcePaths(internals.resource.resource),
+    paths: readPaths('openapi', internals.resource.resource),
   }));
   const server = serverOf(located.map(({ paths }) => paths.origin));
   const paths: Record<string, PathItem> = {};

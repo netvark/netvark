@@ -17,24 +17,30 @@ choice the specification leaves open is written down.
 |                           | [`@netvark/kysely-keyset`](packages/kysely-keyset#readme)     | The [Kysely](https://kysely.dev) binding for PostgreSQL: a definer checked against your `DB` interface and `paginate` rendered onto your own select query.                                                                             |
 | [resource](docs/resource) | [`@netvark/resource-core`](packages/resource-core#readme)     | One declaration per PostgreSQL table, keyed by its database names and typed by the public catalog, so a wrong name fails `tsc` at the option that holds it. In development: names, schemas, error codes, messages, and OpenAPI follow. |
 |                           | [`@netvark/kysely-resource`](packages/kysely-resource#readme) | The Kysely runtime on PostgreSQL: every operation in one transaction scoped to the actor's tenant, for row security policies and its own scope predicate alike. In development.                                                        |
+|                           | [`@netvark/hono-resource`](packages/hono-resource#readme)     | The Hono routes: every operation a runtime runs, served where the declarations' links point, with JSON:API negotiation, validation, includes, and the request's actor resolved once. In development.                                   |
 
 Every package is ESM only and runs on Node 22.12+, Bun, and Deno. Every package but
 `@netvark/pg-catalog`, a build-time tool that reads files and drives PostgreSQL, also runs on
 Cloudflare Workers and reads nothing from the environment. The cores have no dependencies apart from
 each other (`@netvark/jsonapi-core` is built on `@netvark/ban-core`, and `@netvark/resource-core` on
-the catalog, jsonapi, and keyset cores); a binding has its host as its only peer dependency, except
-`@netvark/pg-catalog`, which depends on `pg` and takes PGlite as an optional peer.
+the catalog, jsonapi, and keyset cores). A binding takes its host as a peer dependency, and also
+each `@netvark` package whose values the application hands it
+([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)):
+`@netvark/hono-jsonapi` takes `@netvark/hono-ban`, and `@netvark/hono-resource` takes
+`@netvark/hono-jsonapi` and `@netvark/resource-core`. `@netvark/pg-catalog` depends on `pg` and
+takes PGlite and `@netvark/resource-core` as optional peers.
 
 ## Install
 
 ```bash
-pnpm add @netvark/hono-ban hono                       # errors on Hono
-pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban  # JSON:API on Hono
-pnpm add @netvark/kysely-keyset kysely                 # keyset pagination on Kysely
-pnpm add -D @netvark/pg-catalog @electric-sql/pglite   # your PostgreSQL schema as a typed catalog
-pnpm add @netvark/resource-core                        # resources declared over that catalog
-pnpm add @netvark/kysely-resource kysely              # those resources run on PostgreSQL through Kysely
-pnpm add @netvark/ban-core                             # a core on its own: a fetch handler, a worker, another framework
+pnpm add @netvark/hono-ban hono                             # errors on Hono
+pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban       # JSON:API on Hono
+pnpm add @netvark/kysely-keyset kysely                      # keyset pagination on Kysely
+pnpm add -D @netvark/pg-catalog @electric-sql/pglite        # your PostgreSQL schema as a typed catalog
+pnpm add @netvark/resource-core                             # resources declared over that catalog
+pnpm add @netvark/kysely-resource kysely                    # those resources run on PostgreSQL through Kysely
+pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono  # and served on Hono
+pnpm add @netvark/ban-core                                  # a core on its own: a fetch handler, a worker, another framework
 ```
 
 ## Naming
