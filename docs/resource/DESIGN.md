@@ -173,18 +173,26 @@ the foreign key `organization_id` under `fields` fails `tsc` at the line that sa
 ### 3.5 Messages
 
 ```ts
-export const de = defineMessages([Contacts, Organizations], APP_ERRORS, {
-  errors: { ...JSON_API_ERRORS_DE, CONTACT_EMAIL_TAKEN: { title: 'Konflikt', detail: 'Diese E-Mail-Adresse ist bereits vergeben.' } },
-  constraints: { check: { ... }, unique: { ... }, foreignKey: { ... }, notNull: { ... } },
-  validation: { maxLength: '{field} darf höchstens {limit} Zeichen lang sein.', /* every kind used */ },
-  fields: { contacts: { name: 'Name', createdAt: 'Erstellt am', /* every member */ } },
-  options: { contacts: { kind: { person: 'Person', company: 'Firma' }, status: { active: 'Aktiv', archived: 'Archiviert' } } },
+import { m } from './paraglide/messages.js'; // compiled by Paraglide JS from messages/{locale}.json
+
+export const messages = defineMessages([Contacts, Organizations], APP_ERRORS, {
+  errors: { NOT_FOUND: { title: m.not_found_title, detail: m.not_found_detail } /* every code */ },
+  constraints: { unique: { title: m.conflict, detail: m.unique_detail } /* every kind used */ },
+  validation: { maxLength: m.max_length, enum: m.one_of /* every issue kind */ },
+  fields: { contacts: { name: m.contact_name, createdAt: m.created_at /* every member */ } },
+  options: { contacts: { kind: { person: m.kind_person, company: m.kind_company } } },
 });
 ```
 
-A missing kind, label, or option fails `tsc`. `localizeErrors({ en, de }, { language })` is the
-`transform` of the ban handler: it negotiates `Accept-Language` and rewrites titles and details,
-never codes or pointers.
+```json
+{ "max_length": "{field} darf höchstens {limit} Zeichen lang sein." }
+```
+
+Every message is a function, so Paraglide's compiled ones fit as they are (ADR-0009). A missing
+code, kind, label, or option fails `tsc`, and so does a translation that uses a variable its kind
+does not receive. `localizeErrors(messages, { resource })` is the `transform` of the ban handler: it
+picks each object's message and inputs and rewrites titles and details, never codes or pointers, in
+the locale `paraglideMiddleware` resolved for the request.
 
 ### 3.6 The server
 
@@ -269,6 +277,7 @@ server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶
 | 0006 | Fixtures are mandatory on codecs and validators; the database is the oracle                        |
 | 0007 | Schema issues are named by JSON Schema keywords; constraint violations carry the constraint's code |
 | 0008 | A host-free core with a server subpath and a storage contract                                      |
+| 0009 | Messages are functions; the i18n library owns the locale                                           |
 
 ## 6. Later
 

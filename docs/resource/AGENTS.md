@@ -14,8 +14,9 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   migrations or restating them. Wire behavior comes from JSON:API 1.1; type behavior from the
   PostgreSQL manual, checked by running the SQL; schema behavior from Zod's documentation and source
   for the peer range; keywords and formats from JSON Schema 2020-12, OpenAPI 3.1, and the OpenAPI
-  Format Registry; language negotiation from RFC 9110 and RFC 4647. Cite the clause next to the
-  decision with an `@ref <url>` comment and name it in the test.
+  Format Registry; localization from Paraglide JS's documentation, which owns the locale (ADR 0009),
+  and `Content-Language` and `Vary` from RFC 9110. Cite the clause next to the decision with an
+  `@ref <url>` comment and name it in the test.
 - Database names in, derived names out. A declaration takes only database names, and no option may
   take a free-form public name except `as` and `code` (ADR 0003).
 - Never restate, never invent. No composed schema carries `.default()`, `.prefault()`, `.catch()`,

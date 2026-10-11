@@ -40,8 +40,8 @@ grammar, the derivations, or the error model.
   needs its check in SPEC 6.1, an issue kind, its JSON Schema keyword, its fold into `limits`,
   boundary fixtures, and oracle cases.
 - **An issue kind or a constraint kind.** SPEC 6.4 or 9.1, the `Messages` types, the English
-  default, the template variables, a localization test, and an ADR: the vocabulary is a public
-  contract, so removing or renaming a kind is `major`.
+  default, the inputs its message receives (SPEC 10.3), a localization test, and an ADR: the
+  vocabulary is a public contract, so removing or renaming a kind is `major`.
 - **A declaration option.** SPEC 3 and 14, the type-level check with its `@ts-expect-error` case, a
   `fails/` declaration in `e2e/resource/` whose `// error:` marker pins the compiler's message, the
   runtime `TypeError` with its message, the README when a user would look for it, and a `minor`

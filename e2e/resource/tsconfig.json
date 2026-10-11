@@ -5,6 +5,9 @@
   // maps, exactly as an installed copy would (no `source` condition here).
   // Build first (`pnpm build` at the root). `fails/` holds declarations that
   // must not compile; `fails.e2e.test.ts` compiles them on their own.
+  // `localization/` imports the messages Paraglide compiles into
+  // `localization/paraglide` in this package's `build`, which the root build
+  // runs.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],

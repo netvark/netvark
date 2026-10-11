@@ -39,6 +39,20 @@ export type {
 export type { ErrorCatalog } from './errors/error-catalog';
 export type { ConstraintKind, ErrorEntry } from './errors/error-entry';
 export type {
+  ErrorTransform,
+  LocalizeErrorsOptions,
+} from './messages/localize-errors';
+export type { MessagesFor } from './messages/messages-for';
+export type {
+  CodeInputs,
+  ConstraintInputs,
+  ErrorText,
+  IssueInputs,
+  Label,
+  Message,
+  Messages,
+} from './messages/types';
+export type {
   FieldFacts,
   FieldLimits,
   FieldMeta,
@@ -54,4 +68,7 @@ export { defineCodec } from './codecs/define-codec';
 export { defineValidator } from './codecs/define-validator';
 export { createDeclareResource } from './declare/create-declare-resource';
 export { errorCatalog } from './errors/error-catalog';
+export { defaultMessages } from './messages/default-messages';
+export { defineMessages } from './messages/define-messages';
+export { localizeErrors } from './messages/localize-errors';
 export { ISSUE_KINDS } from './schema/issue-kinds';
