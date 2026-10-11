@@ -4,8 +4,10 @@
  * never; a stored value with no read form fails the read. The values are
  * the ones drivers get wrong by default: an `int8` past 2^53, a `numeric`
  * read as a float, a `timestamptz` read at millisecond precision or in the
- * local zone, a `date` read as a local midnight, a key in upper case, and
- * array elements that need quoting, `NULL` and the empty string among them.
+ * local zone, a `date` read as a local midnight, a key in upper case,
+ * array elements that need quoting, `NULL` and the empty string among them,
+ * and the elements of a boolean array, which PostgreSQL prints as `t` and
+ * `f`.
  * @packageDocumentation
  */
 import type { PublicRow } from '../../server/storage';
@@ -44,6 +46,7 @@ const EVERY_FORM = {
   secret: 'hidden',
   priority: 'high',
   rank: -7,
+  checklist: [true, false, true],
 };
 
 /** The row of `EVERY_FORM` created in workspace 1 under `parent`. */
@@ -65,6 +68,7 @@ function everyForm(parent: string): PublicRow {
     createdIn: '1',
     priority: 'high',
     rank: -7,
+    checklist: [true, false, true],
     workspace: '1',
     parent,
   };

@@ -114,6 +114,7 @@ const tasks: DeclaredResource = declareResource('tasks', {
     created_in: { access: 'read' },
     priority: { access: 'readWrite', filter: ['eq', 'in', 'nin'], sort: true },
     rank: { access: 'readWrite', filter: ['gte', 'between'], sort: true },
+    checklist: { access: 'readWrite' },
   },
   relationships: {
     workspace_id: { target: () => workspaces, access: 'read' },

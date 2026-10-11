@@ -2227,6 +2227,21 @@ const value = {
           "identity": null,
           "generated": null,
           "comment": null
+        },
+        "flags": {
+          "type": "bool",
+          "typeKind": "base",
+          "array": true,
+          "sqlType": "boolean[]",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
         }
       },
       "constraints": {

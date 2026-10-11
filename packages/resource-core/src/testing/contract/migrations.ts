@@ -12,7 +12,8 @@
  * `list` filters and sorts besides (SPEC 12.8, obligation 5): an enum,
  * which sorts in the order of its labels, an `int4`, and a `tsvector`
  * generated from the title with the `simple` configuration, which search
- * reads.
+ * reads. The fourth adds a boolean array, whose elements PostgreSQL prints
+ * as `t` and `f` where a boolean cast to text prints `true` and `false`.
  * `public-catalog.ts` is what `pg-catalog extract` writes for these
  * migrations; `e2e/resource` proves it current. The schema has no row
  * security, so only the adapter's scope predicate keeps a row in its scope.
@@ -20,6 +21,7 @@
  * @ref https://www.postgresql.org/docs/18/sql-altertable.html (ATTACH PARTITION: the table must have the target's CHECK constraints)
  * @ref https://www.postgresql.org/docs/18/datatype-enum.html#DATATYPE-ENUM-ORDERING
  * @ref https://www.postgresql.org/docs/18/textsearch-tables.html#TEXTSEARCH-TABLES-INDEX (a generated tsvector column)
+ * @ref https://www.postgresql.org/docs/18/datatype-boolean.html ("The datatype output function for type boolean always emits either t or f")
  * @packageDocumentation
  */
 
@@ -80,6 +82,8 @@ alter table tasks
   add column priority task_priority not null default 'normal',
   add column rank int4,
   add column search tsvector generated always as (to_tsvector('simple', title)) stored;
+`,
+  `alter table tasks add column checklist boolean[];
 `,
 ];
 

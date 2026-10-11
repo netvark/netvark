@@ -16,6 +16,20 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const LOCAL = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/u;
 const UTC = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)\+00$/u;
 
+/**
+ * A boolean as PostgreSQL prints it: a cast to text gives `true` or
+ * `false` (`booltext`), while an array prints its elements with the
+ * element type's output function, `boolout`, as `t` or `f`.
+ * @ref https://www.postgresql.org/docs/18/datatype-boolean.html ("The datatype output function for type boolean always emits either t or f")
+ * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/bool.c (`booltext`, the cast to text, differs from `boolout`)
+ */
+const BOOLEANS: ReadonlyMap<string, boolean> = new Map([
+  ['true', true],
+  ['t', true],
+  ['false', false],
+  ['f', false],
+]);
+
 function finite(text: string): unknown {
   const value = Number(text);
   return Number.isFinite(value) ? value : UNREPRESENTABLE;
@@ -41,7 +55,7 @@ const READERS: Readonly<Record<string, (text: string) => unknown>> = {
   float4: finite,
   float8: finite,
   numeric: (text) => (DECIMAL.test(text) ? text : UNREPRESENTABLE),
-  bool: (text) => text === 'true',
+  bool: (text) => BOOLEANS.get(text) ?? UNREPRESENTABLE,
   date: (text) => (DATE.test(text) ? text : UNREPRESENTABLE),
   timestamp: (text) => matching(LOCAL, text, '$dateT$time'),
   timestamptz: (text) => matching(UTC, text, '$dateT$timeZ'),

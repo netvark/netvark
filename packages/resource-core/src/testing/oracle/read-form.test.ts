@@ -53,6 +53,12 @@ describe('readForm', () => {
     ]);
   });
 
+  it('reads the elements of a boolean array, which PostgreSQL prints as t and f', () => {
+    const flags: ColumnType = { ...scalar('bool'), array: true };
+    expect(readForm('{t,f}', flags)).toEqual([true, false]);
+    expect(readForm('{}', flags)).toEqual([]);
+  });
+
   it.each([
     ['float8', 'Infinity'],
     ['float4', 'NaN'],
@@ -62,6 +68,8 @@ describe('readForm', () => {
     ['timestamp', 'infinity'],
     ['timestamptz', '2026-10-11 09:30:00+01'],
     ['jsonb', 'null'],
+    ['bool', 'yes'],
+    ['bool', 'TRUE'],
   ])('gives UNREPRESENTABLE for %s %s', (base, text) => {
     expect(readForm(text, scalar(base))).toBe(UNREPRESENTABLE);
   });

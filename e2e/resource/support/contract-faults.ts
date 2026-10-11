@@ -20,6 +20,7 @@ import {
   wrapping,
 } from './faulty-adapters.ts';
 import { LIST_FAULTS } from './list-faults.ts';
+import { READ_FAULTS } from './read-faults.ts';
 
 /** A defect: what it breaks, the cases that must fail, and the adapter that has it. */
 export interface Fault {
@@ -34,7 +35,6 @@ export interface Fault {
 
 const SET_LOCAL = 'select set_config($1, $2, true)';
 const SCOPE_PREDICATE = /"workspace_id" = (\$\d+)::text::"int8"/gu;
-const STARTS_AT = '"starts_at"::text as "startsAt"';
 const ROW_LOCK = / for (?:no key )?update$/u;
 
 const O1_FIRST =
@@ -43,8 +43,6 @@ const O1_UNCHANGED =
   'obligation 1: rolls back and rejects with what the run threw, unchanged';
 const O1_WENT_ON =
   'obligation 1: rejects with the error of a statement that failed, though the run went on';
-const O3_FORMS =
-  'obligation 3: reads every field in its read form, a codec field through its storage codec, and no write field';
 const O6_ROLLBACK =
   "obligation 6: a refused statement rejects its transaction and rolls back the transaction's earlier writes";
 const O10_UPDATE =
@@ -114,38 +112,7 @@ export const FAULTS: ReadonlyArray<Fault> = [
       sql.replaceAll(SCOPE_PREDICATE, '$1::text is not null'),
     ),
   },
-  {
-    name: 'reads a numeric as a number',
-    fails: [O3_FORMS],
-    adapter: wrapping((adapter) => ({
-      ...adapter,
-      create: async (tx, resource, input) => {
-        const row = await adapter.create(tx, resource, input);
-        return { ...row, estimate: Number(row['estimate']) };
-      },
-    })),
-  },
-  {
-    name: 'returns a write field',
-    fails: [O3_FORMS],
-    adapter: wrapping((adapter) => ({
-      ...adapter,
-      create: async (tx, resource, input) => ({
-        ...(await adapter.create(tx, resource, input)),
-        secret: input.attributes['secret'] ?? null,
-      }),
-    })),
-  },
-  {
-    name: 'reads infinity as null',
-    fails: ['obligation 3: fails a read whose stored value has no read form'],
-    adapter: rewriting((sql) =>
-      sql.replace(
-        STARTS_AT,
-        `nullif("starts_at", 'infinity')::text as "startsAt"`,
-      ),
-    ),
-  },
+  ...READ_FAULTS,
   {
     name: 'writes a member left out as null',
     fails: [

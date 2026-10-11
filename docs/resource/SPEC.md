@@ -2028,19 +2028,20 @@ self-reference; and `logs`, partitioned by its id with client ids, whose ids bel
 `logs_low` and the rest to `contract_archive.logs_high_rest`, a partition of a table attached with
 its own primary key. A third migration adds to tasks what `list` filters and sorts besides: an enum,
 which sorts in the order of its labels, an `int4`, and a `tsvector` generated from the title with
-`simple`. `tasks` filters with operators of every keyset type, sorts by its scalars, searches that
-column, sorts by `['-priority', 'due_on']` by default, and pages two to three rows at a time; `logs`
-lists, filtered by its owner. A column default reads
+`simple`, and a fourth adds a `boolean` array. `tasks` filters with operators of every keyset type,
+sorts by its scalars, searches that column, sorts by `['-priority', 'due_on']` by default, and pages
+two to three rows at a time; `logs` lists, filtered by its owner. A column default reads
 `current_setting('contract.workspace_id', true)`, so a case reads back what the transaction set, and
 the schema has no row security, so only the adapter's predicate keeps a row in its scope. The values
 are the ones drivers get wrong by default: an `int8` past 2^53, a `numeric` read as a float, a
 `timestamptz` at millisecond precision or in the local zone, array elements that need quoting,
-`NULL` and the empty string among them. A harness gives its adapter the catalog, a storage codec for
-`point`, and a keyset definer with a cursor secret; on a server, it gives the adapter at least two
-connections, so the concurrent cases of obligations 8 and 10 run two transactions at once: the first
-takes its lock, the second starts, and the first finishes only after the second had time to reach
-the database. An adapter that serializes its transactions, as PGlite's does, passes them without a
-lock.
+`NULL` and the empty string among them, and the elements of a `boolean` array, which PostgreSQL
+prints as `t` and `f` where a `boolean` cast to text prints `true` and `false`. A harness gives its
+adapter the catalog, a storage codec for `point`, and a keyset definer with a cursor secret; on a
+server, it gives the adapter at least two connections, so the concurrent cases of obligations 8 and
+10 run two transactions at once: the first takes its lock, the second starts, and the first finishes
+only after the second had time to reach the database. An adapter that serializes its transactions,
+as PGlite's does, passes them without a lock.
 
 The cases of obligation 5 list five tasks of workspace 1, created between two of workspace 2, two
 rows a page, each request walked forward with `next` from the first page and back with `prev` from
@@ -2415,9 +2416,9 @@ modifier, domains, and CHECKs judge it with assignment semantics, which an expli
 (`'abcd'::varchar(3)` truncates silently). The session runs in UTC with ISO dates. A value the
 schema accepts MUST be stored as the same value: its read form (5.1) compared per type
 (`numeric(5,2)` prints `1.50`, `uuid` lower case, `timestamptz` in UTC, `bpchar` padded, `real` at
-single precision). A value the schema refuses MUST be refused, or stored as a value whose read form
-is outside 5.1 or differs from what was sent, the cases of 5.2. Relationship ids run through the
-linkage schema and into the target's key column.
+single precision, a `boolean` array's elements as `t` and `f`). A value the schema refuses MUST be
+refused, or stored as a value whose read form is outside 5.1 or differs from what was sent, the
+cases of 5.2. Relationship ids run through the linkage schema and into the target's key column.
 
 `id-spellings.e2e.test.ts` holds `schema.id` to PostgreSQL for every key type of the oracle, over
 each type's candidates (`support/id-candidates.ts`: the spellings PostgreSQL reads, near misses,

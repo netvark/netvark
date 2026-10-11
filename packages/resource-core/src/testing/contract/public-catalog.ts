@@ -376,6 +376,19 @@ const value = {
             "kind": "stored",
             "searchConfig": "simple"
           }
+        },
+        "checklist": {
+          "type": "bool",
+          "typeKind": "base",
+          "array": true,
+          "sqlType": "boolean[]",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
         }
       },
       "constraints": {
