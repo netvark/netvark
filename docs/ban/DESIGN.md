@@ -602,8 +602,11 @@ directly; pass `{ dialect: 'openapi-3.0' }` to get `enum` instead of `const` for
 Under `jsonApi({ mixedEntries: true })` a document may combine the listed codes, so `errorResponses`
 describes each status as the documents whose objects carry any code a body of that status may carry,
 the statuses chosen as `responseStatus` chooses them, each object pinned to one entry.
-`@hono/zod-openapi` accepts raw schema objects in `responses[*].content[*].schema`, so the helpers
-drop into `createRoute()` without any Zod wrapping (verified by a generated-document test). @ref
+`errorResponses(ban, list, { objectRef })` references each entry's object instead of inlining it in
+every response, and `errorObjectSchemas(ban, list)` gives the objects to place once, typically in
+`components.schemas`, which keeps a document of many operations small. `@hono/zod-openapi` accepts
+raw schema objects in `responses[*].content[*].schema`, so the helpers drop into `createRoute()`
+without any Zod wrapping (verified by a generated-document test). @ref
 https://spec.openapis.org/oas/v3.1.0#schema-object @ref
 https://github.com/asteasolutions/zod-to-openapi/blob/master/src/openapi-registry.ts
 

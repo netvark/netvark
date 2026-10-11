@@ -17,7 +17,7 @@ import type { JsonApiDocumentMembers } from './schema';
 
 import { assertMemberName } from '../../internal/member-name';
 import { errorAsObject, itemsAsObjects } from './error-object';
-import { bodySchema, mixedBodySchema } from './schema';
+import { bodySchema, entryObjectSchema, mixedBodySchema } from './schema';
 
 export type {
   JsonApiErrorObject,
@@ -164,6 +164,12 @@ export function jsonApi(
             ctx: SchemaContext,
           ): JsonSchema {
             return mixedBodySchema(definitions, ctx, schemaOptions);
+          },
+          objectSchema(
+            definition: ResolvedDefinition,
+            ctx: SchemaContext,
+          ): JsonSchema {
+            return entryObjectSchema(definition, ctx, schemaOptions);
           },
         }
       : {}),

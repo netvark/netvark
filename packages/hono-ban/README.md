@@ -361,6 +361,21 @@ const route = createRoute({
 });
 ```
 
+With `jsonApi({ mixedEntries: true })` each route's error responses repeat the objects of the codes
+it lists. Register each object once and reference it, so the document stays small however many
+routes there are:
+
+```ts
+import { errorObjectSchemas, errorResponses } from '@netvark/hono-ban/openapi';
+
+const name = (key: string) => `Error.${key}`;
+const objectRef = (key: string) => `#/components/schemas/${name(key)}`;
+for (const [key, schema] of Object.entries(errorObjectSchemas(ban, codes))) {
+  app.openAPIRegistry.registerComponent('schemas', name(key), schema);
+}
+// In each createRoute: responses: { ...errorResponses(ban, codes, { objectRef }) }
+```
+
 Hooks for `@hono/zod-validator` (`hook` from `@netvark/hono-ban/zod`), `@hono/valibot-validator`
 (`@netvark/hono-ban/valibot`), and `@hono/standard-validator` (`@netvark/hono-ban/standard-schema`)
 work the same way: they throw into `onError`, so validation failures get the same id, header, and

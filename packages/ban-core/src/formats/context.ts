@@ -34,6 +34,12 @@ export type SchemaDialect = 'draft-2020-12' | 'openapi-3.0';
 export interface SchemaContext {
   readonly docsBaseUrl: string | undefined;
   readonly dialect: SchemaDialect;
+  /**
+   * Where the document holds each entry's object, by catalog key. A format
+   * that combines entries then references the objects in `mixedSchema`
+   * instead of inlining them (SPEC 7.2.4, 9).
+   */
+  readonly objectRef?: ((key: string) => string) | undefined;
 }
 
 /** A JSON Schema 2020-12 object. */

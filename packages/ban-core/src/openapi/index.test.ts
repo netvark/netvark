@@ -103,6 +103,25 @@ describe('errorResponses', () => {
     });
   });
 
+  it('names a description several entries share once', () => {
+    const errors = {
+      NAME_INVALID: { status: 422, title: 'Invalid Attribute' },
+      AGE_INVALID: { status: 422, title: 'Invalid Attribute' },
+      AGE_MISSING: { status: 422, title: 'Missing Attribute' },
+    } as const;
+    const refs = ['NAME_INVALID', 'AGE_INVALID', 'AGE_MISSING', 'CONFLICT'];
+    expect(errorResponses(createBan({ errors }), refs)['422']).toMatchObject({
+      description: 'Invalid Attribute or Missing Attribute',
+    });
+    const mixing = createBan({
+      errors,
+      format: jsonApi({ mixedEntries: true }),
+    });
+    expect(errorResponses(mixing, refs)['400']).toMatchObject({
+      description: 'Invalid Attribute or Missing Attribute or Conflict',
+    });
+  });
+
   it('uses the format content type', () => {
     const api = createBan({ format: jsonApi() });
     expect(
