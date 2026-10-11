@@ -244,6 +244,17 @@ the scope predicate to every statement, locks the row an update or a remove deci
 the members a request carried, records its events in an outbox table, and maps every PostgreSQL
 rejection to its declared code. Workers call the same domain HTTP does.
 
+`@netvark/hono-resource` serves the runtime on Hono, every declared operation at the path its links
+name, with an operations endpoint that runs a request in one transaction and the OpenAPI document:
+
+```ts
+app.use(
+  jsonApi({ extensions: [ATOMIC_OPERATIONS_EXTENSION], profiles: [CURSOR_PAGINATION_PROFILE] }),
+);
+app.onError(ban.onError({ transform: localizeErrors(messages, { resource: resourceTypeOf }) }));
+app.route('/', jsonApiRoutes({ runtime, actor: (c) => sessionActor(c), openapi: { info } }));
+```
+
 ### 3.7 A migration
 
 A migration that makes `nickname` NOT NULL without a default makes `nickname` required on create
@@ -300,26 +311,29 @@ PGlite and on servers. `createResourceRuntime` runs the lifecycle over it and is
 boundary is enforced three times: the session parameter row security reads, the predicate on every
 statement, and the boot checks, static ones that CI runs from the catalog through
 `checkResourceRuntime` and connected ones at startup that ask the server whether row security
-applies to the role. Effects write events to an outbox table in the operation's transaction;
+applies to the role. `transaction(actor, work)` runs several operations in one transaction, as an
+operations request needs: the first failure rolls everything back and is mapped as the operation
+alone would map it. Effects write events to an outbox table in the operation's transaction;
 `relayOutbox` delivers them after commit, at least once. Cursors are bound to the scope values, so a
 cursor from one tenant is refused in another. ADR 0012 records why.
 
 ## 5. Decisions
 
-| ADR  | Decision                                                                                           |
-| ---- | -------------------------------------------------------------------------------------------------- |
-| 0001 | Record architecture decisions                                                                      |
-| 0002 | The public catalog is the type source; a declaration is keyed by database names                    |
-| 0003 | Public names are derived; `as` and `code` are the only overrides                                   |
-| 0004 | Writes omit what they do not change; the database supplies defaults                                |
-| 0005 | Values cross the wire in canonical forms; a write PostgreSQL would alter is rejected               |
-| 0006 | Fixtures are mandatory on codecs and validators; the database is the oracle                        |
-| 0007 | Schema issues are named by JSON Schema keywords; constraint violations carry the constraint's code |
-| 0008 | A host-free core with a server subpath and a storage contract                                      |
-| 0009 | Messages are functions; the i18n library owns the locale                                           |
-| 0010 | The database resolves the violations a partition raises                                            |
-| 0011 | An id takes what its key's write form takes and is sent in the spelling the server reads back      |
-| 0012 | The runtime runs declared resources over the storage contract, in text, inside row security        |
+| ADR  | Decision                                                                                                       |
+| ---- | -------------------------------------------------------------------------------------------------------------- |
+| 0001 | Record architecture decisions                                                                                  |
+| 0002 | The public catalog is the type source; a declaration is keyed by database names                                |
+| 0003 | Public names are derived; `as` and `code` are the only overrides                                               |
+| 0004 | Writes omit what they do not change; the database supplies defaults                                            |
+| 0005 | Values cross the wire in canonical forms; a write PostgreSQL would alter is rejected                           |
+| 0006 | Fixtures are mandatory on codecs and validators; the database is the oracle                                    |
+| 0007 | Schema issues are named by JSON Schema keywords; constraint violations carry the constraint's code             |
+| 0008 | A host-free core with a server subpath and a storage contract                                                  |
+| 0009 | Messages are functions; the i18n library owns the locale                                                       |
+| 0010 | The database resolves the violations a partition raises                                                        |
+| 0011 | An id takes what its key's write form takes and is sent in the spelling the server reads back                  |
+| 0012 | The runtime runs declared resources over the storage contract, in text, inside row security                    |
+| 0013 | Hosts take the runtime contract, mount where the links point, and run an operations request in one transaction |
 
 ## 6. Later
 

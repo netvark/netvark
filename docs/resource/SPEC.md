@@ -1,9 +1,10 @@
 # resource: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/resource-core` and `@netvark/kysely-resource`;
-  `docs/resource/DESIGN.md` explains the why. Each binding adds its sections after the core's when
-  its epic starts, from 18 on, so the core's numbering stays stable: `@netvark/kysely-resource`
-  holds 18, and `@netvark/hono-resource` and `@netvark/react-resource` follow.
+- Status: normative for the 0.x line of `@netvark/resource-core`, `@netvark/kysely-resource`, and
+  `@netvark/hono-resource`; `docs/resource/DESIGN.md` explains the why. Each binding adds its
+  sections after the core's when its epic starts, from 18 on, so the core's numbering stays stable:
+  `@netvark/kysely-resource` holds 18, `@netvark/hono-resource` 19, and `@netvark/react-resource`
+  follows.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source files that implement it and the tests that prove it. When this document and the code
@@ -42,12 +43,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform`                            |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `scopeColumnOf`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `isResourceBehavior`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow` |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform`                                                                                                                                   |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `scopeColumnOf`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `isResourceBehavior`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`, `ResourceRuntime`, `RuntimeResources`, `Domain`, `ResourceOperations`, `ResourceInput`, `ListOptions` |
+| `@netvark/resource-core/openapi` | `openapi`, `resourcePaths`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `ResourcePaths`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ```
 packages/resource-core/src/
@@ -2107,6 +2108,87 @@ gives for its migrations.
 
 ---
 
+### 12.10 The runtime contract (`server/runtime.ts`, ADR 0013)
+
+What a host or a worker calls to run the declared operations, whichever runtime runs them.
+`@netvark/kysely-resource` implements it (18.3, 18.4) and re-exports these types, and
+`@netvark/hono-resource` takes it (19). The types are this package's, so a host types a runtime
+without a query builder or a driver.
+
+```ts
+interface ResourceRuntime<
+  TDomain extends DomainShape = DomainShape,
+  TResources extends RuntimeResources<TDomain> = RuntimeResources<TDomain>,
+> {
+  readonly warnings: ReadonlyArray<string>; // what the runtime warned about when it started
+  readonly resources: ReadonlyArray<DeclaredResource>; // every resource it runs, in its behaviors' order
+  readonly as: (actor: TDomain['actor']) => Domain<TResources>;
+  readonly transaction: <TResult>(
+    actor: TDomain['actor'],
+    work: (domain: Domain<TResources>) => Promise<TResult>,
+  ) => Promise<TResult>;
+}
+```
+
+`RuntimeResources<TDomain>` is what `defineResource` returned for each resource (12.3), keyed by
+type, and `Domain<TResources>` holds one `ResourceOperations` per key.
+`ResourceOperations<TResource>` holds the operations the declaration declares (3.3), and `include`
+when it declares an includable relationship: for a typed declaration exactly those, each resolving
+to its public rows, `PublicRowOf` (11.1), with `list` taking a request in the declaration's keyset
+fields (`KeysetRequestOf`) and `include` the names of its includable relationships; for a resource
+typed wide every operation is optional, and `list` takes any `StorageListRequest`. The operations
+are read-only methods, whose parameters TypeScript compares both ways, so those of a runtime typed
+by its behaviors pass where a host or a worker takes them typed wide, as `ResourceOperations`, a
+`Domain`, or a `ResourceRuntime<TDomain>`; what the wide type lets through, such as a sort the
+keyset does not declare, the runtime refuses when it plans the page. @ref
+https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-6.html#strict-function-types
+("methods are excluded")
+
+| Operation                     | Takes                                                                                                                           | Resolves to                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `list(request?, options?)`    | a keyset request in public names (12.8), which `keysetRequest` builds from `parseQuery` (11.2), and `ListOptions`, `{ total? }` | a `Page` of public rows                       |
+| `get(id)`                     | the id as sent                                                                                                                  | the public row                                |
+| `create(input)`               | `ResourceInput`                                                                                                                 | the created row                               |
+| `update(id, input)`           | the id as sent and `ResourceInput`                                                                                              | the updated row                               |
+| `remove(id)`                  | the id as sent                                                                                                                  | `undefined`                                   |
+| `include(relationship, rows)` | an includable relationship and rows of the resource                                                                             | the target's rows the rows link to, each once |
+
+- `ListOptions.total` also counts the rows of the scope the filter selects.
+- `ResourceInput` is `{ id?, attributes?, relationships? }`, a resource object as
+  `@netvark/jsonapi-core` parses it, each relationship as its linkage; a missing member is `{}`. A
+  refusal's items point where a request document holds the member (9.3):
+  `/data/attributes/<name>/...`, `/data/relationships/<name>/data/...`, and `/data/id`. A host that
+  read the input elsewhere, from a relationship document or an operations request, moves them there
+  (19.3, 19.4).
+- `resources` lists the declared resource of every behavior the runtime runs, in the order of its
+  behaviors: what a host mounts, documents, and finds include targets in.
+- `as(actor)` runs each operation in a transaction of its own, with every scope the actor has
+  (12.5). Once it commits, the events it recorded go to the runtime's hook after commit.
+- `transaction(actor, work)` runs every operation of the domain `work` receives in one transaction,
+  with every scope the actor has, one operation at a time:
+  - When `work` resolves and no operation failed, the transaction commits, the events every
+    operation recorded go to the hook once, in their order, and `transaction` resolves to what
+    `work` resolved to.
+  - The first operation that fails rejects with what it threw and ends the transaction: the
+    transaction rolls back however `work` settles, and every later call of that domain rejects with
+    a `TypeError`. `transaction` rejects with that failure as the operation alone would answer it,
+    mapped once the transaction ended (18.5), when `work` rejected with that same value or resolved;
+    when `work` rejected with another value, such as an error it built from the failure, with that
+    value.
+  - When `work` rejects and no operation failed, the transaction rolls back and `transaction`
+    rejects with what `work` rejected with.
+  - A call while another operation of the same domain is pending, or once `transaction` settled,
+    rejects with a `TypeError`. A `transaction` called inside `work` opens a transaction of its own;
+    the two do not nest.
+
+The first failure decides because a statement PostgreSQL refused aborts the transaction, so nothing
+after it could commit, and because an operations request is all or nothing. @ref
+https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed atomically") @ref
+https://www.postgresql.org/docs/18/tutorial-transactions.html
+
+Tests: `server/runtime-types.test-d.ts` (typed operations pass where the wide types are taken, and
+stay read-only), and the runtime's own suites (18.7).
+
 ## 13. OpenAPI and the API diff (`openapi/`)
 
 ### 13.1 `openapi(resources, options)`
@@ -2131,7 +2213,8 @@ resources, after the checks of every list of resources (4.2). The options:
   document's only server, so resources whose links have different origins throw `TypeError`, as do
   two resources with one path. An operation's id is `<type>.<operation>` (`contacts.list`,
   `contacts.organization.relationship.get`), unique since neither a type nor a member name holds a
-  `.`, and its tag is the type.
+  `.`, and its tag is the type. `resourcePaths(definition)` reads them and is exported, so a host
+  mounts its routes at the paths the document lists (19.2).
 - **Bodies** use `application/vnd.api+json` without parameters, which matches the media type with
   the Cursor Pagination profile a page carries (RFC 9110 media ranges). Documents are those
   `@netvark/jsonapi-core` builds and parses (11.1): a resource document with the includable targets'
@@ -3077,8 +3160,9 @@ their numbers; this section holds the runtime's own test plan, packaging, and co
 | `outbox/`  | `relayOutbox`                                                                                                           |
 
 Types exported: `KyselyStorage`, `KyselyStorageOptions`, `KyselyTransaction`, `TextCodec`,
-`OutboxTable`, `RuntimeOptions`, `RuntimeResources`, `ResourceRuntime`, `Domain`,
-`ResourceOperations`, `ResourceInput`, `ListOptions`, `BootReport`, `RelayOptions`, `OutboxEvent`.
+`OutboxTable`, `RuntimeOptions`, `BootReport`, `RelayOptions`, `OutboxEvent`, and the runtime
+contract's `RuntimeResources`, `ResourceRuntime`, `Domain`, `ResourceOperations`, `ResourceInput`,
+and `ListOptions`, re-exported from `@netvark/resource-core/server` (12.10).
 
 ### 18.2 The storage adapter: `createKyselyStorage(options)`
 
@@ -3354,7 +3438,7 @@ JavaScript mistakes in the options themselves throw `TypeError` before any check
 `createResourceRuntime: options.storage must come from createKyselyStorage` and
 `createResourceRuntime: resources.contacts must be a behavior defineResource returned`.
 
-### 18.4 The domain: `runtime.as(actor)`
+### 18.4 The domain: `runtime.as(actor)` and `runtime.transaction(actor, work)`
 
 ```ts
 const domain = runtime.as(actor);
@@ -3366,23 +3450,34 @@ const created = await domain.contacts.create({
 });
 const renamed = await domain.contacts.update(created.id, { attributes: { name: 'Ada L.' } });
 await domain.contacts.remove(created.id);
+
+// One transaction for both, as an operations request runs them (19.4).
+await runtime.transaction(actor, async (domain) => {
+  const contact = await domain.contacts.create({ attributes: { name: 'Grace', kind: 'person' } });
+  await domain.calls.create({
+    attributes: { minutes: 12, note: 'Intro call' },
+    relationships: { contact: { type: 'contacts', id: contact.id } },
+  });
+});
 ```
 
-`as(actor)` returns a `Domain`: one `ResourceOperations` per resource, keyed by type, holding the
-operations the declaration declares (3.3), and `include` when it declares an includable
-relationship. `createResourceRuntime` infers the domain's definer and each behavior's resource from
-`resources`, so for a typed declaration `Domain` holds exactly those operations, each resolving to
-its public rows, `PublicRowOf` (11.1), with `list` taking a request in the declaration's keyset
-fields (`KeysetRequestOf`) and `include` the names of its includable relationships; for a behavior
-typed wide every operation is optional, and `list` takes any `StorageListRequest`. The operations
-are read-only methods, whose parameters TypeScript compares both ways, so those of a runtime typed
-by its behaviors pass where a host or a worker takes them typed wide, as `ResourceOperations`, a
-`Domain`, or a `ResourceRuntime<TDomain>`; what the wide type lets through, such as a sort the
-keyset does not declare, the runtime refuses when it plans the page (18.5). Each operation runs the
-lifecycle of 12.3 in one transaction of `storage.transaction`, with every scope the actor has,
-`scopeValues(scopes, actor)` (12.5), for an unscoped resource too: a policy on its table may read
-them, as one on the tenants table reads the tenant. An actor without a value for every scope runs no
-operation: `scopeValues` throws its `TypeError` before any statement.
+The runtime implements the contract of 12.10. `createResourceRuntime` infers the domain's definer
+and each behavior's resource from `resources`, so for a typed declaration `Domain` holds exactly the
+operations it declares, typed as 12.10 states, and `runtime.resources` lists each behavior's
+resource in the order of `resources`. Each operation runs the lifecycle of 12.3 in one transaction
+of `storage.transaction`, with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for
+an unscoped resource too: a policy on its table may read them, as one on the tenants table reads the
+tenant. An actor without a value for every scope runs no operation: `scopeValues` throws its
+`TypeError` before any statement.
+
+`transaction(actor, work)` opens one `storage.transaction` with the actor's scope values and hands
+`work` a domain whose operations run their lifecycle in that transaction instead of opening one;
+`include` reads in it too. The events every operation records gather in one list, written to the
+outbox as each effect records them and handed to `afterCommit` once the transaction committed. The
+first operation that fails records what it threw with its resource and operation; once
+`storage.transaction` rejected, `transaction` maps it with `operationFailure` exactly as the
+operation alone would (18.5), the partition's names included, which the adapter reads outside the
+transaction.
 
 | Operation                  | Runs                                                                                                                                                       | Resolves to           |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
@@ -3409,8 +3504,8 @@ operation: `scopeValues` throws its `TypeError` before any statement.
   statement reads no column, so a target holding a value without a read form is found too.
 - The id of `get`, `update`, and `remove` is refused as `NOT_FOUND` before the transaction when
   `schema.id` refuses it, and otherwise looked up as `schema.id` outputs it (3.4, 12.3).
-- `include` reads in a transaction of its own. `many(tx, resource, ids)` selects the public rows
-  whose key is any of `ids`, in the scope, in one statement,
+- `include` reads in a transaction of its own, or in `transaction`'s. `many(tx, resource, ids)`
+  selects the public rows whose key is any of `ids`, in the scope, in one statement,
   `where "key" = any($1::text::<key type>[])`; a linked row the actor cannot see is left out, as a
   `get` of it would answer `NOT_FOUND`. An id outside the target key's form names no row and is left
   out too, and without an id `include` runs no statement. The target's behavior is the one
@@ -3571,3 +3666,182 @@ what `report` itself throws; neither reaches the operation's caller, whose write
 | outbox columns   | `position` `int8`, `name` `text`, `version` `int4`, `payload` `jsonb`                                                | no       |
 | outbox schema    | `public` when `outbox.schema` is not given                                                                           | no       |
 | relay `limit`    | 100 by default                                                                                                       | no       |
+
+## 19. Hono routes (`@netvark/hono-resource`, `packages/hono-resource/src/`, ADR 0013)
+
+`jsonApiRoutes` serves a runtime of the contract (12.10) over HTTP on Hono: every declared operation
+at the path its links name, the to-one relationship routes, an Atomic Operations endpoint, and the
+OpenAPI document, with no handler written per resource. It maps a route to an operation and a
+request to the operation's input and nothing more: `@netvark/hono-jsonapi` negotiates, validates,
+and builds documents, the runtime authorizes and runs, and the host's ban renders every error.
+
+### 19.1 Public surface and module map
+
+```
+@netvark/hono-resource
+├── jsonApiRoutes(options)   routes.ts   the routes of a runtime (19.2 to 19.5)
+└── resourceTypeOf(c)        actor.ts    the type a request's route serves, for localizeErrors (19.6)
+```
+
+| Module             | Holds                                                                           |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `paths.ts`         | each resource's paths from its links, the base, and the methods each path takes |
+| `actor.ts`         | the request's actor, resolved once, and `resourceTypeOf`                        |
+| `collection.ts`    | `list` and `create`                                                             |
+| `member.ts`        | `get`, `update`, and `remove`                                                   |
+| `relationships.ts` | the relationship and related routes                                             |
+| `operations.ts`    | the Atomic Operations endpoint                                                  |
+| `pointers.ts`      | moving an error's items to where the request held the input                     |
+| `openapi.ts`       | the document's route                                                            |
+
+Types exported: `JsonApiRoutesOptions`, `RoutesOpenApiOptions`.
+
+### 19.2 `jsonApiRoutes(options)`
+
+```ts
+const app = new Hono<AppEnv>();
+app.use(
+  jsonApi({ extensions: [ATOMIC_OPERATIONS_EXTENSION], profiles: [CURSOR_PAGINATION_PROFILE] }),
+);
+app.onError(handle); // the application's ban (19.6)
+app.notFound(notFoundHandler());
+app.route(
+  '/',
+  jsonApiRoutes({
+    runtime, // createResourceRuntime's (18.3), or any runtime of the contract
+    actor: (c) => sessionActor(c), // the request's actor, or throws the error the request answers
+    openapi: { info: { title: 'Contacts API', version: '1.0.0' }, appErrors: APP_ERRORS },
+  }),
+);
+```
+
+| Option    | Meaning                                                                                                                                                                                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `runtime` | A runtime of the contract (12.10); its `resources` are what the routes serve.                                                                                                                                                                                                              |
+| `actor`   | `(c: Context<TEnv>) => TActor \| Promise<TActor>`, the actor the request runs as. It runs once per request, before the query or the document is read, so a request it refuses answers that refusal whatever else is wrong with it; what it throws is the response, such as `UNAUTHORIZED`. |
+| `openapi` | `openapi`'s options (13.1) without the resources, which are the runtime's. Without it, no document is served.                                                                                                                                                                              |
+
+It returns a `Hono<TEnv>` whose routes sit at the full paths the links name; the host mounts it at
+`/` and owns the rest: `jsonApi()` before it, which negotiates every request (jsonapi SPEC 10.1),
+with `ATOMIC_OPERATIONS_EXTENSION` among its extensions when the operations endpoint is served and
+`CURSOR_PAGINATION_PROFILE` among its profiles, the error handler, and `notFound`. The paths are
+`resourcePaths` of each resource's JSON:API definition (13.1), the function the document reads, with
+`{id}` written as Hono's `:id`, so the routes, the links, and the document name the same URLs; a
+mount under a prefix would make the links lie, so a host that serves under one sets the definer's
+`links.base` to it. The base is the collection path without its last segment: `/api` for
+`/api/contacts`.
+
+`jsonApiRoutes` throws `TypeError` before it serves anything when the runtime runs no resource, when
+a resource's links give no paths (13.1's messages), when two resources' links have different origins
+or bases, or when two resources name one path.
+
+A path answers the methods its operations take and any other with `METHOD_NOT_ALLOWED` (405), whose
+`Allow` header lists them, `HEAD` beside `GET` since Hono answers `HEAD` with a `GET` route. @ref
+https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6 ("The origin server MUST generate an Allow
+header field in a 405 response") @ref https://hono.dev/docs/api/routing
+
+### 19.3 Resource and relationship routes
+
+Each route exists only when its operation is declared (3.3), as the document lists it (13.1):
+
+| Route                       | Runs                                                      | Answers                                                                         |
+| --------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `GET <collection>`          | `list(keysetRequest(declared, query))`, then each include | 200, `paginatedDocument` with the page's links and meta and `included`          |
+| `POST <collection>`         | `create(document)`                                        | 201, the resource document, with `Location` from `links.self` (jsonapi 10.2)    |
+| `GET <resource>`            | `get(id)`, then each include                              | 200, the resource document with `included`                                      |
+| `PATCH <resource>`          | `update(id, document)`                                    | 200, the resource document                                                      |
+| `DELETE <resource>`         | `remove(id)`                                              | 204                                                                             |
+| `GET <relationship link>`   | `get(id)`                                                 | 200, the row's relationship document                                            |
+| `PATCH <relationship link>` | `update(id, { relationships: { <name>: linkage } })`      | 200, the updated row's relationship document                                    |
+| `GET <related link>`        | `get(id)`, then the target's `get` of the linked id       | 200, the target's resource document, or `data: null` when the row links nothing |
+
+- The query is `queryValidator(resource)`'s (jsonapi SPEC 10.4), the target's on a related route;
+  the document is `bodyValidator(resource, { operation })`'s, or
+  `relationshipValidator(resource, name, 'one')`'s on a relationship route, which refuses a
+  relationship the resource's updates do not write with 403.
+- Each include path is one relationship (11.1), run as the resource's `include(name, rows)`, whose
+  policy decides (12.2); the rows join `included` as resource objects of the target, the runtime's
+  resource of the relationship's type.
+- The relationship `PATCH` exists when the relationship is `readWrite` and the resource declares
+  `update`, and the related route when the target is a resource of the runtime that declares `get`.
+  Relationships are to-one (DESIGN 6), so no route adds to or removes from one.
+- The id is the `:id` path parameter, which Hono decodes.
+- A refusal of a relationship route's linkage points where the relationship document holds it: the
+  runtime's `/data/relationships/<name>/data...` becomes `/data...`.
+
+JSON:API lets a relationship update answer 204 when the server changed nothing else, and 200 with
+the relationship document otherwise; the route always sends the document, so a client sees the
+linkage the server holds. @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses
+
+### 19.4 Atomic Operations: `POST <base>/operations`
+
+Served when a resource of the runtime declares `create`, `update`, or `remove`, through
+`atomicOperations` (jsonapi SPEC 11.1) with:
+
+- `transaction`: `runtime.transaction(actor, run)`, the actor resolved once for the request, so the
+  operations run in one transaction and the hook after commit runs once (12.10);
+- per resource, the handlers of its declared operations over the transaction's domain: `add` is
+  `create`, `update` is `update`, `remove` is `remove`, and an `update` whose target names a
+  relationship is `update(id, { relationships: { <name>: linkage } })`, when the relationship is
+  `readWrite` and the resource declares `update`;
+- `resolveHref`: an `href` whose path is a resource path of the routes (19.2), or a relationship
+  link of one, names that resource, or that relationship; any other is the processor's 400;
+- `maxOperations`: the processor's default.
+
+The runtime's refusals point at `/data...` (12.10), and the endpoint moves each item to the
+operation that failed: `/data...` becomes `/atomic:operations/<index>/data...`, and a relationship
+operation's `/data/relationships/<name>/data...` becomes `/atomic:operations/<index>/data...`. A
+refusal an operation throws inside the transaction moves before the processor sees it; a failure
+`transaction` maps once the transaction ended, such as a constraint violation, moves by the index of
+the operation whose call threw it. An item without a path gets the operation's pointer from the
+processor. @ref https://jsonapi.org/ext/atomic/#processing-errors
+
+### 19.5 The document: `GET <base>/openapi.json`
+
+With `openapi`, the document is `openapi(runtime.resources, options.openapi)` (13.1), built once
+when `jsonApiRoutes` runs, so a document that cannot be built, such as one with an invalid example,
+throws there rather than on a request. It is served as `application/json`, without an actor: a
+client reads it before it has a session.
+
+### 19.6 Errors and localization
+
+The routes throw and the host's ban renders (jsonapi SPEC 10.5); its catalog holds the JSON:API
+catalog, the codes of the runtime's resources, and the application's:
+
+```ts
+const ban = createBan({
+  errors: { ...ERROR_CATALOG, ...errorCatalog(runtime.resources, APP_ERRORS) },
+  format: jsonApi({ mixedEntries: true }),
+});
+const handle = ban.onError({ transform: localizeErrors(messages, { resource: resourceTypeOf }) });
+```
+
+`resourceTypeOf(c)` is the type of the resource the request's route serves, the target's on a
+related route and the failing operation's on the operations endpoint, or `undefined`: what
+`localizeErrors` takes to label members (10.4).
+
+### 19.7 Test plan
+
+- Unit tests (`packages/hono-resource/src/*.test.ts`) over a runtime of the contract held in memory
+  (`test-support/memory-runtime.ts`), with `app.request`: every route of 19.3 and its absence when
+  the operation is not declared, the 405 and its `Allow`, the actor's order before the validators,
+  includes, the relationship routes' pointers, the operations endpoint's transaction, moved
+  pointers, and `resolveHref`, the document route, `resourceTypeOf`, and each `TypeError` of 19.2.
+- End to end (`e2e/resource/http/`): the contacts application on `createResourceRuntime` over
+  `@hono/node-server`, against PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server: defaults on
+  create, omission on update, a 400 with codes, pointers, and localized messages per problem, a 409
+  from a unique violation in German, row security isolation, role checks per operation and include,
+  search with cursors over ties, a cursor from another organization refused, an operations request
+  that commits once and one that rolls back with its pointer, and every example of the served
+  document valid against its schema.
+
+### 19.8 Packaging
+
+- ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
+  `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run in the build. One
+  entry, `index`.
+- Dependencies, each `workspace:^`: `@netvark/resource-core` (the contract, `keysetRequest`,
+  `resourcePaths`, `openapi`) and `@netvark/hono-jsonapi`. Peer dependencies: `hono` and
+  `@netvark/hono-ban`, as `@netvark/hono-jsonapi`'s. It imports no runtime: any runtime of the
+  contract runs behind it.
+- Runs wherever Hono runs: Node.js 22.12 and later, Bun, Deno, and Cloudflare Workers.
