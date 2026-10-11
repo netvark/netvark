@@ -121,7 +121,7 @@ Contacts.names.fields.get('createdAt'); // 'created_at'
 | `as`                   | on a member that filters or sorts, ASCII letters, digits, `_`, and `-`, starting with a letter or a digit; on a filtered member, not `or`, nor `q` with `search`               |
 | `sort.default`         | fields declared with `sort: true`, each once                                                                                                                                   |
 | `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on an enforced CHECK without a rule, and required on every such CHECK over a written column    |
-| `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
+| `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer; on a CHECK with a rule, `code` alone                                      |
 | `codecs`, `validators` | values `defineCodec` and `defineValidator` made, never objects written by hand; each fixture typed by its schema's input                                                       |
 
 A member the grammar does not have is an error anywhere: `fields: { name: { sortable: true } }`
@@ -466,6 +466,21 @@ Contacts.errors.CONTACTS_NAME_NOT_NULL;
 // { status: 422, title: 'Invalid Attribute', kind: 'notNull', fields: ['name'] }
 Contacts.errors.EMAIL_CHECK; // the email domain's CHECK
 // { status: 422, title: 'Invalid Attribute', kind: 'check', fields: ['email'] }
+```
+
+A domain CHECK takes `code` in the definer's `domains`, next to its validator. A CHECK that has a
+rule takes an entry for its code alone: its rule enforces it already, so a validator there fails
+`tsc`.
+
+```ts
+// create domain short_text as varchar(120) check (char_length(value) between 1 and 120);
+domains: {
+  email: { email_check: { validator: 'email' } },
+  short_text: { short_text_check: { code: 'NAME_LENGTH' } },
+},
+
+Organizations.errors.NAME_LENGTH; // in place of SHORT_TEXT_CHECK
+// { status: 422, title: 'Invalid Attribute', kind: 'check', fields: ['name'] }
 ```
 
 The scope column is never a member. `contacts_email_unique` covers `(organization_id, email)` and
@@ -1107,7 +1122,8 @@ option, operator, or code, a loosened limit, and a new default page size break n
 - **Give codes to the errors clients handle.** A derived code follows the constraint's name, which
   PostgreSQL generates from the columns unless the migration names it; `code: 'CONTACT_EMAIL_TAKEN'`
   stays put when a migration renames the constraint. Name constraints in ASCII, or give `code`: a
-  CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z.
+  CHECK on `größe` is named `notes_größe_check`, whose code is not A-Z. A domain CHECK's code goes
+  in the definer's `domains`, whether or not the CHECK has a rule.
 - **Express uniqueness over columns.** A unique index derives its code from its name, as a
   constraint does, so name it like one. An index over an expression has no code: prefer a `citext`
   column with a plain UNIQUE to a unique index on `lower(email)`, or map the index by name with
@@ -1137,8 +1153,9 @@ option, operator, or code, a loosened limit, and a new default page size break n
   and validate responses with schemas that allow them, as `read` and the document's response schemas
   do: the diff counts adding them as safe.
 - **Keep derived codes unique.** A code is the constraint's name upper-cased, without its table, so
-  two tables that share a CHECK name, as tables copied from one another do, derive one code twice.
-  `errorCatalog` names both constraints; give `code` on one, or name constraints after their table.
+  two tables that share a CHECK name, as tables copied from one another do, derive one code twice,
+  and so do two domains whose CHECKs share a name. The error names both constraints; give `code` on
+  one, or name constraints after their table or domain.
 - **Review names as API changes.** Snapshot `names` in a test, so a migration that renames a column
   shows up in review as the public name it changes.
 - **Write fixtures at the edges.** A fixture is an example and a test: give the boundary values, the

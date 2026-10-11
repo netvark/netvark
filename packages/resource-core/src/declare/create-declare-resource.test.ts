@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { catalogOf, domain } from '../test-support/catalog-builder';
+import {
+  catalogOf,
+  domain,
+  untypedDeclare,
+} from '../test-support/catalog-builder';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
 import { typeErrorOf } from '../test-support/failure';
@@ -129,8 +133,23 @@ describe('createDeclareResource: the registries (SPEC 2, 3.6)', () => {
         domains: { short_text: { short_text_check: { validator: 'email' } } },
       }),
     ).toBe(
-      'createDeclareResource.domains.short_text.short_text_check: the CHECK has a rule, which enforces it already',
+      'createDeclareResource.domains.short_text.short_text_check.validator: the CHECK has a rule, which enforces it already',
     );
+    expect(
+      failure({
+        ...valid,
+        domains: { short_text: { short_text_check: { code: 'Too long' } } },
+      }),
+    ).toBe(
+      'createDeclareResource.domains.short_text.short_text_check.code: "Too long" is not A-Z, 0-9, _',
+    );
+    for (const entry of [{}, { code: 'EMAIL_INVALID' }]) {
+      expect(
+        failure({ ...valid, domains: { email: { email_check: entry } } }),
+      ).toBe(
+        'createDeclareResource.domains.email.email_check.validator: a CHECK without a rule needs a validator',
+      );
+    }
     expect(
       failure({
         ...valid,
@@ -147,6 +166,22 @@ describe('createDeclareResource: the registries (SPEC 2, 3.6)', () => {
     ).toBe(
       'createDeclareResource.domains.email.email_check: unknown member "validators"',
     );
+  });
+
+  it("takes a code alone for a domain CHECK with a rule, which its members' errors carry (SPEC 3.6)", () => {
+    const declareResource = untypedDeclare(contactsCatalog, {
+      ...TEST_REGISTRIES,
+      domains: {
+        ...TEST_REGISTRIES.domains,
+        short_text: { short_text_check: { code: 'NAME_LENGTH' } },
+      },
+    });
+    const organizations = declareResource('organizations', {
+      operations: ['get', 'update'],
+      fields: { name: { access: 'readWrite' } },
+    });
+    expect(Object.keys(organizations.errors)).toContain('NAME_LENGTH');
+    expect(Object.keys(organizations.errors)).not.toContain('SHORT_TEXT_CHECK');
   });
 
   it('holds a domain CHECK code, given or derived, to the code pattern (SPEC 4.2, 6.4)', () => {

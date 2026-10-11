@@ -1,8 +1,9 @@
 /**
  * Definer configurations TypeScript refuses (resource SPEC 2, 3.6): a full
- * catalog, domain rules the catalog does not support, and a codec written
- * by hand instead of by `defineCodec`. Each `// error:` names a text the
- * diagnostic on the next line must contain.
+ * catalog, domain entries the catalog does not support (an unknown CHECK,
+ * a validator on a CHECK with a rule, a CHECK without a rule left without
+ * one), and a codec written by hand instead of by `defineCodec`. Each
+ * `// error:` names a text the diagnostic on the next line must contain.
  */
 import { createDeclareResource } from '@netvark/resource-core';
 
@@ -30,8 +31,30 @@ createDeclareResource({
   validators,
   domains: {
     email: {
-      // error: email_format is not a CHECK without a rule of domain email
+      // error: email_format is not a CHECK of domain email
       email_format: { validator: 'email' },
+    },
+  },
+});
+
+createDeclareResource({
+  catalog: publicCatalog,
+  validators,
+  domains: {
+    short_text: {
+      // error: validator: the CHECK has a rule, which enforces it already
+      short_text_check: { validator: 'email' },
+    },
+  },
+});
+
+createDeclareResource({
+  catalog: publicCatalog,
+  validators,
+  domains: {
+    email: {
+      // error: validator: a CHECK without a rule needs a validator
+      email_check: { code: 'EMAIL_INVALID' },
     },
   },
 });

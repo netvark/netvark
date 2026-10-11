@@ -20,6 +20,7 @@ import {
   table,
   untypedDeclare,
 } from './catalog-builder';
+import { TEST_REGISTRIES } from './definer';
 
 /** A derived code's entry, as `toEqual` compares it. */
 export interface EntryLike {
@@ -87,19 +88,27 @@ export function checkedDomain(
   });
 }
 
-/** A resource over table `t`, keyed by a uuid `id`, with the columns, constraints, and domains given. */
+/**
+ * A resource over table `t`, keyed by a uuid `id`, with the columns,
+ * constraints, and domains given, and the definer's `domains` entries.
+ */
 export function declareOver(
   columns: Readonly<Record<string, PublicColumn>>,
   constraints: Readonly<Record<string, PublicConstraint>>,
   domains: ReadonlyArray<PublicDomain>,
   declaration: object,
+  domainRules: object = {},
 ): DeclaredResource {
   const id = column({ type: 'uuid', sqlType: 'uuid', nullable: false });
   const catalog = catalogOf(
     { t: table('t', { id, ...columns }, constraints) },
     Object.fromEntries(domains.map((entry) => [entry.name, entry])),
   );
-  return untypedDeclare(catalog)('t', {
+  return untypedDeclare(catalog, {
+    codecs: TEST_REGISTRIES.codecs,
+    validators: TEST_REGISTRIES.validators,
+    domains: domainRules,
+  })('t', {
     operations: ['get', 'create'],
     ...declaration,
   });

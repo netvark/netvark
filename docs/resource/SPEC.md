@@ -344,21 +344,27 @@ name for that constraint; ADR 0003). `code` renames the derived error code of an
 
 ### 3.6 Domain rules
 
-A domain's CHECK whose `rule` is `null` is covered once for the application, in the definer:
-`domains: { email: { email_check: { validator: 'email' } } }`, keyed by the domain's reference name
-and its constraint name. It is REQUIRED when a declared writable field's column, or the element of
-an array column, has that domain, directly or through a base domain, and it is an error on a CHECK
-that has a rule, as in 3.5. TypeScript checks `domains` against the catalog and the validators
-(`DomainsCheck`) where the definer is created.
+The definer's `domains` holds the application's entries for domain CHECKs, once, keyed by the
+domain's reference name and its constraint name:
+`domains: { email: { email_check: { validator: 'email' } } }`. TypeScript checks `domains` against
+the catalog and the validators (`DomainsCheck`) where the definer is created, and the definer checks
+it again when it runs.
 
-A rule MAY give `code`, which replaces the CHECK's derived code, its constraint name upper-cased
-(4.1, `email_check` derives `EMAIL_CHECK`); a given or derived code MUST match `CODE_PATTERN`, so a
-constraint name outside A-Z, 0-9, and `_` needs one. The validator's issues carry that code (6.4) on
-every column of the domain, as a table CHECK's validator carries the table constraint's code.
+`validator` names a validator for a CHECK whose `rule` is `null`. It is REQUIRED when a declared
+writable field's column, or the element of an array column, has that domain, directly or through a
+base domain, and an entry for such a CHECK always holds one. It is an error on a CHECK that has a
+rule, as in 3.5: the schemas enforce the rule already (6.1).
 
-A CHECK that has a rule takes no entry, so its code is always its name upper-cased.
-`declareResource` refuses a resource where that code is not A-Z, 0-9, and `_`, or repeats another
-code of the resource (9.1), and renaming the constraint in a migration is then the only fix.
+`code` replaces the CHECK's derived code, its constraint name upper-cased (4.1, `email_check`
+derives `EMAIL_CHECK`), whether the CHECK has a rule or not. A CHECK that has a rule takes an entry
+only for its code, as `domains: { short_text: { short_text_check: { code: 'NAME_LENGTH' } } }` does
+for the contacts application's `short_text` domain, `CHECK (char_length(VALUE) BETWEEN 1 AND 120)`
+(15.4). A given or derived code MUST match `CODE_PATTERN`, so a constraint name outside A-Z, 0-9,
+and `_` needs one. A validator's issues carry that code (6.4) on every column of the domain, as a
+table CHECK's validator carries the table constraint's code. `declareResource` refuses a resource
+where a domain CHECK's derived code is not A-Z, 0-9, and `_`, or where a domain CHECK's code repeats
+another code of the resource (9.1); both messages name `code` in the definer's `domains` as the fix,
+so no migration has to rename a constraint.
 
 The validator receives every value the domain holds where it runs (7.2), so its input type MUST
 accept: the domain's value, the output type of its base type; the output of each codec whose `types`
@@ -2230,7 +2236,9 @@ option, in the two forms of 3; its message names the option relative to the decl
 | `types`, `fixtures`, or a fixture list that is empty, or a schema that is not a Zod 4 schema (7) | `defineCodec.types: must be a non-empty list of type names`                                                                                                 |
 | a fixture the schema disagrees with (7)                                                          | `defineValidator.fixtures.reject[1]: the schema accepts this fixture`                                                                                       |
 | a schema that parses asynchronously (7)                                                          | `defineCodec.schema: must parse synchronously`                                                                                                              |
-| a domain rule for an unknown domain or CHECK, or for a CHECK with a rule (3.6)                   | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                                                           |
+| a domain rule for an unknown domain or CHECK (3.6)                                               | `createDeclareResource.domains.email.email_format: "email_format" is not a CHECK of domain email`                                                           |
+| a domain rule without a validator for a CHECK without a rule (3.6)                               | `createDeclareResource.domains.email.email_check.validator: a CHECK without a rule needs a validator`                                                       |
+| a domain rule with a validator for a CHECK with a rule (3.6)                                     | `createDeclareResource.domains.short_text.short_text_check.validator: the CHECK has a rule, which enforces it already`                                      |
 | a domain rule's code, given or derived, that does not match `CODE_PATTERN` (3.6)                 | `createDeclareResource.domains.email.email_check.code: "Email" is not A-Z, 0-9, _`                                                                          |
 | a codec schema that accepts `undefined` or `null` (7.1)                                          | `defineCodec.schema: must reject null; the column's nullability decides null`                                                                               |
 | `links` or `page` that `@netvark/jsonapi-core`'s rules refuse                                    | `createDeclareResource.links.base must not end with "/"`                                                                                                    |
@@ -2271,7 +2279,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a code that does not match `CODE_PATTERN`, or that another code repeats                          | `notes.rules.notes_priorität_check: code "NOTES_PRIORITÄT_CHECK" is not A-Z, 0-9, _; set code`                                                              |
 | `code` on a key without a code (9.1)                                                             | `notes.rules.notes_pkey.code: the key has no code, since clients cannot violate it`                                                                         |
 | an `example` the field schema rejects                                                            | `contacts.fields.name.example: the field schema rejects the example`                                                                                        |
-| a domain CHECK code that is not A-Z, 0-9, `_`, or that another code repeats (3.6, 9.1)           | `meetings: domain inner's CHECK value_check derives code VALUE_CHECK, which domain outer's CHECK value_check also takes`                                    |
+| a domain CHECK code that is not A-Z, 0-9, `_`, or that another code repeats (3.6, 9.1)           | `meetings: domain inner's CHECK value_check derives code VALUE_CHECK, which domain outer's CHECK value_check also takes; set code on one of them`           |
 | a registry list or `appErrors` of the wrong shape (4.2)                                          | `errorCatalog.resources[1]: must be a resource declareResource returned`                                                                                    |
 | registry conflicts (4.2)                                                                         | `errorCatalog: relationship contacts.organization targets organizations, which is not listed`                                                               |
 
@@ -2406,8 +2414,11 @@ stated `default` (`fields-create.e2e.test.ts`); the derived error codes, recorde
 snapshot (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on
 PGlite and both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog`
 assembles from them, rendered by `createBan`; `constraintError` against the same violations, each
-mapped to its code's error; localized error documents (`localization.e2e.test.ts`): messages the
-Paraglide compiler builds from `localization/messages/`, mapped with `defineMessages` and served
+mapped to its code's error; a domain CHECK with a rule given a code in the definer (3.6), which the
+declared errors, `errorCatalog`, and `constraintError` give for a real refusal on PGlite and the
+server, while the definer refuses a validator on that CHECK and a code alone on a CHECK without a
+rule (`domain-codes.e2e.test.ts`); localized error documents (`localization.e2e.test.ts`): messages
+the Paraglide compiler builds from `localization/messages/`, mapped with `defineMessages` and served
 through Hono and `@netvark/hono-ban`, answer a 422 in German with option labels, in English with its
 plural forms, in the base locale for a language the project lacks, in a regional tag's language, and
 a 409, which `constraintError` makes of a real violation, with a code's own texts, each with
@@ -2841,6 +2852,20 @@ its symbol, which the `bytea` storage codec cannot write, and 42 more, which hav
 30 fixtures that are not objects, for the 10 CHECKs over several members. Before 7.3 reported such
 fixtures as unwritable, the symbol reached the database as an empty text, and a CHECK that refused
 an empty text agreed with the stand-in by accident.
+
+The sixteenth record covers 3.6. Neither stern nor the GitLab slice has a domain, and both compiled
+unchanged, so Pagila, the PostgreSQL port of Sakila as published for PostgreSQL 18, stood in: its
+`year` domain's `CHECK (VALUE >= 1901 AND VALUE <= 2155)` has a range rule, and its definer renamed
+the code to `RELEASE_YEAR_RANGE`. Four declarations (film, language, actor, category) compiled
+against the packed tarball; film's errors and `errorCatalog` held `RELEASE_YEAR_RANGE` and no
+`YEAR_CHECK`, and the definer refused a validator on that CHECK in types and at runtime. PGlite and
+PostgreSQL 14.19 refused a film of 1800 on insert and of 2200 on update with 23514, naming
+`year_check` and the data type `year`, and `constraintError` gave both `RELEASE_YEAR_RANGE`, 422, at
+`/data/attributes/releaseYear`. On 14 the schema had its virtual column stored and `uuidv7()`
+replaced by `gen_random_uuid()`, the two features 14 lacks. Writing up to twelve boundary fixtures
+of each declared field into the real table on 14 and mapping each refusal through `constraintError`,
+a script mapped the refusals of five fixtures of `releaseYear` the same way and found nothing else
+wrong, and `pg-catalog rules --check` found no disagreement in 20 cases and 243 fixtures.
 
 ### 15.6 The Zod floor
 
