@@ -2309,20 +2309,43 @@ public catalog literal modeled on the contacts application of `e2e/catalog`), sm
 for a case, and the generator of 15.2, all typed by `PublicCatalog` so they cannot drift from the
 model; the real extraction is exercised end to end (15.4).
 
-### 15.2 Property test over generated catalogs
+### 15.2 Property test over generated catalogs (`src/declare/generated-catalogs.test.ts`)
 
-A seeded generator in `src/test-support/` builds public catalogs: tables with columns of every type
-of 5.1, nullable or not, with and without column and domain defaults, identity and generated
-columns, every rule kind, and constraints of every kind. For each catalog a declaration exposes
-every column it can, and the test asserts:
+A seeded generator in `src/test-support/generated/` builds a public catalog per seed: tables with
+columns of every type of 5.1, as plain values, arrays, enums, and domains, nullable or not, with and
+without column and domain defaults; domain chains, domains over arrays, and arrays of domains;
+identity and generated columns; every rule kind on columns and on domains, and CHECKs without a
+rule; and constraints of every kind, some NOT ENFORCED: CHECKs over one or two columns, UNIQUE, a
+partial unique index, an exclusion, and foreign keys to another table, to the same table, and to a
+table no resource declares. Each combination the unit tests leave out occurs over the fixed seeds: a
+NOT NULL domain under a nullable column (129 columns), a default on a base domain two levels up
+(11), a rule on the column and another on its domain (65), an identity key with client ids (27), a
+NOT ENFORCED CHECK beside an enforced one (25), and an array of a domain with a rule (345).
 
-- `schema.create` requires exactly the columns 6.3 requires, and `schema.update` requires none;
+For each table a declaration exposes every column it can, with an access the column takes, the
+filters and sort keyset-core allows, and, as the seed decides, a scope, client ids, codes for rules,
+and codes for domain CHECKs in the definer. A model in `src/test-support/model/`, written from this
+document and not from the code, states what each declaration must give, and the test asserts:
+
+- `schema.create` requires exactly the fields 6.3 requires, `linkage.create` the relationships, and
+  `schema.update` none;
 - `schema.read` holds exactly the readable fields, and `resource.attributes` every field;
-- `errors` holds one code per constraint 9.1 selects, with the status of its kind;
-- `fields[*].limits` equals the fold of the column's type bounds and rules;
-- the keyset definition holds exactly the filterable and sortable fields with the types of 11.2.
+- `errors` holds one code per constraint 9.1 selects, with the status of its kind, the given or
+  derived code, and the fields it points at;
+- `fields[*].limits` and `items.limits` equal the fold of the type's bounds and the rules (8);
+- the keyset definition holds exactly the filterable and sortable members, with the types and
+  operators of 11.2;
+- each member's `nullable`, `required`, `options`, and `items.options` are those of 8.
 
-The seed is printed on failure and fixed seeds run in CI. The generator adds no dependency.
+The 300 fixed seeds run in CI, about 2 s for 2,100 tests. A failing test names its seed:
+`PROPERTY_SEEDS=7,42` runs those seeds again, and `PROPERTY_RUNS=500` adds as many random ones;
+3,000 random seeds found nothing more. The generator adds no dependency. Eleven seeded faults, each
+one line of the implementation, fail between 8 and 291 of the 2,100 tests: a domain default ignored
+by the schema, at the first level or the second; `write` in the read schema; a NOT ENFORCED
+constraint counted; citext without the insensitive collation; a bound tie that keeps the first
+bound; codes for the outermost domain alone; a NOT NULL domain ignored; `required` that ignores
+access; a `bool` key without its options; and elements without theirs. The same model runs over real
+declarations (15.5).
 
 ### 15.3 The oracle (`e2e/resource/oracle.e2e.test.ts`)
 
@@ -2866,6 +2889,23 @@ replaced by `gen_random_uuid()`, the two features 14 lacks. Writing up to twelve
 of each declared field into the real table on 14 and mapping each refusal through `constraintError`,
 a script mapped the refusals of five fixtures of `releaseYear` the same way and found nothing else
 wrong, and `pg-catalog rules --check` found no disagreement in 20 cases and 243 fixtures.
+
+The seventeenth record covers 15.2. The model of `src/test-support/model/`, bundled with tsdown, ran
+on Node.js 24 over each catalog's declarations as written, installed from packed tarballs; it read
+each declaration back from its `declaration` and `names`:
+
+| Catalog            | Declarations | Members | Codes | Disagreements |
+| ------------------ | ------------ | ------- | ----- | ------------- |
+| stern              | 111          | 1,367   | 745   | 0             |
+| GitLab 17.11 slice | 60           | 1,487   | 1,302 | 0             |
+| Pagila             | 4            | 20      | 12    | 0             |
+
+The real catalogs reach few of the paths the generated ones do. With each seeded fault of 15.2
+written in turn into the installed package, one changed a verdict: `required` that ignores access,
+on stern's 48 `read` relationships over the scope column. The other faults need a domain default, a
+NOT NULL domain, nested domains, citext, a NOT ENFORCED constraint, a `write` member, an inclusive
+and an exclusive bound at one value, a `bool` key, or an array with options, and none of the three
+catalogs declares one.
 
 ### 15.6 The Zod floor
 
