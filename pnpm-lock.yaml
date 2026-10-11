@@ -595,6 +595,9 @@ importers:
       '@electric-sql/pglite-socket':
         specifier: 'catalog:'
         version: 0.2.11(@electric-sql/pglite-age@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_hashids@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_ivm@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_textsearch@0.0.10(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pg_uuidv7@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pgtap@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite-pgvector@0.0.9(@electric-sql/pglite@0.5.8))(@electric-sql/pglite@0.5.8)
+      '@netvark/resource-core':
+        specifier: workspace:^
+        version: link:../resource-core
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.4
@@ -604,6 +607,9 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.29.6
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   packages/resource-core:
     dependencies:

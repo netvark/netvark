@@ -239,6 +239,13 @@ The storage adapter implements the other facet of each codec, typed by
 `StorageCodecs<typeof codecs>`: `read` and `write` between the parsed wire value and what the driver
 handles.
 
+`pg-catalog rules --check` holds the fixtures, and every member's boundary values, to the database
+your migrations build: an `accept` fixture must be stored, a `reject` fixture refused by its CHECK,
+and a codec's fixture stored and read back as itself through a storage codec over text (see
+[`@netvark/pg-catalog`](https://github.com/netvark/netvark/tree/main/packages/pg-catalog#checking-declarations-against-the-database)).
+A codec's fixtures are round-trip values, so write them as the server gives them back: the period
+above is in UTC, since `tstzrange` keeps instants, not offsets.
+
 ## Public names
 
 Declarations take database names, and the API speaks public names derived from them (SPEC 4):
@@ -439,6 +446,11 @@ In an integration test, write the accepted values through your storage adapter a
 each must come back as the same value, compared per type as SPEC 15.3 does, so a driver that changes
 a value fails at the fixture that shows it, such as a `timestamptz` parsed into a `Date`, which
 keeps only milliseconds.
+
+`oracleCases(resources, { storage })`, from the same entry, lists what `pg-catalog rules --check`
+runs: each member's boundary fixtures, each validator's fixtures, and each codec's, with the text
+written into a copy of their columns and the judge of PostgreSQL's verdict (SPEC 7.3). Run the check
+through the CLI; the function is for a runner of your own.
 
 ## Errors
 
@@ -1131,8 +1143,11 @@ option, operator, or code, a loosened limit, and a new default page size break n
   shows up in review as the public name it changes.
 - **Write fixtures at the edges.** A fixture is an example and a test: give the boundary values, the
   empty string, and `null` where the column allows it. A CHECK passes `NULL`, so the validator of a
-  nullable column must accept `null`. `pg-catalog rules --check` will run every fixture through the
+  nullable column must accept `null`. `pg-catalog rules --check` runs every fixture through the
   database, so a regular expression or a case rule that disagrees with PostgreSQL shows up there.
+  Give only values the member can hold: the check reports a fixture with no text form, such as a
+  symbol, instead of sending it, and a `reject` fixture the column's type refuses, such as `'x'` for
+  an `integer`, since it never reaches the CHECK.
 - **Keep validators to what PostgreSQL agrees on.** `lower()` beyond ASCII follows the database's
   `LC_CTYPE`, and a regular expression's dialect differs in places; choose fixtures inside the
   shared ground, and prefer a CHECK the catalog translates.

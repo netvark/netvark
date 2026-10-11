@@ -9,32 +9,8 @@ import type { Migration } from './migrations/load';
 import type { SqlSession } from './target/session';
 
 import { PgCatalogError } from './errors';
+import { failureOf } from './target/failure';
 import { SESSION_SETTINGS } from './target/session';
-
-interface Failure {
-  readonly message: string;
-  readonly code: string | null;
-  readonly position: number | null;
-}
-
-function member(error: object, key: string): unknown {
-  return Reflect.get(error, key);
-}
-
-/** The message, SQLSTATE, and 1-based character position of a driver error. */
-function failureOf(error: unknown): Failure {
-  if (typeof error !== 'object' || error === null) {
-    return { message: String(error), code: null, position: null };
-  }
-  const message = member(error, 'message');
-  const code = member(error, 'code');
-  const position = Number(member(error, 'position'));
-  return {
-    message: typeof message === 'string' ? message : 'unknown error',
-    code: typeof code === 'string' ? code : null,
-    position: Number.isInteger(position) && position > 0 ? position : null,
-  };
-}
 
 /**
  * Line and column of a 1-based position. PostgreSQL counts characters, so

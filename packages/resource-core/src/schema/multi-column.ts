@@ -86,6 +86,7 @@ export function multiColumnChecks(
           name: validatorName,
           validator,
           code: names.rules.get(constraint) ?? deriveCode(constraint),
+          check: { domain: null, constraint },
         },
         members,
       });

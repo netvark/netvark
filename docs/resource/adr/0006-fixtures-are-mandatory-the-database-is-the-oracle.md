@@ -12,8 +12,9 @@ see: regular expression dialects, `real` comparisons promoted to `double precisi
 scale, code points against UTF-16 units. The disagreement surfaces in production as a request the
 client was told is valid and the database rejects, or the reverse.
 
-PostgreSQL can answer the question directly: `SELECT (<check expression with $1>)` gives the
-database's verdict on a value, and `SELECT ($1::type)::text` gives its canonical form.
+PostgreSQL can answer the question directly: writing a value into a column of its type that holds
+its CHECK gives the database's verdict on it, and the stored text its canonical form (catalog ADR
+0012 settles how).
 
 ## Decision
 
@@ -22,7 +23,8 @@ database's verdict on a value, and `SELECT ($1::type)::text` gives its canonical
   them the call does not compile.
 - `pg-catalog rules --check` (catalog SPEC 10.3) runs every fixture of every declared resource
   through the Zod schema and through the replayed database, and generated boundary fixtures for
-  every translated rule; a disagreement fails the check with the value and both verdicts.
+  every member; a disagreement fails the check with the value and how the two verdicts differ.
+  `oracleCases` (SPEC 7.3) builds what it runs.
 - The default wire forms and the rule translations of `@netvark/resource-core` are proven the same
   way in its end-to-end suite, on PGlite and on PostgreSQL 14 and 18 servers.
 

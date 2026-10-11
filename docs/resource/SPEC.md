@@ -45,7 +45,7 @@ driver, or a Node.js module.
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
 | `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                        |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ```
 packages/resource-core/src/
@@ -63,7 +63,7 @@ packages/resource-core/src/
   jsonapi/                  the JSON:API resource definition and the keyset definition (11)
   server/                   the server subpath (12)
   openapi/                  the document, the surface, the diff (13)
-  testing/                  the storage contract suite and the boundary fixture generators (12.9, 15)
+  testing/                  the storage contract suite, the boundary fixture generators, and the oracle's cases (7.3, 12.9, 15)
   internal/                 prototype-safe object helpers
 ```
 
@@ -871,12 +871,12 @@ A validator is the request-side twin of a CHECK the recognizer could not transla
 single-column CHECK, its input is the member's value (6.1 step 5); attached to a multi-column CHECK,
 its input is an object of the CHECK's members keyed by public name (6.2). A relationship enters as
 its id, or `null`, the value the CHECK sees in the foreign-key column, never as its linkage: the
-validator then reads no target, and its fixtures are the values `pg-catalog rules --check`
-substitutes into the expression (7.3). Such CHECKs often span only foreign keys: all six of stern's
-CHECKs without a rule tie two relationships together (exactly one of a subject and an entity, or at
-least one of a workspace and an offering). A CHECK passes `NULL`, so the validator of a nullable
-member accepts `null`. Its issues carry the CHECK's error code as their kind (6.4), whatever the
-schema's own codes.
+validator then reads no target, and its fixtures are the values `pg-catalog rules --check` writes
+into the CHECK's columns (7.3). Such CHECKs often span only foreign keys: all six of stern's CHECKs
+without a rule tie two relationships together (exactly one of a subject and an entity, or at least
+one of a workspace and an offering). A CHECK passes `NULL`, so the validator of a nullable member
+accepts `null`. Its issues carry the CHECK's error code as their kind (6.4), whatever the schema's
+own codes.
 
 The validator's input type MUST accept what it receives, which `tsc` checks where the rule attaches
 it (`AttachmentRequirement`): for a single-column CHECK, the field's output type, `null` included
@@ -893,19 +893,118 @@ when the schema rejects an `accept` fixture or accepts a `reject` fixture, namin
 (`defineValidator.fixtures.reject[1]: the schema accepts this fixture`), or for the schema mistakes
 of 7.1.
 
-### 7.3 The oracle's inputs
+### 7.3 The oracle's cases (`testing/oracle/`)
 
-`fixtures` are what `pg-catalog rules --check` runs through the database (catalog SPEC 10.3):
+`oracleCases(resources, options)`, from the `testing` entry, turns a registry into what
+`pg-catalog rules --check` writes into the replayed database and how each write is judged (catalog
+SPEC 10.3, catalog ADR 0012). It runs the registry checks (4.2) under its own name
+(`oracleCases: relationship contacts.organization targets organizations, which is not listed`), so
+the runner tells a mistake in the registry by its message. The cases come per resource, in the
+registry's order: its fields, its relationships, its validators, and its codecs.
 
-- a codec fixture is written through the storage facet as `SELECT ($1::<type>)::text`, read back
-  through it, and must equal the fixture and pass the public schema;
-- a validator fixture is substituted into the CHECK expression, `SELECT (<expression>)`, and the
-  database's verdict (true or null accepts, false rejects) must match the list it is in.
+```ts
+function oracleCases(
+  resources: ReadonlyArray<AnyDeclaredResource>,
+  options?: { readonly storage?: Readonly<Record<string, TextStorageCodec>> | undefined },
+): ReadonlyArray<OracleCase>;
 
-This package only stores, types, and self-checks them. Tests: `define-codec.test.ts` and
-`define-validator.test.ts` (every runtime rule, Zod Mini schemas), `define-codec.test-d.ts` and
-`define-validator.test-d.ts` (the fixtures a call needs, typed by the schema's input),
-`storage-codecs.test-d.ts`.
+interface TextStorageCodec {
+  readonly read: (stored: string) => unknown;
+  readonly write: (value: never) => string;
+}
+interface OracleCase {
+  readonly subject: string; // `contacts.email`, `meetings.during (codec timeRange)`
+  readonly kind: 'field' | 'relationship' | 'validator' | 'codec';
+  readonly probe: OracleProbe;
+  readonly fixtures: ReadonlyArray<WritableFixture | UnwritableFixture>;
+}
+type OracleProbe =
+  | {
+      readonly kind: 'columns';
+      readonly table: string;
+      readonly columns: ReadonlyArray<string>;
+      readonly checks: ReadonlyArray<string>; // the table's CHECKs the copy holds
+      readonly notNull: boolean; // whether the copies keep the columns' NOT NULL
+    }
+  | { readonly kind: 'domain'; readonly domain: string };
+interface WritableFixture {
+  readonly label: string;
+  readonly value: unknown; // the fixture as the schema saw it
+  readonly texts: ReadonlyArray<string | null>; // one per probe column, null for SQL NULL
+  readonly judge: (verdict: OracleVerdict) => string | undefined; // the disagreement, if any
+}
+interface UnwritableFixture {
+  readonly label: string;
+  readonly value: unknown;
+  readonly unwritable: string; // why it cannot be written
+}
+type OracleVerdict =
+  | { readonly accepted: true; readonly stored: ReadonlyArray<string | null> } // each column as text
+  | { readonly accepted: false; readonly code: string; readonly constraint: string | null };
+```
+
+- **A member**, `<type>.<name>`: each field with a wire form and each relationship a client writes,
+  with its boundary fixtures (15.3). They are written into a copy of its column that keeps its NOT
+  NULL and holds the CHECKs its schema enforces: its single-column CHECKs with a rule (none when a
+  codec owns the value, 6.1) and those of the validators its declaration names; a domain's come with
+  the column's type. A field's value is written as the text of its wire form, a relationship's id as
+  the key column holds it (a number for an `int2`, `int4`, `float4`, or `float8` key, a boolean for
+  `bool`). The judge applies 15.3: a value the write schema accepts (the member of `schema.update`,
+  else of `schema.create`; the linkage's for a relationship) must be stored as the same value,
+  compared per type; one it refuses must be refused, or stored as a value whose read form does not
+  give back what was sent; `null` is stored as SQL `NULL` or refused; and a field's stored value
+  must read as a value its read schema accepts. The reasons are
+  `the schema accepts it; the database refuses it (<code> <constraint>)`,
+  `the schema accepts it; the database stores <text>`,
+  `the schema refuses it; the database stores it as sent`,
+  `the schema accepts it; the database stores NULL`, and
+  `the database stores <text>, which the read schema refuses`.
+- **A validator**, `<table> CHECK <name> (validator <name>)` or `domain <d> CHECK <name> (...)`:
+  each CHECK once, however many members run its validator. Its fixtures are written into a copy of
+  the CHECK's columns that holds that CHECK alone and drops the columns' NOT NULL, since a CHECK
+  passes `NULL`, or into a value of its domain. A fixture of a single-column CHECK is the member's
+  value, written as the member writes it, a codec's value through its storage codec; one of a CHECK
+  over several members is an object of their values by public name, a missing member written as
+  `NULL`. An `accept` fixture must be stored
+  (`the validator accepts it; the database refuses it (<code> <constraint>)`), and a `reject`
+  fixture refused by that CHECK, 23514 naming it: otherwise
+  `the validator refuses it; the database accepts it`, or, when the type or another constraint
+  refused it first,
+  `the validator refuses it; the database refuses it (<code>) before <name> decides`, since that
+  refusal says nothing of the CHECK.
+- **A codec**, `<type>.<field> (codec <name>)`: each fixture written through its storage codec into
+  a copy of the field's column that keeps its NOT NULL and holds no CHECK, so only the type and its
+  domains judge it. The database must store it (`the database refuses it (<code>)`,
+  `the database stores NULL`), the storage codec must read the stored text back
+  (`the storage codec's read throws on <text>: <message>`) as the fixture
+  (`the database stores <text>, which reads back as <value>`), and the codec's schema must accept
+  what it read (`it reads back as a value the codec's schema refuses`). The fixtures are round-trip
+  values, so each is written as the server gives it back: an instant in UTC, a number at the
+  column's precision, a vector with its column's dimensions.
+
+A text is what the column's input function reads: a string as it is; a number, a boolean, or a
+bigint as its decimal text; a JSON value as JSON text; an array as a literal whose string elements
+are quoted and escaped. A value is written as itself or not at all. A fixture with no text form
+(`undefined`, a function, a symbol, a cycle), one JSON writes as another value (`NaN` as `null`, a
+`Date` as its ISO text, an object without its `undefined` members), a fixture of a CHECK over
+several members that is not an object, and one its storage codec throws on are unwritable, with the
+reason `it has no text form`, `JSON writes it as <text>`, `it is not an object of <members>`, or
+`the storage codec cannot write it: <message>` (`write returned <value>, not text` when it returns
+anything else). The runner reports such a fixture and never sends it: sending another value would
+judge the wrong one, as the GitLab slice's stand-in symbol, once sent as an empty text, showed.
+
+`options.storage` gives, by codec name, a storage codec over text for each codec a declared field
+names: `write` gives the text PostgreSQL reads for a value of the codec, and `read` takes the text
+it prints in a UTC session with ISO dates. `write` takes `never`, so the storage codec of any codec
+fits, and what it returns is checked instead. A codec without one throws `TypeError`
+(`oracleCases.options.storage.range: must be a storage codec over text, since meetings.during names codec range`).
+
+Tests: `define-codec.test.ts` and `define-validator.test.ts` (every runtime rule, Zod Mini schemas),
+`define-codec.test-d.ts` and `define-validator.test-d.ts` (the fixtures a call needs, typed by the
+schema's input), `storage-codecs.test-d.ts`; `oracle-cases.test.ts` (each case's probe and texts and
+every reason of its judge), `unwritable.test.ts`, `pg-text.test.ts`, `verdict.test.ts`,
+`read-form.test.ts`, `same-value.test.ts`, and `column-type.test.ts`. The database's verdicts are
+pg-catalog's to take, in its tests and in `e2e/resource/rules.e2e.test.ts` (15.4).
 
 ---
 
@@ -2093,8 +2192,8 @@ column widened to `bigint` broke its wire form (`integer` to a `string` of `int6
 raised a minimum, renamed CHECKs removed their codes, and widened text limits and a new column
 default broke nobody (15.5).
 
-The command that writes the snapshot and fails CI on a breaking change ships with the CLI that loads
-the registry, next to `rules --check` (catalog SPEC 10.3, 11.2).
+The command that writes the snapshot and fails CI on a breaking change is to join `rules --check` in
+`pg-catalog`'s CLI, which loads the registry already (catalog SPEC 10.3, 11.2; #91).
 
 Tests: `document.test.ts` validates the contacts document against the official OpenAPI 3.1 schemas
 with Ajv 2020-12 (`schema-base`, Schema Objects against the OpenAPI dialect with formats asserted,
@@ -2317,23 +2416,27 @@ a variable its kind does not receive; that a row breaking every NOT ENFORCED con
 the database and accepted by the schemas, while the enforced CHECK beside them refuses in both
 (`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
 the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
-12.9); the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
-workerd for the root, `server`, `testing`, and `openapi` entries. The OpenAPI document is proven
-against the contacts application's HTTP API (`runtime/api.ts`: the runtime of 12 behind Hono and
-`@netvark/hono-jsonapi`): the document passes an independent validator
-(`@seriousme/openapi-schema-validator`) with every reference resolved, is the same on every build,
-puts the application's codes where its options name them, and holds each error object and each
-response a status of one code references once (`openapi-document.e2e.test.ts`); every exchange,
-success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, a client-keyed
-resource, members a write does not accept (9.4), and ids outside the key's form (3.4)
-(`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of the key, a get, an update, and a
-remove by a `uuid` in upper case and a call created under one (`openapi-id-spellings.e2e.test.ts`),
-answers with a status, media type, body, and codes the document lists for its operation, read where
-a response's reference points, a 201's `Location` matching its header's schema, while the request
-schema refuses exactly the requests the server refuses as documents (`support/openapi-contract.ts`,
-Ajv 2020-12 with the formats the document names); and the surface, recorded in a reviewed snapshot
-(`snapshots/surface.json`), diffs an edited declaration into exactly its four changes
-(`openapi-surface.e2e.test.ts`).
+12.9); the oracle's cases (7.3), run by `pg-catalog rules --check` over the oracle's schema, the
+contacts application, and the PostgreSQL 18 schema, agreeing with PGlite and the server, while each
+fault a review misses is reported: a validator that refuses what its CHECK holds, a storage codec
+whose text the database refuses, and a catalog older than the migrations (`rules.e2e.test.ts`), and
+the built bin's output (`rules-cli.e2e.test.ts`); the package surface (every value export listed);
+and the runtime smoke test on Bun, Deno, and workerd for the root, `server`, `testing`, and
+`openapi` entries. The OpenAPI document is proven against the contacts application's HTTP API
+(`runtime/api.ts`: the runtime of 12 behind Hono and `@netvark/hono-jsonapi`): the document passes
+an independent validator (`@seriousme/openapi-schema-validator`) with every reference resolved, is
+the same on every build, puts the application's codes where its options name them, and holds each
+error object and each response a status of one code references once
+(`openapi-document.e2e.test.ts`); every exchange, success paths (`openapi-exchanges.e2e.test.ts`)
+and refusals of reads, writes, a client-keyed resource, members a write does not accept (9.4), and
+ids outside the key's form (3.4) (`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of
+the key, a get, an update, and a remove by a `uuid` in upper case and a call created under one
+(`openapi-id-spellings.e2e.test.ts`), answers with a status, media type, body, and codes the
+document lists for its operation, read where a response's reference points, a 201's `Location`
+matching its header's schema, while the request schema refuses exactly the requests the server
+refuses as documents (`support/openapi-contract.ts`, Ajv 2020-12 with the formats the document
+names); and the surface, recorded in a reviewed snapshot (`snapshots/surface.json`), diffs an edited
+declaration into exactly its four changes (`openapi-surface.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 
@@ -2389,9 +2492,9 @@ carries numbers as a JSON array, and its six CHECKs without a rule share three v
 of relationships; the GitLab slice's `bytea` codec carries base64, and one stand-in validator covers
 its 73 CHECKs. Every fixture passed its own schema at startup, and every one of stern's 12 validator
 fixtures and the 4 codec fixtures gave the same verdict, or the same value after a round trip,
-through PostgreSQL 18.3 (PGlite with pgvector), as `rules --check` will run them. Zod's types added
-0.7 percent instantiations on stern and 0.2 percent on GitLab, and 10 MB and 13 MB of peak memory
-for parsing Zod's own declarations; check time did not change.
+through PostgreSQL 18.3 (PGlite with pgvector), as `rules --check` runs them now (the fifteenth
+record). Zod's types added 0.7 percent instantiations on stern and 0.2 percent on GitLab, and 10 MB
+and 13 MB of peak memory for parsing Zod's own declarations; check time did not change.
 
 The third record covers sections 5 and 6 and the `testing` entry. With the validators taking
 relationships as ids and the attachment checks of 3.6 and 7.2, the same declarations compiled with
@@ -2716,6 +2819,28 @@ time, and called in a `map` over the list 512,594 and 602,376, of which the `map
 512,255 and 602,190 (medians of three runs with one checker). With the wide `DeclaredResource`
 parameter, one call per resource took 1,514,424 and 1,907,288 instantiations, 0.462 s and 0.744 s,
 and the `map` 1,515,593 and 1,907,947.
+
+The fifteenth record covers 7.3 and catalog SPEC 10.3. `pg-catalog rules --check` ran from packed
+tarballs over each catalog's declarations as written, on Node.js 24 and PGlite (with pgvector for
+stern); the time is the whole command, loading the declarations and replaying the migrations
+included:
+
+| Catalog            | Cases | Fixtures | Disagreements | Time   |
+| ------------------ | ----- | -------- | ------------- | ------ |
+| stern              | 1,322 | 13,128   | 0             | 3.7 s  |
+| GitLab 17.11 slice | 1,557 | 12,313   | 290           | 10.2 s |
+
+stern's first run found 18 disagreements: its `vector` codec's fixtures were three numbers, which
+its nine `vector(768)` columns refused (22000, pgvector's `expected 768 dimensions, not 3`); with
+two fixtures of 768 dimensions, it agreed everywhere, the validators of its six CHECKs without a
+rule included. Every disagreement on the GitLab slice is its stand-in validator's, which accepts
+anything but a symbol: 160 boundary fixtures that 28 members' schemas accept through it and their
+CHECKs refuse (24 `jsonb` columns that must hold an object, three columns that must be NULL, and one
+that must be true); 40 of its `accept` fixture `'x'`, which a column's type or CHECK refuses; 18 of
+its symbol, which the `bytea` storage codec cannot write, and 42 more, which have no text form; and
+30 fixtures that are not objects, for the 10 CHECKs over several members. Before 7.3 reported such
+fixtures as unwritable, the symbol reached the database as an empty text, and a CHECK that refused
+an empty text agreed with the stand-in by accident.
 
 ### 15.6 The Zod floor
 

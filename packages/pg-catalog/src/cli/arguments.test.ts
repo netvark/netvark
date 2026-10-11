@@ -45,6 +45,17 @@ describe('parseCommand (SPEC 11.2)', () => {
     });
   });
 
+  it('reads rules --check with its configuration', () => {
+    expect(parseCommand(['rules', '--check'])).toEqual({
+      name: 'rules',
+      config: undefined,
+    });
+    expect(parseCommand(['--config=c.mjs', 'rules', '--check'])).toEqual({
+      name: 'rules',
+      config: 'c.mjs',
+    });
+  });
+
   const mistakes: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
     [[], 'missing command'],
     [['generate'], 'unknown command generate'],
@@ -58,6 +69,9 @@ describe('parseCommand (SPEC 11.2)', () => {
       ['drift', '--env', 'production', '--check'],
       'drift does not take --check',
     ],
+    [['rules'], 'rules needs --check'],
+    [['rules', '--check', '--json'], 'rules does not take --json'],
+    [['rules', '--check', '--env', 'production'], 'rules does not take --env'],
   ];
 
   it.each(mistakes)('rejects %j: %s', (args, message) => {
@@ -82,16 +96,17 @@ describe('parseCommand (SPEC 11.2)', () => {
 });
 
 describe('USAGE', () => {
-  it('lists the four forms of SPEC 11.2 and the exit codes', () => {
-    expect(USAGE.split('\n').slice(0, 5)).toEqual([
+  it('lists the five forms of SPEC 11.2 and the exit codes', () => {
+    expect(USAGE.split('\n').slice(0, 6)).toEqual([
       'Usage:',
       '  pg-catalog extract [--check] [--config <file>]',
       '  pg-catalog drift --env <name> [--json] [--config <file>]',
+      '  pg-catalog rules --check [--config <file>]',
       '  pg-catalog --help',
       '  pg-catalog --version',
     ]);
     expect(USAGE).toContain(
-      'Exit codes: 0 current or no drift, 1 stale or drift, 2 could not run.',
+      'Exit codes: 0 current, no drift, or no disagreement; 1 stale, drift, or\na disagreement; 2 could not run.',
     );
   });
 });

@@ -1,10 +1,16 @@
+import type { AnyDeclaredResource, StorageCodec } from '@netvark/resource-core';
+import type { OracleCase } from '@netvark/resource-core/testing';
+
 import type { ExtractedFile, ExtractReport } from './commands/extract';
 import type {
   DatabaseConfig,
   ExtractionConfig,
   OutputConfig,
+  RulesConfig,
+  RulesStorageCodec,
   TypeOverride,
 } from './config';
+import type { RuleCaseReport, RulesReport } from './oracle/report';
 import type { PgliteExtension } from './target/pglite';
 
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
@@ -12,6 +18,12 @@ import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp';
 import { describe, expectTypeOf, it } from 'vitest';
 
 import { extract, extractCatalog } from './commands/extract';
+import { checkRules } from './commands/rules';
+
+interface Slots {
+  readonly from: number;
+  readonly to: number;
+}
 
 describe('configuration types (SPEC 11.1)', () => {
   it('accepts the extension objects PGlite exports, so they can be passed through', () => {
@@ -110,5 +122,36 @@ describe('command types (SPEC 10.1)', () => {
       migrations: 'db',
       schemas: ['public'],
     });
+  });
+});
+
+describe('rules types (SPEC 10.3, 11.1)', () => {
+  it('takes the registry as a function, synchronous or not, so extract never loads it', () => {
+    expectTypeOf<{
+      registry: () => ReadonlyArray<AnyDeclaredResource>;
+    }>().toExtend<RulesConfig>();
+    expectTypeOf<{
+      registry: () => Promise<ReadonlyArray<AnyDeclaredResource>>;
+    }>().toExtend<RulesConfig>();
+    expectTypeOf<{
+      registry: ReadonlyArray<AnyDeclaredResource>;
+    }>().not.toExtend<RulesConfig>();
+  });
+
+  it("takes a codec's storage codec over text, typed by its value, and nothing that reads or writes anything else", () => {
+    expectTypeOf<StorageCodec<Slots, string>>().toExtend<RulesStorageCodec>();
+    expectTypeOf<{
+      read: (stored: string) => Slots;
+      write: (value: Slots) => Uint8Array;
+    }>().not.toExtend<RulesStorageCodec>();
+    expectTypeOf<{
+      read: (stored: Uint8Array) => Slots;
+      write: (value: Slots) => string;
+    }>().not.toExtend<RulesStorageCodec>();
+  });
+
+  it("reports each case with the kinds resource-core's cases have", () => {
+    expectTypeOf(checkRules).returns.resolves.toEqualTypeOf<RulesReport>();
+    expectTypeOf<RuleCaseReport['kind']>().toEqualTypeOf<OracleCase['kind']>();
   });
 });

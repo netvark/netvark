@@ -12,7 +12,6 @@ import type {
   TypesConfig,
 } from '../config';
 import type { MigrationSource } from '../migrations/load';
-import type { SqlSession } from '../target/session';
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -30,8 +29,7 @@ import {
 } from '../render/catalog-module';
 import { renderKyselyTypes } from '../render/kysely-types';
 import { replay } from '../replay';
-import { openPglite } from '../target/pglite';
-import { openThrowawayDatabase } from '../target/server';
+import { openTarget } from '../target/open-target';
 import { useSession } from '../target/session';
 
 /** What `extractCatalog` needs: the subset of `ExtractionConfig` that produces a catalog. */
@@ -61,26 +59,6 @@ export interface ExtractReport {
   readonly catalog: Catalog;
   /** In the order catalog, public, types. */
   readonly files: ReadonlyArray<ExtractedFile>;
-}
-
-async function openTarget(
-  database: DatabaseConfig | undefined,
-): Promise<SqlSession> {
-  if (database === undefined) {
-    return openPglite();
-  }
-  if ('pglite' in database) {
-    return openPglite(database.pglite.extensions);
-  }
-  const url =
-    typeof database.url === 'function' ? database.url() : database.url;
-  if (url === undefined || url === '') {
-    throw new PgCatalogError(
-      'config_invalid',
-      'database.url returned no URL; set the environment variable it reads, or use the PGlite target',
-    );
-  }
-  return openThrowawayDatabase(url);
 }
 
 /**
