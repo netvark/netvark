@@ -5,7 +5,7 @@ import { scopeValues } from '../../server/scope';
 import { serverValueColumns } from '../../server/server-values';
 import { contractFixture } from './fixture';
 
-const { workspaces, tasks } = contractFixture.resources;
+const { workspaces, tasks, logs } = contractFixture.resources;
 
 /** The server values of a fixture resource. */
 function serverValues(resource: unknown): ReadonlyArray<string> {
@@ -16,10 +16,13 @@ function serverValues(resource: unknown): ReadonlyArray<string> {
 describe('the storage contract fixture', () => {
   it('is frozen, with the migrations as SQL text and a seed that empties first', () => {
     expect(Object.isFrozen(contractFixture)).toBe(true);
-    expect(contractFixture.migrations).toHaveLength(1);
+    expect(contractFixture.migrations).toHaveLength(2);
     expect(contractFixture.migrations[0]).toContain('create table tasks');
+    expect(contractFixture.migrations[1]).toContain(
+      'alter table logs attach partition contract_archive.logs_high',
+    );
     expect(
-      contractFixture.seed.startsWith('truncate table tasks, workspaces'),
+      contractFixture.seed.startsWith('truncate table logs, tasks, workspaces'),
     ).toBe(true);
   });
 
@@ -46,6 +49,20 @@ describe('the storage contract fixture', () => {
     expect(tasks.fields['location']?.codec).toBe('point');
     expect(Object.keys(workspaces.fields)).toEqual(['name', 'createdIn']);
     expect(workspaces.declaration.scope).toBeUndefined();
+  });
+
+  it('declares logs on the partitioned table with the codes obligation 11 expects', () => {
+    expect(Object.keys(logs.fields)).toEqual(['note', 'owner']);
+    expect(logs.errors).toMatchObject({
+      LOGS_PKEY: { status: 409, kind: 'primaryKey', fields: ['id'] },
+      LOGS_NOTE_CHECK: { status: 422, kind: 'check', fields: ['note'] },
+      LOGS_NOTE_NOT_NULL: { status: 422, kind: 'notNull', fields: ['note'] },
+      LOGS_OWNER_ID_FKEY: {
+        status: 404,
+        kind: 'foreignKey',
+        fields: ['owner'],
+      },
+    });
   });
 
   it('leaves created_by alone to the server', () => {

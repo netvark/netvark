@@ -1107,8 +1107,8 @@ check on the request document before validation, so such a member is a 403 and n
 
 ### 9.5 Database rejections (`server/constraint-error.ts`)
 
-`constraintError(thrown, { resource, operation, pointer = '/data' })` turns a PostgreSQL error
-raised inside an operation into the declared error, or returns `undefined`:
+`constraintError(thrown, { resource, operation, pointer = '/data', partition })` turns a PostgreSQL
+error raised inside an operation into the declared error, or returns `undefined`:
 
 1. Recognize the driver error with `findPostgresError` and read
    `{ sqlstate, constraint, table, schema, column, dataType }` with `readPostgresFields`
@@ -1130,7 +1130,9 @@ raised inside an operation into the declared error, or returns `undefined`:
    (23505 `unique` or `primaryKey`, 23P01 `exclusion`, 23514 `check`, 23503 `foreignKey`), since a
    unique index may share its name with a CHECK or FOREIGN KEY constraint of its table, which keeps
    the key (catalog ADR 0009). Tables and domains are matched by schema and name, so two schemas'
-   objects of one name stay apart.
+   objects of one name stay apart. With `partition`, the names `StorageAdapter.partitionRoot`
+   resolved for a violation a partition raised (below), the table and the constraint are read from
+   it; the SQLSTATE and the column stay the error's.
 4. Found: build the error from 9.1 with one item per member of the entry's `fields`, each with
    `path` under `pointer` (`/data/attributes/<field>`, `/data/relationships/<name>`, `/data/id`),
    and the driver error as `cause`. Not found: return `undefined`, and the ban's own `map`
@@ -1140,11 +1142,12 @@ The runtime calls it where an adapter's rejection arrives (12.8, obligation 6), 
 are the operation and the document's base known; inside Atomic Operations the base is the
 operation's own `data` (ADR 0007). It throws `TypeError` for options that do not name a declared
 resource (`constraintError: options.resource must be a resource declareResource returned`), an
-operation, or an RFC 6901 pointer. Tests: `constraint-error.test.ts` with errors captured from
-node-postgres, PGlite, and postgres.js; `e2e/resource/errors.e2e.test.ts`, which runs it over the
-real violation of every derived code of the contacts application, and the refusal of a remove a
-referencing row's `ON DELETE RESTRICT` or `ON DELETE SET NULL` raises, on PGlite and on a PostgreSQL
-server; `localization.e2e.test.ts`, whose localized 409 is what it makes of a real violation; and
+operation, an RFC 6901 pointer, or a `partition` of strings `schema`, `table`, and optionally
+`constraint`. Tests: `constraint-error.test.ts` with errors captured from node-postgres, PGlite, and
+postgres.js; `e2e/resource/errors.e2e.test.ts`, which runs it over the real violation of every
+derived code of the contacts application, and the refusal of a remove a referencing row's
+`ON DELETE RESTRICT` or `ON DELETE SET NULL` raises, on PGlite and on a PostgreSQL server;
+`localization.e2e.test.ts`, whose localized 409 is what it makes of a real violation; and
 `runtime-rows.e2e.test.ts`, whose remove a meeting's `ON DELETE SET NULL` cannot follow is a 409.
 
 What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
@@ -1158,11 +1161,50 @@ What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
 | unique index, partial or not                           | 23505                             | the table, and the index as the constraint                                 |
 | a remove's referencing row: RESTRICT, SET NULL         | 23001 (18) or 23503 (14), 23514   | the referencing table and its constraint                                   |
 
-A NOT NULL domain's 23502 names only the domain, which has no code (9.1). A row written through a
-partitioned table is stored in a partition, and PostgreSQL names the partition, and for a unique or
-primary key the partition's own index. The catalog leaves partitions out, so until it records them
-(#78), such a violation gets no declared code and the ban's `map` answers it. @ref
+A NOT NULL domain's 23502 names only the domain, which has no code (9.1). @ref
 https://www.postgresql.org/docs/18/protocol-error-fields.html
+
+**Partitions.** A row written through a partitioned table is stored in one of its partitions, and a
+violation names that partition, in whichever schema it lives, as its table. A CHECK keeps the
+partitioned table's name, since the partition inherits it, and so does a cloned foreign key unless
+its name was taken on the partition; a PRIMARY KEY, UNIQUE, or EXCLUDE violation, and one of a
+unique index, names the partition's own index, which PostgreSQL names after the partition.
+Partitions are often created after the migrations ran, by pg_partman or by the application, so the
+catalog leaves them out and the database resolves them (ADR 0010):
+
+- `partitionViolation(thrown, { resource, operation })` returns the `{ schema, table, constraint? }`
+  an integrity violation names when that table is not the resource's, and `undefined` for any other
+  error, for the resource's own table, and for a remove, whose violations are all `CONFLICT`. It
+  checks its options as `constraintError` does, under its own name.
+- `StorageAdapter.partitionRoot(names)` (12.8, obligation 11) answers, after the operation's
+  transaction ended, with the partitioned table at the top of the partition's tree
+  (`pg_partition_root`) and that table's name for the constraint: the top of the constraint's
+  `conparentid` chain, the root of the index it is attached to, or the CHECK it inherits, else none.
+  `PARTITION_ROOT_SQL` is the query, which reads only system catalogs; any role may run it.
+- The runtime passes the answer to `constraintError` as `partition`:
+
+```ts
+const raised = partitionViolation(error, { resource, operation });
+const partition = raised === undefined ? undefined : await adapter.partitionRoot(raised);
+return constraintError(error, { resource, operation, partition }) ?? error;
+```
+
+A partition-local unique index, which no index of the partitioned table is attached to, resolves to
+no constraint and keeps no code, and a row that fits no partition names the partitioned table itself
+with 23514 and no constraint, which the ban's `map` answers. A declared resource has a single-column
+primary key, and PostgreSQL wants the partition key in every unique constraint, so a table a
+resource can be declared on is partitioned by its id: what reaches a client is the partition's table
+name, for every kind, and the partition's primary key index, for client ids. Verified on PostgreSQL
+14.19 and 18.3 for a range partition, a partition attached with its own index, a partition two
+levels down, and one in another schema, and against every partition of GitLab 17.11. @ref
+https://www.postgresql.org/docs/18/ddl-partitioning.html @ref
+https://www.postgresql.org/docs/18/functions-info.html#FUNCTIONS-INFO-PARTITION
+
+Tests: `partition.test.ts` and `constraint-error-options.test.ts` with each driver's error;
+`e2e/resource/errors-partitions.e2e.test.ts`, which raises each kind through every partition of the
+contacts application's `calls` and resolves it with `PARTITION_ROOT_SQL`, on PGlite and on a
+PostgreSQL server; `runtime-partitions.e2e.test.ts`, whose duplicate client id and missing contact
+reach the client as the codes of `calls`; and the contract's cases of obligation 11.
 
 ---
 
@@ -1561,6 +1603,13 @@ interface StorageAdapter<TTransaction> {
   remove(tx: TTransaction, resource: DeclaredResource, id: string): Promise<boolean>;
   count(tx: TTransaction, resource: DeclaredResource, quota: string): Promise<number>; // under the quota lock
   record(tx: TTransaction, events: ReadonlyArray<DomainEvent>): Promise<void>;
+  partitionRoot(names: ViolationNames): Promise<ViolationNames | undefined>; // outside any operation
+}
+
+interface ViolationNames {
+  readonly schema: string;
+  readonly table: string;
+  readonly constraint?: string; // a constraint or a unique index of the table
 }
 
 interface StorageWrite {
@@ -1607,6 +1656,11 @@ An adapter MUST:
     https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS @ref
     https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/ri_triggers.c
     (`RI_FKey_check`: "FOR KEY SHARE OF x")
+11. Answer `partitionRoot` outside any operation's transaction, as `PARTITION_ROOT_SQL` does (9.5):
+    for a partition, at any depth and in any schema, the partitioned table at the top of its tree
+    and that table's name for `names.constraint`, or no `constraint` when the table has none; for a
+    table that is not a partition, the partitioned table itself included, `undefined`. A
+    `constraint` is a string or absent, never `null`, so a SQL `NULL` is left out.
 
 ### 12.9 The contract suite (`testing/storage-contract.ts`)
 
@@ -1630,8 +1684,10 @@ interface ContractHarness<TTransaction> {
 (session parameter `contract.workspace_id`), and two declarations: `workspaces`, unscoped with an
 identity key, and `tasks`, scoped to a workspace, with client ids, the server value `created_by`, a
 field of every wire form, an array, JSON, a codec field, generated columns, a `write` field, and a
-self-reference. A column default reads `current_setting('contract.workspace_id', true)`, so a case
-reads back what the transaction set, and the schema has no row security, so only the adapter's
+self-reference; and `logs`, partitioned by its id with client ids, whose ids below 1000 go to
+`logs_low` and the rest to `contract_archive.logs_high_rest`, a partition of a table attached with
+its own primary key. A column default reads `current_setting('contract.workspace_id', true)`, so a
+case reads back what the transaction set, and the schema has no row security, so only the adapter's
 predicate keeps a row in its scope. The values are the ones drivers get wrong by default: an `int8`
 past 2^53, a `numeric` read as a float, a `timestamptz` at millisecond precision or in the local
 zone, array elements that need quoting, `NULL` and the empty string among them. A harness gives its
@@ -1649,8 +1705,9 @@ contract suite itself is proven in `e2e/resource` against a reference adapter wr
 over PGlite and over PostgreSQL through a node-postgres pool (`contract.e2e.test.ts`), so the
 contract is shown implementable before `@netvark/kysely-resource` exists.
 `contract-faults.e2e.test.ts` gives the reference adapter one defect at a time, from parameters set
-for the session to a missing quota or row lock, and checks that the cases about it fail, and
-`extract.e2e.test.ts` checks that the fixture's catalog is what extraction gives for its migrations.
+for the session to a missing quota or row lock and a partition resolved to its own names, and checks
+that the cases about it fail, and `extract.e2e.test.ts` checks that the fixture's catalog is what
+extraction gives for its migrations.
 
 ---
 

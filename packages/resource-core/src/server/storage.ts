@@ -30,7 +30,11 @@
  * 10. hold the row `lock` returns until the transaction ends, locked at
  *    least as the write it names will lock it: `FOR NO KEY UPDATE` before
  *    an update, `FOR UPDATE` before a remove, which also keeps another
- *    transaction from adding a reference to the row.
+ *    transaction from adding a reference to the row;
+ * 11. answer `partitionRoot` outside any operation, as
+ *    `PARTITION_ROOT_SQL` does: for a partition, the partitioned table at
+ *    the top of its tree and that table's name for the constraint, when it
+ *    has one; for any other table, `undefined`.
  *
  * `storageContract` (`@netvark/resource-core/testing`) checks them.
  * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/transam/xact.c (EndTransactionBlock: "Since COMMIT may actually do a ROLLBACK")
@@ -42,6 +46,7 @@ import type { KeysetRequest, Page } from '@netvark/keyset-core';
 import type { DeclaredResource } from '../declare/declared-resource';
 import type { DomainEvent } from './event';
 import type { ScopeValue } from './scope';
+import type { ViolationNames } from './violation-names';
 
 /**
  * A row as the API reads it: `id`, each readable field, and each
@@ -128,4 +133,13 @@ export interface StorageAdapter<TTransaction> {
   ): Promise<number>;
   /** Writes `events` to the outbox in the transaction. */
   record(tx: TTransaction, events: ReadonlyArray<DomainEvent>): Promise<void>;
+  /**
+   * What a violation a partition raised names in the partitioned table at
+   * the top of the partition's tree: the table, and its constraint or
+   * unique index that `names.constraint` was cloned from, is attached to,
+   * or inherits, when there is one. `undefined` when `names.table` is not
+   * a partition. The runtime calls it after the operation's transaction
+   * ended, with what `partitionViolation` gave.
+   */
+  partitionRoot(names: ViolationNames): Promise<ViolationNames | undefined>;
 }

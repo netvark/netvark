@@ -83,4 +83,19 @@ describe('constraintError: options JavaScript passes', () => {
   ])('refuses %j', (options, message) => {
     expect(untypedCall(options)).toThrow(new TypeError(message));
   });
+
+  it.each([
+    'things',
+    { schema: 'public' },
+    { schema: 'public', table: 'things', constraint: null },
+    { schema: 'public', table: 7 },
+  ])('refuses the partition %j', (partition) => {
+    expect(
+      untypedCall({ resource: Things, operation: 'create', partition }),
+    ).toThrow(
+      new TypeError(
+        'constraintError: options.partition must be what StorageAdapter.partitionRoot answers: { schema, table, constraint? }, each a string',
+      ),
+    );
+  });
 });

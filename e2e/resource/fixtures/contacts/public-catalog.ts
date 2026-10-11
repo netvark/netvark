@@ -128,6 +128,134 @@ export const publicCatalog = {
     }
   },
   "tables": {
+    "calls": {
+      "schema": "public",
+      "name": "calls",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": {
+            "literal": null
+          },
+          "identity": null,
+          "generated": null
+        },
+        "organization_id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "contact_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "minutes": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "note": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "calls_contact_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "contact_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "calls_minutes_check": {
+          "kind": "check",
+          "columns": [
+            "minutes"
+          ],
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "600",
+              "inclusive": true
+            }
+          },
+          "enforced": true
+        },
+        "calls_organization_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "organization_id"
+          ],
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "calls_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
     "contact_phones": {
       "schema": "public",
       "name": "contact_phones",

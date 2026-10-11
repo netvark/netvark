@@ -8,8 +8,9 @@
  * read their row with `lock`, so the row the policy and the rules decide
  * on is the row the write changes. A rule's `Rejection` becomes its
  * code's error, a PostgreSQL integrity violation the declared code
- * `constraintError` finds, and a row the actor cannot see `NOT_FOUND`,
- * built as a denied `get` builds it.
+ * `constraintError` finds, a partition's through the adapter's
+ * `partitionRoot` (`failure.ts`), and a row the actor cannot see
+ * `NOT_FOUND`, built as a denied `get` builds it.
  */
 import type { ResourceIssue } from '@netvark/resource-core';
 import type {
@@ -26,15 +27,13 @@ import type { AppActor, AppDomain, Services } from './domain.ts';
 import { BanError, BUILTIN_CATALOG, createBan } from '@netvark/ban-core';
 import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 import {
-  constraintError,
   quotaExceeded,
   reject,
-  Rejection,
-  rejectionError,
   scopeValues,
 } from '@netvark/resource-core/server';
 
-import { APP_ERRORS, QUOTAS, SCOPES } from './domain.ts';
+import { QUOTAS, SCOPES } from './domain.ts';
+import { failure } from './failure.ts';
 
 /** Any resource's behavior in the domain. */
 type Behavior = ResourceBehavior<AppDomain>;
@@ -138,23 +137,6 @@ function parsed(
   return storageWrite(result.value, write === 'create' ? input.id : undefined);
 }
 
-/** What the operation's failure is to the client: the error of a rejection or of an integrity violation, else as thrown. */
-function failure(
-  error: unknown,
-  behavior: Behavior,
-  operation: Writing | 'get',
-) {
-  if (error instanceof Rejection) {
-    return rejectionError(error, {
-      resource: behavior.resource,
-      errors: APP_ERRORS,
-    });
-  }
-  return (
-    constraintError(error, { resource: behavior.resource, operation }) ?? error
-  );
-}
-
 /** The runtime over `adapter`, handing `services` to policies, rules, effects, and quotas. */
 export function createRuntime<TTransaction>(
   adapter: StorageAdapter<TTransaction>,
@@ -169,7 +151,7 @@ export function createRuntime<TTransaction>(
     try {
       return await adapter.transaction(scopeValues(SCOPES, actor), run);
     } catch (error) {
-      throw failure(error, behavior, operation);
+      throw await failure(adapter, error, behavior.resource, operation);
     }
   };
   /** Runs the effects in order and records their events with the write. */

@@ -27,6 +27,7 @@ describe('package surface (SPEC 1)', () => {
 
   it('@netvark/resource-core/server exports the documented values', () => {
     expect(Object.keys(server).toSorted()).toEqual([
+      'PARTITION_ROOT_SQL',
       'Rejection',
       'constraintError',
       'createDomainDefiners',
@@ -34,6 +35,7 @@ describe('package surface (SPEC 1)', () => {
       'defineQuota',
       'defineScope',
       'denyAll',
+      'partitionViolation',
       'quotaExceeded',
       'reject',
       'rejectionError',

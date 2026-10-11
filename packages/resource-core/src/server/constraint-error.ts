@@ -20,7 +20,10 @@
  * RESTRICT` from PostgreSQL 18) or a referential action whose result breaks
  * a constraint of the referencing row, such as `ON DELETE SET NULL` against
  * a CHECK. It names the referencing table, which may not be a declared
- * resource, so it is the built-in `CONFLICT`.
+ * resource, so it is the built-in `CONFLICT`. A violation a partition
+ * raised names the partition; with `partition`, the names
+ * `StorageAdapter.partitionRoot` resolved for it, it is read as the
+ * partitioned table's (`partition.ts`).
  * @ref https://www.postgresql.org/docs/18/protocol-error-fields.html
  * @ref https://www.postgresql.org/docs/18/errcodes-appendix.html
  * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/ri_triggers.c (ri_ReportViolation: ERRCODE_RESTRICT_VIOLATION)
@@ -28,12 +31,10 @@
  */
 import type { PostgresErrorFields } from '@netvark/ban-core/postgresql';
 
-import type {
-  AnyDeclaredResource,
-  DeclaredInternals,
-} from '../declare/declared-resource';
-import type { Operation } from '../declare/types';
+import type { DeclaredInternals } from '../declare/declared-resource';
 import type { ConstraintKind } from '../errors/error-entry';
+import type { ConstraintErrorOptions } from './constraint-options';
+import type { ViolationNames } from './violation-names';
 
 import { BanError, BUILTIN_CATALOG } from '@netvark/ban-core';
 import {
@@ -42,20 +43,10 @@ import {
 } from '@netvark/ban-core/postgresql';
 
 import { notNullKey } from '../catalog/columns';
-import { OPERATIONS } from '../declare/check-options';
-import { internalsOf } from '../declare/declared-resource';
 import { KIND_DETAIL } from '../errors/error-entry';
-import { isRecord, ownValue } from '../internal/object';
-import { memberItems, memberTokens, pointerTokens } from './member-items';
-
-/** What `constraintError` needs to know about the operation. */
-export interface ConstraintErrorOptions {
-  /** The declared resource the operation runs on. */
-  readonly resource: AnyDeclaredResource;
-  readonly operation: Operation;
-  /** The RFC 6901 pointer of the operation's resource object; default `/data`. */
-  readonly pointer?: string | undefined;
-}
+import { ownValue } from '../internal/object';
+import { checkOptions } from './constraint-options';
+import { memberItems, memberTokens } from './member-items';
 
 /** The constraint kinds each integrity SQLSTATE reports. */
 const SQLSTATE_KINDS: ReadonlyMap<
@@ -72,37 +63,6 @@ const NOT_NULL_VIOLATION = '23502';
 /** SQLSTATE class 23, integrity constraint violation. */
 const INTEGRITY_VIOLATION_CLASS = '23';
 const STILL_REFERENCED = 'The resource is still referenced.';
-const DEFAULT_POINTER = '/data';
-
-interface Checked {
-  readonly internals: DeclaredInternals;
-  readonly operation: Operation;
-  readonly base: ReadonlyArray<string>;
-}
-
-function checkOptions(options: unknown): Checked {
-  const value = isRecord(options) ? options : {};
-  const internals = internalsOf(value['resource']);
-  if (internals === undefined) {
-    throw new TypeError(
-      'constraintError: options.resource must be a resource declareResource returned',
-    );
-  }
-  const operation = OPERATIONS.find((known) => known === value['operation']);
-  if (operation === undefined) {
-    throw new TypeError(
-      `constraintError: options.operation must be one of ${OPERATIONS.join(', ')}`,
-    );
-  }
-  const pointer = value['pointer'] ?? DEFAULT_POINTER;
-  const base = typeof pointer === 'string' ? pointerTokens(pointer) : undefined;
-  if (base === undefined) {
-    throw new TypeError(
-      'constraintError: options.pointer must be an RFC 6901 JSON Pointer',
-    );
-  }
-  return { internals, operation, base };
-}
 
 /** The code of a domain CHECK the violation names by its domain, schema, and constraint. */
 function domainCheckCode(
@@ -124,20 +84,39 @@ function domainCheckCode(
   return undefined;
 }
 
+/** A table and constraint as a violation names them, each possibly absent. */
+type Named = Pick<PostgresErrorFields, 'schema' | 'table' | 'constraint'>;
+
+/** The table and constraint the violation names: the partitioned table's, when `partition` resolved them. */
+function namesOf(
+  fields: PostgresErrorFields,
+  partition: ViolationNames | undefined,
+): Named {
+  return partition === undefined
+    ? fields
+    : {
+        schema: partition.schema,
+        table: partition.table,
+        constraint: partition.constraint,
+      };
+}
+
 /** The code of the rule the violation names, before its kind is checked. */
 function codeOf(
   internals: DeclaredInternals,
   fields: PostgresErrorFields,
+  partition: ViolationNames | undefined,
 ): string | undefined {
   const { resource, catalog } = internals;
   if (fields.table === undefined) {
     return domainCheckCode(internals, fields);
   }
+  const names = namesOf(fields, partition);
   const tableDef = ownValue(catalog.tables, resource.table);
   if (
     tableDef === undefined ||
-    tableDef.schema !== fields.schema ||
-    tableDef.name !== fields.table
+    tableDef.schema !== names.schema ||
+    tableDef.name !== names.table
   ) {
     return undefined;
   }
@@ -146,9 +125,9 @@ function codeOf(
       ? undefined
       : resource.names.rules.get(notNullKey(tableDef, fields.column));
   }
-  return fields.constraint === undefined
+  return names.constraint === undefined
     ? undefined
-    : resource.names.rules.get(fields.constraint);
+    : resource.names.rules.get(names.constraint);
 }
 
 /**
@@ -159,13 +138,16 @@ function codeOf(
  * as `cause`. `undefined` when `thrown` carries no PostgreSQL error or a
  * violation the resource declares no code for. Throws `TypeError` for
  * options that do not name a declared resource, an operation, and a
- * pointer.
+ * pointer, or whose `partition` is not what `partitionRoot` answers.
  */
 export function constraintError(
   thrown: unknown,
   options: ConstraintErrorOptions,
 ): BanError | undefined {
-  const { internals, operation, base } = checkOptions(options);
+  const { internals, operation, base, partition } = checkOptions(
+    'constraintError',
+    options,
+  );
   const driverError = findPostgresError(thrown);
   if (driverError === undefined) {
     return undefined;
@@ -182,7 +164,7 @@ export function constraintError(
       cause: driverError,
     });
   }
-  const code = codeOf(internals, fields);
+  const code = codeOf(internals, fields, partition);
   const { names, errors } = internals.resource;
   const entry = code === undefined ? undefined : ownValue(errors, code);
   if (

@@ -41,7 +41,10 @@ export async function extractContractCatalog(check: boolean): Promise<string> {
         migrations: 'migrations',
         out: {
           catalog: 'catalog.ts',
-          public: { file: CONTRACT_CATALOG, tables: ['workspaces', 'tasks'] },
+          public: {
+            file: CONTRACT_CATALOG,
+            tables: ['workspaces', 'tasks', 'logs'],
+          },
         },
       },
       { cwd: dir, check },
