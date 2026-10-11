@@ -30,6 +30,30 @@ const Articles = defineResource({
   validate: { create: CreateArticle, update: CreateArticle.partial() },
 });
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const ID = '0b7c1a9e-4f6d-4d8e-9a3b-2c1d0e9f8a7b';
+const OTHER = '1b7c1a9e-4f6d-4d8e-9a3b-2c1d0e9f8a7b';
+
+/** A UUID in either case, lower-cased, like a server that stores it so. */
+const uuid = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'test',
+    validate: (value: unknown) =>
+      typeof value === 'string' && UUID.test(value)
+        ? { value: value.toLowerCase() }
+        : { issues: [{ message: 'Must be a UUID.' }] },
+  },
+};
+
+/** Server-keyed: the id validator serves updates alone. */
+const Notes = defineResource({
+  type: 'notes',
+  attributes: ['title'],
+  serialize: (row: Row) => ({ id: row.id }),
+  validate: { id: uuid },
+});
+
 async function errorsOf(promise: Promise<unknown>): Promise<{
   status: number;
   errors: ReadonlyArray<ErrorObject>;
@@ -71,6 +95,40 @@ describe('parseUpdateDocument', () => {
     );
     expect(mismatch.status).toBe(409);
     expect(mismatch.errors[0]?.detail).toContain('"2"');
+  });
+
+  it("matches an update's id to the request's by the id validator's output", async () => {
+    const lower = await parseUpdateDocument(
+      Notes,
+      { data: { type: 'notes', id: ID } },
+      ID.toUpperCase(),
+    );
+    const upper = await parseUpdateDocument(
+      Notes,
+      { data: { type: 'notes', id: ID.toUpperCase() } },
+      ID,
+    );
+    // The document's id stays as sent; the host resolves the request's.
+    expect([lower.id, upper.id]).toEqual([ID, ID.toUpperCase()]);
+    const pairs = [
+      [OTHER, ID],
+      [ID, 'not-a-uuid'],
+      ['not-a-uuid', ID],
+    ] as const;
+    const refusals = await Promise.all(
+      pairs.map(async ([id, requested]) =>
+        errorsOf(
+          parseUpdateDocument(
+            Notes,
+            { data: { type: 'notes', id } },
+            requested,
+          ),
+        ),
+      ),
+    );
+    expect(
+      refusals.map(({ status, errors }) => [status, errors[0]?.source]),
+    ).toEqual(Array.from({ length: 3 }, () => [409, { pointer: '/data/id' }]));
   });
 
   it('validates with the update validator and leaves missing attributes alone', async () => {

@@ -154,7 +154,7 @@ export function resourceDefinition(source: ResourceSource): AnyResource {
     validate: {
       ...(operations.has('create') ? { create: validate.create } : {}),
       ...(operations.has('update') ? { update: validate.update } : {}),
-      ...(declaration.clientIds === true ? { id: validate.id } : {}),
+      id: validate.id,
     },
     writable: writableMembers(specs),
     clientIds: declaration.clientIds === true,

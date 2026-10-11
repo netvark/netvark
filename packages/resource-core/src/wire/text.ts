@@ -29,3 +29,15 @@ export const TEXT_FORMAT: Violation = Object.freeze({
 export function isStorableText(value: string): boolean {
   return !value.includes(NUL) && !UNPAIRED_SURROGATE.test(value);
 }
+
+/**
+ * A `bpchar(n)` value as PostgreSQL prints it: padded with spaces to `n`
+ * code points (SPEC 3.4, 5.1). A longer value comes back unchanged.
+ */
+export function paddedText(value: string, length: number): string {
+  // Code points, which `char_length` counts, not grapheme clusters.
+  const codePoints = Array.from(value).length;
+  return codePoints >= length
+    ? value
+    : `${value}${' '.repeat(length - codePoints)}`;
+}

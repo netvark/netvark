@@ -99,6 +99,12 @@ const TARGETS: ReadonlyMap<string, string> = new Map([
   ['date_id', 'key_dates'],
   ['instant_id', 'key_instants'],
   ['mood_id', 'key_moods'],
+  ['local_id', 'key_locals'],
+  ['code_id', 'key_codes'],
+  ['name_id', 'key_names'],
+  ['amount_id', 'key_amounts'],
+  ['whole_id', 'key_wholes'],
+  ['integer_id', 'key_integers'],
 ]);
 
 function idProbes(resource: DeclaredResource): ReadonlyArray<Probe> {

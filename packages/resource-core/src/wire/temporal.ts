@@ -179,3 +179,76 @@ export function isWireTimestamptz(
   const parts = dateTimeParts(text, fractionDigits);
   return parts?.offset !== undefined && staysInRangeInUtc(parts, parts.offset);
 }
+
+const TRAILING_ZEROS = /0+$/u;
+const YEAR_WIDTH = 4;
+const FIELD_WIDTH = 2;
+
+function padded(value: number, width: number): string {
+  return String(value).padStart(width, '0');
+}
+
+/** A fraction of a second as PostgreSQL prints it: without trailing zeros, and nothing when none is left. */
+function fractionText(fraction: string | undefined): string {
+  const kept = (fraction ?? '').replace(TRAILING_ZEROS, '');
+  return kept === '' ? '' : `.${kept}`;
+}
+
+function daysIn(year: number, month: number): number {
+  const leapDay = month === FEBRUARY && isLeapYear(year) ? 1 : 0;
+  return (DAYS_IN_MONTH[month - 1] ?? 0) + leapDay;
+}
+
+/** The date `shift` days (-1, 0, or 1) from a calendar day, as `YYYY-MM-DD`. */
+function shiftedDate(
+  year: number,
+  month: number,
+  day: number,
+  shift: number,
+): string {
+  let [y, m, d] = [year, month, day + shift];
+  if (d < 1) {
+    [y, m] = m === 1 ? [y - 1, MONTHS] : [y, m - 1];
+    d = daysIn(y, m);
+  } else if (d > daysIn(y, m)) {
+    [y, m, d] = m === MONTHS ? [y + 1, 1, 1] : [y, m + 1, 1];
+  }
+  return `${padded(y, YEAR_WIDTH)}-${padded(m, FIELD_WIDTH)}-${padded(d, FIELD_WIDTH)}`;
+}
+
+/**
+ * The read form of a value in the `timestamp(p)` form (SPEC 3.4, 5.1):
+ * `T` in upper case and the fraction without trailing zeros, as PostgreSQL
+ * prints it in an ISO session (`2024-01-31t10:20:30.500` is
+ * `2024-01-31T10:20:30.5`). Other text comes back unchanged.
+ */
+export function timestampReadForm(text: string): string {
+  const match = DATE_TIME.exec(text);
+  if (match === null) {
+    return text;
+  }
+  const [, year, month, day, hour, minute, second, fraction] = match;
+  return `${year ?? ''}-${month ?? ''}-${day ?? ''}T${hour ?? ''}:${minute ?? ''}:${second ?? ''}${fractionText(fraction)}`;
+}
+
+/**
+ * The read form of a value in the `timestamptz(p)` form (SPEC 3.4, 5.1):
+ * the instant in UTC with `Z`, the fraction without trailing zeros
+ * (`2024-01-31T00:20:30.50+02:00` is `2024-01-30T22:20:30.5Z`). An offset
+ * is whole minutes within ±15:59, so the date moves a day at most. Other
+ * text comes back unchanged.
+ */
+export function timestamptzReadForm(text: string): string {
+  const match = DATE_TIME.exec(text);
+  const offset = match === null ? undefined : offsetOf(match);
+  if (match === null || offset === undefined || Number.isNaN(offset)) {
+    return text;
+  }
+  const [, year, month, day, hour, minute, second, fraction] = match;
+  const minutes = Number(hour) * MINUTES_PER_HOUR + Number(minute) - offset;
+  const shift = Math.floor(minutes / MINUTES_PER_DAY);
+  const minuteOfDay = minutes - shift * MINUTES_PER_DAY;
+  const date = shiftedDate(Number(year), Number(month), Number(day), shift);
+  const clock = `${padded(Math.floor(minuteOfDay / MINUTES_PER_HOUR), FIELD_WIDTH)}:${padded(minuteOfDay % MINUTES_PER_HOUR, FIELD_WIDTH)}`;
+  return `${date}T${clock}:${second ?? ''}${fractionText(fraction)}Z`;
+}

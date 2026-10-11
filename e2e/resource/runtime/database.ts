@@ -22,7 +22,8 @@ export const OUTBOX = 'outbox';
 
 export const ADA = '00000000-0000-4000-8000-000000000001';
 export const GRACE = '00000000-0000-4000-8000-000000000002';
-export const ARCHIVED = '00000000-0000-4000-8000-000000000003';
+/** A key with hex letters, which a client may spell in upper case (RFC 9562 section 4). */
+export const ARCHIVED = '00000000-0000-4000-8000-00000000000a';
 
 const SETUP = [
   `create table ${OUTBOX} (

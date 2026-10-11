@@ -138,6 +138,59 @@ const value = {
     }
   },
   "tables": {
+    "key_amounts": {
+      "schema": "public",
+      "name": "key_amounts",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_amounts_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_amounts_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_amounts_pkey ON public.key_amounts USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "key_bigints": {
       "schema": "public",
       "name": "key_bigints",
@@ -236,6 +289,59 @@ const value = {
           "include": [],
           "predicate": null,
           "definition": "CREATE UNIQUE INDEX key_booleans_pkey ON public.key_booleans USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "key_codes": {
+      "schema": "public",
+      "name": "key_codes",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_codes_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_codes_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_codes_pkey ON public.key_codes USING btree (id)"
         }
       },
       "rowSecurity": {
@@ -403,6 +509,112 @@ const value = {
         "policies": {}
       }
     },
+    "key_integers": {
+      "schema": "public",
+      "name": "key_integers",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_integers_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_integers_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_integers_pkey ON public.key_integers USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "key_locals": {
+      "schema": "public",
+      "name": "key_locals",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "timestamp",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp(3) without time zone",
+          "maxLength": null,
+          "precision": 3,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_locals_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_locals_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_locals_pkey ON public.key_locals USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "key_moods": {
       "schema": "public",
       "name": "key_moods",
@@ -448,6 +660,59 @@ const value = {
           "include": [],
           "predicate": null,
           "definition": "CREATE UNIQUE INDEX key_moods_pkey ON public.key_moods USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "key_names": {
+      "schema": "public",
+      "name": "key_names",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "citext",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "citext",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_names_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_names_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_names_pkey ON public.key_names USING btree (id)"
         }
       },
       "rowSecurity": {
@@ -721,6 +986,59 @@ const value = {
         "policies": {}
       }
     },
+    "key_wholes": {
+      "schema": "public",
+      "name": "key_wholes",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric(4,0)",
+          "maxLength": null,
+          "precision": 4,
+          "scale": 0,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "key_wholes_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "key_wholes_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX key_wholes_pkey ON public.key_wholes USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "links": {
       "schema": "public",
       "name": "links",
@@ -908,9 +1226,116 @@ const value = {
           "identity": null,
           "generated": null,
           "comment": null
+        },
+        "local_id": {
+          "type": "timestamp",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "timestamp(3) without time zone",
+          "maxLength": null,
+          "precision": 3,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "code_id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "name_id": {
+          "type": "citext",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "citext",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "amount_id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "whole_id": {
+          "type": "numeric",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "numeric(4,0)",
+          "maxLength": null,
+          "precision": 4,
+          "scale": 0,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "integer_id": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
         }
       },
       "constraints": {
+        "links_amount_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "amount_id"
+          ],
+          "references": {
+            "table": "key_amounts",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (amount_id) REFERENCES key_amounts(id)"
+        },
         "links_bigint_id_fkey": {
           "kind": "foreignKey",
           "columns": [
@@ -944,6 +1369,23 @@ const value = {
           "validated": true,
           "enforced": true,
           "definition": "FOREIGN KEY (boolean_id) REFERENCES key_booleans(id)"
+        },
+        "links_code_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "code_id"
+          ],
+          "references": {
+            "table": "key_codes",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (code_id) REFERENCES key_codes(id)"
         },
         "links_date_id_fkey": {
           "kind": "foreignKey",
@@ -996,6 +1438,40 @@ const value = {
           "enforced": true,
           "definition": "FOREIGN KEY (instant_id) REFERENCES key_instants(id)"
         },
+        "links_integer_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "integer_id"
+          ],
+          "references": {
+            "table": "key_integers",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (integer_id) REFERENCES key_integers(id)"
+        },
+        "links_local_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "local_id"
+          ],
+          "references": {
+            "table": "key_locals",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (local_id) REFERENCES key_locals(id)"
+        },
         "links_mood_id_fkey": {
           "kind": "foreignKey",
           "columns": [
@@ -1012,6 +1488,23 @@ const value = {
           "validated": true,
           "enforced": true,
           "definition": "FOREIGN KEY (mood_id) REFERENCES key_moods(id)"
+        },
+        "links_name_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "name_id"
+          ],
+          "references": {
+            "table": "key_names",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (name_id) REFERENCES key_names(id)"
         },
         "links_numeric_id_fkey": {
           "kind": "foreignKey",
@@ -1104,6 +1597,23 @@ const value = {
           "validated": true,
           "enforced": true,
           "definition": "FOREIGN KEY (uuid_id) REFERENCES key_uuids(id)"
+        },
+        "links_whole_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "whole_id"
+          ],
+          "references": {
+            "table": "key_wholes",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (whole_id) REFERENCES key_wholes(id)"
         }
       },
       "indexes": {

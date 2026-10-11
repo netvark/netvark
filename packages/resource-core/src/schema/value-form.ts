@@ -16,7 +16,7 @@ import { isWireType } from '../wire/types';
 import { NO_LIMITS, withLength, withMultipleOf, withRange } from './limits';
 
 /** The base types of SPEC 5.1 grouped by the JSON value they travel as. */
-type TextType = 'text' | 'varchar' | 'bpchar' | 'citext';
+type TextType = 'text' | 'varchar' | 'citext';
 type NumberType = 'int2' | 'int4' | 'float4' | 'float8';
 type DecimalType = 'int8' | 'numeric';
 type StringType = 'uuid' | 'date';
@@ -26,6 +26,12 @@ type JsonType = 'json' | 'jsonb';
 /** A value's base: a wire form (SPEC 5.1) or a codec's schema (SPEC 7.1). */
 export type ValueForm =
   | { readonly kind: 'text'; readonly type: TextType }
+  | {
+      readonly kind: 'text';
+      readonly type: 'bpchar';
+      /** n of `bpchar(n)`, the length PostgreSQL pads a value to; `null` without one. */
+      readonly length: number | null;
+    }
   | { readonly kind: 'number'; readonly type: NumberType }
   | { readonly kind: 'decimal'; readonly type: DecimalType }
   | { readonly kind: 'string'; readonly type: StringType }
@@ -66,7 +72,6 @@ export type TypeRecord = Pick<
 const FORMS: ReadonlyMap<string, ValueForm> = new Map<string, ValueForm>([
   ['text', { kind: 'text', type: 'text' }],
   ['varchar', { kind: 'text', type: 'varchar' }],
-  ['bpchar', { kind: 'text', type: 'bpchar' }],
   ['citext', { kind: 'text', type: 'citext' }],
   ['int2', { kind: 'number', type: 'int2' }],
   ['int4', { kind: 'number', type: 'int4' }],
@@ -135,10 +140,15 @@ function typeLimits(form: ValueForm, record: TypeRecord): Limits {
 
 /**
  * The form of a wire type. A date-time keeps the record's precision, which
- * PostgreSQL caps at six digits ("precision reduced to maximum allowed").
+ * PostgreSQL caps at six digits ("precision reduced to maximum allowed"),
+ * and a `bpchar` the length it pads to.
  * @ref https://www.postgresql.org/docs/18/datatype-datetime.html
+ * @ref https://www.postgresql.org/docs/18/datatype-character.html
  */
 function formOf(type: string, record: TypeRecord): ValueForm | undefined {
+  if (type === 'bpchar') {
+    return { kind: 'text', type, length: record.maxLength };
+  }
   if (type === 'timestamp' || type === 'timestamptz') {
     const digits = record.precision ?? SECOND_FRACTION_DIGITS;
     return {

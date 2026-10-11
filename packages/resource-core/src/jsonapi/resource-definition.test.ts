@@ -128,12 +128,15 @@ describe('resource (SPEC 11.1)', () => {
     });
   });
 
-  it('validates the operations the declaration serves with its own validators', () => {
+  it('validates the operations the declaration serves, and its ids, with its own validators', () => {
     expect(Contacts.resource.validate).toEqual({
       create: Contacts.validate.create,
       update: Contacts.validate.update,
+      id: Contacts.validate.id,
     });
-    expect(Organizations.resource.validate).toEqual({});
+    expect(Organizations.resource.validate).toEqual({
+      id: Organizations.validate.id,
+    });
   });
 
   it('serializes the readable fields and the relationship ids of a public row', () => {

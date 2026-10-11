@@ -201,7 +201,8 @@ describe('the probes the field metadata gives', () => {
     const stated = TARGETS.filter(({ probes }) =>
       probes.some((probe) => testsStated(probe)),
     );
-    expect(stated.length).toBe(42);
+    // A citext key and a numeric key without a scale state nothing a probe tests.
+    expect(stated.length).toBe(46);
   });
 
   it("describe a bool key's ids and the options, as the emitted declarations type them", () => {

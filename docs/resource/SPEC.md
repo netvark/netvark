@@ -292,15 +292,29 @@ JSON:API ids are strings, so an id travels in its key's wire form when that form
 `int2` or `int4` key as integer text in `int8`'s spelling (5.1) within the type's range, a `real` or
 `double precision` key as JavaScript's shortest round-trip text (`String(value)`, what a server
 writes when it reads the column as a number), and a `bool` key as `true` or `false`. The key's rules
-apply to the value the text names. Other spellings PostgreSQL reads (`+1`, `01`, `1.0`, `1e3`, `-0`,
-` 1`, `t`, `TRUE`) are refused, so an id has one spelling and two ids compare as text.
+apply to the value the text names. An id takes what the key's write form takes (5.1), so the other
+spellings PostgreSQL reads (`+1`, `01`, `1.0`, `1e3`, `-0`, ` 1`, `t`, `TRUE`) are refused, and is
+output in the spelling the server sends for the value it names, its read form (5.1, ADR 0011): a
+`uuid` in lower case, which RFC 9562 lets a client send in either case, a `timestamp` with `T` and
+its fraction without trailing zeros, a `timestamptz` in UTC with `Z`, a `numeric(p, s)` with s
+fraction digits, a `bpchar(n)` padded to n characters, and a `real` as PostgreSQL's `float4` text of
+the value it rounds to (`wire/floats.ts`). Every other form takes one spelling per value. Two ids
+output differently name two keys, except where the key's type compares more coarsely than any
+spelling: `citext` ignores case, a `numeric` without a scale keeps the scale it was given (`1` and
+`1.0` are equal and print differently), and a `bpchar` without a length ignores trailing spaces.
+Such an id keeps the text sent, and two of them compare in PostgreSQL, never as text. @ref
+https://www.rfc-editor.org/rfc/rfc9562#section-4
 
-`schema.id` and `validate.id` (6.2, 6.5) are that form. With `clientIds: true` a create MAY carry an
-`id`, validated by it: the JSON:API definition hands `validate.id` to `@netvark/jsonapi-core`
-(11.1), so an id outside the form is a 422 `VALIDATION_FAILED` at `/data/id`, where PostgreSQL would
-refuse the text or store the key under its own spelling. Without `clientIds` a create that carries
-an id is rejected by `@netvark/jsonapi-core` (403, JSON:API "Client-Generated IDs"). A URL's id
-outside the form names no row, so a runtime answers `NOT_FOUND` for it without a query (12.3).
+`schema.id` and `validate.id` (6.2, 6.5) are that form, and the JSON:API definition hands
+`validate.id` to `@netvark/jsonapi-core` (11.1). With `clientIds: true` a create MAY carry an `id`,
+validated by it: an id outside the form is a 422 `VALIDATION_FAILED` at `/data/id`, where PostgreSQL
+would refuse the text or store the key under a spelling the form does not take, and the handler
+receives the id as the server sends it. Without `clientIds` a create that carries an id is rejected
+by `@netvark/jsonapi-core` (403, JSON:API "Client-Generated IDs"). An update's document may spell
+the URL's key another way the form takes: `@netvark/jsonapi-core` matches the two by `validate.id`'s
+output (its SPEC 9.2), so a client that requests a key in its own spelling and repeats the one the
+server sent is no conflict. A URL's id outside the form names no row, so a runtime answers
+`NOT_FOUND` for it without a query, and looks one in the form up as `schema.id` outputs it (12.3).
 `clientIds` requires a primary key that accepts a client value: a generated column and an identity
 column `GENERATED ALWAYS` reject an explicit value on insert ("cannot insert a non-DEFAULT value"),
 while an identity column `BY DEFAULT` accepts one. A primary key with no default and no identity,
@@ -628,8 +642,11 @@ Range rules and type bounds compare the value PostgreSQL would compare (ADR 0005
 
 Tests: `wire-forms.test.ts` and `wire-string-forms.test.ts` hold, per row, the values the write form
 accepts and rejects, `datetime-precision.test.ts` the fraction digits of `timestamp(p)` from a
-column, a domain, a domain over it, and an array element, and `decimal.test.ts` the exact
-comparison; the oracle runs the same values and generated boundaries through PostgreSQL (15.3).
+column, a domain, a domain over it, and an array element, `decimal.test.ts` the exact comparison and
+`numeric(p, s)`'s read form, and `floats.test.ts`, `temporal.test.ts`, and `text.test.ts` the other
+read forms an id is output in (3.4), `real`'s with PostgreSQL's output at the edges of its
+shortest-digit search (a midpoint between two floats, a far neighbor, a tie); the oracle runs the
+same values and generated boundaries through PostgreSQL (15.3).
 
 ---
 
@@ -674,7 +691,7 @@ non-null values.
 
 `schema` on a declared resource holds three Zod object schemas over the resource's attributes, keyed
 by public names, and `schema.id`, the schema of a resource id in its key's form (3.4), which outputs
-the text it takes:
+the id in the spelling the server sends:
 
 | Schema   | Members                                       | Required                                             | Unknown keys |
 | -------- | --------------------------------------------- | ---------------------------------------------------- | ------------ |
@@ -775,12 +792,14 @@ https://json-schema.org/draft/2020-12/json-schema-validation#section-6
 (`vendor: 'netvark'`) whose issues are `ResourceIssue`s and whose `types` carry the input and output
 types. They are what the JSON:API definition validates attributes with (11.1). `validate.id` wraps
 `schema.id` the same way, its issues at the empty path, the id itself; the JSON:API definition
-validates a create's client id with it. @ref https://standardschema.dev
+validates a create's client id with it and matches an update's id to the URL's by its output (11.1).
+@ref https://standardschema.dev
 
 Tests: `compose.test.ts` (each step of 6.1 and each rule), `field-values.test.ts` (codec, domain,
 and validator members), `object-schemas.test.ts` and `required.test.ts` (6.2, 6.3 over the contacts
-fixture), `linkage-schemas.test.ts`, `id-schema.test.ts`, `id-validators.test.ts` (`schema.id`,
-`validate.id`, and the client id the JSON:API definition refuses), `multi-column.test.ts`, and
+fixture), `linkage-schemas.test.ts`, `id-schema.test.ts` (every key type's id form and the spelling
+each id is output in), `id-validators.test.ts` (`schema.id`, `validate.id`, the client id the
+JSON:API definition refuses, and an update's id in another spelling), `multi-column.test.ts`, and
 `write-schemas.test.ts` (relationships, ids, and the CHECKs over several members), `issues.test.ts`
 (one case per row of 6.4), `length.test.ts` (code points under the Zod floor), `no-defaults.test.ts`
 (the walk), `examples.test.ts`, and `infer.test-d.ts` (`Infer` over the contacts fixture, enum
@@ -1379,20 +1398,20 @@ startup (14), and each declared resource builds its definition with it on the fi
 `resource` and caches it: the relationships name their targets' types, and targets are read lazily
 (3.8).
 
-| Member          | Value                                                                                                           |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| `type`          | the public type                                                                                                 |
-| `attributes`    | every field's public name, `write` fields included, so requests may carry them                                  |
-| `relationships` | each relationship: `{ type: target type, cardinality: 'one', resource: () => target.resource }`                 |
-| `serialize`     | a public row (12.8) to `{ id, attributes, relationships }`, as below                                            |
-| `query.sort`    | the public names of fields with `sort: true`                                                                    |
-| `query.filter`  | each field and relationship with `filter`, by public name, with its operators                                   |
-| `query.include` | the public names of relationships with `include: true` (one level)                                              |
-| `query.page`    | the resolved page below, the same bounds as `keyset.page`                                                       |
-| `query.search`  | `filter[q]` when the declaration has `search`                                                                   |
-| `validate`      | `create` and `update` from 6.5, each only when the declaration serves that operation, and `id` with `clientIds` |
-| `clientIds`     | the declaration's `clientIds`                                                                                   |
-| `writable`      | the members `write.create` and `write.update` hold, by public name (9.4)                                        |
+| Member          | Value                                                                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`          | the public type                                                                                                                                                                                  |
+| `attributes`    | every field's public name, `write` fields included, so requests may carry them                                                                                                                   |
+| `relationships` | each relationship: `{ type: target type, cardinality: 'one', resource: () => target.resource }`                                                                                                  |
+| `serialize`     | a public row (12.8) to `{ id, attributes, relationships }`, as below                                                                                                                             |
+| `query.sort`    | the public names of fields with `sort: true`                                                                                                                                                     |
+| `query.filter`  | each field and relationship with `filter`, by public name, with its operators                                                                                                                    |
+| `query.include` | the public names of relationships with `include: true` (one level)                                                                                                                               |
+| `query.page`    | the resolved page below, the same bounds as `keyset.page`                                                                                                                                        |
+| `query.search`  | `filter[q]` when the declaration has `search`                                                                                                                                                    |
+| `validate`      | `create` and `update` from 6.5, each only when the declaration serves that operation, and `id`, which checks a create's client id with `clientIds` and matches an update's id to the URL's (3.4) |
+| `clientIds`     | the declaration's `clientIds`                                                                                                                                                                    |
+| `writable`      | the members `write.create` and `write.update` hold, by public name (9.4)                                                                                                                         |
 
 Relationship targets are read lazily (3.8), so `Contacts` and `Users` may reference each other in
 either order.
@@ -1687,12 +1706,13 @@ Every operation runs the same lifecycle inside one transaction: policy, rules, q
 effects; any failure rolls back everything, effects included. A get, an update, or a remove whose
 URL id `schema.id` refuses answers `NOT_FOUND` before the transaction: no row has that id, and
 PostgreSQL would refuse the text (SQLSTATE 22P02, a 500) or read another spelling as the key, such
-as a `uuid` without hyphens or an `int8` with a leading zero (3.4). JSON:API answers a missing
-resource with 404 on fetch, update, and remove. An update and a remove read their row with `lock`
-(12.8), so the row the policy and the rules decide on is the row the write changes: under READ
-COMMITTED a plain read takes no lock, and another transaction could change or remove the row between
-the read and the write. @ref
-https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED @ref
+as a `uuid` without hyphens or an `int8` with a leading zero (3.4). One it takes is looked up as it
+outputs it, the spelling the row's key reads back in, so a `uuid` in upper case names its row and
+the runtime passes the key on as the server sends it. JSON:API answers a missing resource with 404
+on fetch, update, and remove. An update and a remove read their row with `lock` (12.8), so the row
+the policy and the rules decide on is the row the write changes: under READ COMMITTED a plain read
+takes no lock, and another transaction could change or remove the row between the read and the
+write. @ref https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED @ref
 https://jsonapi.org/format/1.1/#fetching-resources-responses-404 @ref
 https://jsonapi.org/format/1.1/#crud-updating-responses-404 @ref
 https://jsonapi.org/format/1.1/#crud-deleting-responses-404
@@ -2235,6 +2255,17 @@ single precision). A value the schema refuses MUST be refused, or stored as a va
 is outside 5.1 or differs from what was sent, the cases of 5.2. Relationship ids run through the
 linkage schema and into the target's key column.
 
+`id-spellings.e2e.test.ts` holds `schema.id` to PostgreSQL for every key type of the oracle, over
+each type's candidates (`support/id-candidates.ts`: the spellings PostgreSQL reads, near misses,
+U+0000, and an unpaired surrogate, an enum's labels in upper case and after a space): an id it takes
+is stored and read back as exactly its output, which it takes as itself; one it refuses is refused
+or read back as other text; a lookup by every id it takes runs without an error; and two ids it
+outputs differently are unequal in PostgreSQL, except for the `citext` key and the `numeric` key
+without a scale, where some are equal (3.4). PostgreSQL reads each text as a literal `format('%L')`
+quotes on the server, since PGlite serializes a typed parameter on the client and sends a boolean's
+`yes` as `t`, and a `bpchar` reads back through `format('%s')`, which keeps the padding `::text`
+drops.
+
 It runs on PGlite always, queried directly, since node-postgres behind PGlite's socket server lost
 protocol sync after a refused parameter, and on PostgreSQL 14 and 18 servers when `RESOURCE_PG_URL`
 is set, as CI does, each in a throwaway UTF-8 database. PGlite 0.5.8 never gives back the stack an
@@ -2287,12 +2318,13 @@ against the contacts application's HTTP API (`runtime/api.ts`: the runtime of 12
 and puts the application's codes where its options name them (`openapi-document.e2e.test.ts`); every
 exchange, success paths (`openapi-exchanges.e2e.test.ts`) and refusals of reads, writes, a
 client-keyed resource, members a write does not accept (9.4), and ids outside the key's form (3.4)
-(`openapi-refusals-*.e2e.test.ts`), answers with a status, media type, body, and codes the document
-lists for its operation, a 201's `Location` matching its header's schema, while the request schema
-refuses exactly the requests the server refuses as documents (`support/openapi-contract.ts`, Ajv
-2020-12 with the formats the document names); and the surface, recorded in a reviewed snapshot
-(`snapshots/surface.json`), diffs an edited declaration into exactly its four changes
-(`openapi-surface.e2e.test.ts`).
+(`openapi-refusals-*.e2e.test.ts`), and ids in another spelling of the key, a get, an update, and a
+remove by a `uuid` in upper case and a call created under one (`openapi-id-spellings.e2e.test.ts`),
+answers with a status, media type, body, and codes the document lists for its operation, a 201's
+`Location` matching its header's schema, while the request schema refuses exactly the requests the
+server refuses as documents (`support/openapi-contract.ts`, Ajv 2020-12 with the formats the
+document names); and the surface, recorded in a reviewed snapshot (`snapshots/surface.json`), diffs
+an edited declaration into exactly its four changes (`openapi-surface.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 

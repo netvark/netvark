@@ -146,9 +146,13 @@ update; `relationshipValidator` and atomic operations refuse it the same way. Li
 than let a validator strip what it does not know: a stripped field answers 201 or 200 for a write
 that never happened.
 
-A create carries a client-generated id only with `clientIds: true`. Give the form your keys take as
-`validate.id`, any Standard Schema that produces a string, so an id outside it is a 422 at
-`/data/id` rather than a value the database refuses or stores under another spelling:
+Give the form your keys take as `validate.id`, any Standard Schema that produces a string, with the
+spelling your server sends as its output. A create carries a client-generated id only with
+`clientIds: true`: an id outside the form is a 422 at `/data/id` rather than a value the database
+refuses or stores under another spelling, and the handler receives the output. An update's id
+matches the URL's when the texts are equal or both pass with one output, so a client that requests
+`/calls/ABC…` and sends back the document it received, with `abc…`, gets no 409. PostgreSQL prints a
+`uuid` in lower case, and RFC 9562 lets clients send either:
 
 ```ts
 const Calls = defineResource({
@@ -156,7 +160,7 @@ const Calls = defineResource({
   attributes: ['minutes'],
   serialize: (row: CallRow) => ({ id: row.id, attributes: { minutes: row.minutes } }),
   clientIds: true,
-  validate: { id: z.uuid() },
+  validate: { id: z.uuid().transform((id) => id.toLowerCase()) },
 });
 ```
 

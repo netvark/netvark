@@ -181,9 +181,6 @@ export function defineResource(
   }
   const validate = init.validate ?? {};
   assertValidators(validate);
-  if (validate.id !== undefined && init.clientIds !== true) {
-    throw new TypeError('validate.id needs clientIds: true');
-  }
   const relationshipNames = new Set(Object.keys(relationships));
   const fields = new Set([...attributes, ...relationshipNames]);
   return {

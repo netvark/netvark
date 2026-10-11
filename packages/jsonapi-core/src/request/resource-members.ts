@@ -11,6 +11,7 @@
  */
 import type { ErrorItem } from '@netvark/ban-core';
 
+import type { StandardSchema } from '../internal/standard-schema-types';
 import type { AnyResource } from '../resource/types';
 import type { RequestLinkage } from './identifiers';
 import type { Operation, ParseResourceOptions } from './types';
@@ -92,16 +93,10 @@ export function parseIdentity(
         }),
       );
     }
-  } else if (typeof id === 'string') {
-    if (options.id !== undefined && id !== options.id) {
-      errors.push(
-        conflict(
-          `${pointer}/id`,
-          `The document's id "${id}" does not match the request's id "${options.id}"`,
-        ),
-      );
-    }
-  } else if (!(options.lids === true && typeof lid === 'string')) {
+  } else if (
+    typeof id !== 'string' &&
+    !(options.lids === true && typeof lid === 'string')
+  ) {
     errors.push(
       invalidDocument(
         `${pointer}/id`,
@@ -113,6 +108,61 @@ export function parseIdentity(
     id: typeof id === 'string' ? id : undefined,
     lid: typeof lid === 'string' ? lid : undefined,
   };
+}
+
+/**
+ * Whether an update's id names the resource the request's id names: the
+ * same text, or two texts `schema` takes with one output, the server's
+ * spelling of the key. JSON:API answers 409 for an id that does not match
+ * the endpoint; a server that takes a key in more than one spelling, as a
+ * UUID's hex digits in either case, names the resource in each, so a
+ * client that requests the key in its own spelling and repeats the
+ * server's is no conflict.
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-409
+ * @ref https://www.rfc-editor.org/rfc/rfc9562#section-4
+ */
+async function sameResource(
+  schema: StandardSchema<unknown, string> | undefined,
+  id: string,
+  requested: string,
+): Promise<boolean> {
+  if (id === requested || schema === undefined) {
+    return id === requested;
+  }
+  const [mine, theirs] = await Promise.all([
+    schema['~standard'].validate(id),
+    schema['~standard'].validate(requested),
+  ]);
+  return (
+    mine.issues === undefined &&
+    theirs.issues === undefined &&
+    mine.value === theirs.value
+  );
+}
+
+/**
+ * A 409 for an update whose id names another resource than the request's
+ * (`options.id`), as `validate.id` tells them apart.
+ */
+export async function idConflict(
+  resource: AnyResource,
+  id: string | undefined,
+  options: ParseResourceOptions,
+  pointer: string,
+): Promise<ErrorItem | undefined> {
+  const requested = options.id;
+  if (
+    options.operation === 'create' ||
+    id === undefined ||
+    requested === undefined ||
+    (await sameResource(resource.validate.id, id, requested))
+  ) {
+    return undefined;
+  }
+  return conflict(
+    `${pointer}/id`,
+    `The document's id "${id}" does not match the request's id "${requested}"`,
+  );
 }
 
 /**

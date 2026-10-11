@@ -32,6 +32,7 @@ import { pointer as toPointer } from '../internal/pointer';
 import { invalidDocument } from './identifiers';
 import {
   RESOURCE_MEMBERS,
+  idConflict,
   parseAttributeNames,
   parseIdentity,
   parseRelationships,
@@ -134,6 +135,10 @@ export async function parseResourceObject(
   }
   const errors: Array<ErrorItem> = [];
   const identity = parseIdentity(resource, value, options, pointer, errors);
+  const conflicting = await idConflict(resource, identity.id, options, pointer);
+  if (conflicting !== undefined) {
+    errors.push(conflicting);
+  }
   for (const name of Object.keys(value)) {
     if (!RESOURCE_MEMBERS.has(name) && !isAtMember(name)) {
       errors.push(

@@ -9,6 +9,7 @@ import {
   isBelowPowerOfTen,
   isMultipleOfPowerOfTen,
   powerOfTen,
+  scaledText,
   writtenFractionDigits,
 } from './decimal';
 
@@ -134,5 +135,21 @@ describe('canonical spellings (SPEC 5.1)', () => {
     ]) {
       expect(DECIMAL_TEXT.test(text)).toBe(false);
     }
+  });
+});
+
+describe('scaledText: numeric(p, s) as PostgreSQL prints it (SPEC 3.4)', () => {
+  it.each([
+    ['1.5', 2, '1.50'],
+    ['1', 2, '1.00'],
+    ['1.500', 2, '1.50'],
+    ['1.25', 2, '1.25'],
+    ['-0.5', 2, '-0.50'],
+    ['0.012', 4, '0.0120'],
+    ['12.0', 0, '12'],
+    ['12', 0, '12'],
+    ['1200.00', -2, '1200'],
+  ] as const)('spells %s at scale %d as %s', (text, scale, printed) => {
+    expect(scaledText(text, scale)).toBe(printed);
   });
 });

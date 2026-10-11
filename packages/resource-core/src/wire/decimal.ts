@@ -137,3 +137,19 @@ export function isBelowPowerOfTen(text: string, exponent: number): boolean {
     fraction.padEnd(places, '0').slice(0, places) === '0'.repeat(places)
   );
 }
+
+/**
+ * The text PostgreSQL prints for a `numeric(p, s)` value in the wire form
+ * with no digit below `10^-s` (SPEC 3.4, 5.1): exactly `max(s, 0)`
+ * fraction digits, padded or cut back to zeros (`1.5` in `numeric(5, 2)`
+ * is `1.50`, `20.0` in `numeric(2, -1)` is `20`).
+ */
+export function scaledText(text: string, scale: number): string {
+  const point = text.indexOf('.');
+  const integer = point === -1 ? text : text.slice(0, point);
+  const fraction = point === -1 ? '' : text.slice(point + 1);
+  const digits = Math.max(scale, 0);
+  return digits === 0
+    ? integer
+    : `${integer}.${fraction.padEnd(digits, '0').slice(0, digits)}`;
+}

@@ -3,8 +3,10 @@
  * `validate.id`, an id outside the validator's form is a 422 at the id,
  * before the attributes' issues in document order, and the parsed id is
  * the validator's output. An update's id is the URL's, which the host
- * resolves, so the parser never validates it; an atomic `add` validates
- * its id at the operation's pointer.
+ * resolves, so the parser validates it only to match it to the request's
+ * in another spelling (`resource-update.test.ts`), as an atomic update's
+ * to its target's; an atomic `add` validates its id at the operation's
+ * pointer.
  * @ref https://jsonapi.org/format/1.1/#crud-creating-client-ids
  */
 import { describe, expect, it } from 'vitest';
@@ -116,7 +118,7 @@ describe("a create's client-generated id", () => {
     expect(parsed.id).toBe(ID);
   });
 
-  it("never validates an update's id or a create without one", async () => {
+  it("never validates an update's id that repeats the request's, or a create without one", async () => {
     seen.length = 0;
     const created = await parseCreateDocument(Calls, {
       data: { type: 'calls', attributes: { title: 'A' } },
@@ -128,6 +130,44 @@ describe("a create's client-generated id", () => {
     );
     expect([created.id, updated.id]).toEqual([undefined, 'not-a-uuid']);
     expect(seen).toEqual([]);
+  });
+
+  it("matches an atomic update's id to its target's by the validator's output", async () => {
+    const process = operationsProcessor<object, object>({
+      resources: [{ resource: Calls, update: ({ id }) => ({ id }) }],
+      transaction: async (_context, run) => run({}),
+    });
+    const updated = await process(
+      {
+        'atomic:operations': [
+          {
+            op: 'update',
+            ref: { type: 'calls', id: ID.toUpperCase() },
+            data: { type: 'calls', id: ID, attributes: {} },
+          },
+        ],
+      },
+      {},
+    );
+    // The handler gets the target's id as sent, which the host resolves.
+    expect(updated.results).toMatchObject([{ data: { id: ID.toUpperCase() } }]);
+    const refusal = await refused(
+      process(
+        {
+          'atomic:operations': [
+            {
+              op: 'update',
+              ref: { type: 'calls', id: ID },
+              data: { type: 'calls', id: 'not-a-uuid', attributes: {} },
+            },
+          ],
+        },
+        {},
+      ),
+    );
+    expect(
+      refusal.map(([status, code, source]) => [status, code, source]),
+    ).toEqual([[409, 'CONFLICT', { pointer: '/atomic:operations/0/data/id' }]]);
   });
 
   it("validates an atomic add's id at the operation's pointer", async () => {
