@@ -147,6 +147,17 @@ const ban = createBan({
 });
 ```
 
+### Errors from another copy of the package
+
+A package manager installs a second copy of `@netvark/ban-core` when two packages that depend on it
+ask for ranges that cannot meet, such as `^0.1.0` and `^0.2.0`. Each `BanError` carries a brand from
+the global symbol registry, so `isBanError` and `instanceof BanError` recognize an error another
+copy built, and your handler answers it with its own status, code, and items instead of a 500
+([ADR 0019](https://github.com/netvark/netvark/blob/main/docs/ban/adr/0019-a-ban-error-is-recognized-across-copies-by-a-registered-brand.md)).
+A copy whose errors have another shape is not recognized, so keep one copy where you can:
+`npm ls @netvark/ban-core` (or `pnpm why`) shows each, and upgrading the `@netvark` packages
+together keeps their ranges meeting.
+
 ### Database errors
 
 `@netvark/ban-core/postgresql` maps a Postgres driver error to a catalog entry by SQLSTATE with

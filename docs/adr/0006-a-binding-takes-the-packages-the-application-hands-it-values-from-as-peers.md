@@ -50,5 +50,6 @@ the application's declarations.
   whose ranges cannot meet fails at install instead of on a request.
 - Adding a binding means answering one question: does the application hand it values made with
   another workspace package? `CONTRIBUTING.md`'s "Adding a package" asks it.
-- A `BanError` from a second copy still answers 500 wherever the duplicate comes from outside these
-  peers. Recognizing a `BanError` across copies is a separate decision for the ban family.
+- A second copy can still come from outside these peers, such as `@netvark/ban-core` under the
+  runtime and under the handler. The ban family recognizes a `BanError` across copies by a
+  registered brand (ban ADR 0019, #107).

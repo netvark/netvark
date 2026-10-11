@@ -7,6 +7,25 @@ import { generateErrorId } from '../internal/id';
 import { safeStringify } from '../internal/json';
 
 /**
+ * The brand every `BanError` carries on its prototype (ADR 0019): a key
+ * from the global symbol registry, the same in every copy of the package,
+ * whose value is the version of the shape SPEC 4 lists. It changes when a
+ * member listed there changes its name, type, or meaning.
+ * @ref https://tc39.es/ecma262/#sec-symbol.for
+ */
+const BRAND: unique symbol = Symbol.for('@netvark/ban-core/BanError');
+const BRAND_VERSION = 1;
+
+/** Whether `value` carries the brand at the version this copy reads. */
+function carriesBrand(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Reflect.get(value, BRAND) === BRAND_VERSION
+  );
+}
+
+/**
  * Per-error options accepted by every factory (SPEC 2). `status`, `code`, and
  * `title` are absent on purpose: the catalog fixes them and the generated
  * schemas pin them with `const`, so a per-call value would make the response
@@ -93,6 +112,21 @@ export class BanError extends Error {
     this.#render = init.render;
   }
 
+  /**
+   * `instanceof BanError` holds for this copy's errors and for those
+   * another copy of the package built, recognized by the brand at this
+   * copy's version (ADR 0019); a subclass keeps the ordinary prototype
+   * check. It returns `boolean`, not a type predicate, so TypeScript
+   * narrows to the class `instanceof` names.
+   * @ref https://tc39.es/ecma262/#sec-instanceofoperator
+   */
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, value) ||
+      (this === BanError && carriesBrand(value))
+    );
+  }
+
   /** The fields needed to rebuild an equivalent error (used by the body cap). */
   toInit(): BanErrorInit {
     return {
@@ -141,6 +175,12 @@ export class BanError extends Error {
   }
 }
 
+Object.defineProperty(BanError.prototype, BRAND, { value: BRAND_VERSION });
+
+/**
+ * Whether `value` is a `BanError`, built by this copy of the package or by
+ * another whose brand version it reads (ADR 0019).
+ */
 export function isBanError(value: unknown): value is BanError {
   return value instanceof BanError;
 }
