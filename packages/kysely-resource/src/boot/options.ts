@@ -132,7 +132,8 @@ export function bootContext(caller: string, options: unknown): BootContext {
     isResourceBehavior,
     {
       whole: 'an object of behaviors keyed by type',
-      member: 'a behavior defineResource returned',
+      member:
+        'a behavior defineResource returned (a second installed copy of @netvark/resource-core also fails this)',
     },
   );
   const scopes = records(caller, 'scopes', options['scopes'], isBinding, {

@@ -17,7 +17,9 @@ keyset refusal, a PostgreSQL integrity violation through its declared code, part
 `relayOutbox` delivers the events operations recorded. `createResourceRuntime` checks the
 composition against the catalog and the role it connects as, then runs each operation as the actor
 through `runtime.as(actor)`; `checkResourceRuntime` runs the same static checks in CI, without a
-database. The HTTP host follows in the 0.x line.
+database.
+[`@netvark/hono-resource`](https://github.com/netvark/netvark/tree/main/packages/hono-resource)
+serves the runtime over HTTP on Hono.
 
 ## Install
 
@@ -25,9 +27,15 @@ database. The HTTP host follows in the 0.x line.
 pnpm add @netvark/kysely-resource @netvark/resource-core @netvark/keyset-core kysely zod
 ```
 
-`kysely >= 0.28` is the peer dependency. The adapter runs on PostgreSQL 14 or later and on PGlite,
-through any Kysely PostgreSQL dialect (`PostgresDialect` over `pg`, `PGliteDialect`, or your own),
-on Node 22.12+, Bun, Deno, and Cloudflare Workers.
+`kysely >= 0.28`, `@netvark/resource-core`, and `@netvark/keyset-core` are peer dependencies: your
+application declares its resources and behaviors and makes the keyset definer with its own copies,
+and the runtime must work with those same copies, since it recognizes a behavior by the copy that
+made it and a keyset's refusal by its class
+([ADR 0006](https://github.com/netvark/netvark/blob/main/docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
+Install one copy of each: a second copy of `@netvark/resource-core`, such as one nested under a
+package that declares your resources, fails boot with a `TypeError`. The adapter runs on PostgreSQL
+14 or later and on PGlite, through any Kysely PostgreSQL dialect (`PostgresDialect` over `pg`,
+`PGliteDialect`, or your own), on Node 22.12+, Bun, Deno, and Cloudflare Workers.
 
 ## Quick start
 

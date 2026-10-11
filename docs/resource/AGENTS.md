@@ -53,7 +53,9 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 - Lookups are prototype-safe. Derived lookups are `ReadonlyMap`s, and a name that arrives in a
   request is checked against them before it is used as a key.
 - The runtime binds the core to Kysely and PostgreSQL and nothing else: `packages/kysely-resource/`
-  imports Kysely, never a driver or a Node.js module, so it runs wherever a Kysely dialect does. Its
+  imports Kysely, never a driver or a Node.js module, so it runs wherever a Kysely dialect does.
+  `@netvark/resource-core` and `@netvark/keyset-core` are its peers, since the application hands it
+  declarations, behaviors, and the keyset definer made with its own copies (root ADR 0006). Its
   tests run on PGlite through Kysely's PGlite dialect, never on a mocked database, and what only a
   server shows (the isolation level, pooled connections) runs in `e2e/resource` on PostgreSQL 14
   and 18.

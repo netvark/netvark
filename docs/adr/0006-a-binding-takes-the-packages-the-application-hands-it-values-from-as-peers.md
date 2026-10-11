@@ -40,7 +40,9 @@ the application's declarations.
 - `@netvark/hono-resource` takes `@netvark/resource-core` (the declarations) and
   `@netvark/hono-jsonapi` (the `jsonApi()` negotiation and the `BanError`s its handlers render) as
   peers, beside `hono`.
-- `@netvark/kysely-resource` follows in a change of its own.
+- `@netvark/kysely-resource` takes `@netvark/resource-core` (the declarations, behaviors, and
+  scopes) and `@netvark/keyset-core` (the keyset definer, whose refusals it maps by class) as peers,
+  beside `kysely` (#106).
 
 ## Consequences
 
