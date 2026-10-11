@@ -10,8 +10,9 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 Status: in development and unreleased. This line implements the definer, the declaration, the public
 names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
 `defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
-derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), and messages
-with their localization (SPEC 10). `forbiddenMembers`, the `server` subpath, and OpenAPI follow;
+derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), messages with
+their localization (SPEC 10), and the `server` subpath with `constraintError` and the storage
+adapter contract and its suite (SPEC 9.5 and 12). `list`, `forbiddenMembers`, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -604,6 +605,235 @@ throws makes the handler answer 500 and report it. Without an i18n library,
 `defaultMessages(resources, appErrors)` gives complete English messages, whose issue messages are
 the ones the schemas already produce.
 
+## Server
+
+`@netvark/resource-core/server` holds what only a server composes, typed by your application's own
+registries (SPEC 12): who acts and what they may do, each operation's behavior, tenant scopes,
+quotas, events, and the errors of rules and of the database. It touches no database: a storage
+adapter does, and a runtime runs each operation over one. `@netvark/kysely-resource` will ship both.
+
+### The domain
+
+`createDomainDefiners` binds the definers to your domain's types, so a misspelled permission, quota,
+code, or member fails `tsc`:
+
+```ts
+// server/domain.ts
+import type { Actor } from '@netvark/resource-core/server';
+
+import type { Services } from './services';
+
+import { createDomainDefiners } from '@netvark/resource-core/server';
+
+import { Contacts } from '../resources/contacts';
+import { ContactCreated } from './registries';
+
+type Permission = 'contacts:read' | 'contacts:write';
+
+export interface AppActor extends Actor<Permission> {
+  readonly organization: number;
+}
+
+export const APP_ERRORS = {
+  PLAN_UPGRADE_REQUIRED: { status: 402, title: 'Plan Upgrade Required' },
+} as const;
+
+export interface AppDomain {
+  readonly actor: AppActor;
+  readonly permissions: Permission;
+  readonly quotas: 'contacts';
+  readonly services: Services; // what your runtime hands to policies, rules, values, and effects
+  readonly errors: typeof APP_ERRORS;
+}
+
+const { definePolicy, defineResource } = createDomainDefiners<AppDomain>();
+
+export const ContactsBehavior = defineResource(Contacts, {
+  policy: definePolicy(Contacts, {
+    list: ({ actor }) => actor.can('contacts:read'),
+    get: ({ actor }) => actor.can('contacts:read'),
+    create: ({ actor }) => actor.can('contacts:write'),
+    update: ({ actor }) => actor.can('contacts:write'),
+    remove: ({ actor }) => actor.can('contacts:write'),
+  }),
+  operations: {
+    create: {
+      quota: 'contacts',
+      rules: [
+        async ({ actor, services, input, reject }) => {
+          const plan = await services.plans.of(actor.organization);
+          if (input.attributes.kind === 'company' && !plan.companies) {
+            reject('PLAN_UPGRADE_REQUIRED', { fields: ['kind'] });
+          }
+        },
+      ],
+      effects: [({ row }) => [ContactCreated.of({ id: row.id, name: row.name })]],
+    },
+  },
+});
+```
+
+A predicate allows only by answering exactly `true`, and an operation without one is denied. A
+denied `list` or `create` is `FORBIDDEN` (403); a denied `get`, `update`, or `remove` is `NOT_FOUND`
+(404), the same response as a missing row, so a client cannot probe for rows it may not see
+([RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.4)). `operations.create.values`
+supplies the server values, the columns an insert requires that no client member, scope, or client
+id covers, such as `created_by`; `tsc` requires it exactly when the table has such columns.
+
+### Scopes, quotas, and events
+
+Export the definer's `scopes` `as const` and bind each scope to the actor, so `tsc` checks the
+bindings against them:
+
+```ts
+// server/registries.ts
+import type { QuotaContext, ScopeBindings } from '@netvark/resource-core/server';
+
+import type { scopes } from '../resources/declare-resource';
+import type { AppActor } from './domain';
+import type { Services } from './services';
+
+import { z } from 'zod';
+
+import { defineEvent, defineQuota, defineScope } from '@netvark/resource-core/server';
+
+export const SCOPES = {
+  organization: defineScope({
+    column: 'organization_id',
+    value: (actor: AppActor) => actor.organization,
+    session: 'app.organization_id',
+  }),
+} satisfies ScopeBindings<typeof scopes, AppActor>;
+
+export const QUOTAS = {
+  contacts: defineQuota({
+    limit: async ({ actor, services }: QuotaContext<AppActor, Services>) =>
+      (await services.plans.of(actor.organization)).contacts,
+  }),
+};
+
+export const ContactCreated = defineEvent(
+  'contact.created',
+  1,
+  z.object({ id: z.uuid(), name: z.string() }),
+);
+```
+
+`scopeValues(SCOPES, actor)` is what `StorageAdapter.transaction` sets; it throws for an actor
+without a tenant, so nothing runs unscoped. The adapter sets each `session` parameter for the
+transaction only, which your row security policies read with `current_setting`, and adds
+`column = value` to every statement. `quotaExceeded(count, limit)` is `QUOTA_EXCEEDED` (403) once
+the count reaches the limit, and for a limit that is not a safe integer of at least zero.
+`ContactCreated.of(payload)` validates the payload; a changed payload is a new version.
+
+### Errors of rules and of the database
+
+The runtime turns what an operation threw into the client's error:
+
+```ts
+import type { ResourceBehavior } from '@netvark/resource-core/server';
+
+import { constraintError, Rejection, rejectionError } from '@netvark/resource-core/server';
+
+type Behavior = ResourceBehavior<AppDomain>;
+
+const failure = (error: unknown, behavior: Behavior, operation: 'create' | 'update' | 'remove') =>
+  error instanceof Rejection
+    ? rejectionError(error, { resource: behavior.resource, errors: APP_ERRORS })
+    : (constraintError(error, { resource: behavior.resource, operation }) ?? error);
+```
+
+`rejectionError` builds the code a rule rejected with, with an item per member it named.
+`constraintError` finds the declared code of a PostgreSQL integrity violation from the error's own
+fields, whichever driver threw it (node-postgres, PGlite, postgres.js, Neon, or Bun):
+`CONTACT_EMAIL_TAKEN` (409) with an item at `/data/attributes/email` and the driver error as
+`cause`. It returns `undefined` for an error it does not own, which your ban's `map`, typically
+`postgresMapper()` from `@netvark/ban-core/postgresql`, then answers by SQLSTATE. Every integrity
+violation of a remove is `CONFLICT` (409), since it belongs to a row that references the removed
+one: a foreign key that blocks the delete, or an `ON DELETE` action whose result breaks a constraint
+of the referencing row.
+
+### Storage adapters
+
+An adapter implements `StorageAdapter<TTransaction>` over its own driver or query builder. It reads
+each resource's columns, codecs, and scope from the declared resource and the public catalog:
+
+```ts
+interface StorageAdapter<TTransaction> {
+  transaction(scopes, run): Promise<TResult>; // sets each scope's parameter for this transaction only
+  list(tx, resource, request): Promise<StoragePage>;
+  get(tx, resource, id): Promise<PublicRow | undefined>;
+  lock(tx, resource, id, write: 'update' | 'remove'): Promise<PublicRow | undefined>;
+  create(tx, resource, input): Promise<PublicRow>;
+  update(tx, resource, id, input): Promise<PublicRow | undefined>;
+  remove(tx, resource, id): Promise<boolean>;
+  count(tx, resource, quota): Promise<number>; // under the quota's lock
+  record(tx, events): Promise<void>; // to the outbox, in the transaction
+}
+```
+
+Its ten obligations are in SPEC 12.8; the [best practices](#best-practices) below cover the ones
+that are easy to get wrong.
+
+### The contract suite
+
+`storageContract` from `@netvark/resource-core/testing` checks an adapter against those obligations
+on its own fixture, under your test runner. Create a database from `contractFixture.migrations` plus
+your outbox, then:
+
+```ts
+import { contractFixture, storageContract } from '@netvark/resource-core/testing';
+
+const harness = {
+  adapter: createAdapter({ pool, catalog: contractFixture.catalog, codecs: { point: pointCodec } }),
+  reset: async () => {
+    await pool.query(contractFixture.seed);
+    await pool.query('truncate table outbox restart identity');
+  },
+  events: async () => readOutbox(pool),
+};
+
+for (const contractCase of storageContract(harness)) {
+  it(contractCase.name, contractCase.run);
+}
+```
+
+Each case names the obligation it checks and fails with the expected and the actual value. Run it
+against PostgreSQL with a pool of at least two connections: the cases of the quota lock and the row
+lock run two transactions at once. PGlite serializes transactions, so those cases pass there without
+proving the locks.
+
+### A runtime
+
+A runtime runs every operation in one transaction scoped to the actor: policy, rules, quota, write,
+and effects, so any failure rolls back everything, events included. An update, condensed:
+
+```ts
+const update = async (actor: AppActor, behavior: Behavior, id: string, request: ResourceInput) => {
+  const input = parsed(behavior, 'update', request); // behavior.resource.write.update
+  try {
+    return await adapter.transaction(scopeValues(SCOPES, actor), async (tx) => {
+      const previous = await adapter.lock(tx, behavior.resource, id, 'update');
+      if (previous === undefined) throw notFound();
+      const context = { actor, services, input, row: previous };
+      await behavior.policy.authorize('update', context);
+      for (const rule of behavior.operations.update?.rules ?? [])
+        await rule({ ...context, reject });
+      const row = await adapter.update(tx, behavior.resource, id, input);
+      if (row === undefined) throw notFound();
+      await recordEffects(tx, behavior.operations.update?.effects, { ...context, row, previous });
+      return row;
+    });
+  } catch (error) {
+    throw failure(error, behavior, 'update');
+  }
+};
+```
+
+Take every resource's behavior as `ResourceBehavior<AppDomain>`. The complete runtime, with create,
+get, and remove, is
+[`e2e/resource/runtime/runtime.ts`](https://github.com/netvark/netvark/blob/main/e2e/resource/runtime/runtime.ts).
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -699,6 +929,41 @@ the ones the schemas already produce.
   key, which first checks the existing rows, and for a CHECK, drop it and add it again without
   `NOT ENFORCED`. A rule too costly for the database belongs in server code, with an error of your
   own.
+- **Fail closed on the server.** Return `true` from a predicate only for what is allowed: any other
+  answer denies, and so does an operation without a predicate. Give a resource without a policy
+  `denyAll`, which `defineResource` uses when `policy` is absent.
+- **Answer a denied row with 404.** A runtime builds the `NOT_FOUND` of a denied `get`, `update`, or
+  `remove` exactly as for a missing row, so clients cannot tell rows they may not see from rows that
+  do not exist.
+- **Set scope parameters for the transaction.** Use `set_config(name, value, true)`, never `SET` or
+  `set_config(name, value, false)`: a pooled connection keeps a session setting for the next
+  request, which may be another tenant's.
+- **Write row security policies that deny when the parameter is unset.** Once a transaction-local
+  setting ended, the parameter reads as the empty string on that connection, not as missing:
+  `current_setting('app.organization_id')::bigint` then fails with 22P02 instead of 42704, and
+  `current_setting('app.organization_id', true)` returns `''`, not `NULL`. Both still deny; to deny
+  without an error, compare with `nullif(current_setting('app.organization_id', true), '')::bigint`,
+  which is `NULL` when unset and matches no row.
+- **Lock the row an update or a remove decides on.** Read it with `lock`, never `get`: under READ
+  COMMITTED a plain read takes no lock, so another transaction could change or remove the row
+  between the policy's decision and the write. Before a remove, lock `FOR UPDATE`, which also stops
+  another transaction from adding a reference to the row.
+- **Rethrow database errors unchanged.** An adapter lets the driver's error reach the runtime, as
+  thrown or as `cause`, so `constraintError` reads its fields. A wrapper without `cause` turns every
+  `CONTACT_EMAIL_TAKEN` into a 500.
+- **Fail the transaction when a statement failed.** PostgreSQL turns the COMMIT of an aborted
+  transaction into a rollback that reports no error, so when a statement failed and the run caught
+  it and went on, reject with that statement's error instead of reporting success.
+- **Read values as text.** Select each column as `text` and parse it with its read form, and send
+  parameters as text cast to the column's type. Drivers' default parsers differ, and some turn an
+  `int8` past 2^53 or a `numeric` into a number that loses digits, or a `timestamptz` into a `Date`
+  that drops its microseconds.
+- **Serialize the quota count with the insert.** Take a transaction-scoped advisory lock keyed by
+  the resource, the quota, and the scope value before counting, so two concurrent creates cannot
+  both take the last slot.
+- **Record events in the operation's transaction.** Effects return events and the adapter writes
+  them to an outbox with the write; deliver them after commit, so no consumer hears of a write that
+  rolled back.
 
 ## Performance
 
@@ -719,7 +984,10 @@ from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: rea
 declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what reading each one's
 `schema.create` output costs. A full `defineMessages` mapping, one function per code, kind, member,
 and option, took stern's check from 0.19 s and 124 MB to 0.35 s and 161 MB, and the GitLab slice's,
-with 1,302 derived codes, from 0.28 s and 157 MB to 0.67 s and 198 MB.
+with 1,302 derived codes, from 0.28 s and 157 MB to 0.67 s and 198 MB. A policy and a behavior for
+every declaration, with rules and effects, collected in one
+`ReadonlyArray<ResourceBehavior<TDomain>>` as a runtime takes them, took stern's check from 0.18 s
+and 129 MB to 0.52 s and 202 MB, and the GitLab slice's from 0.27 s and 151 MB to 0.68 s and 211 MB.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in

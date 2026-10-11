@@ -35,6 +35,10 @@
       "source": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./server": {
+      "source": "./src/server/index.ts",
+      "default": "./dist/server.js"
+    },
     "./testing": {
       "source": "./src/testing/index.ts",
       "default": "./dist/testing.js"
@@ -44,6 +48,7 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js",
+      "./server": "./dist/server.js",
       "./testing": "./dist/testing.js",
       "./package.json": "./package.json"
     },

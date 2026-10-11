@@ -4,10 +4,13 @@
  * would, replays the migrations into PGlite and finds the committed
  * catalog.ts and public-catalog.ts unchanged. The contacts application's
  * catalogs type the declarations; the oracle's type the probes (SPEC 15.3);
- * the PostgreSQL 18 schema's type the NOT ENFORCED declarations.
+ * the PostgreSQL 18 schema's type the NOT ENFORCED declarations. The
+ * storage contract's catalog, which the testing entry ships next to its
+ * migrations (SPEC 12.9), is what extraction gives for them.
  */
 import { describe, expect, it } from 'vitest';
 
+import { extractContractCatalog } from './support/contract-catalog.ts';
 import { CONTACTS_DIR, ORACLE_DIR, POSTGRES18_DIR } from './support/paths';
 import { binPath, runBin } from './support/run-bin';
 
@@ -27,5 +30,12 @@ describe('the extracted catalogs', () => {
       'unchanged catalog.ts\nunchanged public-catalog.ts\n',
     );
     expect(run.code).toBe(0);
+  });
+
+  it("of the storage contract's migrations is the one @netvark/resource-core/testing ships", async () => {
+    expect(
+      await extractContractCatalog(true),
+      'run `pnpm run contract:catalog` in e2e/resource',
+    ).toBe('unchanged');
   });
 });

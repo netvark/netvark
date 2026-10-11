@@ -6,7 +6,10 @@
  * constraint, the NOT NULL column, or the domain the code stands for, on
  * PGlite and on the server `RESOURCE_PG_URL` names. A table's constraint
  * names the table; a domain's CHECK names the domain in `dataType` and no
- * table or column (resource SPEC 9.5). `errorCatalog`
+ * table or column (resource SPEC 9.5), and `constraintError` gives each
+ * refusal its code's error, with an item per member and the driver's
+ * error as the cause. A remove's refusal, which names the referencing
+ * table, is `CONFLICT`. `errorCatalog`
  * assembles the four resources into one `@netvark/ban-core` catalog, and
  * JavaScript callers get its registry checks as a `TypeError`.
  * @ref https://www.postgresql.org/docs/18/errcodes-appendix.html
@@ -22,6 +25,7 @@ import { createBan } from '@netvark/ban-core';
 import { jsonApi } from '@netvark/ban-core/formats/json-api';
 import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 import { errorCatalog } from '@netvark/resource-core';
+import { constraintError } from '@netvark/resource-core/server';
 
 import { publicCatalog } from './fixtures/contacts/public-catalog.ts';
 import { Contacts } from './resources/contacts.ts';
@@ -33,6 +37,16 @@ import { declareUntyped, typeErrorOf } from './support/untyped.ts';
 import { SEED, VIOLATIONS } from './support/violations.ts';
 
 const RESOURCES = [Organizations, Contacts, Meetings, Notes] as const;
+
+/** `server_version_num` of PostgreSQL 18.0, the first major that raises 23001 for ON DELETE RESTRICT. */
+const POSTGRES_18 = 180_000;
+/** The columns of a table referencing a contact, by what the reference does when the contact is removed. */
+const REFERRERS: Readonly<Record<string, string>> = {
+  'ON DELETE RESTRICT':
+    'contact_id uuid not null references contacts (id) on delete restrict',
+  'ON DELETE SET NULL against a CHECK':
+    'contact_id uuid references contacts (id) on delete set null, label text, check (contact_id is not null or label is not null)',
+};
 
 /** The SQLSTATE PostgreSQL raises for a violation of each kind. */
 const SQLSTATES: Readonly<Record<ErrorEntry['kind'], string>> = {
@@ -58,12 +72,17 @@ interface Refusal {
   readonly dataType?: string;
 }
 
+/** What PostgreSQL refuses `sql` with, after `setup`, in a transaction it rolls back. */
 async function refusalOf(
   database: OracleDatabase,
   sql: string,
+  setup: ReadonlyArray<string> = [],
 ): Promise<Refusal> {
   await database.query('begin');
   try {
+    for (const statement of setup) {
+      await database.query(statement);
+    }
     await database.query(sql);
   } catch (error) {
     return error as Refusal;
@@ -93,6 +112,19 @@ function codeOf(
     return refusal.constraint?.toUpperCase();
   }
   return resource.names.rules.get(String(refusal.constraint));
+}
+
+/** The JSON Pointer tokens of a member under `/data`, as `constraintError` puts its items (SPEC 9.5). */
+function pathOf(
+  resource: DeclaredResource,
+  member: string,
+): ReadonlyArray<string> {
+  if (member === 'id') {
+    return ['data', 'id'];
+  }
+  return resource.names.relationships.has(member)
+    ? ['data', 'relationships', member]
+    : ['data', 'attributes', member];
 }
 
 /** The domain CHECK a refusal without a table names: `dataType` is the domain. */
@@ -160,6 +192,16 @@ for (const [name, open] of liveDatabases(CONTACTS_SCHEMA)) {
           entry === undefined ? undefined : SQLSTATES[entry.kind],
         );
         expect(codeOf(resource, refusal)).toBe(code);
+        const error = constraintError(refusal, {
+          resource,
+          operation: 'create',
+        });
+        expect(error?.code).toBe(code);
+        expect(error?.status).toBe(entry?.status);
+        expect(error?.cause).toBe(refusal);
+        expect(error?.errors?.map((item) => item.path) ?? []).toEqual(
+          entry?.fields.map((member) => pathOf(resource, member)),
+        );
         if (entry?.kind === 'notNull') {
           expect(refusal.constraint).toBeUndefined();
         }
@@ -172,6 +214,33 @@ for (const [name, open] of liveDatabases(CONTACTS_SCHEMA)) {
           ]);
           expect(domainCheckOf(refusal)).toBeDefined();
         }
+      },
+    );
+
+    it.each(Object.entries(REFERRERS))(
+      'the remove of a contact a row references %s, which is CONFLICT',
+      async (_action, columns) => {
+        const [row] = await database.query(
+          "select current_setting('server_version_num')::int as version",
+        );
+        const restrict =
+          Number(row?.['version']) >= POSTGRES_18 ? '23001' : '23503';
+        const refusal = await refusalOf(
+          database,
+          "delete from contacts where name = 'Pinned'",
+          [
+            "insert into contacts (organization_id, name) values (1, 'Pinned')",
+            `create table contact_pins (${columns})`,
+            "insert into contact_pins (contact_id) select id from contacts where name = 'Pinned'",
+          ],
+        );
+        expect(refusal).toMatchObject({
+          code: columns.includes('restrict') ? restrict : '23514',
+          table: 'contact_pins',
+        });
+        expect(
+          constraintError(refusal, { resource: Contacts, operation: 'remove' }),
+        ).toMatchObject({ status: 409, code: 'CONFLICT', cause: refusal });
       },
     );
   });

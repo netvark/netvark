@@ -95,7 +95,8 @@ async function setup(schema: LiveSchema): Promise<ReadonlyArray<string>> {
   return [...scripts, SESSION];
 }
 
-async function freshPglite(schema: LiveSchema): Promise<PGlite> {
+/** A new PGlite instance with the schema's extensions and migrations, and the session settings. */
+export async function migratedPglite(schema: LiveSchema): Promise<PGlite> {
   const pglite = await PGlite.create({ extensions: schema.extensions });
   for (const script of await setup(schema)) {
     await pglite.exec(script);
@@ -104,8 +105,8 @@ async function freshPglite(schema: LiveSchema): Promise<PGlite> {
 }
 
 /** PGlite (PostgreSQL 18) with the schema's extensions, in process, replaced after `ERROR_BUDGET` errors. */
-async function openPglite(schema: LiveSchema): Promise<OracleDatabase> {
-  let pglite = await freshPglite(schema);
+export async function openPglite(schema: LiveSchema): Promise<OracleDatabase> {
+  let pglite = await migratedPglite(schema);
   let errors = 0;
   return {
     query: async (sql, parameters = []) => {
@@ -115,7 +116,7 @@ async function openPglite(schema: LiveSchema): Promise<OracleDatabase> {
         errors += 1;
         if (errors >= ERROR_BUDGET) {
           await pglite.close();
-          pglite = await freshPglite(schema);
+          pglite = await migratedPglite(schema);
           errors = 0;
         }
         throw error;
@@ -149,11 +150,16 @@ async function serverVersion(url: string): Promise<number> {
   return Number(row?.['version']);
 }
 
-/** A database of its own on the server, created from `template0` in UTF-8 and dropped by `close`. */
-async function openServer(
+/** A database of its own on a server: its URL, and how to drop it. */
+export interface ThrowawayDatabase {
+  readonly url: string;
+  readonly drop: () => Promise<void>;
+}
+
+/** A database of its own on the server at `url`, created from `template0` in UTF-8. */
+export async function throwawayDatabase(
   url: string,
-  schema: LiveSchema,
-): Promise<OracleDatabase> {
+): Promise<ThrowawayDatabase> {
   const name = `resource_e2e_${randomBytes(NAME_BYTES).toString('hex')}`;
   await onServer(
     url,
@@ -161,10 +167,24 @@ async function openServer(
   );
   const target = new URL(url);
   target.pathname = `/${name}`;
-  const client = new Client({ connectionString: target.toString() });
+  return {
+    url: target.toString(),
+    drop: async () => {
+      await onServer(url, `drop database ${name} with (force)`);
+    },
+  };
+}
+
+/** A throwaway database holding `schema`, dropped by `close`. */
+async function openServer(
+  url: string,
+  schema: LiveSchema,
+): Promise<OracleDatabase> {
+  const database = await throwawayDatabase(url);
+  const client = new Client({ connectionString: database.url });
   const close = async () => {
     await client.end();
-    await onServer(url, `drop database ${name} with (force)`);
+    await database.drop();
   };
   try {
     await client.connect();

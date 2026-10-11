@@ -19,7 +19,7 @@ import { describe, ownValue } from '../internal/object';
 import { checkPageInit, mergePage } from './check-page';
 
 /** The values of `Operation`, in the order the SPEC lists them. */
-const OPERATIONS: ReadonlyArray<Operation> = [
+export const OPERATIONS: ReadonlyArray<Operation> = [
   'list',
   'get',
   'create',

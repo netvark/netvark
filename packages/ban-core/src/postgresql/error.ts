@@ -7,13 +7,19 @@
  * - node-postgres (`DatabaseError`), PGlite (the same class from
  *   `@electric-sql/pg-protocol`), and Neon (`NeonDbError`): `code` is the
  *   SQLSTATE, `severity` is field `S`; `constraint`, `table`, `schema`,
- *   `column` are fields `n`, `t`, `s`, `c`.
+ *   `column`, `dataType` are fields `n`, `t`, `s`, `c`, `d`.
  * - postgres.js (`PostgresError`): `code`, `severity` from field `V`,
  *   `severity_local` from field `S`, and `constraint_name`, `table_name`,
- *   `schema_name`, `column_name`.
+ *   `schema_name`, `column_name`, and `data type_name` (with a space, as its
+ *   `errorFields` spells it) for field `d`.
  * - Bun (`PostgresError`): the SQLSTATE is `errno`; `code` is the constant
  *   `ERR_POSTGRES_SERVER_ERROR` (or `ERR_POSTGRES_SYNTAX_ERROR` for 42601);
- *   `severity` and the object fields follow node-postgres.
+ *   `severity` and the object fields follow node-postgres, except that
+ *   `column` holds the source column of the JavaScript error, a number,
+ *   when the server sends no field `c`.
+ *
+ * Field `d` names the domain of a domain constraint's violation, which
+ * names no table or column.
  *
  * Wrappers: Drizzle's `DrizzleQueryError` and Slonik keep the driver error
  * on `cause`; Sequelize 6 on `original` (and `parent`, the same object);
@@ -27,7 +33,7 @@
  * @ref https://github.com/electric-sql/pglite/blob/main/packages/pglite/src/errors.ts
  * @ref https://github.com/porsager/postgres/blob/master/src/connection.js
  * @ref https://github.com/porsager/postgres/blob/master/src/errors.js
- * @ref https://github.com/neondatabase/serverless/blob/main/src/httpQuery.ts
+ * @ref https://github.com/neondatabase/serverless/blob/main/src/http/error.ts
  * @ref https://github.com/oven-sh/bun/blob/main/src/js/internal/sql/errors.ts
  * @ref https://github.com/oven-sh/bun/blob/main/src/sql_jsc/postgres/protocol/error_response_jsc.rs
  * @ref https://github.com/drizzle-team/drizzle-orm/blob/main/drizzle-orm/src/errors.ts
@@ -57,7 +63,9 @@ export interface PostgresErrorLike {
   readonly constraint?: string | undefined;
   readonly table?: string | undefined;
   readonly schema?: string | undefined;
-  readonly column?: string | undefined;
+  /** Bun: the JavaScript error's source column, a number, when the server sends no field `c`. */
+  readonly column?: string | number | undefined;
+  readonly dataType?: string | undefined;
   /** postgres.js spelling of `constraint`. */
   readonly constraint_name?: string | undefined;
   /** postgres.js spelling of `table`. */
@@ -66,6 +74,8 @@ export interface PostgresErrorLike {
   readonly schema_name?: string | undefined;
   /** postgres.js spelling of `column`. */
   readonly column_name?: string | undefined;
+  /** postgres.js spelling of `dataType`. */
+  readonly 'data type_name'?: string | undefined;
 }
 
 /** The fields normalized across drivers. */
@@ -77,6 +87,8 @@ export interface PostgresErrorFields {
   readonly table: string | undefined;
   readonly schema: string | undefined;
   readonly column: string | undefined;
+  /** The domain of a domain constraint's violation (field `d`). */
+  readonly dataType: string | undefined;
 }
 
 /**
@@ -175,5 +187,6 @@ export function readPostgresFields(
     table: readString(error.table) ?? readString(error.table_name),
     schema: readString(error.schema) ?? readString(error.schema_name),
     column: readString(error.column) ?? readString(error.column_name),
+    dataType: readString(error.dataType) ?? readString(error['data type_name']),
   };
 }

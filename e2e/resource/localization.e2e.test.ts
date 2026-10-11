@@ -12,7 +12,7 @@ import { join, relative } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { app } from './localization/app.ts';
+import { app, closeContacts } from './localization/app.ts';
 import { parseDiagnostics } from './support/diagnostics';
 import { compileMessages, copyProject } from './support/paraglide';
 import { PACKAGE_DIR } from './support/paths';
@@ -22,6 +22,7 @@ import { binPath, runBin } from './support/run-bin';
 const scratch: Array<string> = [];
 
 afterAll(async () => {
+  await closeContacts();
   await Promise.all(
     scratch.map(async (dir) => {
       await rm(dir, { recursive: true, force: true });

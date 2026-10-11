@@ -118,6 +118,16 @@ describe('built-in rows through pg.Client', () => {
       table: 'users',
       schema: 'public',
       column: 'email',
+      dataType: undefined,
+    });
+    const domain = findPostgresError(
+      (await call(h, '/domain-check')).report.cause,
+    );
+    expect(domain).toMatchObject({ code: '23514', dataType: 'short_code' });
+    expect(readPostgresFields(domain ?? {})).toMatchObject({
+      constraint: 'short_code_check',
+      table: undefined,
+      dataType: 'short_code',
     });
   });
 

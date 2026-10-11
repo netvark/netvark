@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findPostgresError,
   postgresMapper,
+  readPostgresFields,
 } from '@netvark/hono-ban/postgresql';
 
 import {
@@ -54,6 +55,21 @@ describe('built-in rows', () => {
       expect(findPostgresError(report.cause)?.code).toBe(sqlstate);
     },
   );
+});
+
+describe('the fields of a domain constraint', () => {
+  it('names the domain as dataType, and no table or column', async () => {
+    const { report } = await call(h, '/domain-check');
+    expect(readPostgresFields(findPostgresError(report.cause) ?? {})).toEqual({
+      sqlstate: '23514',
+      errorClass: '23',
+      constraint: 'short_code_check',
+      table: undefined,
+      schema: 'public',
+      column: undefined,
+      dataType: 'short_code',
+    });
+  });
 });
 
 describe('through Drizzle', () => {

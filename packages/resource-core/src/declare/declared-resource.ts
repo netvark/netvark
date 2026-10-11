@@ -140,6 +140,10 @@ export interface DeclaredInternals {
   readonly catalog: PublicCatalog;
   /** Each error code's origin, the constraint behind it, for the registry checks (SPEC 4.2). */
   readonly errorOrigins: ReadonlyMap<string, string>;
+  /** Domain reference name to CHECK name to code, for `constraintError` (SPEC 9.5). */
+  readonly domainChecks: ReadonlyMap<string, ReadonlyMap<string, string>>;
+  /** The column of the declaration's scope, which the server writes (SPEC 3.2). */
+  readonly scopeColumn: string | undefined;
 }
 
 const DECLARED = new WeakMap<object, DeclaredInternals>();

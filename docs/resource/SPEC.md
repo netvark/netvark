@@ -43,9 +43,9 @@ driver, or a Node.js module.
 | Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                                                                                                         |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ```
 packages/resource-core/src/
@@ -1107,15 +1107,21 @@ check on the request document before validation, so such a member is a 403 and n
 
 ### 9.5 Database rejections (`server/constraint-error.ts`)
 
-`constraintError(resources, thrown, { resource, operation, pointer = '/data' })` turns a PostgreSQL
-error raised inside an operation into the declared error, or returns `undefined`:
+`constraintError(thrown, { resource, operation, pointer = '/data' })` turns a PostgreSQL error
+raised inside an operation into the declared error, or returns `undefined`:
 
 1. Recognize the driver error with `findPostgresError` and read
    `{ sqlstate, constraint, table, schema, column, dataType }` with `readPostgresFields`
-   (`@netvark/ban-core/postgresql`, which gains `dataType`), so node-postgres, PGlite, postgres.js,
-   and Bun are covered without a driver import.
-2. 23503 (foreign key) during `remove`: the referencing row belongs to another table, so return the
-   built-in `CONFLICT` (409) with the detail "The resource is still referenced." and no items.
+   (`@netvark/ban-core/postgresql`, which reads `dataType` from field `d`), so node-postgres,
+   PGlite, postgres.js, and Bun are covered without a driver import.
+2. Any integrity violation (class 23) during `remove`: a remove carries no members, so the violation
+   is another row's, a reference that blocks it (23503, or 23001 for `ON DELETE RESTRICT` from
+   PostgreSQL 18) or a referential action whose result breaks a constraint of the referencing row
+   (`ON DELETE SET NULL` against a CHECK or a NOT NULL). It names the referencing table, which may
+   not be a declared resource, so return the built-in `CONFLICT` (409) with the detail "The resource
+   is still referenced." and no items. @ref
+   https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/ri_triggers.c
+   (`ri_ReportViolation`: `ERRCODE_RESTRICT_VIOLATION`)
 3. 23502 (not null) carries no constraint name on any supported major: find the NOT NULL key of
    `(table, column)`. A domain's CHECK (23514) names the domain in `dataType` and no table: find the
    code of `(schema, dataType, constraint)` among the operation resource's domain CHECKs. Other
@@ -1130,10 +1136,16 @@ error raised inside an operation into the declared error, or returns `undefined`
    and the driver error as `cause`. Not found: return `undefined`, and the ban's own `map`
    (typically `postgresMapper()`) handles it with its SQLSTATE table.
 
-It runs inside the operation because only there are the operation and the document's base known;
-inside Atomic Operations the base is the operation's own `data` (ADR 0007). Tests:
-`constraint-error.test.ts` with errors captured from node-postgres, PGlite, and postgres.js, and the
-end-to-end suite against real violations (15.4).
+The runtime calls it where an adapter's rejection arrives (12.8, obligation 6), because only there
+are the operation and the document's base known; inside Atomic Operations the base is the
+operation's own `data` (ADR 0007). It throws `TypeError` for options that do not name a declared
+resource (`constraintError: options.resource must be a resource declareResource returned`), an
+operation, or an RFC 6901 pointer. Tests: `constraint-error.test.ts` with errors captured from
+node-postgres, PGlite, and postgres.js; `e2e/resource/errors.e2e.test.ts`, which runs it over the
+real violation of every derived code of the contacts application, and the refusal of a remove a
+referencing row's `ON DELETE RESTRICT` or `ON DELETE SET NULL` raises, on PGlite and on a PostgreSQL
+server; `localization.e2e.test.ts`, whose localized 409 is what it makes of a real violation; and
+`runtime-rows.e2e.test.ts`, whose remove a meeting's `ON DELETE SET NULL` cannot follow is a 409.
 
 What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
 `e2e/resource/errors.e2e.test.ts` for every derived code of the contacts application:
@@ -1144,8 +1156,12 @@ What PostgreSQL reports, verified on PostgreSQL 14.19 and 18.3 (PGlite) by
 | table CHECK, UNIQUE, PRIMARY KEY, EXCLUDE, FOREIGN KEY | 23514, 23505, 23505, 23P01, 23503 | the table and the constraint                                               |
 | domain CHECK                                           | 23514                             | the domain as `dataType`, and the constraint; no table or column           |
 | unique index, partial or not                           | 23505                             | the table, and the index as the constraint                                 |
+| a remove's referencing row: RESTRICT, SET NULL         | 23001 (18) or 23503 (14), 23514   | the referencing table and its constraint                                   |
 
-A NOT NULL domain's 23502 names only the domain, which has no code (9.1). @ref
+A NOT NULL domain's 23502 names only the domain, which has no code (9.1). A row written through a
+partitioned table is stored in a partition, and PostgreSQL names the partition, and for a unique or
+primary key the partition's own index. The catalog leaves partitions out, so until it records them
+(#78), such a violation gets no declared code and the ban's `map` answers it. @ref
 https://www.postgresql.org/docs/18/protocol-error-fields.html
 
 ---
@@ -1349,7 +1365,8 @@ definitions with hand-written ones for the contacts fixture; `operators.test-d.t
 ## 12. The `server` subpath (`server/`, ADR 0008)
 
 What only a server composes, typed by the application's registries. Nothing here touches a database:
-the storage adapter does (12.8).
+a storage adapter does (12.8), and a runtime runs each operation over one. The runtime is not part
+of this package.
 
 ### 12.1 `createDomainDefiners<TDomain>()`
 
@@ -1358,40 +1375,66 @@ const { definePolicy, defineResource } = createDomainDefiners<{
   actor: AppActor; // extends Actor<Permission>
   permissions: Permission; // a union of permission strings
   quotas: QuotaName; // a union of quota names
-  services: Services; // what the runtime hands to rules and effects
+  services: Services; // what the runtime hands to policies, values, rules, and effects
   errors: typeof APP_ERRORS; // the application's ban-core catalog fragment
 }>();
 
 interface Actor<TPermission extends string> {
   readonly id: string;
-  can(permission: TPermission): boolean;
+  readonly can: (permission: TPermission) => boolean;
 }
 ```
 
 The type argument is the whole input; the function only binds the definers to it, so
-`actor.can('contacts:raed')`, `quota: 'contact'`, and `reject('CONTACT_LIMTI')` fail `tsc`.
+`actor.can('contacts:raed')`, `quota: 'contact'`, and `reject('CONTACT_LIMTI')` fail `tsc`. `can` is
+a property, not a method: TypeScript compares a method's parameters bivariantly, so a method would
+accept an actor whose `can` takes other permissions. The constraint
+`TDomain extends DomainOf<TDomain>` checks the actor against `permissions`, and its error is
+reported on the type argument. @ref https://www.typescriptlang.org/tsconfig/#strictFunctionTypes
 
 ### 12.2 Policies
 
 `definePolicy(Contacts, { list, get, create, update, remove, include })` holds one predicate per
-operation, `(context) => boolean | Promise<boolean>`, where the context has `actor` and `services`,
-`row` (the current public row) for `get`, `update`, and `remove`, and `input` (the parsed input) for
-`create` and `update`; `include` maps a relationship's public name to a predicate deciding whether
-the actor may include it.
+operation, `(context) => boolean | Promise<boolean>`, over these contexts:
 
-- An operation without a predicate is denied, and `denyAll` is the policy of a resource that has
-  none.
+| Operation       | Context                                                             |
+| --------------- | ------------------------------------------------------------------- |
+| `list`          | `actor`, `services`                                                 |
+| `get`, `remove` | `actor`, `services`, `row` (the current public row)                 |
+| `create`        | `actor`, `services`, `input` (the parsed input)                     |
+| `update`        | `actor`, `services`, `row`, `input`                                 |
+| `include`       | per relationship declared with `include: true`; `actor`, `services` |
+
+`include` on a resource without an includable relationship fails `tsc`, and so does a predicate for
+an operation the resource does not declare. `policy.authorize(operation, context)` resolves when the
+operation's predicate answers exactly `true`; any other answer denies, so a predicate that returns a
+truthy value by mistake still fails closed, and one that throws rejects with its error.
+
+- An operation without a predicate is denied, and `denyAll`, the policy of a resource that has none,
+  has no predicate.
 - A denial without a row (`list`, `create`) is `FORBIDDEN` (403). A denial with a row (`get`,
-  `update`, `remove`) is `NOT_FOUND` (404), so a client cannot probe for rows it may not see. @ref
+  `update`, `remove`) is `NOT_FOUND` (404), rendered exactly as a missing row is, so a client cannot
+  probe for rows it may not see. Neither carries a detail. @ref
   https://www.rfc-editor.org/rfc/rfc9110#section-15.5.4 (an origin server that wishes to hide a
   forbidden resource MAY respond with 404)
-- A denied include is `FORBIDDEN` with the `include` parameter as its source.
+- `policy.authorizeInclude(relationship, context)` rejects a denied include with `FORBIDDEN`, the
+  detail "The relationship may not be included.", and one item at the query parameter
+  (`{ location: 'query', path: ['include'] }`), which the JSON:API format renders as
+  `source.parameter: 'include'`. @ref https://jsonapi.org/format/1.1/#error-objects
+
+JavaScript mistakes throw `TypeError`:
+`definePolicy: the resource must be a resource declareResource returned`,
+`definePolicy: contacts: the policy must be an object`,
+`definePolicy: contacts: "lsit" is not a declared operation`,
+`definePolicy: contacts: "owner" is not an includable relationship`,
+`definePolicy: contacts: include must be an object`, and
+`definePolicy: contacts: the predicate of get must be a function`.
 
 ### 12.3 Behavior
 
 ```ts
 defineResource(Contacts, {
-  policy, // from definePolicy; denyAll when absent
+  policy, // from definePolicy(Contacts, ...); denyAll when absent
   operations: {
     create: { values, quota, rules, effects }, // each optional, except values (below)
     update: { rules, effects },
@@ -1400,24 +1443,47 @@ defineResource(Contacts, {
 });
 ```
 
-- `values(context)` returns the server values: an object keyed by column, typed
+- `values({ actor, services, input })` returns the server values: an object keyed by column, typed
   `ServerValuesOf<typeof Contacts>`, holding exactly the columns required on insert (6.3) that no
-  client-writable member, scope, or client id covers. When that set is not empty `values` is
-  REQUIRED, and it is a compile error to return a missing or an extra column.
+  client-writable member, the scope, or a client id covers, each in its column's wire form. When
+  that set is not empty, `operations.create.values` is REQUIRED, and a missing column, an extra
+  column, or a value of another type fails `tsc`; when it is empty, `values` fails `tsc`.
 - `quota` names a quota (12.6) checked on create.
-- `rules` are predicates over `{ actor, services, input, row }` that refuse with `reject` (12.4).
-- `effects` return events (12.7) to record with the write.
+- `rules` run with `{ actor, services, reject }`, plus `input` on create and update and `row` on
+  update and remove, and refuse with `reject` (12.4).
+- `effects` return the events (12.7) to record with the write: a create's receive `input` and the
+  created `row`, an update's `input`, the updated `row`, and the `previous` row, a remove's the
+  removed `row`.
+- A behavior for an operation the resource does not declare, or for `list` and `get`, fails `tsc`.
+
+`defineResource` returns `{ resource, policy, operations, serverValues }`, frozen, with `denyAll`
+for a missing policy, empty `rules` and `effects` lists, and `serverValues` the columns `values`
+must supply, in column order. JavaScript mistakes throw `TypeError`, among them
+`defineResource: organizations: operations.create.values must supply slug`,
+`defineResource: teams: operations: create is not a declared operation`,
+`defineResource: contacts: operations.update: "quota" is not one of rules, effects`, and
+`defineResource: contacts: policy must come from definePolicy(contacts, ...) or be denyAll`.
 
 Every operation runs the same lifecycle inside one transaction: policy, rules, quota, write,
-effects; any failure rolls back everything, effects included.
+effects; any failure rolls back everything, effects included. An update and a remove read their row
+with `lock` (12.8), so the row the policy and the rules decide on is the row the write changes:
+under READ COMMITTED a plain read takes no lock, and another transaction could change or remove the
+row between the read and the write. @ref
+https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED
 
 ### 12.4 `reject(code, options?)`
 
-`reject(code, { fields, detail })` throws a `Rejection` carrying one of the application's codes; the
-runtime turns it into that code's error (status and title from `errors`) with one item per named
-public member, under the operation's pointer base. `fields` are public names of the resource,
-checked by `tsc`. Rules use it for what needs outside state: a reference check before `remove`, a
-limit only a service knows.
+`reject(code, { fields, detail })` throws a `Rejection` carrying one of the application's codes. A
+rule receives `reject` typed by the domain's codes and the resource's public member names (`id`
+included), so a misspelled code or member fails `tsc`. Rules use it for what needs outside state: a
+reference check before `remove`, a limit only a service knows.
+
+`rejectionError(rejection, { resource, errors, pointer = '/data' })` is the runtime's half: the
+code's error from `errors` (status, title, `type`, and the definition, with `detail` when the
+rejection has one), one item per named member under `pointer`, and the rejection as `cause`. It
+throws `TypeError` for a code `errors` does not hold
+(`rejectionError: options.errors has no code SEAT_LIMIT`) and for a member the resource does not
+have (`rejectionError: SEAT_LIMIT names "emial", which contacts has no member called`).
 
 ### 12.5 Scopes
 
@@ -1436,6 +1502,9 @@ const SCOPE_BINDINGS = {
 - `session` names a custom configuration parameter, two dotted identifiers
   (`^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$`), which row security policies read with
   `current_setting`. @ref https://www.postgresql.org/docs/18/runtime-config-custom.html
+- `scopeValues(SCOPE_BINDINGS, actor)` gives each scope's `{ scope, column, session, value }` for
+  `StorageAdapter.transaction`, and throws `TypeError` when a binding's value is not a string or a
+  finite number, so an actor without a tenant never runs unscoped.
 - For every operation on a scoped resource, the adapter sets the parameter for the transaction only
   (`set_config(session, value, true)`), adds `column = value` to every statement as defense in depth
   next to row security, and writes `value` into the column on create. @ref
@@ -1444,31 +1513,44 @@ const SCOPE_BINDINGS = {
 ### 12.6 Quotas
 
 `defineQuota({ limit })` with `limit(context) => number | Promise<number>`. On create, the runtime
-counts the resource's rows in the actor's scope and refuses when the insert would exceed the limit,
-with `QUOTA_EXCEEDED` (403), a code of resource-core's own catalog fragment (9.2). The count and the
-insert are atomic per quota and scope value: the adapter serializes them (a transaction-scoped
-advisory lock), so two concurrent creates cannot both take the last slot.
+counts the resource's rows in the actor's scope (`StorageAdapter.count`) and refuses with
+`quotaExceeded(count, limit)`: `QUOTA_EXCEEDED` (403), a code of resource-core's own catalog
+fragment (9.2), with the detail "The quota for this resource is used up.". It fails closed: a limit
+that is not a safe integer of at least zero refuses every create. The count and the insert are
+atomic per quota and scope value: the adapter serializes them (a transaction-scoped advisory lock),
+so two concurrent creates cannot both take the last slot.
 
 ### 12.7 Events
 
-`defineEvent(name, version, schema)` declares an event; `Event.of(payload)` validates the payload
-and returns `{ name, version, payload }`. Effects return events, the adapter writes them to an
-outbox in the operation's transaction, and delivery after commit belongs to the runtime.
+`defineEvent(name, version, schema)` declares an event: the name is letters and digits in segments
+joined by `.`, `_`, or `-`, the version a positive integer, the schema any Standard Schema.
+`Event.of(payload)` validates the payload and returns `{ name, version, payload }`, frozen; it
+throws `TypeError` for a payload the schema refuses, with the issues as `cause`, and for a schema
+that validates asynchronously, since an effect's events are built inside the transaction. Effects
+return events, the adapter writes them to an outbox in the operation's transaction, and delivery
+after commit belongs to the runtime. Consumers tell payload shapes apart by version, so a changed
+payload is a new version. @ref https://standardschema.dev
 
 ### 12.8 The storage adapter contract (`server/storage.ts`)
 
 ```ts
 interface StorageAdapter<TTransaction> {
-  transaction<T>(
+  transaction<TResult>(
     scopes: ReadonlyArray<ScopeValue>,
-    run: (tx: TTransaction) => Promise<T>,
-  ): Promise<T>;
+    run: (tx: TTransaction) => Promise<TResult>,
+  ): Promise<TResult>;
   list(
     tx: TTransaction,
     resource: DeclaredResource,
     request: StorageListRequest,
   ): Promise<StoragePage>;
   get(tx: TTransaction, resource: DeclaredResource, id: string): Promise<PublicRow | undefined>;
+  lock(
+    tx: TTransaction,
+    resource: DeclaredResource,
+    id: string,
+    write: 'update' | 'remove',
+  ): Promise<PublicRow | undefined>; // the row, locked until the transaction ends
   create(tx: TTransaction, resource: DeclaredResource, input: StorageWrite): Promise<PublicRow>;
   update(
     tx: TTransaction,
@@ -1480,36 +1562,95 @@ interface StorageAdapter<TTransaction> {
   count(tx: TTransaction, resource: DeclaredResource, quota: string): Promise<number>; // under the quota lock
   record(tx: TTransaction, events: ReadonlyArray<DomainEvent>): Promise<void>;
 }
+
+interface StorageWrite {
+  readonly id?: string; // a create's client id (3.4)
+  readonly attributes: Readonly<Record<string, unknown>>; // parsed field values, by public name
+  readonly relationships: Readonly<Record<string, string | null>>; // target ids; null clears
+  readonly values?: Readonly<Record<string, unknown>>; // a create's server values, by column
+}
 ```
+
+A `PublicRow` is `{ id: string }` with each readable field and relationship by public name, a
+relationship as its target's id or `null`; a `write` field is never read. An adapter reads what it
+needs from the declared resource's public members, `names` (the table, the key column), `fields`
+(each member's column, kind, access, and codec), and `declaration.scope`, from the public catalog
+(schemas and types), and from its own storage codecs (7.1).
 
 An adapter MUST:
 
-1. Run each operation in one transaction that begins by setting every scope's parameter locally.
+1. Run each operation in one transaction that begins by setting every scope's parameter for that
+   transaction only, rolls back when `run` rejects, and rejects with what `run` threw, unchanged, so
+   the runtime still sees its `Rejection` (12.4). When a statement failed and `run` went on, the
+   transaction rejects with that statement's error, since PostgreSQL turns the COMMIT of an aborted
+   transaction into a rollback that reports no error. @ref
+   https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/transam/xact.c
+   (`EndTransactionBlock`: "Since COMMIT may actually do a ROLLBACK")
 2. Add each scope's predicate to every statement on a scoped table.
 3. Return public rows in the read forms of 5, through the storage codecs for codec fields, and fail
    a read whose stored value has no read form instead of emitting another value.
 4. Insert or update exactly the members present in the input, plus the scope columns and the server
-   values, and nothing else (ADR 0004).
+   values on create, and nothing else (ADR 0004): a member left out keeps its value, or its default
+   on create; `null` clears a member; an update without members changes nothing and returns the row.
 5. Page `list` with the declared resource's keyset definition and `@netvark/keyset-core`'s planner,
    filters and sorts addressed by public names.
-6. Pass every PostgreSQL error raised inside an operation through `constraintError` (9.5).
-7. Treat a row outside the actor's scope as absent for `get`, `update`, and `remove`.
+6. Let every PostgreSQL error raised inside an operation reach the runtime with its fields, as
+   thrown or as the `cause` of what is thrown, so the runtime's `constraintError` (9.5) maps it;
+   never replace it with an error of its own.
+7. Treat a row outside the actor's scope as absent for `get`, `lock`, `update`, and `remove`.
 8. Make `count` and the following insert atomic per quota and scope value.
 9. Write recorded events in the operation's transaction.
+10. Hold the row `lock` returns until the transaction ends, locked at least as the write it names
+    will lock it: `FOR NO KEY UPDATE` before an update, `FOR UPDATE` before a remove. `FOR UPDATE`
+    also blocks the `FOR KEY SHARE` lock a foreign key check takes on the row it references, so no
+    other transaction adds a reference to a row about to be removed. @ref
+    https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS @ref
+    https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/ri_triggers.c
+    (`RI_FKey_check`: "FOR KEY SHARE OF x")
 
 ### 12.9 The contract suite (`testing/storage-contract.ts`)
 
 `storageContract(harness)` returns `ReadonlyArray<ContractCase>`, each
-`{ name, run(): Promise<void> }`, one or more per obligation of 12.8. The cases throw on failure and
-import no test runner, so an adapter package runs them under its own
-(`for (const c of cases) it(c.name, c.run)`). The suite ships its own fixture: migrations as SQL
-text, their public catalog, and declarations over it; the harness gives an adapter connected to a
-database with those migrations applied and a `reset()` between cases.
+`{ name, run(): Promise<void> }`, one or more per obligation of 12.8, named after it
+(`obligation 7: a row of another scope is absent for get, lock, update, and remove`). Each case
+resets the database first, throws a `ContractFailure` that names what it checked with the expected
+and the actual value, and imports no test runner, so an adapter package runs the cases under its own
+(`for (const c of cases) it(c.name, c.run)`).
+
+```ts
+interface ContractHarness<TTransaction> {
+  readonly adapter: StorageAdapter<TTransaction>; // over a database holding contractFixture.migrations
+  readonly reset: () => Promise<void>; // runs contractFixture.seed and empties the outbox
+  readonly events: () => Promise<ReadonlyArray<DomainEvent>>; // the committed outbox, in order
+}
+```
+
+`contractFixture` is the suite's own fixture: `migrations` as SQL text, the `seed`, the public
+`catalog` `pg-catalog extract` reads from the migrations, the `point` codec, the `workspace` scope
+(session parameter `contract.workspace_id`), and two declarations: `workspaces`, unscoped with an
+identity key, and `tasks`, scoped to a workspace, with client ids, the server value `created_by`, a
+field of every wire form, an array, JSON, a codec field, generated columns, a `write` field, and a
+self-reference. A column default reads `current_setting('contract.workspace_id', true)`, so a case
+reads back what the transaction set, and the schema has no row security, so only the adapter's
+predicate keeps a row in its scope. The values are the ones drivers get wrong by default: an `int8`
+past 2^53, a `numeric` read as a float, a `timestamptz` at millisecond precision or in the local
+zone, array elements that need quoting, `NULL` and the empty string among them. A harness gives its
+adapter the catalog and a storage codec for `point`; on a server, it gives the adapter at least two
+connections, so the concurrent cases of obligations 8 and 10 run two transactions at once: the first
+takes its lock, the second starts, and the first finishes only after the second had time to reach
+the database. An adapter that serializes its transactions, as PGlite's does, passes them without a
+lock. The cases of obligation 5 arrive with the keyset definition (11.2).
 
 Tests: `domain.test-d.ts` (permissions, quotas, codes, fields, and server values as compile errors),
-`policy.test.ts`, `behavior.test.ts`, `scope.test.ts`, and `constraint-error.test.ts`. The contract
-suite itself is proven in `e2e/resource` against a minimal reference adapter written in plain SQL
-over PGlite, so the contract is shown implementable before `@netvark/kysely-resource` exists.
+`policy.test.ts`, `behavior.test.ts`, `scope.test.ts`, `quota.test.ts`, `event.test.ts`,
+`reject.test.ts`, `server-values.test.ts`, and `constraint-error.test.ts`, with
+`contract/assert.test.ts`, `contract/concurrency.test.ts`, and `contract/fixture.test.ts`. The
+contract suite itself is proven in `e2e/resource` against a reference adapter written in plain SQL,
+over PGlite and over PostgreSQL through a node-postgres pool (`contract.e2e.test.ts`), so the
+contract is shown implementable before `@netvark/kysely-resource` exists.
+`contract-faults.e2e.test.ts` gives the reference adapter one defect at a time, from parameters set
+for the session to a missing quota or row lock, and checks that the cases about it fail, and
+`extract.e2e.test.ts` checks that the fixture's catalog is what extraction gives for its migrations.
 
 ---
 
@@ -1742,16 +1883,19 @@ ones an insert needs, and a member left out holds its stated `default`
 (`fields-create.e2e.test.ts`); the derived error codes, recorded in a reviewed snapshot
 (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
 both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
-them, rendered by `createBan`; `constraintError` against the same violations; localized error
-documents (`localization.e2e.test.ts`): messages the Paraglide compiler builds from
-`localization/messages/`, mapped with `defineMessages` and served through Hono and
-`@netvark/hono-ban`, answer a 422 in German with option labels, in English with its plural forms, in
-the base locale for a language the project lacks, in a regional tag's language, and a 409 with a
-code's own texts, each with `Content-Language` and `Vary`, while `tsc` accepts the mapping and
-refuses a translation that names a variable its kind does not receive; that a row breaking every NOT
-ENFORCED constraint is stored by the database and accepted by the schemas, while the enforced CHECK
-beside them refuses in both (`not-enforced.e2e.test.ts`); the package surface (every value export
-listed); and the runtime smoke test on Bun, Deno, and workerd for the root and `openapi` entries.
+them, rendered by `createBan`; `constraintError` against the same violations, each mapped to its
+code's error; localized error documents (`localization.e2e.test.ts`): messages the Paraglide
+compiler builds from `localization/messages/`, mapped with `defineMessages` and served through Hono
+and `@netvark/hono-ban`, answer a 422 in German with option labels, in English with its plural
+forms, in the base locale for a language the project lacks, in a regional tag's language, and a 409,
+which `constraintError` makes of a real violation, with a code's own texts, each with
+`Content-Language` and `Vary`, while `tsc` accepts the mapping and refuses a translation that names
+a variable its kind does not receive; that a row breaking every NOT ENFORCED constraint is stored by
+the database and accepted by the schemas, while the enforced CHECK beside them refuses in both
+(`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
+the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
+12.9); the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
+workerd for the root, `server`, `testing`, and `openapi` entries.
 
 ### 15.5 Real catalogs
 

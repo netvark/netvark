@@ -52,7 +52,7 @@ function checkResources(
   });
 }
 
-function isErrorDefinition(value: unknown): value is ErrorDefinition {
+export function isErrorDefinition(value: unknown): value is ErrorDefinition {
   return (
     isRecord(value) &&
     isErrorStatus(value['status']) &&

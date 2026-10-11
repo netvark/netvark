@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "paraglide-js compile --project ./localization/project.inlang --outdir ./localization/paraglide --strategy preferredLanguage baseLocale --emit-ts-declarations --silent",
+    "contract:catalog": "node --experimental-strip-types scripts/contract-catalog.ts",
     "smoke:bun": "bun run smoke/run.ts",
     "smoke:deno": "deno run --allow-read --allow-env smoke/run.ts",
     "smoke:workerd": "node --experimental-strip-types smoke/workerd.ts",
