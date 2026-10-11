@@ -11,8 +11,8 @@ renders every error. Every choice is written down in
 section 19, and the decisions behind it in
 [ADR 0013](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0013-hosts-take-the-runtime-contract-and-mount-where-the-links-point.md).
 
-Status: in development and unreleased. The collection and resource routes, includes, and the 405 of
-every other method are served. The relationship routes, the Atomic Operations endpoint, the OpenAPI
+Status: in development and unreleased. The collection, resource, relationship, and related routes,
+includes, and the 405 of every other method are served. The Atomic Operations endpoint, the OpenAPI
 document's route, and `resourceTypeOf` for localized errors follow in the 0.x line.
 
 ## Install
@@ -94,13 +94,16 @@ export async function sessionActor(c: Context<AppEnv>): Promise<AppActor> {
 
 Each route exists only when the declaration declares its operation:
 
-| Route                      | Runs                                                      | Answers                                                    |
-| -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
-| `GET /api/contacts`        | `list(keysetRequest(Contacts, query))`, then each include | 200, the page with the Cursor Pagination links and meta    |
-| `POST /api/contacts`       | `create(document)`                                        | 201, the resource document, with `Location` from its links |
-| `GET /api/contacts/:id`    | `get(id)`, then each include                              | 200, the resource document with `included`                 |
-| `PATCH /api/contacts/:id`  | `update(id, document)`                                    | 200, the resource document                                 |
-| `DELETE /api/contacts/:id` | `remove(id)`                                              | 204                                                        |
+| Route                                              | Runs                                                      | Answers                                                                     |
+| -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `GET /api/contacts`                                | `list(keysetRequest(Contacts, query))`, then each include | 200, the page with the Cursor Pagination links and meta                     |
+| `POST /api/contacts`                               | `create(document)`                                        | 201, the resource document, with `Location` from its links                  |
+| `GET /api/contacts/:id`                            | `get(id)`, then each include                              | 200, the resource document with `included`                                  |
+| `PATCH /api/contacts/:id`                          | `update(id, document)`                                    | 200, the resource document                                                  |
+| `DELETE /api/contacts/:id`                         | `remove(id)`                                              | 204                                                                         |
+| `GET /api/contacts/:id/relationships/organization` | `get(id)`                                                 | 200, the relationship document: the linkage and its links                   |
+| `PATCH /api/notes/:id/relationships/contact`       | `update(id, { relationships: { contact: linkage } })`     | 200, the updated relationship document                                      |
+| `GET /api/contacts/:id/organization`               | `get(id)`, then the target's `get` of the linked id       | 200, the target's resource document, or `data: null` when nothing is linked |
 
 - **The paths are the links'.** `resourcePaths` reads them from each resource's JSON:API links, the
   function the OpenAPI document reads, so the routes, the links, and the document name the same
@@ -112,12 +115,19 @@ Each route exists only when the declaration declares its operation:
   a 409.
 - **Includes run through the resource's `include`**, so its policy for the relationship decides, and
   the rows join `included` once each.
+- **Relationship routes follow the declaration.** They exist when the resource declares `get`: the
+  relationship link's `PATCH` when the relationship is `readWrite` and the resource declares
+  `update`, and the related link when the target declares `get`. An update the link does not
+  support, `POST` or `DELETE` on a to-one relationship or `PATCH` of one the resource does not
+  update, answers 403, as JSON:API requires.
+- **A refused linkage points at `/data`**, where the relationship document holds it: the runtime's
+  `/data/relationships/contact` becomes `/data`, so a client maps the error to what it sent.
 - **What the runtime throws is the response**, such as `NOT_FOUND` for a row the actor does not see.
 
 `jsonApiRoutes` throws `TypeError` before it serves anything when an option is wrong, when the
 runtime runs no resource, when a resource's links give no paths, when the links have different
-origins or bases, when two resources name one path, or when an includable relationship's target is
-not among the runtime's resources.
+origins or bases, when two routes have one path, or when a relationship's target, includable or not,
+is not among the runtime's resources.
 
 ## Best practices
 
@@ -128,8 +138,9 @@ routes at `/api/api/...` while the links and the document still name `/api/...`.
 **Resolve the actor from the request's credentials alone.** `actor` runs once per request, before
 the query or the document is read, so a client without a session gets your `UNAUTHORIZED` and learns
 nothing about the resource from a 400. Throw the catalog's error, never return a guest actor you did
-not mean to have, and leave the body to the validators. A 405 answers without the actor: the OpenAPI
-document lists every path's methods to anyone.
+not mean to have, and leave the body to the validators. A 405, and the 403 of an update a
+relationship does not support, answer without the actor: the OpenAPI document lists every path's
+methods to anyone.
 
 **Type the actor with your `Env`.** Pass a function whose parameter is `Context<AppEnv>`, such as
 `sessionActor` above, and the routes are a `Hono<AppEnv>`; an inline arrow with an untyped `c` gets

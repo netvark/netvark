@@ -173,7 +173,7 @@ describe('jsonApiRoutes refusals (resource SPEC 19.2)', () => {
     );
   });
 
-  it('refuses two resources that name one path', () => {
+  it('refuses two routes that have one path', () => {
     const Again = linkedUnder('/api')('workspaces', {
       operations: ['get'],
       fields: { name: { access: 'read' } },
@@ -181,18 +181,23 @@ describe('jsonApiRoutes refusals (resource SPEC 19.2)', () => {
     expect(() =>
       jsonApiRoutes({ runtime: memoryRuntime([Workspaces, Again]), actor }),
     ).toThrow(
-      new TypeError(
-        'jsonApiRoutes: two resources have the path /api/workspaces',
-      ),
+      new TypeError('jsonApiRoutes: two routes have the path /api/workspaces'),
     );
   });
 
-  it('refuses an includable relationship whose target the runtime does not run', () => {
+  it('refuses a relationship whose target the runtime does not run, includable or not', () => {
     expect(() =>
       jsonApiRoutes({ runtime: memoryRuntime([Tasks]), actor }),
     ).toThrow(
       new TypeError(
-        'jsonApiRoutes: tasks: relationship workspace is includable, but the runtime runs no resource of its target workspaces',
+        'jsonApiRoutes: tasks: relationship workspace targets workspaces, which the runtime does not run',
+      ),
+    );
+    expect(() =>
+      jsonApiRoutes({ runtime: memoryRuntime([Logs]), actor }),
+    ).toThrow(
+      new TypeError(
+        'jsonApiRoutes: entrées: relationship owner targets workspaces, which the runtime does not run',
       ),
     );
   });

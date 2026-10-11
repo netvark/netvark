@@ -29,7 +29,7 @@ export interface RouteContext<TEnv extends Env, TDomain extends DomainShape> {
   readonly runtime: ResourceRuntime<TDomain>;
   readonly actors: Actors<TEnv, TDomain['actor']>;
   readonly methods: MethodTable;
-  /** By type, each includable relationship's target: the runtime's resource of its type. */
+  /** By type, each relationship's target: the runtime's resource of its type. */
   readonly targets: ReadonlyMap<string, ReadonlyMap<string, DeclaredResource>>;
 }
 
@@ -57,6 +57,21 @@ export function operationsOf<TEnv extends Env, TDomain extends DomainShape>(
   return operations;
 }
 
+/** The runtime's resource that `declared`'s relationship `name` targets, which `targetsOf` found for each. */
+export function targetOf<TEnv extends Env, TDomain extends DomainShape>(
+  context: RouteContext<TEnv, TDomain>,
+  declared: DeclaredResource,
+  name: string,
+): DeclaredResource {
+  const target = context.targets.get(declared.names.type)?.get(name);
+  if (target === undefined) {
+    throw new TypeError(
+      `jsonApiRoutes: ${declared.names.type} has no target for relationship ${name}`,
+    );
+  }
+  return target;
+}
+
 /**
  * The included resources of `rows`, one entry per include path, each the
  * rows `declared`'s `include` links them to over its relationship. Every
@@ -71,15 +86,12 @@ export async function includedOf<TEnv extends Env, TDomain extends DomainShape>(
 ): Promise<Array<Included>> {
   const included: Array<Included> = [];
   for (const [name] of query.include ?? []) {
-    const target =
-      name === undefined
-        ? undefined
-        : context.targets.get(declared.names.type)?.get(name);
-    if (name === undefined || target === undefined) {
+    if (name === undefined) {
       throw new TypeError(
-        `jsonApiRoutes: ${declared.names.type} accepted an include it has no target for`,
+        `jsonApiRoutes: ${declared.names.type} accepted an empty include path`,
       );
     }
+    const target = targetOf(context, declared, name);
     if (operations.include === undefined) {
       throw notRun(declared, 'include');
     }
@@ -91,10 +103,12 @@ export async function includedOf<TEnv extends Env, TDomain extends DomainShape>(
 }
 
 /**
- * By type, each includable relationship's target among `resources`.
- * Throws `TypeError` for a target the runtime does not run.
+ * By type, each relationship's target among `resources`, which a route
+ * includes, links to, and serves the related route of. Throws `TypeError`
+ * for a target the runtime does not run, as `openapi` and `errorCatalog`
+ * refuse a list without it (SPEC 4.2).
  */
-export function includeTargets(
+export function targetsOf(
   resources: ReadonlyArray<DeclaredResource>,
 ): ReadonlyMap<string, ReadonlyMap<string, DeclaredResource>> {
   const byType = new Map(
@@ -102,20 +116,27 @@ export function includeTargets(
   );
   return new Map(
     resources.map((declared) => {
-      const { relationships, query } = declared.resource;
-      const targets = query.include.map((name) => {
-        const type = Object.hasOwn(relationships, name)
-          ? relationships[name]?.type
-          : undefined;
-        const target = type === undefined ? undefined : byType.get(type);
-        if (target === undefined) {
-          throw new TypeError(
-            `jsonApiRoutes: ${declared.names.type}: relationship ${name} is includable, but the runtime runs no resource of its target ${String(type)}`,
-          );
-        }
-        return [name, target] as const;
-      });
+      const targets = Object.entries(declared.resource.relationships).map(
+        ([name, { type }]) => {
+          const target = byType.get(type);
+          if (target === undefined) {
+            throw new TypeError(
+              `jsonApiRoutes: ${declared.names.type}: relationship ${name} targets ${type}, which the runtime does not run`,
+            );
+          }
+          return [name, target] as const;
+        },
+      );
       return [declared.names.type, new Map(targets)] as const;
     }),
   );
+}
+
+/** The `:id` of a resource route. */
+export function idOf(c: Context): string {
+  const id = c.req.param('id');
+  if (id === undefined) {
+    throw new TypeError('jsonApiRoutes: a resource route has no :id');
+  }
+  return id;
 }

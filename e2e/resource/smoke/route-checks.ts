@@ -2,8 +2,10 @@
  * Runtime-neutral checks of `@netvark/hono-resource` (resource SPEC 19.8)
  * over the built package: the routes of a runtime of the contract held in
  * memory answer a declared resource at the path its links name, another
- * method with 405 and `Allow`, and a request without an actor with what
- * the actor threw, through Hono's `fetch` as every runtime calls it. No
+ * method with 405 and `Allow`, a request without an actor with what the
+ * actor threw, a relationship link with its linkage, an update the
+ * relationship does not support with 403, and a related link with the
+ * target's document, through Hono's `fetch` as every runtime calls it. No
  * Node.js API, so the module runs on Bun, Deno, and workerd.
  */
 import type { PublicRow, ResourceRuntime } from '@netvark/resource-core/server';
@@ -21,6 +23,7 @@ import {
 } from '@netvark/hono-jsonapi';
 import { jsonApiRoutes } from '@netvark/hono-resource';
 
+import { Contacts } from '../resources/contacts.ts';
 import { Organizations } from '../resources/organizations.ts';
 import { check } from './report.ts';
 
@@ -34,21 +37,29 @@ const ACME: PublicRow = {
   createdAt: '2026-10-11T08:00:00.000Z',
 };
 
-/** The organization `id` names, once a turn of the microtask queue has passed. */
-async function organization(id: string): Promise<PublicRow> {
+/** A contact of Acme's, its relationship held by public name. */
+const ADA: PublicRow = { id: '7', name: 'Ada', organization: ACME.id };
+
+/** The row of `rows` that `id` names, once a turn of the microtask queue has passed. */
+async function rowOf(
+  rows: ReadonlyArray<PublicRow>,
+  id: string,
+): Promise<PublicRow> {
   await Promise.resolve();
-  if (id !== ACME.id) {
-    throw jsonApiError('NOT_FOUND', {
-      detail: 'The organization does not exist',
-    });
+  const row = rows.find((candidate) => candidate.id === id);
+  if (row === undefined) {
+    throw jsonApiError('NOT_FOUND', { detail: 'The resource does not exist' });
   }
-  return ACME;
+  return row;
 }
 
 const runtime: ResourceRuntime = {
   warnings: [],
-  resources: [Organizations],
-  as: () => ({ organizations: { get: async (id) => organization(id) } }),
+  resources: [Organizations, Contacts],
+  as: () => ({
+    organizations: { get: async (id) => rowOf([ACME], id) },
+    contacts: { get: async (id) => rowOf([ADA], id) },
+  }),
 };
 
 /** The host: negotiation, the error handlers, and the routes at `/`. */
@@ -101,4 +112,42 @@ export const routeChecks: Checks = {
     const response = await host().request('/api/organizations/1');
     check(response.status === 401, `status ${String(response.status)}`);
   },
+  'hono-resource answers a relationship link with its linkage': async () => {
+    const response = await host().request(
+      '/api/contacts/7/relationships/organization',
+      { headers: { 'X-Actor': 'smoke' } },
+    );
+    check(response.status === 200, `status ${String(response.status)}`);
+    const text = await response.text();
+    check(
+      text.includes('"related":"/api/contacts/7/organization"') &&
+        text.includes('"data":{"type":"organizations","id":"1"}'),
+      text,
+    );
+  },
+  'hono-resource answers an update the relationship does not support with 403':
+    async () => {
+      const response = await host().request(
+        '/api/contacts/7/relationships/organization',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({ data: null }),
+        },
+      );
+      check(response.status === 403, `status ${String(response.status)}`);
+    },
+  "hono-resource answers a related link with the target's document":
+    async () => {
+      const response = await host().request('/api/contacts/7/organization', {
+        headers: { 'X-Actor': 'smoke' },
+      });
+      check(response.status === 200, `status ${String(response.status)}`);
+      const text = await response.text();
+      check(
+        text.includes('"self":"/api/organizations/1"') &&
+          text.includes('"name":"Acme"'),
+        text,
+      );
+    },
 };

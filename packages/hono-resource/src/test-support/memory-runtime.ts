@@ -4,7 +4,9 @@
  * rows, scoped to the actor's workspace for a scoped resource, with every
  * call recorded, so a test reads what a route handed the runtime. `get`,
  * `update`, and `remove` of a row the actor does not see answer
- * NOT_FOUND, as a runtime does, and an include of workspaces by an actor
+ * NOT_FOUND, as a runtime does, and so does a write that links a row
+ * that does not exist, at `/data/relationships/<name>`, as a runtime's
+ * target lookup answers (SPEC 12.3); an include of workspaces by an actor
  * without `workspaces:read` answers FORBIDDEN, as a policy would. A page
  * holds every row the actor sees, in insertion order, and has no other
  * page. Not published with the package.
@@ -70,6 +72,28 @@ export function member(
 
 function notFound(): Error {
   return jsonApiError('NOT_FOUND', { detail: 'The resource does not exist' });
+}
+
+/** Throws NOT_FOUND at the first relationship of `input` that links a row `state` does not hold. */
+function checkTargets(state: MemoryRuntime, input: ResourceInput): void {
+  for (const [name, linkage] of Object.entries(input.relationships ?? {})) {
+    const missing =
+      typeof linkage === 'object' &&
+      linkage !== null &&
+      'type' in linkage &&
+      'id' in linkage &&
+      state.rows.get(String(linkage.type))?.has(String(linkage.id)) !== true;
+    if (missing) {
+      throw jsonApiError([
+        {
+          code: 'NOT_FOUND',
+          status: 404,
+          detail: 'The related resource does not exist',
+          path: ['data', 'relationships', name],
+        },
+      ]);
+    }
+  }
 }
 
 /** The members `input` writes, each relationship as its target's id. */
@@ -186,6 +210,7 @@ function operationsOf(
     operations.create = async (input) =>
       roundTrip(() => {
         record('create', [input]);
+        checkTargets(state, input);
         const id = input.id ?? crypto.randomUUID();
         const row = {
           ...newRow(declared, id, input),
@@ -200,6 +225,7 @@ function operationsOf(
     operations.update = async (id, input) =>
       roundTrip(() => {
         record('update', [id, input]);
+        checkTargets(state, input);
         const row = { ...find(id), ...membersOf(input), id };
         rows.set(id, row);
         return row;
