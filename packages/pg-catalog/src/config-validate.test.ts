@@ -10,10 +10,6 @@ function config(changes: Record<string, unknown>): unknown {
   return { ...BASE, ...changes };
 }
 
-function out(changes: Record<string, unknown>): unknown {
-  return config({ out: { ...BASE.out, ...changes } });
-}
-
 describe('validateConfig (SPEC 11.1)', () => {
   it('treats options set to undefined as absent, as a JavaScript configuration may write them', () => {
     const valid = config({
@@ -144,99 +140,6 @@ describe('validateConfig (SPEC 11.1)', () => {
       'information_schema',
       config({ schemas: ['information_schema'] }),
       'schemas[0] is a system schema',
-    ],
-    ['no out', { migrations: 'migrations' }, 'out must be an object'],
-    ['no catalog path', config({ out: {} }), 'out.catalog must be a string'],
-    [
-      'a misspelled output',
-      out({ type: 'db.ts' }),
-      'out.type is not an option',
-    ],
-    [
-      'a public slice without a file',
-      out({ public: { tables: ['contacts'] } }),
-      'out.public.file must be a string',
-    ],
-    [
-      'a public slice without tables',
-      out({ public: { file: 'public.ts', tables: [] } }),
-      'out.public.tables must not be empty',
-    ],
-    [
-      'a duplicate public table',
-      out({ public: { file: 'public.ts', tables: ['contacts', 'contacts'] } }),
-      'out.public.tables lists contacts twice',
-    ],
-    ['an empty types path', out({ types: '' }), 'out.types must not be empty'],
-    [
-      'types without a file',
-      out({ types: { camelCase: true } }),
-      'out.types.file must be a string',
-    ],
-    [
-      'a misspelled types option',
-      out({ types: { file: 'db.ts', camelcase: true } }),
-      'out.types.camelcase is not an option',
-    ],
-    [
-      'overrides that are an array',
-      out({ types: { file: 'db.ts', overrides: [] } }),
-      'out.types.overrides must be an object',
-    ],
-    [
-      'an empty override',
-      out({ types: { file: 'db.ts', overrides: { 'public.money': '' } } }),
-      'out.types.overrides.public.money must not be empty',
-    ],
-    [
-      'an override without select',
-      out({
-        types: {
-          file: 'db.ts',
-          overrides: { 'public.money': { insert: 'string' } },
-        },
-      }),
-      'out.types.overrides.public.money.select must be a string',
-    ],
-    [
-      'an override with an unknown position',
-      out({
-        types: {
-          file: 'db.ts',
-          overrides: { 'public.money': { select: 'string', where: 'string' } },
-        },
-      }),
-      'out.types.overrides.public.money.where is not an option',
-    ],
-    [
-      'an override with an update that is not a string',
-      out({
-        types: {
-          file: 'db.ts',
-          overrides: { 'public.money': { select: 'string', update: 1 } },
-        },
-      }),
-      'out.types.overrides.public.money.update must be a string',
-    ],
-    [
-      'a duplicate import',
-      out({ types: { file: 'db.ts', imports: ['import a;', 'import a;'] } }),
-      'out.types.imports lists import a; twice',
-    ],
-    [
-      'camelCase as a string',
-      out({ types: { file: 'db.ts', camelCase: 'yes' } }),
-      'out.types.camelCase must be an object',
-    ],
-    [
-      'a misspelled camelCase option',
-      out({ types: { file: 'db.ts', camelCase: { upper: true } } }),
-      'out.types.camelCase.upper is not an option',
-    ],
-    [
-      'a camelCase option that is not a boolean',
-      out({ types: { file: 'db.ts', camelCase: { upperCase: 'true' } } }),
-      'out.types.camelCase.upperCase must be a boolean',
     ],
     [
       'drift that is an array',

@@ -54,16 +54,32 @@ export interface TypesConfig {
 }
 
 /**
+ * The catalog module and the interface it exports, which compile errors
+ * print in place of the catalog's members (SPEC 9.1).
+ */
+export interface CatalogFileConfig {
+  readonly file: string;
+  /** Default `ExtractedCatalog`. */
+  readonly interface?: string;
+}
+
+/** The public module: the tables a browser may see, and the interface it exports. */
+export interface PublicFileConfig {
+  readonly file: string;
+  readonly tables: ReadonlyArray<string>;
+  /** Default `ExtractedPublicCatalog`. */
+  readonly interface?: string;
+}
+
+/**
  * The files `extract` writes, relative to the configuration file (or the
- * `cwd` option). `public` writes the slice of `tables` a browser may see;
- * `types` writes the Kysely types, as a path or with options.
+ * `cwd` option): the catalog module, as a path or with its interface's
+ * name; `public`, the slice of `tables` a browser may see; `types`, the
+ * Kysely types, as a path or with options.
  */
 export interface OutputConfig {
-  readonly catalog: string;
-  readonly public?: {
-    readonly file: string;
-    readonly tables: ReadonlyArray<string>;
-  };
+  readonly catalog: string | CatalogFileConfig;
+  readonly public?: PublicFileConfig;
   readonly types?: string | TypesConfig;
 }
 
@@ -92,13 +108,21 @@ export interface ExtractionConfig {
 /** The schemas read when the configuration names none (SPEC 15). */
 export const DEFAULT_SCHEMAS: ReadonlyArray<string> = ['public'];
 
+/** `out.catalog` with its options, for a configuration that gives only the path. */
+export function catalogFile(
+  catalog: string | CatalogFileConfig,
+): CatalogFileConfig {
+  return typeof catalog === 'string' ? { file: catalog } : catalog;
+}
+
 /**
  * Validates a configuration eagerly and returns it unchanged, for the
  * default export of `netvark.config.ts`. A mistake throws `TypeError`
  * naming the option: an unknown key at any level, an empty string, a
  * `database` with both or neither of `pglite` and `url`, a system,
  * duplicate, or overlong schema name, an empty or duplicate
- * `out.public.tables`, or a drift environment name outside
+ * `out.public.tables`, an interface name outside `^[A-Z][A-Za-z0-9_]*$` or
+ * shared by both modules, or a drift environment name outside
  * `^[A-Za-z0-9][A-Za-z0-9_-]*$`. URL functions are not called.
  */
 export function defineExtraction(config: ExtractionConfig): ExtractionConfig {

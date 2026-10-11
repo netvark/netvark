@@ -15,7 +15,7 @@ import process from 'node:process';
 
 import { diffCatalogs } from '@netvark/catalog-core';
 
-import { DEFAULT_SCHEMAS } from '../config';
+import { catalogFile, DEFAULT_SCHEMAS } from '../config';
 import { PgCatalogError } from '../errors';
 import { readCatalog } from '../extract/read-catalog';
 import { parseCatalogModule } from '../render/catalog-module';
@@ -157,9 +157,10 @@ export async function drift(
   options: DriftOptions = {},
 ): Promise<DriftReport> {
   const url = environmentUrl(config, environment);
+  const { file } = catalogFile(config.out.catalog);
   const committed = await readCommitted(
-    resolve(options.cwd ?? process.cwd(), config.out.catalog),
-    config.out.catalog,
+    resolve(options.cwd ?? process.cwd(), file),
+    file,
   );
   const live = await introspectCatalog({
     url,

@@ -3,9 +3,14 @@
  * fresh database, read its catalog, and write or check the generated files.
  * @packageDocumentation
  */
-import type { Catalog } from '@netvark/catalog-core';
+import type { Catalog, PublicCatalog } from '@netvark/catalog-core';
 
-import type { DatabaseConfig, ExtractionConfig, TypesConfig } from '../config';
+import type {
+  DatabaseConfig,
+  ExtractionConfig,
+  PublicFileConfig,
+  TypesConfig,
+} from '../config';
 import type { MigrationSource } from '../migrations/load';
 import type { SqlSession } from '../target/session';
 
@@ -15,7 +20,7 @@ import process from 'node:process';
 
 import { toPublicCatalog } from '@netvark/catalog-core';
 
-import { DEFAULT_SCHEMAS } from '../config';
+import { catalogFile, DEFAULT_SCHEMAS } from '../config';
 import { PgCatalogError } from '../errors';
 import { readCatalog } from '../extract/read-catalog';
 import { loadMigrations } from '../migrations/load';
@@ -97,9 +102,10 @@ export async function extractCatalog(
   });
 }
 
-function publicModule(catalog: Catalog, tables: ReadonlyArray<string>): string {
+function publicModule(catalog: Catalog, config: PublicFileConfig): string {
+  let publicCatalog: PublicCatalog;
   try {
-    return renderPublicCatalogModule(toPublicCatalog(catalog, tables));
+    publicCatalog = toPublicCatalog(catalog, config.tables);
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown error';
     throw new PgCatalogError(
@@ -108,6 +114,9 @@ function publicModule(catalog: Catalog, tables: ReadonlyArray<string>): string {
       { cause: error },
     );
   }
+  return renderPublicCatalogModule(publicCatalog, {
+    interface: config.interface,
+  });
 }
 
 async function readExisting(path: string): Promise<Buffer | null> {
@@ -150,8 +159,9 @@ function typesConfig(types: string | TypesConfig): TypesConfig {
  * Kysely types when `out.types` is set. Without `check` it writes the files
  * whose bytes differ (creating directories); with `check` it writes
  * nothing. A public table the catalog does not hold fails with
- * `public_table_unknown`, and two objects with one TypeScript name with
- * `name_collision`, before any file is written.
+ * `public_table_unknown`, two objects with one TypeScript name with
+ * `name_collision`, and an interface name outside `INTERFACE_NAME` with
+ * `TypeError`, before any file is written.
  */
 export async function extract(
   config: ExtractionConfig,
@@ -160,14 +170,19 @@ export async function extract(
   const cwd = options.cwd ?? process.cwd();
   const check = options.check ?? false;
   const catalog = await extractCatalog({ ...config, cwd });
+  const catalogOut = catalogFile(config.out.catalog);
   const outputs: Array<[ExtractedFile['kind'], string, string]> = [
-    ['catalog', resolve(cwd, config.out.catalog), renderCatalogModule(catalog)],
+    [
+      'catalog',
+      resolve(cwd, catalogOut.file),
+      renderCatalogModule(catalog, { interface: catalogOut.interface }),
+    ],
   ];
   if (config.out.public !== undefined) {
     outputs.push([
       'public',
       resolve(cwd, config.out.public.file),
-      publicModule(catalog, config.out.public.tables),
+      publicModule(catalog, config.out.public),
     ]);
   }
   if (config.out.types !== undefined) {

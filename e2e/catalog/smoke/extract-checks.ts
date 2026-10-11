@@ -1,8 +1,8 @@
 /**
  * Extraction checks for runtimes with a file system and WebAssembly (Bun
  * and Deno): replay the contacts migrations into PGlite through the built
- * `@netvark/pg-catalog` and compare with the reviewed catalog and Kysely
- * types.
+ * `@netvark/pg-catalog` and compare with the reviewed catalog module and
+ * Kysely types, byte for byte.
  */
 import type { Checks } from './report.ts';
 
@@ -16,6 +16,7 @@ import {
 
 import { catalog } from '../fixtures/contacts/expected/catalog.ts';
 import {
+  EXPECTED_CATALOG,
   EXPECTED_TYPES,
   MIGRATIONS_DIR,
   PGLITE_EXTENSIONS,
@@ -32,8 +33,9 @@ export const extractChecks: Checks = {
       });
       sameJson(extracted, catalog, 'catalog');
       check(
-        renderCatalogModule(extracted).endsWith(' as const;\n'),
-        'module terminator',
+        renderCatalogModule(extracted) ===
+          (await readFile(EXPECTED_CATALOG, 'utf8')),
+        'catalog module',
       );
       check(
         renderKyselyTypes(extracted) ===

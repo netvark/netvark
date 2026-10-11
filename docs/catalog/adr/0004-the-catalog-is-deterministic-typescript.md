@@ -1,6 +1,6 @@
 # ADR 0004: The catalog is deterministic TypeScript
 
-- Status: accepted
+- Status: accepted; the module's binding is typed by a named interface since ADR 0011
 - Date: 2026-10-10
 
 ## Context

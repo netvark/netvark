@@ -44,6 +44,7 @@ export async function extractContractCatalog(check: boolean): Promise<string> {
           public: {
             file: CONTRACT_CATALOG,
             tables: ['workspaces', 'tasks', 'logs'],
+            interface: 'ContractPublicCatalog',
           },
         },
       },

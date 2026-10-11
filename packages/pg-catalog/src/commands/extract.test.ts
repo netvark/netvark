@@ -65,7 +65,9 @@ describe('extract (SPEC 10.1)', () => {
       join(directory, 'generated/public-catalog.ts'),
       'utf8',
     );
-    expect(publicText).toContain('export const publicCatalog = {');
+    expect(publicText).toContain(
+      'export const publicCatalog: ExtractedPublicCatalog = value;',
+    );
     expect(publicText).toContain('"people"');
     expect(publicText).not.toContain('"secrets"');
   });
