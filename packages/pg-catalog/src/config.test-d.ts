@@ -78,6 +78,22 @@ describe('configuration types (SPEC 11.1)', () => {
   });
 });
 
+describe('output types (SPEC 9.1, 11.1)', () => {
+  it('takes the catalog as a path or with the interface it exports, and the public interface beside its tables', () => {
+    expectTypeOf<{
+      catalog: { file: 'c.ts'; interface: 'SternCatalog' };
+      public: { file: 'p.ts'; tables: ['contacts']; interface: 'SternPublic' };
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{ catalog: { file: 'c.ts' } }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: { interface: 'SternCatalog' };
+    }>().not.toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: { file: 'c.ts'; interface: 7 };
+    }>().not.toExtend<OutputConfig>();
+  });
+});
+
 describe('command types (SPEC 10.1)', () => {
   it('reports every file with a closed set of statuses', () => {
     expectTypeOf(extract).returns.resolves.toEqualTypeOf<ExtractReport>();

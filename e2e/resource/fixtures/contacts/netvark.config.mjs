@@ -9,9 +9,10 @@ export default defineExtraction({
   database: { pglite: { extensions: ['pg_trgm', 'btree_gist', 'citext'] } },
   schemas: ['public', 'audit'],
   out: {
-    catalog: 'catalog.ts',
+    catalog: { file: 'catalog.ts', interface: 'ContactsCatalog' },
     public: {
       file: 'public-catalog.ts',
+      interface: 'ContactsPublicCatalog',
       tables: [
         'calls',
         'contacts',

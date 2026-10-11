@@ -3,6 +3,7 @@
  * 14). Each `// error:` names a text the diagnostic on the next line must
  * contain.
  */
+import { Contacts } from '../resources/contacts.ts';
 import { declareResource } from '../resources/declare-resource.ts';
 import { Organizations } from '../resources/organizations.ts';
 
@@ -42,5 +43,16 @@ declareResource('meetings', {
   relationships: {
     // error: provides no match for the signature '(): void'
     organization_id: { target: Organizations, access: 'read' },
+  },
+});
+
+// The catalog prints by the name of its interface (pg-catalog SPEC 9.1),
+// not member by member, so TypeScript does not cut the message short.
+declareResource('notes', {
+  operations: ['get'],
+  fields: {},
+  relationships: {
+    // error: Type '{ target: () => DeclaredResource<DeclareContext<ContactsPublicCatalog, {
+    contact_id: { target: () => Contacts, access: 'readWrite' },
   },
 });

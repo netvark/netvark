@@ -8,9 +8,10 @@ export default defineExtraction({
   migrations: 'migrations',
   database: { pglite: { extensions: ['citext'] } },
   out: {
-    catalog: 'catalog.ts',
+    catalog: { file: 'catalog.ts', interface: 'OracleCatalog' },
     public: {
       file: 'public-catalog.ts',
+      interface: 'OraclePublicCatalog',
       tables: [
         'key_bigints',
         'key_booleans',

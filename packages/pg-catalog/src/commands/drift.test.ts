@@ -119,6 +119,13 @@ describe('drift before connecting (SPEC 10.2, 12)', () => {
       message:
         'cannot read the committed catalog catalog.ts; run pg-catalog extract and commit it',
     });
+    const named = { ...config, out: { catalog: { file: 'named.ts' } } };
+    await expect(
+      drift(named, 'production', { cwd: directory }),
+    ).rejects.toMatchObject({
+      message:
+        'cannot read the committed catalog named.ts; run pg-catalog extract and commit it',
+    });
     const current = renderCatalogModule(catalogOf({}));
     await writeFile(
       join(directory, 'catalog.ts'),

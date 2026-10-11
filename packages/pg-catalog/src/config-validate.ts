@@ -7,6 +7,12 @@
  */
 import type { ExtractionConfig } from './config';
 
+import {
+  DEFAULT_CATALOG_INTERFACE,
+  DEFAULT_PUBLIC_INTERFACE,
+  INTERFACE_NAME,
+} from './render/catalog-module';
+
 /** `drift` environment names: what a CLI flag and a CI job name can carry. */
 const ENVIRONMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
 /** `NAMEDATALEN - 1` (SPEC 15). */
@@ -189,15 +195,63 @@ function types(value: unknown): void {
   }
 }
 
+/** The interface a module exports: `fallback` when the option is absent. */
+function interfaceName(value: unknown, path: string, fallback: string): string {
+  if (value === undefined) {
+    return fallback;
+  }
+  text(value, path);
+  if (!INTERFACE_NAME.test(value)) {
+    fail(
+      `${path} must be an ASCII identifier that starts with an uppercase letter`,
+    );
+  }
+  return value;
+}
+
+/** Validates `out.catalog` and returns the interface it exports. */
+function catalogFile(value: unknown): string {
+  if (typeof value === 'string') {
+    text(value, 'out.catalog');
+    return DEFAULT_CATALOG_INTERFACE;
+  }
+  if (!isOptions(value)) {
+    fail('out.catalog must be a string or an object');
+  }
+  const config = options(value, 'out.catalog', ['file', 'interface']);
+  text(config['file'], 'out.catalog.file');
+  return interfaceName(
+    config['interface'],
+    'out.catalog.interface',
+    DEFAULT_CATALOG_INTERFACE,
+  );
+}
+
+/** Validates `out.public` and returns the interface it exports. */
+function publicFile(value: unknown): string {
+  const config = options(value, 'out.public', ['file', 'tables', 'interface']);
+  text(config['file'], 'out.public.file');
+  if (texts(config['tables'], 'out.public.tables').length === 0) {
+    fail('out.public.tables must not be empty');
+  }
+  return interfaceName(
+    config['interface'],
+    'out.public.interface',
+    DEFAULT_PUBLIC_INTERFACE,
+  );
+}
+
 function out(value: unknown): void {
   const config = options(value, 'out', ['catalog', 'public', 'types']);
-  text(config['catalog'], 'out.catalog');
-  if (config['public'] !== undefined) {
-    const slice = options(config['public'], 'out.public', ['file', 'tables']);
-    text(slice['file'], 'out.public.file');
-    if (texts(slice['tables'], 'out.public.tables').length === 0) {
-      fail('out.public.tables must not be empty');
-    }
+  const catalogInterface = catalogFile(config['catalog']);
+  if (
+    config['public'] !== undefined &&
+    publicFile(config['public']) === catalogInterface
+  ) {
+    // Both modules may be imported together, and one name would leave a message ambiguous.
+    fail(
+      `out.public.interface must differ from the catalog's interface, ${catalogInterface}`,
+    );
   }
   if (config['types'] !== undefined) {
     types(config['types']);

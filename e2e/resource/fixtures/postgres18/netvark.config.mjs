@@ -9,9 +9,10 @@ export default defineExtraction({
   migrations: 'migrations',
   database: { pglite: {} },
   out: {
-    catalog: 'catalog.ts',
+    catalog: { file: 'catalog.ts', interface: 'Postgres18Catalog' },
     public: {
       file: 'public-catalog.ts',
+      interface: 'Postgres18PublicCatalog',
       tables: ['imported_contacts', 'owners'],
     },
   },
