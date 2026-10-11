@@ -5,6 +5,7 @@ import {
   DEFAULT_MAX_PAGE_SIZE,
   DEFAULT_PAGE_SIZE,
   defineKeyset,
+  isSearchConfig,
 } from './define-keyset';
 
 function message(fn: () => unknown): string {
@@ -188,6 +189,29 @@ describe('defineKeyset', () => {
         source: { vector: 'search_vector' },
         config: 'english',
       });
+    });
+
+    it('isSearchConfig keeps to the regconfig name syntax', () => {
+      for (const config of [
+        'simple',
+        'english',
+        '_x',
+        'a1_b',
+        'a'.repeat(63),
+      ]) {
+        expect(isSearchConfig(config), config).toBe(true);
+      }
+      for (const config of [
+        '',
+        'English',
+        '1english',
+        'pg_catalog.english',
+        "en'glish",
+        'a'.repeat(64),
+        null,
+      ]) {
+        expect(isSearchConfig(config), String(config)).toBe(false);
+      }
     });
 
     it('validates the mode, the configuration name, and the source', () => {

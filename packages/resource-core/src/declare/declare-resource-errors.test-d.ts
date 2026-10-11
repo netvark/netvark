@@ -232,3 +232,55 @@ describe('declareResource: filters and sorts keyset-core cannot run (SPEC 11.3)'
     });
   });
 });
+
+describe('declareResource: definitions keyset-core and jsonapi-core refuse (SPEC 11.2)', () => {
+  it('rejects an empty or repeated filter', () => {
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error at least one operator
+        name: { access: 'read', filter: [] },
+        // @ts-expect-error eq is listed twice
+        nickname: { access: 'read', filter: ['eq', 'eq'] },
+      },
+      relationships: {
+        // @ts-expect-error in is listed twice
+        organization_id: {
+          target: () => null,
+          access: 'read',
+          filter: ['in', 'in'],
+        },
+      },
+    });
+  });
+
+  it('rejects a filtered or sortable name outside keyset-core field names', () => {
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error not a keyset-core field name
+        name: { access: 'read', as: 'größe', filter: ['eq'] },
+        // @ts-expect-error not a keyset-core field name
+        nickname: { access: 'read', as: 'nick name', sort: true },
+        email: { access: 'read', as: 'e mail' },
+      },
+    });
+  });
+
+  it('rejects a filtered member named or, or q with search', () => {
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error the filter disjunction
+        name: { access: 'read', as: 'or', filter: ['eq'] },
+        // @ts-expect-error the search parameter
+        nickname: { access: 'read', as: 'q', filter: ['eq'] },
+      },
+      search: { column: 'search' },
+    });
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: { name: { access: 'read', as: 'q', filter: ['eq'] } },
+    });
+  });
+});

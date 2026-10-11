@@ -15,22 +15,20 @@ import type {
   PublicColumn,
   PublicTable,
 } from '@netvark/catalog-core';
-import type { SortField } from '@netvark/keyset-core';
+import type { FieldType } from '@netvark/keyset-core';
 
 import type {
   CodecTypeName,
   IsIdentifierColumn,
 } from '../catalog/resolve-type';
-import type {
-  ColumnName,
-  PrimaryKeyColumn,
-  SearchColumn,
-  TableName,
-} from '../catalog/types';
+import type { ColumnName, PrimaryKeyColumn, TableName } from '../catalog/types';
+import type { KeysetTypeOf } from '../jsonapi/keyset-types';
 import type { CodesCheck } from '../names/codes-check';
+import type { KeysetNamesCheck } from '../names/keyset-names-check';
 import type { NamesCheck } from '../names/names-check';
 import type { OperationOf } from './access-check';
 import type { FieldsCheck } from './fields-check';
+import type { HasRepeat } from './lists';
 import type { DeclareContext } from './registries';
 import type { RelationshipsCheck } from './relationships-check';
 import type {
@@ -40,6 +38,7 @@ import type {
   RequireWhen,
 } from './requirement';
 import type { RulesCheck } from './rules-check';
+import type { SearchCheck, SortCheck } from './search-sort-check';
 import type { Declaration, DeclaredMembers, MemberOf } from './types';
 
 type Fields<TDecl extends Declaration> = TDecl['fields'];
@@ -65,15 +64,6 @@ type UpdatableMember<TDecl extends Declaration> =
         ? K
         : never;
     }[keyof Relationships<TDecl>];
-
-type HasRepeat<
-  TList extends ReadonlyArray<unknown>,
-  TSeen = never,
-> = TList extends readonly [infer THead, ...infer TRest]
-  ? [THead] extends [TSeen]
-    ? true
-    : HasRepeat<TRest, TSeen | THead>
-  : false;
 
 /**
  * A literal list of operations, checked; a list typed only as
@@ -118,69 +108,6 @@ type ScopeCheck<
     : Requirement<`scope: "${TDecl['scope']}" is not a scope of createDeclareResource`>
   : unknown;
 
-type SearchCheck<
-  TTable extends string,
-  TTableDef extends PublicTable,
-  TSearch,
-> = TSearch extends { readonly column: infer TColumn extends string }
-  ? SearchColumnCheck<
-      TTable,
-      TTableDef,
-      TSearch,
-      TColumn,
-      MemberOf<TSearch, 'config'>
-    >
-  : unknown;
-
-type SearchColumnCheck<
-  TTable extends string,
-  TTableDef extends PublicTable,
-  TSearch,
-  TColumn extends string,
-  TConfig,
-> = KnownMembers<TSearch, 'column' | 'config' | 'mode', 'search'> &
-  (TColumn extends SearchColumn<TTableDef>
-    ? TTableDef['columns'][TColumn]['generated'] extends {
-        readonly searchConfig: infer TGenerated extends string;
-      }
-      ? RequireWhen<
-          [TConfig] extends [TGenerated | undefined] ? false : true,
-          `search.config: the column is generated with config "${TGenerated}"`
-        >
-      : RequireWhen<
-          [TConfig] extends [string] ? false : true,
-          `search.config: required, because ${TColumn} is not generated with a configuration`
-        >
-    : Requirement<`search.column: "${TColumn}" is not a tsvector column of ${TTable}`>);
-
-/** Fields declared with `sort: true`, which the default sort may name. */
-type SortableColumn<TDecl extends Declaration> = {
-  [K in keyof Fields<TDecl>]: Fields<TDecl>[K] extends { readonly sort: true }
-    ? K
-    : never;
-}[keyof Fields<TDecl>] &
-  string;
-
-type SortEntryField<TEntry> = TEntry extends `-${infer TField}`
-  ? TField
-  : TEntry extends string
-    ? TEntry
-    : TEntry extends SortField<infer TField>
-      ? TField
-      : never;
-
-type SortCheck<TDecl extends Declaration> = TDecl['sort'] extends {
-  readonly default: ReadonlyArray<infer TEntry>;
-}
-  ? string extends SortEntryField<TEntry>
-    ? unknown
-    : [Exclude<SortEntryField<TEntry>, SortableColumn<TDecl>>] extends [never]
-      ? unknown
-      : {
-          readonly default: Requirement<`sort.default: "${Exclude<SortEntryField<TEntry>, SortableColumn<TDecl>>}" is not declared with sort: true`>;
-        }
-  : unknown;
-
 /** Why the primary key takes no client value (SPEC 3.4), or `never`. */
 type ClientIdError<TColumn extends PublicColumn> =
   TColumn['generated'] extends null
@@ -205,7 +132,18 @@ type ClientIdsCheck<TTableDef extends PublicTable, TClientIds> = [
       : Requirement<`clientIds: ${ClientIdError<TTableDef['columns'][PrimaryKeyColumn<TTableDef>]>}`>
     : unknown;
 
-/** Why `TTableDef`'s primary key cannot be a resource id (SPEC 3.4), or `never`. */
+/** Why keyset-core cannot order pages by the primary key `TKey` (SPEC 11.2), or `never`. */
+type KeyOrderError<
+  TCatalog extends PublicCatalog,
+  TTable extends string,
+  TTableDef extends PublicTable,
+  TKey extends keyof TTableDef['columns'] & string,
+> =
+  KeysetTypeOf<TCatalog, TTableDef, TKey> extends FieldType
+    ? never
+    : `${TTable}: the primary key is ${KeysetTypeOf<TCatalog, TTableDef, TKey> & string}, which @netvark/keyset-core cannot order`;
+
+/** Why `TTableDef`'s primary key cannot be a resource id (SPEC 3.4, 11.2), or `never`. */
 type IdentityError<
   TCatalog extends PublicCatalog,
   TTable extends string,
@@ -216,7 +154,10 @@ type IdentityError<
         TCatalog,
         TTableDef['columns'][PrimaryKeyColumn<TTableDef>]
       > extends true
-    ? never
+    ? PrimaryKeyColumn<TTableDef> extends infer TKey extends
+        keyof TTableDef['columns'] & string
+      ? KeyOrderError<TCatalog, TTable, TTableDef, TKey>
+      : never
     : `${TTable}: the primary key's type ${CodecTypeName<TTableDef['columns'][PrimaryKeyColumn<TTableDef>]>} cannot carry a resource id`;
 
 /** Checked on the `table` argument: a resource needs a single-column primary key that can carry an id (SPEC 3.4). */
@@ -258,6 +199,7 @@ type DeclarationCheckOf<
   AtMember<'sort', SortCheck<TDecl>> &
   RulesCheck<TContext, TTable, TTableDef, TDecl> &
   NamesCheck<TTableDef, TDecl> &
+  KeysetNamesCheck<TTableDef, TDecl> &
   CodesCheck<TTableDef, TDecl, TScopeColumn> & {
     readonly fields: FieldsCheck<
       TContext,

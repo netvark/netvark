@@ -36,6 +36,15 @@ export const DEFAULT_MAX_PAGE_SIZE = 100;
 /** `regconfig` names a definition may use as text search configurations. */
 export const SEARCH_CONFIG: RegExp = /^[a-z_][a-z0-9_]{0,62}$/u;
 
+/**
+ * Whether `value` is a text search configuration a definition may name:
+ * the one value an adapter emits as a literal, so it keeps to the name
+ * syntax of a `regconfig` (SPEC 3.4). A plain `boolean`, as `isFieldName`.
+ */
+export function isSearchConfig(value: unknown): boolean {
+  return typeof value === 'string' && SEARCH_CONFIG.test(value);
+}
+
 /** The relations type of a definition without relations. */
 // oxlint-disable-next-line typescript/no-generated-empty-object-type -- reason: the default must have no relation names at all, so no relation field path exists; a `Record<string, never>` would admit every string
 export type NoRelations = Readonly<Record<never, never>>;
@@ -104,7 +113,7 @@ function normalizeSearch(init: unknown): SearchSpec | null {
     );
   }
   const config = init['config'] ?? 'simple';
-  if (typeof config !== 'string' || !SEARCH_CONFIG.test(config)) {
+  if (typeof config !== 'string' || !isSearchConfig(config)) {
     throw new TypeError(`search.config must match ${SEARCH_CONFIG.source}`);
   }
   if (init['vector'] !== undefined && init['columns'] !== undefined) {

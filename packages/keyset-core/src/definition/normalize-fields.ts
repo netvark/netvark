@@ -27,8 +27,21 @@ import {
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
 
+/**
+ * Whether `value` may name a field or a relation: names are the request's
+ * vocabulary (SPEC 3), so they match `NAME` and are never a prototype key
+ * (2.3). Exported for libraries that derive definitions and check their
+ * names where they are declared. A plain `boolean`, not a type guard,
+ * since a string it refuses is still a string.
+ */
+export function isFieldName(value: unknown): boolean {
+  return (
+    typeof value === 'string' && NAME.test(value) && !PROTO_KEYS.has(value)
+  );
+}
+
 export function assertName(what: string, name: string): void {
-  if (!NAME.test(name) || PROTO_KEYS.has(name)) {
+  if (!isFieldName(name)) {
     throw new TypeError(
       `${what} must match ${NAME.source}: ${JSON.stringify(name)}`,
     );

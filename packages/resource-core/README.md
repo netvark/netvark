@@ -106,7 +106,7 @@ Contacts.names.fields.get('createdAt'); // 'created_at'
 | Option                 | Rule                                                                                                                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `catalog`              | the public catalog (`toPublicCatalog`), never the full one                                                                                                                     |
-| `table`                | a table of the public catalog, with a single-column primary key whose type can carry a resource id (not `json` or `jsonb`)                                                     |
+| `table`                | a table of the public catalog, with a single-column primary key whose type can carry a resource id (not `json` or `jsonb`) and orders pages (not an enum without values)       |
 | `fields`               | columns of the table, other than the primary key, a foreign-key column, the scope column, and a `tsvector`                                                                     |
 | `access`               | what the column allows (a generated column and an identity `ALWAYS` column are `read`, an identity `BY DEFAULT` column is `read` or `immutable`) and what the operations write |
 | `codec`                | a codec of the definer that accepts the column's type; a column without a wire form, such as `tstzrange` or `bytea`, needs one                                                 |
@@ -114,9 +114,10 @@ Contacts.names.fields.get('createdAt'); // 'created_at'
 | `operations`           | non-empty, without repeats; `update` needs a member writable on update                                                                                                         |
 | `scope`                | a scope of the definer whose column the table has                                                                                                                              |
 | `clientIds`            | a primary key that accepts a client value: not a generated column and not an identity `ALWAYS` column                                                                          |
-| `search`               | a `tsvector` column; `config` equals the one the column is generated with, or is given                                                                                         |
-| `filter`, `sort`       | operators `@netvark/keyset-core` runs for the member's type, `isNull` only where the column can be null; no filter or sort for `json`, `jsonb`, or a codec, no sort for arrays |
-| `sort.default`         | fields declared with `sort: true`                                                                                                                                              |
+| `search`               | a `tsvector` column; `config` equals the one the column is generated with, or is given, and is an unqualified name (`english`, not `pg_catalog.english`)                       |
+| `filter`, `sort`       | operators `@netvark/keyset-core` runs for the member's type, each once, at least one; `isNull` only on a nullable column; none on `json`, `jsonb`, a codec; no sort on arrays  |
+| `as`                   | on a member that filters or sorts, ASCII letters, digits, `_`, and `-`, starting with a letter or a digit; on a filtered member, not `or`, nor `q` with `search`               |
+| `sort.default`         | fields declared with `sort: true`, each once                                                                                                                                   |
 | `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on an enforced CHECK without a rule, and required on every such CHECK over a written column    |
 | `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
 | `codecs`, `validators` | values `defineCodec` and `defineValidator` made, never objects written by hand; each fixture typed by its schema's input                                                       |
@@ -279,11 +280,20 @@ export const Notes = declareResource('notes', {
 });
 ```
 
+A member that filters or sorts also names a query parameter, `filter[createdAt]` or
+`sort=-createdAt`, so its public name must be a field name `@netvark/keyset-core` accepts: ASCII
+letters, digits, `_`, and `-`, starting with a letter or a digit. A filtered member cannot be named
+`or`, which `filter` reserves for the disjunction, nor `q` when the resource has `search`, whose
+parameter is `filter[q]`. `priorität` above keeps its name because nothing filters or sorts by it;
+to filter by it, give it `as: 'priority'`.
+
 `tsc` checks the type, every member that gives `as` or whose column could derive a refused or shared
 name, and every given code. The other cases cost more to check in types than they catch, so only the
 declaration's runtime check, which runs when the module loads, reports them: a derived code outside
 the pattern or repeated, a column only a quoted identifier can name (`"suite-"`), and two columns a
-Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`). SPEC 4.2 lists both sides.
+Unicode case mapping gives one name (`a_ß` and `a_s_s` both give `aSS`), and the derived name of a
+filtered or sortable column with a letter outside ASCII (`größe`). SPEC 4.2 and 11.2 list both
+sides.
 
 ## Schemas
 
@@ -875,6 +885,10 @@ get, and remove, is
   `isNull` only where the column can be null, and sort by scalars: an array, a `jsonb` column, and a
   codec field do not sort. Declare only the operators clients need, since each one is a query the
   database must answer quickly.
+- **Keep query names URL-safe.** A filtered or sortable member's public name goes into request URLs,
+  so keep it to ASCII letters, digits, `_`, and `-`: give `as: 'priority'` to a `priorität` column
+  before filtering by it, and leave `or`, and `q` on a resource with `search`, to the query syntax.
+  List each operator once, and each `sort.default` field once.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
   database or the server sets, `write` only for values clients send but never read back.
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
@@ -1006,21 +1020,23 @@ memory are medians of at least five runs:
 
 | Catalog            | Declarations | Fields | Relationships | Check time | Peak memory, 1 checker | Peak memory, 4 checkers |
 | ------------------ | ------------ | ------ | ------------- | ---------- | ---------------------- | ----------------------- |
-| stern              | 111          | 1,183  | 184           | 0.19 s     | 134 MB                 | 220 MB                  |
-| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.28 s     | 149 MB                 | 286 MB                  |
+| stern              | 111          | 1,183  | 184           | 0.19 s     | 135 MB                 | 219 MB                  |
+| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.28 s     | 163 MB                 | 278 MB                  |
 
 The names checks account for about 15 percent of the stern check time and 11 percent of the GitLab
 one. The filter and sort check, with 1,019 of stern's fields and 1,290 of the GitLab slice's
 declaring both, adds 15 percent instantiations and 4 and 6 percent check time (0.18 to 0.19 s, 0.27
-to 0.28 s). Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB
-of peak memory, most of it to parse Zod's own declarations. A resource's codes are typed only where
-code reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the
-check from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: reading every
-declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what reading each one's
-`schema.create` output costs. A full `defineMessages` mapping, one function per code, kind, member,
-and option, took stern's check from 0.19 s and 124 MB to 0.35 s and 161 MB, and the GitLab slice's,
-with 1,302 derived codes, from 0.28 s and 157 MB to 0.67 s and 198 MB. A policy and a behavior for
-every declaration, with rules and effects, collected in one
+to 0.28 s). The checks of the definitions a declaration derives (public names, `filter` lists, the
+default sort, the search configuration, the primary key) add 4 and 2 percent instantiations and 2
+and 4 percent check time. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and
+about 10 MB of peak memory, most of it to parse Zod's own declarations. A resource's codes are typed
+only where code reads them: `errorCatalog` over all of stern's declarations, spread into
+`createBan`, took the check from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same
+way: reading every declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what
+reading each one's `schema.create` output costs. A full `defineMessages` mapping, one function per
+code, kind, member, and option, took stern's check from 0.19 s and 124 MB to 0.35 s and 161 MB, and
+the GitLab slice's, with 1,302 derived codes, from 0.28 s and 157 MB to 0.67 s and 198 MB. A policy
+and a behavior for every declaration, with rules and effects, collected in one
 `ReadonlyArray<ResourceBehavior<TDomain>>` as a runtime takes them, took stern's check from 0.18 s
 and 129 MB to 0.52 s and 202 MB, and the GitLab slice's from 0.27 s and 151 MB to 0.68 s and 211 MB.
 
@@ -1047,10 +1063,13 @@ and 129 MB to 0.52 s and 202 MB, and the GitLab slice's from 0.27 s and 151 MB t
   more instantiations. Key an alias by what repeats across fields, since TypeScript caches it by its
   arguments: the filter check computes a keyset type per resolved column type and checks the
   operators per keyset type and declared list, so a column costs a lookup; its first version, keyed
-  by the column, added 37 and 57 percent instantiations instead of 15. Name every union of template
-  literal types with an alias: TypeScript 7 instantiates an inline union in a conditional's
-  `extends` clause again on every evaluation, at 4 to 7 times the cost. Re-run the real-catalog
-  measurement when a check changes shape.
+  by the column, added 37 and 57 percent instantiations instead of 15. Do not read a string one
+  character at a time in a check every member takes: template literal recursion costs about ten
+  instantiations a character, and the first version of the public-name check, which read every name,
+  added 26 and 56 percent instantiations; checking only the members the names check already examines
+  added 4 and 2. Name every union of template literal types with an alias: TypeScript 7 instantiates
+  an inline union in a conditional's `extends` clause again on every evaluation, at 4 to 7 times the
+  cost. Re-run the real-catalog measurement when a check changes shape.
 
 @ref https://devblogs.microsoft.com/typescript/announcing-typescript-7-0-rc/
 

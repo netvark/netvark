@@ -165,8 +165,24 @@ describe('FilterRequirement (SPEC 11.3)', () => {
       Messages<
         Contacts,
         'created_at',
-        { access: 'read'; filter: readonly []; sort: false }
+        { access: 'read'; filter: readonly ['gt', 'lte']; sort: false }
       >
+    >().toBeNever();
+  });
+
+  it('requires at least one operator, each listed once', () => {
+    expectTypeOf<
+      Messages<Contacts, 'name', { access: 'read'; filter: readonly [] }>
+    >().toEqualTypeOf<'filter: list at least one operator'>();
+    expectTypeOf<
+      Messages<
+        Contacts,
+        'name',
+        { access: 'read'; filter: readonly ['eq', 'in', 'eq'] }
+      >
+    >().toEqualTypeOf<'filter: an operator is listed twice'>();
+    expectTypeOf<
+      Messages<Contacts, 'name', { access: 'read'; filter: Array<'eq'> }>
     >().toBeNever();
   });
 
@@ -238,7 +254,7 @@ describe('FilterRequirement (SPEC 11.3)', () => {
       Messages<
         Tables['audit.changes'],
         'payload',
-        { access: 'read'; filter: readonly []; sort: true }
+        { access: 'read'; filter: readonly ['eq']; sort: true }
       >
     >().toEqualTypeOf<
       | 'filter: type jsonb is not filterable'

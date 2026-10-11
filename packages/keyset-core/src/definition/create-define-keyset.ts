@@ -21,7 +21,12 @@ import type {
 
 import { createCursorCodec } from '../cursor/codec';
 import { isRecord } from '../internal/object';
-import { defineKeyset, positiveInteger, SEARCH_CONFIG } from './define-keyset';
+import {
+  defineKeyset,
+  isSearchConfig,
+  positiveInteger,
+  SEARCH_CONFIG,
+} from './define-keyset';
 
 /**
  * What a configured definer merges under every definition (SPEC 3.6): the
@@ -95,10 +100,7 @@ function checkDefaults(defaults: KeysetDefaults): void {
     }
   }
   const config = optionalObject('search', defaults.search)?.['config'];
-  if (
-    config !== undefined &&
-    (typeof config !== 'string' || !SEARCH_CONFIG.test(config))
-  ) {
+  if (config !== undefined && !isSearchConfig(config)) {
     throw new TypeError(`search.config must match ${SEARCH_CONFIG.source}`);
   }
 }

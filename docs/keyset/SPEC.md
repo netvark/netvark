@@ -36,10 +36,10 @@ beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter:
 typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its only
 peer dependency.
 
-| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@netvark/keyset-core`   | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `OperatorsOf`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PlanOptions`, `CursorContext`, `CursorContextValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
-| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/keyset-core`   | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `isFieldName`, `isSearchConfig`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `OperatorsOf`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PlanOptions`, `CursorContext`, `CursorContextValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
+| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 `e2e/keyset/package-surface.e2e.test.ts` asserts the exact value export list of both packages
 against the built packages, that the adapter's re-exports are the core's own bindings, and that its
@@ -64,9 +64,9 @@ packages/keyset-core/src/
   definition/
     types.ts                   section 3
     field-types.ts             the vocabularies as type guards (3.1)
-    normalize-fields.ts        normalizeFields(), normalizeColumnField(), assertName(), assertIdentifier() (3.1, 3.2)
+    normalize-fields.ts        normalizeFields(), normalizeColumnField(), isFieldName(), assertName(), assertIdentifier() (3, 3.1, 3.2)
     normalize-relations.ts     normalizeRelations() (3.3)
-    define-keyset.ts           defineKeyset(), DEFAULT_PAGE_SIZE, DEFAULT_MAX_PAGE_SIZE, SEARCH_CONFIG, positiveInteger() (3.4, 3.5)
+    define-keyset.ts           defineKeyset(), DEFAULT_PAGE_SIZE, DEFAULT_MAX_PAGE_SIZE, SEARCH_CONFIG, isSearchConfig(), positiveInteger() (3.4, 3.5)
     create-define-keyset.ts    createDefineKeyset(), KeysetDefaults, DefaultedKeysetInit (3.6)
   filter/
     types.ts                   Filter, FilterCondition, RelationFilter, RelationFieldMap (4.1)
@@ -171,8 +171,10 @@ Tests: `like.test.ts`.
 | `cursor`    | `{ secret, previousSecrets, ttl }` (8); `secret` may come from a configured definer (3.6)                 |
 
 Names of fields and relations are the request's vocabulary and MUST match
-`^[A-Za-z0-9][A-Za-z0-9_-]*$` and not be a prototype key (2.3). Table and column names are the
-database's and are opaque non-empty strings here; the adapter resolves them (10).
+`^[A-Za-z0-9][A-Za-z0-9_-]*$` and not be a prototype key (2.3); `isFieldName(value)` is that test,
+for a library that derives definitions and checks their names where it declares them. Table and
+column names are the database's and are opaque non-empty strings here; the adapter resolves them
+(10).
 
 ### 3.1 Column fields (`types.ts`, `field-types.ts`, `normalize-fields.ts`)
 
@@ -195,8 +197,8 @@ The normalized `ColumnField` is
 Every mistake is a `TypeError` whose message names the option (`fields.age.type ...`).
 
 Tests: `field-types.test.ts`, `normalize-fields.test.ts` (defaults, `isNull`, narrowed and rejected
-operators, enum and array requirements, collation, every malformed member, name grammar, prototype
-keys ignored).
+operators, enum and array requirements, collation, every malformed member, name grammar and
+`isFieldName`, prototype keys ignored).
 
 ### 3.2 Aggregate fields (`normalize-fields.ts`)
 
@@ -234,12 +236,13 @@ Tests: `normalize-relations.test.ts`.
 
 `mode` defaults to `websearch` and MUST be `websearch`, `plain`, or `phrase` (the `tsquery` parser:
 `websearch_to_tsquery`, `plainto_tsquery`, `phraseto_tsquery`). `config` defaults to `simple` and
-MUST match `^[a-z_][a-z0-9_]{0,62}$`, the name syntax of a `regconfig`; it is the one value the
-adapter emits as a literal (10.2). `columns` and `vector` are exclusive; `columns` MUST be a
-non-empty array of non-empty strings. The normalized `SearchSpec` is `{ mode: 'like', columns }` or
-`{ mode, source: { columns } | { vector }, config }`; `null` when absent.
+MUST match `^[a-z_][a-z0-9_]{0,62}$`, the name syntax of a `regconfig`, which
+`isSearchConfig(value)` tests; it is the one value the adapter emits as a literal (10.2). `columns`
+and `vector` are exclusive; `columns` MUST be a non-empty array of non-empty strings. The normalized
+`SearchSpec` is `{ mode: 'like', columns }` or `{ mode, source: { columns } | { vector }, config }`;
+`null` when absent.
 
-Tests: `define-keyset.test.ts` (`search`).
+Tests: `define-keyset.test.ts` (`search`, `isSearchConfig`).
 
 ### 3.5 `defineKeyset(init)` (`define-keyset.ts`, ADR 0011)
 
@@ -808,15 +811,15 @@ workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
 
 ## 13. Constants
 
-| Name                    | Value                                                       | Exported |
-| ----------------------- | ----------------------------------------------------------- | -------- |
-| `CURSOR_VERSION`        | 1                                                           | yes      |
-| `MIN_SECRET_BYTES`      | 32                                                          | yes      |
-| `DEFAULT_PAGE_SIZE`     | 20                                                          | yes      |
-| `DEFAULT_MAX_PAGE_SIZE` | 100                                                         | yes      |
-| `OPERATORS`             | the nineteen operators of 4.2, in table order               | yes      |
-| `keyAlias(i)`           | `keyset<i>`                                                 | yes      |
-| `PROTO_KEYS`            | `__proto__`, `constructor`, `prototype`                     | no       |
-| name grammar            | `^[A-Za-z0-9][A-Za-z0-9_-]*$` (field and relation names)    | no       |
-| `SEARCH_CONFIG`         | `^[a-z_][a-z0-9_]{0,62}$` (text search configuration names) | no       |
-| `TAG_BYTES`             | 32 (the HMAC-SHA256 tag)                                    | no       |
+| Name                    | Value                                                       | Exported                      |
+| ----------------------- | ----------------------------------------------------------- | ----------------------------- |
+| `CURSOR_VERSION`        | 1                                                           | yes                           |
+| `MIN_SECRET_BYTES`      | 32                                                          | yes                           |
+| `DEFAULT_PAGE_SIZE`     | 20                                                          | yes                           |
+| `DEFAULT_MAX_PAGE_SIZE` | 100                                                         | yes                           |
+| `OPERATORS`             | the nineteen operators of 4.2, in table order               | yes                           |
+| `keyAlias(i)`           | `keyset<i>`                                                 | yes                           |
+| `PROTO_KEYS`            | `__proto__`, `constructor`, `prototype`                     | no                            |
+| name grammar            | `^[A-Za-z0-9][A-Za-z0-9_-]*$` (field and relation names)    | no, `isFieldName` tests it    |
+| `SEARCH_CONFIG`         | `^[a-z_][a-z0-9_]{0,62}$` (text search configuration names) | no, `isSearchConfig` tests it |
+| `TAG_BYTES`             | 32 (the HMAC-SHA256 tag)                                    | no                            |

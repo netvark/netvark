@@ -55,7 +55,7 @@ describe('declareResource: filter and sort against the operator table (SPEC 11.3
           access: 'read',
           filter: ['contains', 'containedBy', 'overlaps'],
         },
-        created_at: { access: 'read', sort: true, filter: [] },
+        created_at: { access: 'read', sort: true, filter: ['gt', 'lte'] },
       }),
     ).not.toThrow();
     expect(
@@ -126,7 +126,9 @@ describe('declareResource: filter and sort against the operator table (SPEC 11.3
   it('refuses filter and sort on a member without a keyset type', () => {
     expect(
       typeErrorOf(
-        fields('audit.changes', { payload: { access: 'read', filter: [] } }),
+        fields('audit.changes', {
+          payload: { access: 'read', filter: ['eq'] },
+        }),
       ),
     ).toBe('audit.changes.fields.payload.filter: type jsonb is not filterable');
     expect(

@@ -8,12 +8,14 @@ import type { MemberSpec, SpecSource } from './field-spec';
 import type { MultiColumnCheck } from './multi-column';
 import type { RelationshipSpec } from './relationship-specs';
 
-import { fieldSpecs } from './field-spec';
+import { fieldSpecs, memberSpec } from './field-spec';
 import { multiColumnChecks } from './multi-column';
 import { relationshipSpecs } from './relationship-specs';
 
 /** The specs of a declared resource's members and its multi-column CHECKs. */
 export interface ResourceSpecs {
+  /** The primary key, read as a member named `id`, for its keyset type (SPEC 11.2). */
+  readonly id: MemberSpec;
   readonly fields: ReadonlyArray<MemberSpec>;
   readonly relationships: ReadonlyArray<RelationshipSpec>;
   readonly checks: ReadonlyArray<MultiColumnCheck>;
@@ -22,6 +24,11 @@ export interface ResourceSpecs {
 /** The specs of the resource `source` declares. */
 export function resourceSpecs(source: SpecSource): ResourceSpecs {
   return {
+    id: memberSpec(source, {
+      column: source.names.id,
+      name: 'id',
+      access: 'read',
+    }),
     fields: fieldSpecs(source),
     relationships: relationshipSpecs(source),
     checks: multiColumnChecks(source),

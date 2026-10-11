@@ -58,21 +58,53 @@ const RELATIONSHIP_OPERATORS = ['eq', 'ne', 'in', 'nin', 'isNull'] as const;
 const SEARCH_MODES = ['websearch', 'plain', 'phrase'] as const;
 const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 
+/**
+ * `filter` lists at least one operator, each once, as `@netvark/jsonapi-core`
+ * requires of the resource's query capabilities (SPEC 11.1); `check` names
+ * the vocabulary.
+ */
+function checkFilterList(
+  path: string,
+  value: unknown,
+  check: (path: string, operator: unknown) => void,
+): void {
+  const operators = optionalArray(`${path}.filter`, value);
+  if (operators === undefined) {
+    return;
+  }
+  if (operators.length === 0) {
+    throw new TypeError(`${path}.filter: list at least one operator`);
+  }
+  const seen = new Set<unknown>();
+  for (const [index, operator] of operators.entries()) {
+    const at = `${path}.filter[${String(index)}]`;
+    check(at, operator);
+    if (seen.has(operator)) {
+      throw new TypeError(`${at}: ${describe(operator)} is listed twice`);
+    }
+    seen.add(operator);
+  }
+}
+
+function checkFieldOperator(path: string, operator: unknown): void {
+  if (!isOperator(operator)) {
+    throw new TypeError(
+      `${path}: ${describe(operator)} is not an operator of @netvark/keyset-core`,
+    );
+  }
+}
+
+function checkRelationshipOperator(path: string, operator: unknown): void {
+  expectOneOf(path, operator, RELATIONSHIP_OPERATORS);
+}
+
 function checkField(path: string, value: unknown): void {
   const field = expectRecord(path, value);
   expectKnownKeys(path, field, FIELD_KEYS);
   expectOneOf(`${path}.access`, field['access'], ACCESS_MODES);
   optionalString(`${path}.as`, field['as']);
   optionalString(`${path}.codec`, field['codec']);
-  for (const [index, operator] of (
-    optionalArray(`${path}.filter`, field['filter']) ?? []
-  ).entries()) {
-    if (!isOperator(operator)) {
-      throw new TypeError(
-        `${path}.filter[${String(index)}]: ${describe(operator)} is not an operator of @netvark/keyset-core`,
-      );
-    }
-  }
+  checkFilterList(path, field['filter'], checkFieldOperator);
   optionalBoolean(`${path}.sort`, field['sort']);
   optionalString(`${path}.description`, field['description']);
 }
@@ -87,15 +119,7 @@ function checkRelationship(path: string, value: unknown): void {
   }
   expectOneOf(`${path}.access`, relationship['access'], RELATIONSHIP_ACCESS);
   optionalString(`${path}.as`, relationship['as']);
-  for (const [index, operator] of (
-    optionalArray(`${path}.filter`, relationship['filter']) ?? []
-  ).entries()) {
-    expectOneOf(
-      `${path}.filter[${String(index)}]`,
-      operator,
-      RELATIONSHIP_OPERATORS,
-    );
-  }
+  checkFilterList(path, relationship['filter'], checkRelationshipOperator);
   optionalBoolean(`${path}.include`, relationship['include']);
   optionalString(`${path}.description`, relationship['description']);
 }
