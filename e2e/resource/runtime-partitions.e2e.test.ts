@@ -3,7 +3,11 @@
  * PostgreSQL raises for a call names the partition that stores it, one of
  * them in another schema and two levels down, and the runtime still
  * answers with the declared code of `calls`, because its failure path has
- * the adapter resolve the partitioned table's names first.
+ * the adapter resolve the partitioned table's names first. A contact no
+ * row is never reaches the foreign key: the runtime's lookup answers it
+ * with the same code (`runtime-targets.e2e.test.ts`), and
+ * `errors-partitions.e2e.test.ts` raises the foreign key through each
+ * partition.
  */
 import type { RuntimeDatabase } from './runtime/database.ts';
 import type { ResourceInput } from './runtime/input.ts';
@@ -15,7 +19,6 @@ import { ADA } from './runtime/database.ts';
 import { CallsBehavior } from './runtime/domain.ts';
 import { editor, openRuntime } from './runtime/fixture.ts';
 
-const NO_CONTACT = '00000000-0000-4000-8000-00000000dead';
 /** An id each partition of `calls` stores (`errors-partitions.e2e.test.ts`). */
 const PARTITIONS = [
   ['calls_even', '00000000-0000-4000-8000-0000000000c1'],
@@ -56,19 +59,6 @@ describe('the runtime over the partitions of calls', () => {
         status: 409,
         code: 'CALLS_PKEY',
         errors: [{ path: ['data', 'id'] }],
-      });
-    },
-  );
-
-  it.each(PARTITIONS)(
-    'answers a contact no row is, for a call %s would store, with the code of the foreign key of calls',
-    async (_partition, id) => {
-      await expect(
-        runtime.create(editor, CallsBehavior, call(id, NO_CONTACT)),
-      ).rejects.toMatchObject({
-        status: 404,
-        code: 'CALLS_CONTACT_ID_FKEY',
-        errors: [{ path: ['data', 'relationships', 'contact'] }],
       });
     },
   );

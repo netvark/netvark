@@ -43,10 +43,9 @@ import {
 } from '@netvark/ban-core/postgresql';
 
 import { notNullKey } from '../catalog/columns';
-import { KIND_DETAIL } from '../errors/error-entry';
 import { ownValue } from '../internal/object';
+import { codeError } from './code-error';
 import { checkOptions } from './constraint-options';
-import { memberItems, memberTokens } from './member-items';
 
 /** The constraint kinds each integrity SQLSTATE reports. */
 const SQLSTATE_KINDS: ReadonlyMap<
@@ -165,7 +164,7 @@ export function constraintError(
     });
   }
   const code = codeOf(internals, fields, partition);
-  const { names, errors } = internals.resource;
+  const { errors } = internals.resource;
   const entry = code === undefined ? undefined : ownValue(errors, code);
   if (
     code === undefined ||
@@ -174,17 +173,5 @@ export function constraintError(
   ) {
     return undefined;
   }
-  const detail = KIND_DETAIL[entry.kind];
-  const paths = entry.fields.flatMap((member) => {
-    const tokens = memberTokens(names, member);
-    return tokens === undefined ? [] : [tokens];
-  });
-  return new BanError({
-    status: entry.status,
-    code,
-    title: entry.title,
-    detail,
-    errors: memberItems(base, paths, detail),
-    cause: driverError,
-  });
+  return codeError(internals.resource, code, entry, base, driverError);
 }

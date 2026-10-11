@@ -13,8 +13,9 @@ section 18, and the decisions behind it in
 Status: in development and unreleased. The storage adapter has its transaction protocol, scopes,
 reads and writes, keyset pages with totals, `many` for includes, quotas, row locks, and the outbox
 insert, and the runtime maps what an operation throws to the client's error (a rule's rejection, a
-keyset refusal, a PostgreSQL integrity violation through its declared code, partitions included);
-the domain (`runtime.as(actor)`), boot checks, and the outbox relay follow in the 0.x line.
+keyset refusal, a PostgreSQL integrity violation through its declared code, partitions included).
+`relayOutbox` delivers the events operations recorded. The domain (`runtime.as(actor)`) and its boot
+checks follow in the 0.x line.
 
 ## Install
 
@@ -135,6 +136,48 @@ runtime calls it, and you rarely do. What it does to your rows:
 - **Events with the write.** `record` inserts each event into the outbox table in the operation's
   transaction, so an event exists exactly when its write committed.
 
+## Delivering events
+
+Effects write their events into the outbox in the operation's transaction. `relayOutbox` delivers
+them once the transaction has committed:
+
+```ts
+// src/server/relay.ts
+import { relayOutbox } from '@netvark/kysely-resource';
+
+import { db } from './db';
+import { queue } from './queue';
+
+const BATCH = 100;
+
+/** Delivers until a run finds fewer than a batch; call it on a timer. */
+export async function drainOutbox(): Promise<void> {
+  let delivered = BATCH;
+  while (delivered === BATCH) {
+    delivered = await relayOutbox({
+      db,
+      outbox: { table: 'outbox' },
+      limit: BATCH,
+      deliver: async (events) => {
+        await queue.sendBatch(events); // throw to keep the events for the next run
+      },
+    });
+  }
+}
+```
+
+- **One run, one transaction.** A run claims the oldest `limit` rows (100 by default) with
+  `FOR UPDATE SKIP LOCKED`, calls `deliver` once with them in `position` order, deletes them, and
+  commits. It resolves to how many it delivered; an empty outbox resolves to 0 without calling
+  `deliver`.
+- **A failed delivery keeps the events.** When `deliver` throws or rejects, the run rolls back and
+  rejects with that error, so the next run delivers the same events.
+- **Relays run side by side.** A run skips the rows another run holds, without waiting for it, so
+  several workers can drain one outbox. Each run is READ COMMITTED whatever the role's or the
+  database's default says: under SERIALIZABLE, two runs over one page fail each other.
+- **Events as text and JSON.** `position` is text, since an `int8` may exceed 2^53; `version` is a
+  number; `payload` is the parsed JSON.
+
 ## Best practices
 
 **Write policies that read the parameter, and survive its absence.** Once a connection has run a
@@ -192,6 +235,20 @@ needs the same placement, `(organization_id, title desc nulls last, id)`, and af
 no range: sort by `NOT NULL` columns with few ties where lists grow long. A first key with many
 equal values still reads the entries of its tie before the cursor: `-createdAt` over 20 000 equal
 timestamps reads 10 101 at the same depth.
+
+**Deduplicate by `position`.** Delivery is at least once: a run whose delivery succeeded but whose
+commit did not (a lost connection, a stopped process) delivers the same events again. Key the
+consumer by `position`, such as a table of handled positions or a queue's deduplication id.
+
+**Grant the outbox per role.** The outbox holds every tenant's events and has no row security, so
+the API's role gets `insert` only, which an identity column needs no sequence grant for, and never
+reads an event. The relay's role gets `select`, `update`, and `delete`: `FOR UPDATE` needs the
+`update` privilege.
+
+```sql
+grant insert on outbox to api;
+grant select, update, delete on outbox to relay;
+```
 
 **Pool freely.** Settings and parameters are local to their transaction, so a pooled connection
 carries nothing into the next one: CI checks it on four connections of a node-postgres pool on

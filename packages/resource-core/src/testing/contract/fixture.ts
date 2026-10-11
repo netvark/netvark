@@ -8,11 +8,10 @@ import type { ZodType } from 'zod';
  * adapter the catalog and a storage codec for `point`.
  * @packageDocumentation
  */
-import type { PublicCatalog } from '@netvark/catalog-core';
-
 import type { Codec } from '../../codecs/types';
 import type { DeclaredResource } from '../../declare/declared-resource';
 import type { Scope } from '../../server/scope';
+import type { ContractPublicCatalog } from './public-catalog';
 
 import { z } from 'zod';
 
@@ -48,8 +47,12 @@ export interface ContractFixture {
   readonly migrations: ReadonlyArray<string>;
   /** Empties the tables and inserts the seed rows; `reset()` runs it. */
   readonly seed: string;
-  /** The public catalog of the migrations. */
-  readonly catalog: PublicCatalog;
+  /**
+   * The public catalog of the migrations, typed as `pg-catalog extract`
+   * writes it, so a harness can declare resources of its own over the
+   * schema, with every type check a declaration gets.
+   */
+  readonly catalog: ContractPublicCatalog;
   readonly codecs: ContractCodecs;
   readonly scopes: { readonly workspace: Scope<'workspace_id', ContractActor> };
   readonly resources: {

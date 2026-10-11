@@ -13,8 +13,9 @@ names and codes derived from it, the wire forms and Zod schemas, `defineCodec` a
 derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), messages with
 their localization (SPEC 10), the JSON:API resource, with the members each write accepts, and the
 keyset definition a declaration derives (SPEC 9.4 and 11), the `server` subpath with
-`constraintError` and the storage adapter contract and its suite, `list` included (SPEC 9.5 and 12),
-and the `openapi` entry: the OpenAPI document, the surface, and its diff (SPEC 13);
+`constraintError`, `relationshipTargets`, and the storage adapter contract and its suite, `list`
+included (SPEC 9.5 and 12), and the `openapi` entry: the OpenAPI document, the surface, and its diff
+(SPEC 13);
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -966,8 +967,9 @@ proving the locks.
 
 ### A runtime
 
-A runtime runs every operation in one transaction scoped to the actor: policy, rules, quota, write,
-and effects, so any failure rolls back everything, events included. An update, condensed:
+A runtime runs every operation in one transaction scoped to the actor: policy, rules, relationship
+targets, quota, write, and effects, so any failure rolls back everything, events included. An
+update, condensed:
 
 ```ts
 const update = async (
@@ -988,6 +990,8 @@ const update = async (
       await behavior.policy.authorize('update', context);
       for (const rule of behavior.operations.update?.rules ?? [])
         await rule({ ...context, reject });
+      for (const target of relationshipTargets(behavior.resource, input))
+        if ((await adapter.get(tx, target.resource, target.id)) === undefined) throw target.error;
       const row = await adapter.update(tx, behavior.resource, id, input);
       if (row === undefined) throw notFound();
       await recordEffects(tx, behavior.operations.update?.effects, { ...context, row, previous });
@@ -998,6 +1002,15 @@ const update = async (
   }
 };
 ```
+
+PostgreSQL checks a foreign key without row security, so a write that names another tenant's row
+passes it while a missing row fails it, and the difference would tell the actor which ids another
+tenant holds. `relationshipTargets(resource, input)` lists each target the write names, with the
+error its foreign key's code makes for a missing row, the same status, detail, and item at
+`/data/relationships/<name>`; look each up in the actor's transaction and throw that error for one
+the actor does not see, so both answer alike. It leaves out a relationship the write clears, a
+foreign key PostgreSQL does not enforce, and a create's reference to its own client id. Look the
+targets up after the policy and the rules, so an actor they refuse learns nothing of the targets.
 
 Take every resource's behavior as `ResourceBehavior<AppDomain>`. The complete runtime, with create,
 get, and remove, is
@@ -1240,6 +1253,9 @@ option, operator, or code, a loosened limit, and a new default page size break n
   `current_setting('app.organization_id', true)` returns `''`, not `NULL`. Both still deny; to deny
   without an error, compare with `nullif(current_setting('app.organization_id', true), '')::bigint`,
   which is `NULL` when unset and matches no row.
+- **Look relationship targets up as the actor.** A foreign key accepts another tenant's row, since
+  PostgreSQL checks it without row security. Run `relationshipTargets` before a create or an update
+  writes, and answer a target the actor does not see with its `error`, exactly as a missing one.
 - **Lock the row an update or a remove decides on.** Read it with `lock`, never `get`: under READ
   COMMITTED a plain read takes no lock, so another transaction could change or remove the row
   between the policy's decision and the write. Before a remove, lock `FOR UPDATE`, which also stops

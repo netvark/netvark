@@ -3,10 +3,12 @@
  * declarations on PostgreSQL (resource SPEC 18, ADR 0012). The storage
  * adapter runs each operation in one transaction that sets every scope's
  * session parameter for that transaction only, and adds the scope's
- * predicate to every statement on a scoped table.
+ * predicate to every statement on a scoped table; `relayOutbox` delivers
+ * the events operations recorded, after they committed.
  * @ref https://kysely.dev/
  * @packageDocumentation
  */
+export type { OutboxEvent, RelayOptions } from './outbox/relay';
 export type { KyselyTransaction } from './storage/transaction';
 export type {
   KyselyStorage,
@@ -16,4 +18,5 @@ export type {
   TextCodec,
 } from './storage/types';
 
+export { relayOutbox } from './outbox/relay';
 export { createKyselyStorage } from './storage/create-storage';

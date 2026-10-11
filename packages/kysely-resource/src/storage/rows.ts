@@ -52,6 +52,28 @@ export async function selectRow(
   return row === undefined ? undefined : readRow(context, table, resource, row);
 }
 
+/**
+ * Whether the row of the resource whose key is `id` exists in the
+ * transaction's scope, as the actor sees it: under the scope's predicate
+ * and the table's row security, which a foreign key's check bypasses. It
+ * reads no column, so a row with a value that has no read form is found
+ * too.
+ */
+export async function rowExists(
+  context: ValueContext,
+  tx: KyselyTransaction,
+  resource: DeclaredResource,
+  id: string,
+): Promise<boolean> {
+  const table = tableOf(context.catalog, resource);
+  const rows = await tx.execute((db) =>
+    sql`select 1 as "found" from ${tableName(table)} where ${keyPredicate(context, table, resource, id)} and ${scopePredicate(context.catalog, table, resource, tx)}`.compile(
+      db,
+    ),
+  );
+  return rows.length > 0;
+}
+
 /** Inserts the members of `input`, its client id, its server values, and the scope column; returns the stored row. */
 export async function insertRow(
   context: ValueContext,

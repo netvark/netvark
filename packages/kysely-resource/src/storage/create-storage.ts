@@ -18,6 +18,7 @@ import { storageConfig } from './options';
 import { recordEvents } from './outbox';
 import { partitionRoot } from './partition';
 import { countRows } from './quota';
+import { registerStorage } from './registry';
 import { deleteRow, insertRow, selectRow, updateRow } from './rows';
 import { KyselyTransaction } from './transaction';
 
@@ -57,5 +58,7 @@ export function createKyselyStorage<TDatabase>(
     record: async (tx, events) => recordEvents(config.outbox, tx, events),
     partitionRoot: async (names) => partitionRoot(config.db, names),
   };
-  return Object.freeze(storage);
+  const frozen = Object.freeze(storage);
+  registerStorage(frozen, config);
+  return frozen;
 }
