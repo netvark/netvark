@@ -7,9 +7,19 @@
 import type { FieldType, Operator } from '../definition/types';
 import type { ArrayOperator, ComparisonOperator } from '../plan/types';
 
-const EQUALITY: ReadonlyArray<Operator> = ['eq', 'ne'];
-const MEMBERSHIP: ReadonlyArray<Operator> = ['in', 'nin'];
-const ORDERED: ReadonlyArray<Operator> = ['gt', 'gte', 'lt', 'lte', 'between'];
+type EqualityOperator = 'eq' | 'ne';
+type MembershipOperator = 'in' | 'nin';
+type OrderedOperator = 'gt' | 'gte' | 'lt' | 'lte' | 'between';
+
+const EQUALITY: ReadonlyArray<EqualityOperator> = ['eq', 'ne'];
+const MEMBERSHIP: ReadonlyArray<MembershipOperator> = ['in', 'nin'];
+const ORDERED: ReadonlyArray<OrderedOperator> = [
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'between',
+];
 const PATTERNS: ReadonlyArray<PatternOperator> = [
   'contains',
   'startsWith',
@@ -35,7 +45,29 @@ export type PatternOperator =
   | 'startsWithi'
   | 'endsWithi';
 
-const BY_TYPE: Readonly<Record<FieldType, ReadonlyArray<Operator>>> = {
+/**
+ * The operators a field of `TType` accepts (SPEC 4.2), without the `isNull`
+ * a nullable field adds: the type-level twin of `operatorsFor`, for a
+ * library that checks a field's operators before it builds a definition.
+ */
+export type OperatorsOf<TType extends FieldType> = TType extends 'array'
+  ? ArrayOperator
+  : TType extends 'boolean'
+    ? EqualityOperator
+    : TType extends 'uuid' | 'enum'
+      ? EqualityOperator | MembershipOperator
+      : TType extends 'text'
+        ?
+            | EqualityOperator
+            | MembershipOperator
+            | OrderedOperator
+            | PatternOperator
+        : EqualityOperator | MembershipOperator | OrderedOperator;
+
+/** Typed by `OperatorsOf`, so the table never lists an operator the type does not. */
+const BY_TYPE: {
+  readonly [TType in FieldType]: ReadonlyArray<OperatorsOf<TType>>;
+} = {
   text: [...EQUALITY, ...MEMBERSHIP, ...ORDERED, ...PATTERNS],
   integer: [...EQUALITY, ...MEMBERSHIP, ...ORDERED],
   bigint: [...EQUALITY, ...MEMBERSHIP, ...ORDERED],

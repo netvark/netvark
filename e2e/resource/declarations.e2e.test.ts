@@ -191,6 +191,35 @@ const DECLARATION_ERRORS: ReadonlyArray<readonly [string, object, string]> = [
     },
     'contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already',
   ],
+  [
+    'contacts',
+    {
+      operations: ['list'],
+      fields: { tags: { access: 'read', filter: ['gt'] } },
+    },
+    'contacts.fields.tags.filter: operator "gt" is not available for array fields',
+  ],
+  [
+    'contacts',
+    {
+      operations: ['list'],
+      fields: { name: { access: 'read', filter: ['isNull'] } },
+    },
+    'contacts.fields.name.filter: operator "isNull" is not available for non-null fields',
+  ],
+  [
+    'contacts',
+    { operations: ['list'], fields: { tags: { access: 'read', sort: true } } },
+    'contacts.fields.tags.sort: an array field is not sortable',
+  ],
+  [
+    'import_rows',
+    {
+      operations: ['list'],
+      fields: { payload: { access: 'read', filter: ['eq'] } },
+    },
+    'import_rows.fields.payload.filter: type jsonb is not filterable',
+  ],
 ];
 
 describe('declarations JavaScript gets wrong', () => {

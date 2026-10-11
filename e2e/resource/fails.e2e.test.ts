@@ -33,6 +33,7 @@ const FILES = [
   'definer.ts',
   'errors.ts',
   'fields.ts',
+  'filters.ts',
   'names.ts',
   'not-enforced.ts',
   'options.ts',

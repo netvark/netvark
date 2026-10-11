@@ -51,7 +51,7 @@ type BaseValue<TType extends string> = TType extends keyof WireValues
     : unknown;
 
 /** The values of the `enum` rules of the domains passed, `never` when none has one. */
-type DomainEnumValues<
+export type DomainEnumValues<
   TCatalog extends PublicCatalog,
   TDomains extends ReadonlyArray<string>,
 > = {

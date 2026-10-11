@@ -115,6 +115,7 @@ Contacts.names.fields.get('createdAt'); // 'created_at'
 | `scope`                | a scope of the definer whose column the table has                                                                                                                              |
 | `clientIds`            | a primary key that accepts a client value: not a generated column and not an identity `ALWAYS` column                                                                          |
 | `search`               | a `tsvector` column; `config` equals the one the column is generated with, or is given                                                                                         |
+| `filter`, `sort`       | operators `@netvark/keyset-core` runs for the member's type, `isNull` only where the column can be null; no filter or sort for `json`, `jsonb`, or a codec, no sort for arrays |
 | `sort.default`         | fields declared with `sort: true`                                                                                                                                              |
 | `rules`                | constraint names and NOT NULL keys (`contacts_name_not_null`); a validator only on an enforced CHECK without a rule, and required on every such CHECK over a written column    |
 | `domains`              | a validator for each domain CHECK without a rule that a written field reaches, once, in the definer                                                                            |
@@ -867,6 +868,13 @@ get, and remove, is
   `string` and the call fails; its errors are then reported at the call.
 - **Return targets from arrow functions.** `target: () => Organizations`, never `Organizations`
   itself, which throws `TypeError` at runtime and fails `tsc`.
+- **Filter with what the planner runs.** Declare the operators of the member's keyset type
+  (`@netvark/keyset-core` SPEC 4.2): ordered comparisons for numbers and dates, patterns for text,
+  `contains`, `containedBy`, and `overlaps` for arrays, `eq` and `in` for uuids and enums. A text
+  column with a CHECK `IN (...)` is an enum, so `gt` and `contains` are refused there. Offer
+  `isNull` only where the column can be null, and sort by scalars: an array, a `jsonb` column, and a
+  codec field do not sort. Declare only the operators clients need, since each one is a query the
+  database must answer quickly.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
   database or the server sets, `write` only for values clients send but never read back.
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
@@ -998,14 +1006,16 @@ memory are medians of at least five runs:
 
 | Catalog            | Declarations | Fields | Relationships | Check time | Peak memory, 1 checker | Peak memory, 4 checkers |
 | ------------------ | ------------ | ------ | ------------- | ---------- | ---------------------- | ----------------------- |
-| stern              | 111          | 1,183  | 184           | 0.18 s     | 135 MB                 | 223 MB                  |
-| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.25 s     | 156 MB                 | 280 MB                  |
+| stern              | 111          | 1,183  | 184           | 0.19 s     | 134 MB                 | 220 MB                  |
+| GitLab 17.11 slice | 60           | 1,461  | 26            | 0.28 s     | 149 MB                 | 286 MB                  |
 
 The names checks account for about 15 percent of the stern check time and 11 percent of the GitLab
-one. Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB of peak
-memory, most of it to parse Zod's own declarations. A resource's codes are typed only where code
-reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the check
-from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: reading every
+one. The filter and sort check, with 1,019 of stern's fields and 1,290 of the GitLab slice's
+declaring both, adds 15 percent instantiations and 4 and 6 percent check time (0.18 to 0.19 s, 0.27
+to 0.28 s). Codecs, validators, and schemas add 1.4 and 4.8 percent instantiations and about 10 MB
+of peak memory, most of it to parse Zod's own declarations. A resource's codes are typed only where
+code reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the
+check from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: reading every
 declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what reading each one's
 `schema.create` output costs. A full `defineMessages` mapping, one function per code, kind, member,
 and option, took stern's check from 0.19 s and 124 MB to 0.35 s and 161 MB, and the GitLab slice's,
@@ -1034,9 +1044,13 @@ and 129 MB to 0.52 s and 202 MB, and the GitLab slice's from 0.27 s and 151 MB t
   created by about three quarters. Compute what depends on the catalog alone per table, so
   TypeScript caches it: the names check examines only the members a table's name risk holds, which
   took its first version from 3 and 6.5 times the cost of the other checks to 15 and 9.5 percent
-  more instantiations. Name every union of template literal types with an alias: TypeScript 7
-  instantiates an inline union in a conditional's `extends` clause again on every evaluation, at 4
-  to 7 times the cost. Re-run the real-catalog measurement when a check changes shape.
+  more instantiations. Key an alias by what repeats across fields, since TypeScript caches it by its
+  arguments: the filter check computes a keyset type per resolved column type and checks the
+  operators per keyset type and declared list, so a column costs a lookup; its first version, keyed
+  by the column, added 37 and 57 percent instantiations instead of 15. Name every union of template
+  literal types with an alias: TypeScript 7 instantiates an inline union in a conditional's
+  `extends` clause again on every evaluation, at 4 to 7 times the cost. Re-run the real-catalog
+  measurement when a check changes shape.
 
 @ref https://devblogs.microsoft.com/typescript/announcing-typescript-7-0-rc/
 

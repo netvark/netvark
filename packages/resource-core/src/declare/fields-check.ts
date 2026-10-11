@@ -1,9 +1,9 @@
 /**
- * The type-level check of `fields` (SPEC 3.1, 3.6, 5.1, 7.1). Each valid
- * key maps to the requirements its column and the operations impose, and
- * each invalid key to a message type, so `tsc` reports the mistake at the
- * key with its reason. The runtime twin is `checkField` in
- * `check-columns.ts`.
+ * The type-level check of `fields` (SPEC 3.1, 3.6, 5.1, 7.1, 11.3). Each
+ * valid key maps to the requirements its column and the operations impose,
+ * and each invalid key to a message type, so `tsc` reports the mistake at
+ * the key with its reason. The runtime twins are `checkField` in
+ * `check-columns.ts` and `checkFilters` in `check-filters.ts`.
  * @packageDocumentation
  */
 import type { PublicColumn, PublicTable } from '@netvark/catalog-core';
@@ -20,6 +20,7 @@ import type {
   SearchColumn,
 } from '../catalog/types';
 import type { AccessRequirement, OperationOf } from './access-check';
+import type { FilterRequirement } from './filter-check';
 import type { DeclareContext } from './registries';
 import type { KnownMembers, Requirement, RequireWhen } from './requirement';
 import type { Declaration, FieldDeclaration } from './types';
@@ -87,13 +88,22 @@ type FieldMember = keyof FieldDeclaration;
 
 type FieldRequirements<
   TContext extends DeclareContext,
-  TColumn extends PublicColumn,
+  TTableDef extends PublicTable,
+  TColumn extends keyof TTableDef['columns'] & string,
   TOps,
   TField extends FieldDeclaration,
 > = KnownMembers<TField, FieldMember, 'a field declaration'> &
-  AccessRequirement<TColumn, TOps, TField['access']> &
-  CodecRequirement<TContext, TColumn, TField['codec']> &
-  DomainRequirement<TContext, TColumn, TField['access']>;
+  AccessRequirement<TTableDef['columns'][TColumn], TOps, TField['access']> &
+  CodecRequirement<TContext, TTableDef['columns'][TColumn], TField['codec']> &
+  DomainRequirement<TContext, TTableDef['columns'][TColumn], TField['access']> &
+  FilterRequirement<
+    TContext,
+    TTableDef,
+    TColumn,
+    TField['filter'],
+    TField['sort'],
+    TField['codec']
+  >;
 
 type FieldKeyError<
   TTable extends string,
@@ -146,7 +156,8 @@ export type FieldsCheck<
   >
     ? FieldRequirements<
         TContext,
-        TTableDef['columns'][K],
+        TTableDef,
+        K,
         OperationOf<TDecl>,
         TDecl['fields'][K]
       >
