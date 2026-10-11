@@ -3,9 +3,10 @@
  * makes, made again for declarations written in JavaScript, plus those
  * types cannot express; each throws `TypeError` naming the option. The
  * result carries the derived names (`names/derive-names.ts`), the derived
- * error codes (`errors/derive-errors.ts`), the schemas (SPEC 6), and the
- * field metadata (SPEC 8), whose specs are computed here and whose Zod
- * schemas and metadata are built on first read.
+ * error codes (`errors/derive-errors.ts`), the schemas (SPEC 6), the
+ * field metadata (SPEC 8), and the keyset and JSON:API definitions
+ * (SPEC 11), whose specs are computed here and whose Zod schemas,
+ * metadata, and JSON:API definition are built on first read.
  * @packageDocumentation
  */
 import type { DefinerContext } from './check-config';
@@ -14,6 +15,8 @@ import type { DeclaredResource } from './declared-resource';
 import { deriveErrors } from '../errors/derive-errors';
 import { lazy } from '../internal/lazy';
 import { describe, ownValue } from '../internal/object';
+import { keysetDefinition } from '../jsonapi/keyset-definition';
+import { resourceDefinition } from '../jsonapi/resource-definition';
 import { fieldMetas } from '../meta/field-meta';
 import { deriveNames } from '../names/derive-names';
 import {
@@ -35,6 +38,7 @@ import {
   checkSearch,
   checkSort,
 } from './check-options';
+import { resolvePage } from './check-page';
 import { checkRules } from './check-rules';
 import { checkDeclarationShape } from './check-shape';
 import { brandDeclared } from './declared-resource';
@@ -66,9 +70,8 @@ export function declareResourceIn(
     { context, table, tableDef, operations, scopeColumn },
     declaration,
   );
-  checkSearch(table, tableDef, declaration);
-  checkSort(table, declaration);
-  checkPage(context, table, declaration.page);
+  const search = checkSearch(table, tableDef, declaration);
+  const page = resolvePage(checkPage(context, table, declaration.page));
   checkRules(context, table, tableDef, declaration);
   const names = deriveNames(
     table,
@@ -76,6 +79,7 @@ export function declareResourceIn(
     { id: identity.id, scopeColumn },
     declaration,
   );
+  const sort = checkSort(table, declaration, names);
   const frozen = freezeDeclaration(declaration);
   const { errors, origins, domainChecks } = deriveErrors({
     catalog: context.catalog,
@@ -92,7 +96,7 @@ export function declareResourceIn(
     declaration: frozen,
     names,
   });
-  checkFilters(table, frozen, specs);
+  const members = checkFilters(table, frozen, specs);
   checkExamples(table, frozen, specs.fields);
   const schema = lazy(() => attributeSchemas(specs.fields, specs.checks));
   const validate = lazy(() => attributeValidators(specs.fields, schema()));
@@ -100,6 +104,25 @@ export function declareResourceIn(
   const write = lazy(() => writeValidators(specs, schema(), linkage()));
   const fields = lazy(() =>
     fieldMetas(frozen, specs.fields, specs.relationships),
+  );
+  const keyset = keysetDefinition({
+    table: tableDef.name,
+    members,
+    search,
+    sort,
+    page,
+  });
+  const resource = lazy(() =>
+    resourceDefinition({
+      defineResource: context.defineResource,
+      declaration: frozen,
+      names,
+      specs,
+      members,
+      page,
+      operations,
+      validate: validate(),
+    }),
   );
   return brandDeclared(
     Object.freeze({
@@ -121,6 +144,10 @@ export function declareResourceIn(
       },
       get fields() {
         return fields();
+      },
+      keyset,
+      get resource() {
+        return resource();
       },
     }),
     {

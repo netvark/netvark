@@ -6,6 +6,7 @@
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 import type {
+  DefineResource,
   PageCapabilitiesInit,
   ResourceLinksInit,
 } from '@netvark/jsonapi-core';
@@ -52,7 +53,8 @@ export interface DefinerContext {
   readonly validators: ValidatorRegistry;
   readonly scopes: ScopeRegistry;
   readonly domains: DomainRules;
-  readonly links: ResourceLinksInit;
+  /** `@netvark/jsonapi-core`'s `defineResource` with the definer's `links` (SPEC 11.1). */
+  readonly defineResource: DefineResource;
   readonly page: PageCapabilitiesInit;
 }
 
@@ -195,21 +197,24 @@ function checkDomains(
   });
 }
 
-/** `links` checked by `@netvark/jsonapi-core`'s own convention, whose message gains the definer's prefix. */
-function checkLinks(value: unknown): ResourceLinksInit {
+/**
+ * The definer of every declaration's JSON:API definition, configured with
+ * `links`, which `@netvark/jsonapi-core` checks by its own convention; the
+ * message gains the definer's prefix.
+ */
+function definerOf(value: unknown): DefineResource {
   const links = expectRecord(
     `${DEFINER}.links`,
     value === undefined ? {} : value,
   ) as ResourceLinksInit;
   try {
-    createDefineResource({ links });
+    return createDefineResource({ links });
   } catch (error) {
     if (error instanceof TypeError) {
       throw new TypeError(`${DEFINER}.${error.message}`, { cause: error });
     }
     throw error;
   }
-  return links;
 }
 
 /** Checks the definer's configuration and returns what every declaration reads. */
@@ -230,7 +235,7 @@ export function checkDefinerConfig(value: unknown): DefinerContext {
     validators,
     scopes: optionalRegistry('scopes', config['scopes'], checkScope),
     domains: checkDomains(config['domains'], catalog, validators),
-    links: checkLinks(config['links']),
+    defineResource: definerOf(config['links']),
     page,
   };
 }

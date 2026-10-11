@@ -5,7 +5,9 @@
  */
 import type { PublicColumn, PublicTable } from '@netvark/catalog-core';
 import type { PageCapabilitiesInit } from '@netvark/jsonapi-core';
+import type { SortInput, TextSearchMode } from '@netvark/keyset-core';
 
+import type { ResourceNames } from '../names/types';
 import type { DefinerContext } from './check-config';
 import type { Declaration, Operation } from './types';
 
@@ -146,15 +148,22 @@ export function checkOperations(
   return seen;
 }
 
-/** `search` against the table (SPEC 3.7). */
+/** The search a declared resource's keyset definition runs (SPEC 11.2). */
+export interface ResolvedSearch {
+  readonly vector: string;
+  readonly config: string;
+  readonly mode: TextSearchMode;
+}
+
+/** `search` against the table (SPEC 3.7), resolved to the column, configuration, and mode keyset-core runs. */
 export function checkSearch(
   table: string,
   tableDef: PublicTable,
   declaration: Declaration,
-): void {
+): ResolvedSearch | undefined {
   const { search } = declaration;
   if (search === undefined) {
-    return;
+    return undefined;
   }
   const column = ownValue(tableDef.columns, search.column);
   if (column === undefined || !isSearchColumn(column)) {
@@ -172,12 +181,14 @@ export function checkSearch(
       `${table}.search.config: the column is generated with config "${generated}"`,
     );
   }
-  if (generated === null && search.config === undefined) {
+  const config = search.config ?? generated;
+  if (config === null) {
     throw new TypeError(
       `${table}.search.config: required, because ${search.column} is not generated with a configuration`,
     );
   }
   checkSearchConfig(table, search.config, generated);
+  return { vector: search.column, config, mode: search.mode ?? 'websearch' };
 }
 
 /** The configuration keyset-core receives, declared or generated, keeps to its `regconfig` syntax (SPEC 11.2). */
@@ -202,22 +213,39 @@ function checkSearchConfig(
   }
 }
 
-/** `sort.default` names fields declared with `sort: true`, each once, as keyset-core requires (SPEC 3.7). */
-export function checkSort(table: string, declaration: Declaration): void {
+/**
+ * `sort.default` names fields declared with `sort: true`, each once, as
+ * keyset-core requires (SPEC 3.7). Returns the entries by public name, the
+ * keyset definition's default sort (11.2), or `undefined` without one.
+ */
+export function checkSort(
+  table: string,
+  declaration: Declaration,
+  names: ResourceNames,
+): ReadonlyArray<SortInput> | undefined {
   const seen = new Set<string>();
-  for (const [index, entry] of (declaration.sort?.default ?? []).entries()) {
-    const name =
+  return declaration.sort?.default?.map((entry, index) => {
+    const column =
       typeof entry === 'string' ? entry.replace(/^-/u, '') : entry.field;
     const path = `${table}.sort.default[${String(index)}]`;
-    const field = ownValue(declaration.fields, name);
-    if (field?.sort !== true) {
-      throw new TypeError(`${path}: "${name}" is not declared with sort: true`);
+    const name = names.columns.get(column);
+    if (
+      ownValue(declaration.fields, column)?.sort !== true ||
+      name === undefined
+    ) {
+      throw new TypeError(
+        `${path}: "${column}" is not declared with sort: true`,
+      );
     }
-    if (seen.has(name)) {
-      throw new TypeError(`${path}: "${name}" is listed twice`);
+    if (seen.has(column)) {
+      throw new TypeError(`${path}: "${column}" is listed twice`);
     }
-    seen.add(name);
-  }
+    seen.add(column);
+    if (typeof entry !== 'string') {
+      return { field: name, direction: entry.direction };
+    }
+    return entry.startsWith('-') ? `-${name}` : name;
+  });
 }
 
 /** The declaration's `page` merged over the definer's (SPEC 3.7). */

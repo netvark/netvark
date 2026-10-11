@@ -6,7 +6,9 @@
  * and report issues, the field metadata describes the members and its
  * patterns compile with the flags `su`, the error catalog assembles and
  * renders through `@netvark/ban-core`, an error document is localized with
- * messages of the application's own, and mistakes throw the documented
+ * messages of the application's own, the derived JSON:API resource parses
+ * a query whose sort the derived keyset plans, with cursors signed and
+ * verified by the runtime's Web Crypto, and mistakes throw the documented
  * `TypeError`s.
  * Codes are upper-cased by the runtime's `String.prototype.toUpperCase`, so
  * each runtime derives them here. No Node.js API, so the same module runs
@@ -18,7 +20,8 @@ import type { Checks } from './report.ts';
 
 import { createBan, fromRequest } from '@netvark/ban-core';
 import { jsonApi } from '@netvark/ban-core/formats/json-api';
-import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import { ERROR_CATALOG, parseQuery } from '@netvark/jsonapi-core';
+import { createDefineKeyset } from '@netvark/keyset-core';
 import {
   createDeclareResource,
   defaultMessages,
@@ -36,6 +39,8 @@ import { Notes } from '../resources/notes.ts';
 import { Organizations } from '../resources/organizations.ts';
 import { validators } from '../resources/validators.ts';
 import { check } from './report.ts';
+
+const CURSOR_SECRET = 'a smoke-test cursor secret of at least 32 bytes';
 
 /** The `TypeError` message of calling `fn` with `args` as JavaScript would, types erased. */
 function messageOf(
@@ -216,6 +221,41 @@ export const neutralChecks: Checks = {
       check(text.includes('"title":"Konflikt"'), text);
       check(text.includes('"detail":"Room, During: bereits belegt."'), text);
     },
+  'derives a resource and a keyset whose cursors round-trip': async () => {
+    const query = parseQuery(
+      Contacts.resource,
+      'filter[status][in]=active&sort=-createdAt&page[size]=1',
+    );
+    const keyset = createDefineKeyset({ cursor: { secret: CURSOR_SECRET } })(
+      Contacts.keyset,
+    );
+    const request = {
+      filter: { field: 'status', op: 'in', value: ['active'] },
+      sort: query.sort,
+      page: { size: query.page?.size },
+    } as const;
+    const plan = await keyset.plan(request);
+    const order = plan.sort
+      .map(
+        ({ field, direction }) => `${direction === 'desc' ? '-' : ''}${field}`,
+      )
+      .join();
+    check(order === '-createdAt,id', order);
+    const rows = [
+      { id: 'c2', createdAt: '2026-10-10 12:00:00+00' },
+      { id: 'c1', createdAt: '2026-10-09 12:00:00+00' },
+    ];
+    const page = await keyset.page(plan, rows, (row) => [
+      row.createdAt,
+      row.id,
+    ]);
+    check(page.rows.length === 1 && page.next !== null, 'no next cursor');
+    const next = await keyset.plan({
+      ...request,
+      page: { size: 1, after: page.next },
+    });
+    check(next.seek !== null, 'the cursor gave no seek predicate');
+  },
   'refuses a list without a relationship target': () => {
     const message = messageOf(errorCatalog, [[Contacts]]);
     check(

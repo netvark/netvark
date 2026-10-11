@@ -9,5 +9,9 @@
 /** The member of the search parameter, `filter[q]`, of a declaration with `search`. */
 export const SEARCH_MEMBER = 'q';
 
+/** The search parameter of a declaration with `search`, as clients send it (SPEC 3.7). */
+export const SEARCH_PARAMETER: `filter[${typeof SEARCH_MEMBER}]` =
+  `filter[${SEARCH_MEMBER}]` as const;
+
 /** The member that groups conditions into a disjunction, `filter[or][n]` (jsonapi SPEC 6.8). */
 export const FILTER_OR_MEMBER = 'or';

@@ -35,8 +35,10 @@ describe('the declared resources', () => {
         'declaration',
         'errors',
         'fields',
+        'keyset',
         'linkage',
         'names',
+        'resource',
         'schema',
         'table',
         'validate',
@@ -46,6 +48,7 @@ describe('the declared resources', () => {
       expect(Object.isFrozen(resource.names)).toBe(true);
       expect(Object.isFrozen(resource.errors)).toBe(true);
       expect(Object.isFrozen(resource.fields)).toBe(true);
+      expect(Object.isFrozen(resource.keyset)).toBe(true);
       expect(Object.isFrozen(resource.declaration)).toBe(true);
       expect(Object.isFrozen(resource.declaration.fields)).toBe(true);
     }

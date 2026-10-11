@@ -616,6 +616,42 @@ throws makes the handler answer 500 and report it. Without an i18n library,
 `defaultMessages(resources, appErrors)` gives complete English messages, whose issue messages are
 the ones the schemas already produce.
 
+## The JSON:API resource and the keyset
+
+A declared resource derives the two definitions a collection endpoint needs, from the same members
+and under the same public names (SPEC 11):
+
+- `Contacts.resource` is a `@netvark/jsonapi-core` resource: the attributes, the relationships,
+  `serialize` for public rows, the create and update validators of the served operations, and the
+  capabilities `parseQuery` holds a request to: the declared sorts, the filters with their
+  operators, the includes, `filter[q]` when the declaration has `search`, and the page bounds. It is
+  built on first read, since it names each relationship target's type.
+- `Contacts.keyset` is a `@netvark/keyset-core` definition without the cursor: the same filters and
+  sorts with each column's keyset type, the search column and its configuration, the key `id`, the
+  default sort, and the same page bounds.
+
+The cursor secret is server configuration, so the server defines the keyset with its own definer:
+
+```ts
+import { parseQuery } from '@netvark/jsonapi-core';
+import { createDefineKeyset } from '@netvark/keyset-core';
+
+const defineKeyset = createDefineKeyset({ cursor: { secret: env.CURSOR_SECRET } });
+const contacts = defineKeyset(Contacts.keyset);
+
+parseQuery(Contacts.resource, 'filter[kind][in]=person&sort=-createdAt'); // a 400 for anything undeclared
+await contacts.plan({ sort: ['-createdAt'], page: { size: 10 } });
+// @ts-expect-error: kind does not sort
+await contacts.plan({ sort: ['kind'] });
+```
+
+What `parseQuery` accepts, the keyset plans under the same names, and what it refuses the keyset
+refuses too, except a sort by `id`. A list route passes the parsed `sort`, `search`, and page as
+they are, and each condition as `{ field, op: operator, value }`, converting only values:
+`parseQuery` yields text, or a list for a repeated parameter, while keyset-core takes `isNull` as a
+boolean and `in`, `nin`, `between`, and an array field's operators as lists (SPEC 11.2). The page
+bounds are resolved once for both, so a page size one accepts, the other accepts.
+
 ## Server
 
 `@netvark/resource-core/server` holds what only a server composes, typed by your application's own
@@ -889,6 +925,9 @@ get, and remove, is
   so keep it to ASCII letters, digits, `_`, and `-`: give `as: 'priority'` to a `priorität` column
   before filtering by it, and leave `or`, and `q` on a resource with `search`, to the query syntax.
   List each operator once, and each `sort.default` field once.
+- **Define the keyset on the server.** Declarations reach browsers, so `keyset` carries no cursor:
+  pass it to the server's `createDefineKeyset({ cursor })`, which holds the secret and, during a
+  rotation, `previousSecrets`. Plan with the names `parseQuery` returned, never with columns.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
   database or the server sets, `write` only for values clients send but never read back.
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
