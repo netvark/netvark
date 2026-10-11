@@ -977,8 +977,10 @@ proving the locks.
 ### A runtime
 
 A runtime runs every operation in one transaction scoped to the actor: policy, rules, relationship
-targets, quota, write, and effects, so any failure rolls back everything, events included. An
-update, condensed:
+targets, quota, write, and effects, so any failure rolls back everything, events included.
+[`@netvark/kysely-resource`](../kysely-resource/README.md) is the runtime for PostgreSQL through
+Kysely: `createResourceRuntime` checks the composition at boot and runs this lifecycle for
+`runtime.as(actor)`. A runtime over another storage composes it the same way. An update, condensed:
 
 ```ts
 const update = async (
@@ -1021,9 +1023,9 @@ the actor does not see, so both answer alike. It leaves out a relationship the w
 foreign key PostgreSQL does not enforce, and a create's reference to its own client id. Look the
 targets up after the policy and the rules, so an actor they refuse learns nothing of the targets.
 
-Take every resource's behavior as `ResourceBehavior<AppDomain>`. The complete runtime, with create,
-get, and remove, is
-[`e2e/resource/runtime/runtime.ts`](https://github.com/netvark/netvark/blob/main/e2e/resource/runtime/runtime.ts).
+Take every resource's behavior as `ResourceBehavior<AppDomain>`. Every operation's complete
+lifecycle is in
+[`packages/kysely-resource/src/runtime/`](https://github.com/netvark/netvark/tree/main/packages/kysely-resource/src/runtime).
 
 ## OpenAPI and the API diff
 

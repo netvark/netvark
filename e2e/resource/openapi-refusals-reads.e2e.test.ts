@@ -17,7 +17,7 @@ import type { Refusal } from './support/refusals.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
-import { ADA, GRACE } from './runtime/database.ts';
+import { ADA, GRACE } from './runtime/seed.ts';
 import { openApiSession } from './support/api-session.ts';
 import {
   CONTACT,

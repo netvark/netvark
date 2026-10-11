@@ -82,7 +82,9 @@ function version(name: string): number {
 }
 
 /** The migrations' SQL, then the session settings. */
-async function setup(schema: LiveSchema): Promise<ReadonlyArray<string>> {
+export async function migrationScripts(
+  schema: LiveSchema,
+): Promise<ReadonlyArray<string>> {
   const names = await readdir(schema.migrations);
   const versioned = names
     .filter((name) => VERSIONED.test(name))
@@ -98,7 +100,7 @@ async function setup(schema: LiveSchema): Promise<ReadonlyArray<string>> {
 /** A new PGlite instance with the schema's extensions and migrations, and the session settings. */
 export async function migratedPglite(schema: LiveSchema): Promise<PGlite> {
   const pglite = await PGlite.create({ extensions: schema.extensions });
-  for (const script of await setup(schema)) {
+  for (const script of await migrationScripts(schema)) {
     await pglite.exec(script);
   }
   return pglite;
@@ -128,7 +130,8 @@ export async function openPglite(schema: LiveSchema): Promise<OracleDatabase> {
   };
 }
 
-async function onServer(
+/** Runs `statement` on a connection of its own to the server at `url`. */
+export async function onServer(
   url: string,
   statement: string,
 ): Promise<ReadonlyArray<Row>> {
@@ -188,7 +191,7 @@ async function openServer(
   };
   try {
     await client.connect();
-    for (const script of await setup(schema)) {
+    for (const script of await migrationScripts(schema)) {
       await client.query(script);
     }
   } catch (error) {

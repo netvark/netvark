@@ -19,7 +19,7 @@ import type { Sent } from './support/http.ts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { ADA, ARCHIVED } from './runtime/database.ts';
+import { ADA, ARCHIVED } from './runtime/seed.ts';
 import { APP_CONTRACT, openApiSession } from './support/api-session.ts';
 import {
   CALLS,

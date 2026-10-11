@@ -21,7 +21,7 @@ import { openapi } from '@netvark/resource-core/openapi';
 
 import { Calls } from './resources/calls.ts';
 import { APP_RESOURCES } from './runtime/api.ts';
-import { ADA } from './runtime/database.ts';
+import { ADA } from './runtime/seed.ts';
 import { APP_DOCUMENT, APP_DOCUMENT_OPTIONS } from './support/app-document.ts';
 import { contractOf } from './support/openapi-contract.ts';
 
