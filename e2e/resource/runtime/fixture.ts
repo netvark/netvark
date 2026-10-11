@@ -11,6 +11,7 @@ import type { ResourceInput, Runtime } from './runtime.ts';
 import { BanError } from '@netvark/ban-core';
 
 import { publicCatalog } from '../fixtures/contacts/public-catalog.ts';
+import { DEFINE_KEYSET } from '../support/keyset-definer.ts';
 import { referenceAdapter } from '../support/reference-adapter.ts';
 import { OUTBOX, openRuntimeDatabase } from './database.ts';
 import { createRuntime } from './runtime.ts';
@@ -65,6 +66,7 @@ export async function openRuntime(): Promise<{
     catalog: publicCatalog,
     codecs: {},
     outbox: OUTBOX,
+    defineKeyset: DEFINE_KEYSET,
     transact: database.transact,
   });
   return { database, runtime: createRuntime(adapter, services) };

@@ -55,9 +55,13 @@ export interface ContractFixture {
   readonly resources: {
     /** Unscoped, with an identity key. */
     readonly workspaces: DeclaredResource;
-    /** Scoped to a workspace, with client ids, the server value `created_by`, and a field of each kind. */
+    /**
+     * Scoped to a workspace, with client ids, the server value
+     * `created_by`, a field of each kind, filters and sorts of each keyset
+     * type, search, a default sort, and pages of two to three rows.
+     */
     readonly tasks: DeclaredResource;
-    /** Partitioned by its id, with client ids and an owner workspace. */
+    /** Partitioned by its id, with client ids and an owner workspace it filters by. */
     readonly logs: DeclaredResource;
   };
 }
@@ -87,33 +91,53 @@ const tasks: DeclaredResource = declareResource('tasks', {
   scope: 'workspace',
   clientIds: true,
   fields: {
-    title: { access: 'readWrite' },
-    estimate: { access: 'readWrite' },
-    points: { access: 'readWrite' },
-    due_on: { access: 'readWrite' },
-    starts_at: { access: 'readWrite' },
-    tags: { access: 'readWrite' },
+    title: {
+      access: 'readWrite',
+      filter: ['eq', 'ne', 'in', 'nin', 'gte', 'lt', 'startsWith', 'containsi'],
+      sort: true,
+    },
+    estimate: { access: 'readWrite', filter: ['eq', 'between'], sort: true },
+    points: { access: 'readWrite', filter: ['eq', 'gt', 'in'], sort: true },
+    due_on: { access: 'readWrite', filter: ['lt', 'isNull'], sort: true },
+    starts_at: { access: 'readWrite', filter: ['gt', 'lte'], sort: true },
+    tags: {
+      access: 'readWrite',
+      filter: ['contains', 'containedBy', 'overlaps'],
+    },
     details: { access: 'readWrite' },
-    done: { access: 'readWrite' },
+    done: { access: 'readWrite', filter: ['eq'] },
     location: { access: 'readWrite', codec: 'point' },
     location_text: { access: 'read' },
     secret: { access: 'write' },
     has_secret: { access: 'read' },
     created_by: { access: 'read' },
     created_in: { access: 'read' },
+    priority: { access: 'readWrite', filter: ['eq', 'in', 'nin'], sort: true },
+    rank: { access: 'readWrite', filter: ['gte', 'between'], sort: true },
   },
   relationships: {
     workspace_id: { target: () => workspaces, access: 'read' },
-    parent_id: { target: () => tasks, access: 'readWrite' },
+    parent_id: {
+      target: () => tasks,
+      access: 'readWrite',
+      filter: ['eq', 'in', 'isNull'],
+    },
   },
+  search: { column: 'search' },
+  sort: { default: ['-priority', 'due_on'] },
+  page: { default: 2, max: 3 },
 });
 
 const logs: DeclaredResource = declareResource('logs', {
-  operations: ['create'],
+  operations: ['list', 'create'],
   clientIds: true,
   fields: { note: { access: 'readWrite' } },
   relationships: {
-    owner_id: { target: () => workspaces, access: 'readWrite' },
+    owner_id: {
+      target: () => workspaces,
+      access: 'readWrite',
+      filter: ['eq', 'in'],
+    },
   },
 });
 

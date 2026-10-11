@@ -16,10 +16,13 @@ function serverValues(resource: unknown): ReadonlyArray<string> {
 describe('the storage contract fixture', () => {
   it('is frozen, with the migrations as SQL text and a seed that empties first', () => {
     expect(Object.isFrozen(contractFixture)).toBe(true);
-    expect(contractFixture.migrations).toHaveLength(2);
+    expect(contractFixture.migrations).toHaveLength(3);
     expect(contractFixture.migrations[0]).toContain('create table tasks');
     expect(contractFixture.migrations[1]).toContain(
       'alter table logs attach partition contract_archive.logs_high',
+    );
+    expect(contractFixture.migrations[2]).toContain(
+      'create type task_priority',
     );
     expect(
       contractFixture.seed.startsWith('truncate table logs, tasks, workspaces'),
@@ -42,6 +45,8 @@ describe('the storage contract fixture', () => {
       'hasSecret',
       'createdBy',
       'createdIn',
+      'priority',
+      'rank',
       'workspace',
       'parent',
     ]);

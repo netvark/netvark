@@ -15,13 +15,15 @@
  * driver raised them, and a transaction whose run went on after a failed
  * statement rejects with that statement's error, since PostgreSQL turns
  * the COMMIT of an aborted transaction into a rollback that reports no
- * error. `list` pages with the keyset definition (SPEC 11.2), which the
- * contract does not cover yet.
+ * error. `list` plans the request with the declared resource's keyset
+ * definition, defined once per resource with the server's configured
+ * definer, and renders the plan as plain SQL (`reference-list.ts`).
  * @ref https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADMIN-SET
  * @ref https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS
  * @ref https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS
  * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/transam/xact.c (EndTransactionBlock: "Since COMMIT may actually do a ROLLBACK")
  */
+import type { DefineDefaultedKeyset, Keyset } from '@netvark/keyset-core';
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
   PublicRow,
@@ -38,6 +40,7 @@ import type {
 
 import { PARTITION_ROOT_SQL } from '@netvark/resource-core/server';
 
+import { keysetPage } from './reference-list.ts';
 import { quoted, readRow, selectList } from './reference-sql.ts';
 import { guarded, scopeOf, Statement } from './reference-statement.ts';
 
@@ -51,6 +54,8 @@ export interface ReferenceOptions extends SqlContext {
   readonly transact: Transact;
   /** The outbox: a table with `name text`, `version int4`, and `payload jsonb`. */
   readonly outbox: string;
+  /** The server's configured definer, which holds the cursor secret (resource SPEC 11.2). */
+  readonly defineKeyset: DefineDefaultedKeyset;
 }
 
 const SESSION =
@@ -79,6 +84,16 @@ export function referenceAdapter(
   options: ReferenceOptions,
 ): StorageAdapter<ReferenceTransaction> {
   const context: SqlContext = options;
+  const keysets = new WeakMap<DeclaredResource, Keyset>();
+  const keysetOf = (resource: DeclaredResource): Keyset => {
+    const known = keysets.get(resource);
+    if (known !== undefined) {
+      return known;
+    }
+    const keyset = options.defineKeyset(resource.keyset);
+    keysets.set(resource, keyset);
+    return keyset;
+  };
   const one = async (
     tx: ReferenceTransaction,
     resource: DeclaredResource,
@@ -122,12 +137,8 @@ export function referenceAdapter(
         }
         return result;
       }),
-    list: async () => {
-      await Promise.resolve();
-      throw new Error(
-        'list: the reference adapter pages with the keyset definition, which the contract does not cover yet',
-      );
-    },
+    list: async (tx, resource, request) =>
+      keysetPage(context, keysetOf(resource), tx, resource, request),
     get,
     lock: async (tx, resource, id, write) =>
       read(tx, resource, id, ROW_LOCKS[write]),

@@ -11,8 +11,9 @@ Status: in development and unreleased. This line implements the definer, the dec
 names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
 `defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
 derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), messages with
-their localization (SPEC 10), and the `server` subpath with `constraintError` and the storage
-adapter contract and its suite (SPEC 9.5 and 12). `list`, `forbiddenMembers`, and OpenAPI follow;
+their localization (SPEC 10), the JSON:API resource and the keyset definition a declaration derives
+(SPEC 11), and the `server` subpath with `constraintError` and the storage adapter contract and its
+suite, `list` included (SPEC 9.5 and 12). `forbiddenMembers` and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -843,6 +844,29 @@ interface StorageAdapter<TTransaction> {
 Its eleven obligations are in SPEC 12.8; the [best practices](#best-practices) below cover the ones
 that are easy to get wrong.
 
+`list` pages with the resource's `keyset`. Define it once per resource with the server's
+`createDefineKeyset({ cursor })`, plan the request, which names members by their public names, and
+render the plan as `@netvark/kysely-keyset` does for Kysely:
+
+```ts
+const keysets = new WeakMap<DeclaredResource, Keyset>();
+
+async function list(tx, resource, request: StorageListRequest): Promise<StoragePage> {
+  let keyset = keysets.get(resource);
+  if (keyset === undefined) keysets.set(resource, (keyset = defineKeyset(resource.keyset)));
+  const plan = await keyset.plan(request);
+  // One statement on the schema-qualified table: where the scope's predicate, plan.filter, and
+  // plan.seek; each of plan.keys selected as text under its alias, ordered by its direction and
+  // nulls; limit plan.limit.
+  const { rows, keyValues } = await select(tx, resource, plan);
+  return keyset.page(plan, rows, (row) => keyValues.get(row) ?? []);
+}
+```
+
+The reference adapter's
+[`reference-list.ts`](https://github.com/netvark/netvark/blob/main/e2e/resource/support/reference-list.ts)
+renders every part of a declared resource's plan in plain SQL.
+
 ### The contract suite
 
 `storageContract` from `@netvark/resource-core/testing` checks an adapter against those obligations
@@ -853,7 +877,12 @@ your outbox, then:
 import { contractFixture, storageContract } from '@netvark/resource-core/testing';
 
 const harness = {
-  adapter: createAdapter({ pool, catalog: contractFixture.catalog, codecs: { point: pointCodec } }),
+  adapter: createAdapter({
+    pool,
+    catalog: contractFixture.catalog,
+    codecs: { point: pointCodec },
+    defineKeyset: createDefineKeyset({ cursor: { secret: process.env.CURSOR_SECRET } }),
+  }),
   reset: async () => {
     await pool.query(contractFixture.seed);
     await pool.query('truncate table outbox restart identity');
@@ -866,7 +895,8 @@ for (const contractCase of storageContract(harness)) {
 }
 ```
 
-Each case names the obligation it checks and fails with the expected and the actual value. Run it
+Each case names the obligation it checks and fails with the expected and the actual value; the list
+cases follow `next` and `prev`, so the adapter signs cursors as it does in production. Run it
 against PostgreSQL with a pool of at least two connections: the cases of the quota lock and the row
 lock run two transactions at once. PGlite serializes transactions, so those cases pass there without
 proving the locks.
@@ -928,6 +958,11 @@ get, and remove, is
 - **Define the keyset on the server.** Declarations reach browsers, so `keyset` carries no cursor:
   pass it to the server's `createDefineKeyset({ cursor })`, which holds the secret and, during a
   rotation, `previousSecrets`. Plan with the names `parseQuery` returned, never with columns.
+- **Page with the plan, not around it.** Pass every value of the plan as a parameter of its column's
+  type, a cursor's values too: they are the text each key was selected as. Read back through a
+  driver's `Date` or `number`, a `timestamptz` loses its microseconds and an `int8` past 2^53 its
+  last digits, and the next page repeats or skips a row. Order with each key's `nulls`, since
+  PostgreSQL's default puts nulls first when descending, and never page with `offset`.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
   database or the server sets, `write` only for values clients send but never read back.
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and

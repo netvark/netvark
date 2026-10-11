@@ -42,6 +42,8 @@ const EVERY_FORM = {
   done: true,
   location: { x: 1.5, y: -2 },
   secret: 'hidden',
+  priority: 'high',
+  rank: -7,
 };
 
 /** The row of `EVERY_FORM` created in workspace 1 under `parent`. */
@@ -61,6 +63,8 @@ function everyForm(parent: string): PublicRow {
     hasSecret: true,
     createdBy: CREATOR,
     createdIn: '1',
+    priority: 'high',
+    rank: -7,
     workspace: '1',
     parent,
   };

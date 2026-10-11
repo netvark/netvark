@@ -104,8 +104,13 @@ export class Parameters {
 
   /** Adds `text` and returns its placeholder cast to `column`'s type. */
   public add(text: string | null, column: PublicColumn): string {
+    return `${this.text(text)}::${castType(column)}`;
+  }
+
+  /** Adds `text` and returns its placeholder as `text`. */
+  public text(text: string | null): string {
     this.values.push(text);
-    return `$${String(this.values.length)}::text::${castType(column)}`;
+    return `$${String(this.values.length)}::text`;
   }
 }
 
