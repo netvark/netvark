@@ -12,27 +12,26 @@
  */
 import type {
   ArrayElementType,
-  Collation,
-  FieldType,
-  ScalarFieldType,
+  ArrayFieldInit,
+  EnumFieldInit,
+  ScalarFieldInit,
+  TextFieldInit,
 } from '@netvark/keyset-core';
 
 import type { ValueSpec } from '../schema/value-form';
 
-/** A member as keyset-core types a field: its type, an enum's values, an array's element, and its collation. */
-export interface KeysetType {
-  readonly type: FieldType;
-  /** The labels or the rule's values of an `enum`; `null` for any other type. */
-  readonly values: ReadonlyArray<string> | null;
-  /** The element type of an `array`; `null` for any other type. */
-  readonly of: ArrayElementType | null;
-  /** `insensitive` for `citext`, which compares case-insensitively in the database. */
-  readonly collation: Collation;
-}
-
-interface ScalarKeyset extends KeysetType {
-  readonly type: ScalarFieldType;
-}
+/**
+ * A member as keyset-core types a field, in the shape of its field init:
+ * the type, an enum's values, an array's element, and
+ * `collation: 'insensitive'` for `citext`, which compares
+ * case-insensitively in the database. A keyset field init is this with a
+ * column and options (`keyset-definition.ts`).
+ */
+export type KeysetType =
+  | Pick<TextFieldInit, 'type' | 'collation'>
+  | Pick<EnumFieldInit, 'type' | 'values'>
+  | Pick<ArrayFieldInit, 'type' | 'of'>
+  | Pick<ScalarFieldInit, 'type'>;
 
 /** The keyset type of each base type of SPEC 5.1 other than text, `bool`, and JSON. */
 const SCALARS: ReadonlyMap<string, ArrayElementType> = new Map<
@@ -51,28 +50,24 @@ const SCALARS: ReadonlyMap<string, ArrayElementType> = new Map<
   ['timestamptz', 'timestamptz'],
 ]);
 
-function scalar(type: ScalarFieldType): ScalarKeyset {
-  return { type, values: null, of: null, collation: 'default' };
-}
+/** A keyset type an array's element may also have. */
+type ScalarKeyset = Exclude<KeysetType, { readonly type: 'array' }>;
 
 function scalarOf(spec: ValueSpec): ScalarKeyset | undefined {
   const { form, options } = spec;
   if (options !== null && (form.kind === 'enum' || form.kind === 'text')) {
-    return options.length === 0
-      ? undefined
-      : { type: 'enum', values: options, of: null, collation: 'default' };
+    return options.length === 0 ? undefined : { type: 'enum', values: options };
   }
   if (form.kind === 'text') {
-    return {
-      ...scalar('text'),
-      collation: form.type === 'citext' ? 'insensitive' : 'default',
-    };
+    return form.type === 'citext'
+      ? { type: 'text', collation: 'insensitive' }
+      : { type: 'text' };
   }
   if (form.kind === 'boolean') {
-    return scalar('boolean');
+    return { type: 'boolean' };
   }
   const type = 'type' in form ? SCALARS.get(form.type) : undefined;
-  return type === undefined ? undefined : scalar(type);
+  return type === undefined ? undefined : { type };
 }
 
 /** The keyset type of a member's value, or `undefined` when it can be neither filtered nor sorted. */
@@ -84,10 +79,5 @@ export function keysetTypeOf(spec: ValueSpec): KeysetType | undefined {
   if (element === undefined || element.type === 'enum') {
     return undefined;
   }
-  return {
-    type: 'array',
-    values: null,
-    of: element.type,
-    collation: 'default',
-  };
+  return { type: 'array', of: element.type };
 }

@@ -7,7 +7,9 @@
  * keyset-core orders every page, has a keyset type. It runs once the
  * members' specs are known, since keyset types and nullability come from
  * them, so a declaration that passes derives definitions keyset-core and
- * `@netvark/jsonapi-core` accept. The type-level twins are
+ * `@netvark/jsonapi-core` accept; it returns the members with their keyset
+ * types, which the keyset definition is built from
+ * (`jsonapi/keyset-definition.ts`). The type-level twins are
  * `FilterRequirement` in `filter-check.ts`, `KeysetNamesCheck` in
  * `names/keyset-names-check.ts`, and `IdentityCheck` in
  * `declaration-check.ts`.
@@ -35,6 +37,21 @@ import { FILTER_OR_MEMBER, SEARCH_MEMBER } from '../jsonapi/query-names';
 interface Filtering {
   readonly filter?: ReadonlyArray<Operator> | undefined;
   readonly sort?: boolean | undefined;
+}
+
+/** A member keyset-core filters or sorts by, with its keyset type: what a keyset field is built from (SPEC 11.2). */
+export interface KeysetMember {
+  readonly spec: MemberSpec;
+  readonly keyset: KeysetType;
+  readonly sortable: boolean;
+  /** The declared `filter`, or none. */
+  readonly operators: ReadonlyArray<Operator>;
+}
+
+/** The primary key, by which keyset-core orders every page, and the members that filter or sort. */
+export interface KeysetMembers {
+  readonly id: KeysetMember;
+  readonly members: ReadonlyArray<KeysetMember>;
 }
 
 /**
@@ -105,10 +122,10 @@ function checkMember(
   spec: MemberSpec,
   member: Filtering,
   search: boolean,
-): void {
+): KeysetMember | undefined {
   const { filter, sort } = member;
   if (filter === undefined && sort !== true) {
-    return;
+    return undefined;
   }
   checkName(path, spec, filter !== undefined, search);
   const keyset = keysetTypeOf(spec.value);
@@ -126,39 +143,52 @@ function checkMember(
   if (sort === true && keyset.type === 'array') {
     throw new TypeError(`${path}.sort: an array field is not sortable`);
   }
+  return { spec, keyset, sortable: sort === true, operators: filter ?? [] };
 }
 
 /**
  * Checks the primary key and the `filter` and `sort` of every field and
- * relationship `declaration` names.
+ * relationship `declaration` names, and returns those keyset-core reads.
  */
 export function checkFilters(
   table: string,
   declaration: Declaration,
   specs: Pick<ResourceSpecs, 'id' | 'fields' | 'relationships'>,
-): void {
-  if (keysetTypeOf(specs.id.value) === undefined) {
+): KeysetMembers {
+  const key = keysetTypeOf(specs.id.value);
+  if (key === undefined) {
     throw new TypeError(
       `${table}: the primary key is ${unkeyed(specs.id.value.form)}, which @netvark/keyset-core cannot order`,
     );
   }
   const search = declaration.search !== undefined;
-  for (const spec of specs.fields) {
-    const field = ownValue(declaration.fields, spec.column);
-    if (field !== undefined) {
-      checkMember(`${table}.fields.${spec.column}`, spec, field, search);
+  const members: Array<KeysetMember> = [];
+  const add = (path: string, spec: MemberSpec, member?: Filtering): void => {
+    const checked =
+      member === undefined
+        ? undefined
+        : checkMember(path, spec, member, search);
+    if (checked !== undefined) {
+      members.push(checked);
     }
+  };
+  for (const spec of specs.fields) {
+    add(
+      `${table}.fields.${spec.column}`,
+      spec,
+      ownValue(declaration.fields, spec.column),
+    );
   }
   const relationships = declaration.relationships ?? {};
   for (const spec of specs.relationships) {
-    const relationship = ownValue(relationships, spec.column);
-    if (relationship !== undefined) {
-      checkMember(
-        `${table}.relationships.${spec.column}`,
-        spec,
-        relationship,
-        search,
-      );
-    }
+    add(
+      `${table}.relationships.${spec.column}`,
+      spec,
+      ownValue(relationships, spec.column),
+    );
   }
+  return {
+    id: { spec: specs.id, keyset: key, sortable: true, operators: [] },
+    members,
+  };
 }

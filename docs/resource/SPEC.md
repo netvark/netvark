@@ -393,8 +393,8 @@ relationship fails (4.2), and at runtime the first read of a target, and the reg
 and a target that returns anything but a declared resource throws
 `... .target: must return the declared resource of organizations`. Nothing reads a target while
 modules load, so a target declared later in the module graph is read after it exists: the first read
-of `linkage` or `write` (6.2), which reads every target, is where a wrong target fails, and a failed
-read throws again on the next.
+of `linkage` or `write` (6.2), `fields` (8), or `resource` (11.1), each of which reads every target,
+is where a wrong target fails, and a failed read throws again on the next.
 
 Tests: `declare-resource.test.ts`, `declare-fields.test.ts`, `declare-relationships.test.ts`, and
 `declare-options.test.ts` (every `TypeError` of 14 a declaration can throw), with
@@ -1361,37 +1361,91 @@ expected German document; the oversized body; what passes through), `localize-er
 
 ### 11.1 `resource`
 
-`resource` on a declared resource is a `@netvark/jsonapi-core` definition built with the definer's
-`createDefineResource({ links })`:
+`resource` on a declared resource is a `@netvark/jsonapi-core` definition. The definer makes one
+`defineResource` with `createDefineResource({ links })`, so `links` jsonapi-core refuses fail at
+startup (14), and each declared resource builds its definition with it on the first read of
+`resource` and caches it: the relationships name their targets' types, and targets are read lazily
+(3.8).
 
-| Member          | Value                                                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `type`          | the public type                                                                                                                |
-| `attributes`    | every field's public name, `write` fields included, so requests may carry them                                                 |
-| `relationships` | each relationship: `{ type: target type, cardinality: 'one', resource: () => target.resource }`                                |
-| `serialize`     | a public row (`{ id, ...fields, ...relationship ids }`) to `{ id, attributes, relationships }`, never emitting a `write` field |
-| `query.sort`    | the public names of fields with `sort: true`                                                                                   |
-| `query.filter`  | each field and relationship with `filter`, by public name, with its operators                                                  |
-| `query.include` | the public names of relationships with `include: true` (one level)                                                             |
-| `query.page`    | the merged `page` (2, 3.7)                                                                                                     |
-| `query.search`  | `filter[q]` when the declaration has `search`                                                                                  |
-| `validate`      | `{ create, update }` from 6.5, for the declared operations                                                                     |
-| `clientIds`     | the declaration's `clientIds`                                                                                                  |
+| Member          | Value                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `type`          | the public type                                                                                 |
+| `attributes`    | every field's public name, `write` fields included, so requests may carry them                  |
+| `relationships` | each relationship: `{ type: target type, cardinality: 'one', resource: () => target.resource }` |
+| `serialize`     | a public row (12.8) to `{ id, attributes, relationships }`, as below                            |
+| `query.sort`    | the public names of fields with `sort: true`                                                    |
+| `query.filter`  | each field and relationship with `filter`, by public name, with its operators                   |
+| `query.include` | the public names of relationships with `include: true` (one level)                              |
+| `query.page`    | the resolved page below, the same bounds as `keyset.page`                                       |
+| `query.search`  | `filter[q]` when the declaration has `search`                                                   |
+| `validate`      | `create` and `update` from 6.5, each only when the declaration serves that operation            |
+| `clientIds`     | the declaration's `clientIds`                                                                   |
 
 Relationship targets are read lazily (3.8), so `Contacts` and `Users` may reference each other in
 either order.
 
+`serialize` reads only the members it names. `attributes` holds each readable field the row holds,
+never a `write` field, and is left out when the declaration has no fields; `relationships` holds
+each relationship the row holds, as its target's id or `null`, and is left out when the declaration
+has none. A member the row lacks stays absent, so a sparse row serializes to a sparse resource
+object. A relationship value that is neither a string nor `null` throws `TypeError`
+(`contacts.serialize: relationship "organization" must be a target id or null`), which names the
+member and never its value.
+
+The resolved page is the declaration's `page` over the definer's, with keyset-core's defaults filled
+in: `max` 100, `default` `min(20, max)`, `range` `false` (17). Both definitions get every bound, so
+the default page of a server's `createDefineKeyset` never applies and the two cannot disagree about
+a page size.
+
 ### 11.2 `keyset`
 
 `keyset` is a `@netvark/keyset-core` `DefaultedKeysetInit`: everything but the cursor, whose secret
-is server configuration, so the server passes it to its own `createDefineKeyset({ cursor })`.
+is server configuration, so the server passes it to its own `createDefineKeyset({ cursor })`. It is
+computed when the resource is declared, since it reads no target, and frozen throughout, since every
+request shares it.
 
-- `table` is the table's name; `key` is `['id']`; the `id` field maps the primary key column.
+```ts
+const defineKeyset = createDefineKeyset({ cursor: { secret: env.CURSOR_SECRET } });
+const contacts = defineKeyset(Contacts.keyset);
+await contacts.plan({
+  filter: { field: 'status', op: 'in', value: ['active'] },
+  sort: ['-createdAt'],
+});
+```
+
+- `table` is the table's name without its schema, since keyset-core takes an identifier; the plan's
+  column targets name the table by it, and an adapter selects from the schema-qualified table
+  (`audit.changes`), whose bare name PostgreSQL resolves them against (checked on 14 and 18). @ref
+  https://www.postgresql.org/docs/18/sql-expressions.html#SQL-EXPRESSIONS-COLUMN-REFS
+- `key` is `['id']`. The `id` field maps the primary key column with its keyset type (3.4),
+  `nullable: false`, `sortable: true`, and `operators: []`: the key orders every page, and nothing
+  filters it, since the JSON:API resource has no `id` filter.
 - Each field with `filter` or `sort: true`, and each relationship with `filter`, becomes a field
-  keyed by public name: `column`, the keyset type below, `nullable`, `sortable`, `operators`,
-  `values` for the `enum` type, `of` for arrays, `collation: 'insensitive'` for `citext`.
-- `search` is `{ vector: column, config, mode }`; `sort.default` maps columns to public names;
-  `page` is the merged page.
+  keyed by public name: `column`, the keyset type below, `nullable`, `values` for the `enum` type,
+  `of` for arrays, `collation: 'insensitive'` for `citext`, and, always explicit, `sortable` and
+  `operators`, the declared `filter` or `[]`, so keyset-core's defaults (every operator of the type,
+  scalars sortable) never widen what the declaration states.
+- `search` is `{ vector: column, config, mode }`: `config` is the declared one, else the one the
+  column is generated with (3.7), and `mode` defaults to `websearch`. `sort.default` maps the
+  declared columns to public names, prefixes and directions kept. `page` is the resolved page
+  (11.1).
+
+For a typed declaration, `keyset` is typed `KeysetInitOf<TDecl>`, whose `fields` key each member by
+its public name with its `sortable` literal, which is all keyset-core's request type reads
+(`KeysetRequestOf`), so the request of `defineKeyset(Contacts.keyset).plan` names exactly the
+declared sorts and filters. It is spelled out rather than built on `DefaultedKeysetInit<TFields>`,
+which `keyof TFields` makes invariant: a typed instance would not be assignable to the wide one.
+`resource` is typed `ResourceOf<...>`: the type literal, the attribute and relationship names, the
+row type `PublicRowOf` (12), the sort and filter names, and the create and update attributes of
+`Infer`.
+
+A list route hands keyset-core what `parseQuery` returns, by the same public names: `sort` as it is,
+since a parsed sort field is keyset-core's `{ field, direction }` form, `search` and the page
+members as they are, and each condition as `{ field, op: operator, value }`, converting only values:
+`parseQuery` yields text, or a list for a repeated parameter (jsonapi SPEC 6.8), while keyset-core
+takes `isNull` as a boolean and `in`, `nin`, `between`, and the operators of an array field as lists
+(keyset SPEC 4.2, 4.3). Values themselves keyset-core checks against the field's type (keyset SPEC
+4.3), so `filter[priority][gte]=high` is its `InvalidFilterValueError`, not the parser's.
 
 Those public names become the request's vocabulary of two definitions, and each refuses some
 JSON:API member names. keyset-core takes a field name that matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` and
@@ -1470,7 +1524,10 @@ hold the type-level grammars to keyset-core's `isFieldName` and `isSearchConfig`
 (`test-support/keyset-name-cases.ts`); `e2e/resource/fails/filters.ts`,
 `e2e/resource/fails/definitions.ts`, and `definitions.e2e.test.ts` (15.4);
 `resource-definition.test.ts` and `keyset-definition.test.ts` compare both derived definitions with
-hand-written ones for the contacts fixture.
+hand-written ones for the contacts fixture (11.1, 11.2), and keyset-core plans the latter;
+`jsonapi/definitions.test-d.ts` pins their types; `derived-definitions.e2e.test.ts` holds the two
+definitions of every e2e resource to each other (15.4), and the eleventh record of 15.5 does so on
+the real catalogs, with the page queries run in PostgreSQL.
 
 ---
 
@@ -2008,16 +2065,19 @@ server of major 18 or later), the catalogs `@netvark/pg-catalog` extracts from t
 definition would refuse (`fails/definitions.ts`) throws the same reason from JavaScript
 (`definitions.e2e.test.ts`); the derived names, recorded in a reviewed snapshot
 (`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
-metadata, and definitions; that a client that follows `fields` alone sends values PostgreSQL stores
-as sent, while each value one step past a stated bound, outside the stated options or form, or with
-a fraction digit too many is refused or changed, and the schemas give the metadata's verdict on each
-(`fields.e2e.test.ts`, over every column type of the oracle and the ids of each key type); that the
-`required` members of the contacts application are exactly the ones an insert needs, and a member
-left out holds its stated `default` (`fields-create.e2e.test.ts`); the derived error codes, recorded
-in a reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
-(`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
-catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
-same violations, each mapped to its code's error; localized error documents
+metadata, and definitions, and that the two definitions agree: each filter, sort, search, page, and
+include request `parseQuery` accepts on a resource's `resource`, keyset-core plans with its
+`keyset`, and what `parseQuery` refuses keyset-core refuses too, but a sort by the key
+(`derived-definitions.e2e.test.ts`, 11.2); that a client that follows `fields` alone sends values
+PostgreSQL stores as sent, while each value one step past a stated bound, outside the stated options
+or form, or with a fraction digit too many is refused or changed, and the schemas give the
+metadata's verdict on each (`fields.e2e.test.ts`, over every column type of the oracle and the ids
+of each key type); that the `required` members of the contacts application are exactly the ones an
+insert needs, and a member left out holds its stated `default` (`fields-create.e2e.test.ts`); the
+derived error codes, recorded in a reviewed snapshot (`snapshots/errors.json`), each raised by a
+real violation (`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of
+9.5, and the catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError`
+against the same violations, each mapped to its code's error; localized error documents
 (`localization.e2e.test.ts`): messages the Paraglide compiler builds from `localization/messages/`,
 mapped with `defineMessages` and served through Hono and `@netvark/hono-ban`, answer a 422 in German
 with option labels, in English with its plural forms, in the base locale for a language the project
@@ -2301,6 +2361,23 @@ The operator and sort check had added 15 percent instantiations and 4 and 6 perc
 the ninth record's declarations. The first version of the name checks read every public name one
 character at a time: 596,534 and 890,902 instantiations, 0.218 s and 0.378 s. Examining only the
 members the names check already examines (11.2) removed nearly all of it.
+
+The eleventh record covers section 11's definitions themselves. A script derived both definitions of
+each declaration as written (111 on stern and 60 on the GitLab slice, filtering with `eq` only) and
+of one declaration per table naming every column with each operator and `sort: true` the runtime
+accepts, every relationship with its operators and `include`, `search` on stern's `tsvector`
+columns, and a default sort. The server's `createDefineKeyset({ cursor })` accepted every `keyset`,
+and every `resource` built. Each request `parseQuery` accepted, keyset-core planned and
+`@netvark/kysely-keyset` ran as a page query: on the per-table declarations, 13,202 field-operator
+pairs, 2,126 sorts, 184 includes, and 3 searches on stern, and 13,319, 2,640, 26, and none on the
+GitLab slice. Each operator `parseQuery` refused for a name, keyset-core refused too (14,500 and
+14,478), and so did each sort it refused, but the key's. Then, in a transaction rolled back after,
+each table was replaced by a copy without constraints holding six rows with ties and NULLs: walking
+the default sort and every sortable name in both directions two rows at a time, forwards with `next`
+and back with `prev`, gave the order of one page of all six rows (2,127 and 2,640 walks). Everything
+ran on PostgreSQL 18.3 (PGlite) and on a 14.19 server without a disagreement. The declarations'
+instantiations did not change (489,983 and 580,496): TypeScript computes the two members' types only
+where they are read.
 
 ### 15.6 The Zod floor
 

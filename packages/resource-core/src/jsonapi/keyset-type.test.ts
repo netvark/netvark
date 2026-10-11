@@ -53,13 +53,6 @@ function baseType(type: string): unknown {
   return spec === undefined ? 'no wire form' : keysetTypeOf(spec)?.type;
 }
 
-const scalar = (type: string) => ({
-  type,
-  values: null,
-  of: null,
-  collation: 'default',
-});
-
 describe('keysetTypeOf (SPEC 11.2)', () => {
   it('maps each base type as the table does', () => {
     const table11 = {
@@ -98,18 +91,18 @@ describe('keysetTypeOf (SPEC 11.2)', () => {
         'created_at',
       ]),
     ).toEqual({
-      kind: { ...scalar('enum'), values: ['person', 'company'] },
-      status: { ...scalar('enum'), values: ['active', 'archived'] },
-      email: { ...scalar('text'), collation: 'insensitive' },
-      discount: scalar('decimal'),
-      tags: { ...scalar('array'), of: 'text' },
-      created_at: scalar('timestamptz'),
+      kind: { type: 'enum', values: ['person', 'company'] },
+      status: { type: 'enum', values: ['active', 'archived'] },
+      email: { type: 'text', collation: 'insensitive' },
+      discount: { type: 'decimal' },
+      tags: { type: 'array', of: 'text' },
+      created_at: { type: 'timestamptz' },
     });
   });
 
   it('types an array by its element, which keeps no collation', () => {
     expect(keysetTypes(contactsCatalog, 'meetings', ['attendees'])).toEqual({
-      attendees: { ...scalar('array'), of: 'text' },
+      attendees: { type: 'array', of: 'text' },
     });
   });
 

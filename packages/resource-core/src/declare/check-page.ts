@@ -18,6 +18,13 @@ import {
 
 const PAGE_KEYS: ReadonlyArray<string> = ['default', 'max', 'range'];
 
+/** A page whose bounds are all set. */
+export interface ResolvedPage {
+  readonly default: number;
+  readonly max: number;
+  readonly range: boolean;
+}
+
 /** Checks a `page` option's members; `undefined` gives an empty init. */
 export function checkPageInit(
   path: string,
@@ -35,6 +42,20 @@ export function checkPageInit(
     ...(fallback === undefined ? {} : { default: fallback }),
     ...(max === undefined ? {} : { max }),
     ...(range === undefined ? {} : { range }),
+  };
+}
+
+/**
+ * A merged page with every member set, as both `@netvark/jsonapi-core` and
+ * `@netvark/keyset-core` resolve it: given to both derived definitions
+ * (SPEC 11), a default of a server's own definer cannot set them apart.
+ */
+export function resolvePage(page: PageCapabilitiesInit): ResolvedPage {
+  const max = page.max ?? DEFAULT_MAX_PAGE_SIZE;
+  return {
+    default: page.default ?? Math.min(DEFAULT_PAGE_SIZE, max),
+    max,
+    range: page.range ?? false,
   };
 }
 

@@ -7,9 +7,13 @@
  * @packageDocumentation
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
+import type { AnyResource } from '@netvark/jsonapi-core';
+import type { DefaultedKeysetInit } from '@netvark/keyset-core';
 
 import type { ErrorEntry } from '../errors/error-entry';
 import type { ResourceErrors } from '../errors/error-types';
+import type { KeysetInitOf } from '../jsonapi/keyset-definition-types';
+import type { ResourceOf } from '../jsonapi/resource-definition-types';
 import type { TypedFields } from '../meta/field-meta-types';
 import type { FieldMeta } from '../meta/types';
 import type { ResourceNames } from '../names/types';
@@ -101,6 +105,21 @@ export interface DeclaredResource<
     TTable,
     Readonly<Record<string, FieldMeta>>,
     TypedFields<TContext, TTable, TDecl>
+  >;
+  /**
+   * The `@netvark/keyset-core` definition of the list, everything but its
+   * cursor, which the server's `createDefineKeyset({ cursor })` adds
+   * (SPEC 11.2).
+   */
+  readonly keyset: Typed<TTable, DefaultedKeysetInit, KeysetInitOf<TDecl>>;
+  /**
+   * The `@netvark/jsonapi-core` definition (SPEC 11.1), built on first
+   * read, which reads every target (SPEC 3.8).
+   */
+  readonly resource: Typed<
+    TTable,
+    AnyResource,
+    ResourceOf<TContext, TTable, TDecl>
   >;
   /**
    * Type-only: the definer's catalog and registries, for type helpers such as

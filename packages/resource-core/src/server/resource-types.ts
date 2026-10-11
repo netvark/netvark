@@ -15,6 +15,10 @@ import type {
   Operation,
 } from '../declare/types';
 import type {
+  LinkIds,
+  PublicRowType,
+} from '../jsonapi/resource-definition-types';
+import type {
   FieldNames,
   RelationshipNameOf,
   RelationshipNames,
@@ -55,21 +59,17 @@ type DeclOf<TResource> = TResource extends {
   ? TDecl
   : Declaration;
 
-/** Linkage as target ids: a nullable relationship takes `null`. */
-type LinkIds<TLinkage> = {
-  readonly [K in keyof TLinkage]: null extends TLinkage[K]
-    ? string | null
-    : string;
-};
+type RowOf<TParts> = TParts extends {
+  readonly context: infer TContext extends DeclareContext;
+  readonly table: infer TTable extends string;
+  readonly decl: infer TDecl extends Declaration;
+}
+  ? PublicRowType<TContext, TTable, TDecl>
+  : never;
 
 /** A resource's public row: `id`, each readable field, and each relationship's target id. */
 export type PublicRowOf<TResource extends AnyDeclaredResource> =
-  Parts<TResource> extends undefined
-    ? PublicRow
-    : Simplify<
-        { readonly id: string } & Types<Parts<TResource>>['read'] &
-          LinkIds<Types<Parts<TResource>>['linkage']['read']>
-      >;
+  Parts<TResource> extends undefined ? PublicRow : RowOf<Parts<TResource>>;
 
 /** A create's input: the parsed members it carried, relationships as ids, and a client id when the resource takes one. */
 export type CreateInputOf<TResource extends AnyDeclaredResource> =

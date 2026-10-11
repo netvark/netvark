@@ -22,6 +22,7 @@
     "@netvark/catalog-core": "workspace:*",
     "@netvark/hono-ban": "workspace:*",
     "@netvark/jsonapi-core": "workspace:*",
+    "@netvark/keyset-core": "workspace:*",
     "@netvark/pg-catalog": "workspace:*",
     "@netvark/resource-core": "workspace:*",
     "@types/node": "catalog:",
