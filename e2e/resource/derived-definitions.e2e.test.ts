@@ -2,11 +2,16 @@
  * The two definitions every declared resource derives (resource SPEC 11),
  * through the built packages: the server's `createDefineKeyset({ cursor })`
  * accepts `keyset`; every request `@netvark/jsonapi-core`'s `parseQuery`
- * accepts on `resource`, `@netvark/keyset-core` plans; and what parseQuery
- * refuses, keyset-core refuses too, except a sort by the key, which only
- * keyset-core names. SPEC 15.5 holds the same property on two real
- * catalogs, where every page query also runs in PostgreSQL.
+ * accepts on `resource`, `@netvark/keyset-core` plans, its filters mapped
+ * by `keysetRequest`; and what parseQuery refuses, keyset-core refuses
+ * too, except a sort by the key, which only keyset-core names. SPEC 15.5
+ * holds the same property on two real catalogs, where every page query
+ * also runs in PostgreSQL.
  */
+import type {
+  FilterCondition as ParsedCondition,
+  ParsedQuery,
+} from '@netvark/jsonapi-core';
 import type { Keyset } from '@netvark/keyset-core';
 import type { DeclaredResource } from '@netvark/resource-core';
 
@@ -18,6 +23,7 @@ import {
   isKeysetError,
   OPERATORS,
 } from '@netvark/keyset-core';
+import { keysetRequest } from '@netvark/resource-core/server';
 
 import { Calls } from './resources/calls.ts';
 import { Contacts } from './resources/contacts.ts';
@@ -25,7 +31,7 @@ import { ImportedContacts, Owners } from './resources/imported-contacts.ts';
 import { Meetings } from './resources/meetings.ts';
 import { Notes } from './resources/notes.ts';
 import { Organizations } from './resources/organizations.ts';
-import { filterRequest, keysetCondition } from './support/keyset-request.ts';
+import { filterRequest } from './support/filter-request.ts';
 
 const defineKeyset = createDefineKeyset({
   cursor: { secret: 'an e2e cursor secret of at least thirty-two bytes' },
@@ -57,6 +63,17 @@ function parsed(
     }
     throw error;
   }
+}
+
+/** A query of `condition` alone, which a route never builds: parseQuery refused it. */
+function alone(
+  resource: DeclaredResource['resource'],
+  condition: ParsedCondition,
+): ParsedQuery {
+  return {
+    ...parseQuery(resource, ''),
+    filter: { conditions: [condition], anyOf: [] },
+  };
 }
 
 /** A refusal is a `KeysetError`; anything else thrown fails the test. */
@@ -102,13 +119,13 @@ describe.each(RESOURCES)('%s', (table, declared) => {
       for (const op of OPERATORS) {
         const { query, condition } = filterRequest(name, field, op);
         const byParse = parsed(resource, query);
-        if (byParse === 'accepts') {
-          expect(parseQuery(resource, query).filter.conditions).toEqual([
-            condition,
-          ]);
-        }
-        const filter = keysetCondition(field, condition);
-        const byPlan = await planned(keyset, { filter });
+        const parsedQuery =
+          byParse === 'accepts'
+            ? parseQuery(resource, query)
+            : alone(resource, condition);
+        expect(parsedQuery.filter.conditions).toEqual([condition]);
+        const request = keysetRequest(declared, parsedQuery);
+        const byPlan = await planned(keyset, request);
         if (byParse !== byPlan) {
           disagreements.push(
             `${query}: parseQuery ${byParse}, keyset-core ${byPlan}`,
@@ -124,6 +141,33 @@ describe.each(RESOURCES)('%s', (table, declared) => {
         ops.map((op) => `${name} ${op}`),
       ),
     );
+  });
+
+  it('plans every accepted filter at once, as conditions and as one or group, isNull=false and lists of one included', async () => {
+    const accepted = Object.entries(resource.query.filter).flatMap(
+      ([name, ops]) =>
+        OPERATORS.filter((op) => ops.includes(op)).map(
+          (op) => [name, op] as const,
+        ),
+    );
+    for (const group of [undefined, 0]) {
+      const requests = accepted.map(([name, op]) =>
+        filterRequest(name, fields[name], op, { single: true, group }),
+      );
+      const parsedQuery = parseQuery(
+        resource,
+        requests.map((item) => item.query).join('&'),
+      );
+      const conditions = requests.map((item) => item.condition);
+      expect(parsedQuery.filter).toEqual(
+        group === undefined || conditions.length === 0
+          ? { conditions, anyOf: [] }
+          : { conditions: [], anyOf: [conditions] },
+      );
+      await expect(
+        planned(keyset, keysetRequest(declared, parsedQuery)),
+      ).resolves.toBe('accepts');
+    }
   });
 
   it('plans exactly the sorts parseQuery accepts, and the key besides', async () => {

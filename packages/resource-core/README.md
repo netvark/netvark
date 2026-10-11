@@ -647,11 +647,34 @@ await contacts.plan({ sort: ['kind'] });
 ```
 
 What `parseQuery` accepts, the keyset plans under the same names, and what it refuses the keyset
-refuses too, except a sort by `id`. A list route passes the parsed `sort`, `search`, and page as
-they are, and each condition as `{ field, op: operator, value }`, converting only values:
-`parseQuery` yields text, or a list for a repeated parameter, while keyset-core takes `isNull` as a
-boolean and `in`, `nin`, `between`, and an array field's operators as lists (SPEC 11.2). The page
-bounds are resolved once for both, so a page size one accepts, the other accepts.
+refuses too, except a sort by `id`. The page bounds are resolved once for both, so a page size one
+accepts, the other accepts.
+
+A list route hands the keyset what `parseQuery` returned through `keysetRequest` from
+`@netvark/resource-core/server`. Only the shapes of values differ: `parseQuery` yields text, or a
+list for a repeated parameter, while keyset-core takes `isNull` as a boolean and `in`, `nin`,
+`between`, and an array field's operators as lists. `keysetRequest` converts those, joins the
+conditions and the `filter[or][n]` groups, passes `search` and the page as they are, and leaves
+`sort` out of a query without one, so the declared default applies (SPEC 11.2):
+
+```ts
+import { respond } from '@netvark/hono-jsonapi';
+import { paginatedDocument, parseQuery } from '@netvark/jsonapi-core';
+import { keysetRequest } from '@netvark/resource-core/server';
+
+app.get('/contacts', async (c) => {
+  // ?filter[kind][in]=person&filter[or][0][name][startsWithi]=ada&filter[or][0][email]=ada@example.com
+  const query = parseQuery(Contacts.resource, c.req.queries()); // a 400 for anything undeclared
+  const page = await adapter.transaction(scopes, (tx) =>
+    adapter.list(tx, Contacts, keysetRequest(Contacts, query)),
+  );
+  return respond(c, paginatedDocument(Contacts.resource, page, { url: c.req.url }));
+});
+```
+
+Its result is typed by the declaration, so it is what `contacts.plan` takes. Every other value goes
+to keyset-core unchanged, which accepts each type's text form: `filter[createdAt][gte]=yesterday` is
+keyset-core's `InvalidFilterValueError`, a client error like the parser's.
 
 ## Server
 
@@ -958,6 +981,11 @@ get, and remove, is
 - **Define the keyset on the server.** Declarations reach browsers, so `keyset` carries no cursor:
   pass it to the server's `createDefineKeyset({ cursor })`, which holds the secret and, during a
   rotation, `previousSecrets`. Plan with the names `parseQuery` returned, never with columns.
+- **Build the keyset request with `keysetRequest`.** A translation by hand is easy to get subtly
+  wrong: passing `isNull=true` as the text `'true'` refuses a valid query, a single `in` value as a
+  string refuses it too, and passing the parsed empty `sort` lists by the key alone instead of the
+  declared default. A list is a repeated parameter, never a comma-separated value, since a comma
+  belongs to text.
 - **Page with the plan, not around it.** Pass every value of the plan as a parameter of its column's
   type, a cursor's values too: they are the text each key was selected as. Read back through a
   driver's `Date` or `number`, a `timestamptz` loses its microseconds and an `int8` past 2^53 its

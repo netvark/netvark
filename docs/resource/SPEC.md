@@ -43,7 +43,7 @@ driver, or a Node.js module.
 | Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                                                                                                         |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                                            |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
@@ -1439,13 +1439,47 @@ which `keyof TFields` makes invariant: a typed instance would not be assignable 
 row type `PublicRowOf` (12), the sort and filter names, and the create and update attributes of
 `Infer`.
 
-A list route hands keyset-core what `parseQuery` returns, by the same public names: `sort` as it is,
-since a parsed sort field is keyset-core's `{ field, direction }` form, `search` and the page
-members as they are, and each condition as `{ field, op: operator, value }`, converting only values:
-`parseQuery` yields text, or a list for a repeated parameter (jsonapi SPEC 6.8), while keyset-core
-takes `isNull` as a boolean and `in`, `nin`, `between`, and the operators of an array field as lists
-(keyset SPEC 4.2, 4.3). Values themselves keyset-core checks against the field's type (keyset SPEC
-4.3), so `filter[priority][gte]=high` is its `InvalidFilterValueError`, not the parser's.
+A list route hands keyset-core what `parseQuery` returned through `keysetRequest(resource, query)`
+(`server/keyset-request.ts`, on the `server` subpath), a pure function of the declared resource and
+the `ParsedQuery` of its JSON:API definition:
+
+```ts
+import { parseQuery } from '@netvark/jsonapi-core';
+import { keysetRequest } from '@netvark/resource-core/server';
+
+const query = parseQuery(Contacts.resource, c.req.queries()); // a 400 for anything undeclared
+const plan = await contacts.plan(keysetRequest(Contacts, query));
+```
+
+The two definitions already share the names, so only the shapes of values change. `parseQuery`
+yields text, or a list for a repeated parameter, and leaves interpreting them to the application
+(jsonapi SPEC 6.8, its ADR 0007); keyset-core takes `isNull` as a boolean and `in`, `nin`,
+`between`, and the operators of an array field as lists (keyset SPEC 4.2).
+
+- Each condition becomes `{ field, op: operator, value }`. `isNull=true` and `isNull=false` give the
+  booleans, and one value of `in`, `nin`, `between`, or an array field's operator becomes a list of
+  one: `filter[status][in]=active` is `['active']`. A list is a repeated parameter and a comma is
+  part of a value, so `filter[tags][contains]=a,b` holds the one element `a,b`. Every other value
+  passes unchanged: keyset-core accepts each type's text form and refuses the rest with its own
+  `InvalidFilterValueError` (keyset SPEC 4.3), so `filter[priority][gte]=high`,
+  `filter[nickname][isNull]=yes`, a repeated `eq`, and a `between` of one value are its refusals,
+  which a route renders as it renders any refusal of the plan.
+- The conditions and the `filter[or][n]` groups are joined with `and`, the conditions of a group
+  with `or`, and a single term stands alone. keyset-core binds a cursor to the request's filter as
+  given (keyset SPEC 6.1), so `filter[name]=a` binds it as the hand-written `{ field, op, value }`
+  does, and a query builds the same request on every page, so the cursor one page returns resumes on
+  the next.
+- `sort` passes as it is, a parsed sort field being keyset-core's `{ field, direction }` form, but a
+  query without `sort` leaves it out: keyset-core takes an absent sort as the declared default and
+  an empty one as the key alone (keyset SPEC 5). `search` and the page members `size`, `after`, and
+  `before` pass as they are; the page bounds of the two definitions are the same (11.1).
+- An operator keyset-core does not have throws its `UnsupportedFilterError`, as its planner would.
+  `parseQuery` never yields one, since every operator a declaration lists is keyset-core's.
+
+The result is typed `KeysetRequestOf` of the resource's keyset fields: what
+`defineKeyset(Contacts.keyset).plan` takes, and a `StorageListRequest` (12.8). A query parsed with a
+resource whose sorts or filters the keyset lacks fails `tsc`; the query is not an inference site
+(`NoInfer`), so the resource alone sets the type.
 
 Those public names become the request's vocabulary of two definitions, and each refuses some
 JSON:API member names. keyset-core takes a field name that matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` and
@@ -1525,9 +1559,12 @@ hold the type-level grammars to keyset-core's `isFieldName` and `isSearchConfig`
 `e2e/resource/fails/definitions.ts`, and `definitions.e2e.test.ts` (15.4);
 `resource-definition.test.ts` and `keyset-definition.test.ts` compare both derived definitions with
 hand-written ones for the contacts fixture (11.1, 11.2), and keyset-core plans the latter;
-`jsonapi/definitions.test-d.ts` pins their types; `derived-definitions.e2e.test.ts` holds the two
-definitions of every e2e resource to each other (15.4), and the eleventh record of 15.5 does so on
-the real catalogs, with the page queries run in PostgreSQL.
+`jsonapi/definitions.test-d.ts` pins their types; `server/keyset-request.test.ts` maps every
+operator of every keyset type (`test-support/keyset-kinds.ts`), `isNull` both ways, lists of one and
+of two, `or` groups, the default sort, and the next page's cursor, and keeps keyset-core's refusals,
+and `server/keyset-request.test-d.ts` pins its type; `derived-definitions.e2e.test.ts` holds the two
+definitions of every e2e resource to each other through `keysetRequest` (15.4), and the eleventh and
+thirteenth records of 15.5 do so on the real catalogs, with the page queries run in PostgreSQL.
 
 ---
 
@@ -1755,17 +1792,17 @@ needs from the declared resource's public members, `names` (the table, the key c
 
 A `StorageListRequest` is keyset-core's `KeysetRequest` without relation filters,
 `KeysetRequest<string, string, NoRelations>`: what the declared resource's keyset definition plans,
-since it has no relations (11.2). An adapter defines that keyset once per resource with the server's
-configured `createDefineKeyset({ cursor })`, which holds the cursor secret the declaration leaves
-out, and pages with it as `@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request)`;
-one statement over the schema-qualified table with the scope's predicate, the plan's `filter` and
-`seek`, each key selected as text under its alias, the keys ordered with their directions and null
-placement, and the plan's `limit`; then `page(plan, rows, values)` over the rows read. Every value
-of the plan is a parameter of its column's type, a cursor's included: its values are the text each
-key was selected as, so a `timestamptz` keeps its microseconds and an `int8` its digits. The plan
-orders nulls last on a forward page, where PostgreSQL's default puts them first when descending.
-@ref https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC
-order)
+since it has no relations, and what `keysetRequest` builds from a parsed query (11.2). An adapter
+defines that keyset once per resource with the server's configured `createDefineKeyset({ cursor })`,
+which holds the cursor secret the declaration leaves out, and pages with it as
+`@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request)`; one statement over the
+schema-qualified table with the scope's predicate, the plan's `filter` and `seek`, each key selected
+as text under its alias, the keys ordered with their directions and null placement, and the plan's
+`limit`; then `page(plan, rows, values)` over the rows read. Every value of the plan is a parameter
+of its column's type, a cursor's included: its values are the text each key was selected as, so a
+`timestamptz` keeps its microseconds and an `int8` its digits. The plan orders nulls last on a
+forward page, where PostgreSQL's default puts them first when descending. @ref
+https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC order)
 
 An adapter MUST:
 
@@ -2102,29 +2139,29 @@ definition would refuse (`fails/definitions.ts`) throws the same reason from Jav
 (`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
 metadata, and definitions, and that the two definitions agree: each filter, sort, search, page, and
 include request `parseQuery` accepts on a resource's `resource`, keyset-core plans with its
-`keyset`, and what `parseQuery` refuses keyset-core refuses too, but a sort by the key
-(`derived-definitions.e2e.test.ts`, 11.2); that a client that follows `fields` alone sends values
-PostgreSQL stores as sent, while each value one step past a stated bound, outside the stated options
-or form, or with a fraction digit too many is refused or changed, and the schemas give the
-metadata's verdict on each (`fields.e2e.test.ts`, over every column type of the oracle and the ids
-of each key type); that the `required` members of the contacts application are exactly the ones an
-insert needs, and a member left out holds its stated `default` (`fields-create.e2e.test.ts`); the
-derived error codes, recorded in a reviewed snapshot (`snapshots/errors.json`), each raised by a
-real violation (`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of
-9.5, and the catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError`
-against the same violations, each mapped to its code's error; localized error documents
-(`localization.e2e.test.ts`): messages the Paraglide compiler builds from `localization/messages/`,
-mapped with `defineMessages` and served through Hono and `@netvark/hono-ban`, answer a 422 in German
-with option labels, in English with its plural forms, in the base locale for a language the project
-lacks, in a regional tag's language, and a 409, which `constraintError` makes of a real violation,
-with a code's own texts, each with `Content-Language` and `Vary`, while `tsc` accepts the mapping
-and refuses a translation that names a variable its kind does not receive; that a row breaking every
-NOT ENFORCED constraint is stored by the database and accepted by the schemas, while the enforced
-CHECK beside them refuses in both (`not-enforced.e2e.test.ts`); the storage contract, passed by the
-reference adapter on PGlite and on the server and failed by each of its defects
-(`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`, 12.9); the package surface (every value
-export listed); and the runtime smoke test on Bun, Deno, and workerd for the root, `server`,
-`testing`, and `openapi` entries.
+`keyset`, its filters mapped by `keysetRequest`, alone and all at once, and what `parseQuery`
+refuses keyset-core refuses too, but a sort by the key (`derived-definitions.e2e.test.ts`, 11.2);
+that a client that follows `fields` alone sends values PostgreSQL stores as sent, while each value
+one step past a stated bound, outside the stated options or form, or with a fraction digit too many
+is refused or changed, and the schemas give the metadata's verdict on each (`fields.e2e.test.ts`,
+over every column type of the oracle and the ids of each key type); that the `required` members of
+the contacts application are exactly the ones an insert needs, and a member left out holds its
+stated `default` (`fields-create.e2e.test.ts`); the derived error codes, recorded in a reviewed
+snapshot (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on
+PGlite and both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog`
+assembles from them, rendered by `createBan`; `constraintError` against the same violations, each
+mapped to its code's error; localized error documents (`localization.e2e.test.ts`): messages the
+Paraglide compiler builds from `localization/messages/`, mapped with `defineMessages` and served
+through Hono and `@netvark/hono-ban`, answer a 422 in German with option labels, in English with its
+plural forms, in the base locale for a language the project lacks, in a regional tag's language, and
+a 409, which `constraintError` makes of a real violation, with a code's own texts, each with
+`Content-Language` and `Vary`, while `tsc` accepts the mapping and refuses a translation that names
+a variable its kind does not receive; that a row breaking every NOT ENFORCED constraint is stored by
+the database and accepted by the schemas, while the enforced CHECK beside them refuses in both
+(`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
+the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
+12.9); the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
+workerd for the root, `server`, `testing`, and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -2429,6 +2466,22 @@ ordered without their null placement disagreed 752 times on stern, and `nin` ren
 times. The script's first run computed the GitLab slice's `int8` keys as JavaScript numbers, so
 9007199254740993 went in as a second 9007199254740992, into a key without its constraint, and 609
 walks lost or repeated a row: the values the contract's cases are made of.
+
+The thirteenth record covers `keysetRequest` (11.2). The scripts of the eleventh and twelfth records
+built their requests from query strings, through `parseQuery` and `keysetRequest`, where they had
+written keyset-core's requests by hand. On the per-table declarations, each declared operator went
+as its query and again with `isNull=false` and a list of one (13,202 pairs on stern and 13,319 on
+the GitLab slice), and every declared condition of a table went at once, joined with `and` and as
+one `or` group; keyset-core planned each request and `@netvark/kysely-keyset` ran it as a page
+query. Each condition the twelfth record's script had written by hand, `isNull` both ways and a list
+of one for `in` and `nin` included, came out of `keysetRequest` as written (16,074 and 15,886), and
+the reference adapter and kysely-keyset listed the same rows for it. Both records' walks went page
+by page through query strings carrying the cursor of the page before, for the default sort and every
+declared sort in both directions, and gave the order of one page of all rows; a sort by the key
+alone, which only keyset-core names, kept its hand-written request. Everything ran on PostgreSQL
+18.3 (PGlite) and on a 14.19 server without a disagreement. Typed, `keysetRequest` over a
+`parseQuery` of every declaration as written took 1.8 and 1.7 percent more instantiations than the
+`parseQuery` calls alone (33,639 over 1,826,064 and 34,709 over 2,027,233).
 
 ### 15.6 The Zod floor
 

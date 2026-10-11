@@ -1,20 +1,12 @@
 /**
- * Requests for the agreement of a declared resource's two definitions
- * (resource SPEC 11.2): a `filter` query string with sample values of the
- * member's keyset type, and the condition a list route hands
- * `@netvark/keyset-core` for what `@netvark/jsonapi-core`'s `parseQuery`
- * returned. `parseQuery` yields text, or a list for a repeated parameter
- * (jsonapi SPEC 6.8); keyset-core takes `isNull` as a boolean and the
- * list operators and array fields as lists (keyset SPEC 4.2, 4.3).
+ * Filter queries for the agreement of a declared resource's two
+ * definitions (resource SPEC 11.2): `filter[name][op]` with sample values
+ * of the member's keyset type in their text form, a list as a repeated
+ * parameter (jsonapi SPEC 6.8), and the condition `parseQuery` reads from
+ * it, which `keysetRequest` maps onto the keyset's request.
  */
 import type { FilterCondition as ParsedCondition } from '@netvark/jsonapi-core';
-import type {
-  FieldInit,
-  FilterCondition,
-  Operator,
-} from '@netvark/keyset-core';
-
-import { isOperator } from '@netvark/keyset-core';
+import type { FieldInit, Operator } from '@netvark/keyset-core';
 
 /** Two values of each keyset type in their text form, as a query string carries them. */
 const SAMPLES: Readonly<Record<string, readonly [string, string]>> = {
@@ -58,47 +50,42 @@ export interface FilterRequest {
   readonly condition: ParsedCondition;
 }
 
+/** How `filterRequest` sends a condition. */
+export interface FilterForm {
+  /** `isNull=false`, and one value where a list takes one (not `between`); else `true` and two. */
+  readonly single?: boolean | undefined;
+  /** The `filter[or][n]` group to send it in; else a condition of its own. */
+  readonly group?: number | undefined;
+}
+
 /** `filter[name][op]` with sample values: `true` for `isNull`, two values for a list. */
 export function filterRequest(
   name: string,
   field: FieldInit | undefined,
   op: Operator,
+  form: FilterForm = {},
 ): FilterRequest {
   const [low, high] = samplesOf(field);
-  const value =
-    op === 'isNull' ? 'true' : isList(field, op) ? [low, high] : low;
-  const parameter = `filter[${name}][${op}]`;
+  const single = form.single === true;
+  const list = single && op !== 'between' ? [low] : [low, high];
+  const flag = single ? 'false' : 'true';
+  const values = op === 'isNull' ? [flag] : isList(field, op) ? list : [low];
+  const parameter =
+    form.group === undefined
+      ? `filter[${name}][${op}]`
+      : `filter[or][${String(form.group)}][${name}][${op}]`;
   const params = new URLSearchParams();
-  for (const item of typeof value === 'string' ? [value] : value) {
+  for (const item of values) {
     params.append(parameter, item);
   }
+  // One parameter is its value, a repeated one the list (jsonapi SPEC 6.8).
+  const [only] = values;
   return {
     query: params.toString(),
-    condition: { field: name, operator: op, value },
-  };
-}
-
-/** A parsed condition as keyset-core takes it: lists as arrays, `isNull` as a boolean. */
-export function keysetCondition(
-  field: FieldInit | undefined,
-  condition: ParsedCondition,
-): FilterCondition {
-  const { field: name, operator, value } = condition;
-  if (!isOperator(operator)) {
-    throw new TypeError(
-      `parseQuery returned an operator keyset-core lacks: ${operator}`,
-    );
-  }
-  if (operator === 'isNull') {
-    const flag = value === 'true' ? true : value === 'false' ? false : value;
-    return { field: name, op: operator, value: flag };
-  }
-  if (isList(field, operator)) {
-    return {
+    condition: {
       field: name,
-      op: operator,
-      value: typeof value === 'string' ? [value] : value,
-    };
-  }
-  return { field: name, op: operator, value };
+      operator: op,
+      value: values.length === 1 && only !== undefined ? only : values,
+    },
+  };
 }

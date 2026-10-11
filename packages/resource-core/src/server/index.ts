@@ -50,6 +50,7 @@ export type {
 export { constraintError } from './constraint-error';
 export { createDomainDefiners } from './domain';
 export { defineEvent } from './event';
+export { keysetRequest } from './keyset-request';
 export { PARTITION_ROOT_SQL, partitionViolation } from './partition';
 export { denyAll } from './policy';
 export { defineQuota, quotaExceeded } from './quota';
