@@ -1,9 +1,11 @@
 /**
- * The domain's types (SPEC 18.4): one resource's operations as one actor
- * runs them, typed by its declaration, and the domain and runtime that
- * hold them. A resource TypeScript knows has exactly the operations it
- * declares, and `include` when a relationship is includable; its rows are
- * its public rows and its list request names its own keyset fields. A
+ * The runtime contract (SPEC 12.10, ADR 0013): what a host or a worker
+ * calls to run the declared operations, whichever runtime runs them,
+ * typed here so a host types a runtime without a query builder or a
+ * driver. One resource's operations as one actor runs them are typed by
+ * its declaration: a resource TypeScript knows has exactly the operations
+ * it declares, and `include` when a relationship is includable; its rows
+ * are its public rows and its list request names its own keyset fields. A
  * resource typed wide may have any of them.
  * @packageDocumentation
  */
@@ -12,20 +14,40 @@ import type {
   KeysetRequestOf,
   NoRelations,
   Page,
-} from '@netvark/kysely-keyset';
-import type { AnyDeclaredResource } from '@netvark/resource-core';
-import type {
-  DomainShape,
-  IncludableOf,
-  OperationOf,
-  PublicRow,
-  PublicRowOf,
-  ResourceBehavior,
-  StorageListRequest,
-} from '@netvark/resource-core/server';
+} from '@netvark/keyset-core';
 
-import type { ListOptions } from '../storage/types';
-import type { ResourceInput, RuntimeResources } from './types';
+import type {
+  AnyDeclaredResource,
+  DeclaredResource,
+} from '../declare/declared-resource';
+import type { ResourceBehavior } from './behavior-types';
+import type { DomainShape } from './domain-types';
+import type { IncludableOf, OperationOf, PublicRowOf } from './resource-types';
+import type { PublicRow, StorageListRequest } from './storage';
+
+/**
+ * A create's or an update's input, as `@netvark/jsonapi-core` parses a
+ * resource object: each relationship as its linkage, `{ type, id }` or
+ * `null`. A missing member is `{}`. The write schemas validate it, so a
+ * worker's input is held to what a request's is.
+ */
+export interface ResourceInput {
+  /** A create's client-generated id, for a resource that takes them. */
+  readonly id?: string | undefined;
+  readonly attributes?: Readonly<Record<string, unknown>> | undefined;
+  readonly relationships?: Readonly<Record<string, unknown>> | undefined;
+}
+
+/** What `list` does besides the page. */
+export interface ListOptions {
+  /** Also count the rows of the scope the filter selects, as the page's `total`. */
+  readonly total?: boolean | undefined;
+}
+
+/** What `defineResource` returned for each resource (SPEC 12.3), keyed by type. */
+export type RuntimeResources<TDomain extends DomainShape> = Readonly<
+  Record<string, ResourceBehavior<TDomain>>
+>;
 
 /** The keyset request of `TResource`'s list, in its public names. */
 type ListRequestOf<TResource extends AnyDeclaredResource> = TResource extends {
@@ -67,7 +89,7 @@ type IncludeOf<TResource extends AnyDeclaredResource> = [
   ? never
   : 'include';
 
-/** The operations of one resource as one actor runs them (SPEC 18.4). */
+/** The operations of one resource as one actor runs them. */
 export type ResourceOperations<
   TResource extends AnyDeclaredResource = AnyDeclaredResource,
 > = string extends TResource['table']
@@ -92,13 +114,21 @@ export type Domain<
   >;
 };
 
-/** What `createResourceRuntime` resolves to. */
+/**
+ * A runtime of the declared operations, as a host or a worker takes it:
+ * `@netvark/kysely-resource`'s `createResourceRuntime` resolves to one.
+ */
 export interface ResourceRuntime<
   TDomain extends DomainShape = DomainShape,
   TResources extends RuntimeResources<TDomain> = RuntimeResources<TDomain>,
 > {
-  /** What boot warned about (SPEC 18.3). */
+  /** What the runtime warned about when it started. */
   readonly warnings: ReadonlyArray<string>;
-  /** Each resource's operations as `actor` runs them. */
+  /**
+   * The declared resource of every behavior the runtime runs, in their
+   * order: what a host mounts, documents, and finds include targets in.
+   */
+  readonly resources: ReadonlyArray<DeclaredResource>;
+  /** Each resource's operations as `actor` runs them, each in a transaction of its own. */
   readonly as: (actor: TDomain['actor']) => Domain<TResources>;
 }

@@ -18,11 +18,11 @@ import type {
   DomainShape,
   PublicRow,
   ResourceBehavior,
+  ResourceInput,
 } from '@netvark/resource-core/server';
 
 import type { KyselyTransaction } from '../storage/transaction';
 import type { Run } from './operation';
-import type { ResourceInput } from './types';
 
 import { quotaExceeded, reject } from '@netvark/resource-core/server';
 

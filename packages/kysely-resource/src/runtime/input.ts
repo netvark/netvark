@@ -19,9 +19,10 @@
  */
 import type { ErrorItem } from '@netvark/ban-core';
 import type { DeclaredResource, ResourceIssue } from '@netvark/resource-core';
-import type { StorageWrite } from '@netvark/resource-core/server';
-
-import type { ResourceInput } from './types';
+import type {
+  ResourceInput,
+  StorageWrite,
+} from '@netvark/resource-core/server';
 
 import { BanError, BUILTIN_CATALOG } from '@netvark/ban-core';
 import { errorItem, jsonApiError } from '@netvark/jsonapi-core';

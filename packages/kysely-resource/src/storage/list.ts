@@ -27,13 +27,13 @@ import type {
 import type { AnyDatabase, RenderContext } from '@netvark/kysely-keyset';
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
+  ListOptions,
   PublicRow,
   StorageListRequest,
   StoragePage,
 } from '@netvark/resource-core/server';
 
 import type { KyselyTransaction } from './transaction';
-import type { ListOptions } from './types';
 import type { Row, ValueContext } from './values';
 
 import { expressionBuilder, sql } from 'kysely';

@@ -11,10 +11,10 @@ import type { Operation } from '@netvark/resource-core';
 import type {
   DomainShape,
   ResourceBehavior,
+  ResourceOperations,
 } from '@netvark/resource-core/server';
 
 import type { Run } from './operation';
-import type { ResourceOperations } from './operations-types';
 import type { DomainOptions } from './types';
 
 import { storageConfigOf } from '../storage/registry';

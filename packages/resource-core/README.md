@@ -1027,6 +1027,35 @@ Take every resource's behavior as `ResourceBehavior<AppDomain>`. Every operation
 lifecycle is in
 [`packages/kysely-resource/src/runtime/`](https://github.com/netvark/netvark/tree/main/packages/kysely-resource/src/runtime).
 
+A host or a worker takes a runtime by the contract this subpath types (SPEC 12.10), so it needs no
+query builder or driver to type the one it is given: `warnings`, `resources`, each behavior's
+declared resource in their order, and `as(actor)`. Typed by the behaviors, each resource holds
+exactly the operations it declares; typed wide, as a host that mounts any application takes it,
+every operation is optional:
+
+```ts
+// server/people.ts
+import type { ResourceRuntime } from '@netvark/resource-core/server';
+
+import type { AppActor, AppDomain, ContactsBehavior } from './domain';
+
+type Resources = { readonly contacts: typeof ContactsBehavior };
+
+// a worker, typed by the behaviors it runs
+export async function peopleOf(runtime: ResourceRuntime<AppDomain, Resources>, actor: AppActor) {
+  const page = await runtime.as(actor).contacts.list({
+    filter: { field: 'kind', op: 'eq', value: 'person' },
+    sort: ['name'],
+  });
+  return page.rows; // public rows: id, kind, name, email, createdAt, organization
+}
+
+// a host, typed wide
+export function typesOf(runtime: ResourceRuntime<AppDomain>): ReadonlyArray<string> {
+  return runtime.resources.map((resource) => resource.names.type);
+}
+```
+
 ## OpenAPI and the API diff
 
 `@netvark/resource-core/openapi` documents the resources you serve as an OpenAPI 3.1.2 document, and
