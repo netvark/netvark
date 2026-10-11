@@ -4,10 +4,18 @@ import { defineProject } from 'vitest/config';
 
 /**
  * The core's test project; the root `vitest.config.ts` runs it and owns
- * coverage.
+ * coverage. The workspace packages it builds on resolve to their source
+ * through the `source` condition (see tsconfig.json), so the tests run
+ * without a build and against those packages as they are edited.
  * @ref https://vitest.dev/guide/projects
+ * @ref https://vite.dev/config/ssr-options#ssr-resolve-conditions
  */
 const config: UserWorkspaceConfig = defineProject({
+  ssr: {
+    resolve: {
+      conditions: ['source', 'module', 'node', 'development|production'],
+    },
+  },
   test: {
     name: '@netvark/resource-core',
     include: ['src/**/*.test.ts'],
