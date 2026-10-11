@@ -133,9 +133,22 @@ export function bodySchema(
 }
 
 /**
+ * The object of one entry in a list that combines entries (7.2.4): closed,
+ * and pinned to the entry's `status`, `code`, and `title`.
+ */
+export function entryObjectSchema(
+  definition: ResolvedDefinition,
+  ctx: SchemaContext,
+  options: JsonApiSchemaOptions,
+): JsonSchema {
+  return errorObjectSchema(definition, ctx, options, true);
+}
+
+/**
  * The document of a list that combines entries (7.2.4): each object is the
- * pinned object of one definition, under `anyOf` when there are several, so
- * an object's `status`, `code`, and `title` always belong to one entry.
+ * pinned object of one definition, or a reference to it at
+ * `ctx.objectRef(key)`, under `anyOf` when there are several, so an
+ * object's `status`, `code`, and `title` always belong to one entry.
  * `anyOf`, not `oneOf`, for the reason `errorResponses` gives (ADR 0011).
  * Throws `TypeError` for an empty list, which no body matches.
  */
@@ -144,8 +157,11 @@ export function mixedBodySchema(
   ctx: SchemaContext,
   options: JsonApiSchemaOptions,
 ): JsonSchema {
+  const { objectRef } = ctx;
   const objects = definitions.map((definition) =>
-    errorObjectSchema(definition, ctx, options, true),
+    objectRef === undefined
+      ? entryObjectSchema(definition, ctx, options)
+      : { $ref: objectRef(definition.key) },
   );
   const [only, ...rest] = objects;
   if (only === undefined) {

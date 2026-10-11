@@ -24,11 +24,18 @@ export interface ErrorFormat<TBody = unknown> {
   /**
    * Present on a format whose `renderErrors` gives each item its own
    * identity, so one body can combine entries (SPEC 7.2.4): the schema of a
-   * body whose objects each carry the identity of one of `definitions`.
-   * `errorResponses()` in `@netvark/ban-core/openapi` reads it.
+   * body whose objects each carry the identity of one of `definitions`,
+   * each object a `{ $ref: ctx.objectRef(key) }` when `ctx.objectRef` is
+   * set. `errorResponses()` in `@netvark/ban-core/openapi` reads it.
    */
   mixedSchema?(
     definitions: ReadonlyArray<ResolvedDefinition>,
     ctx: SchemaContext,
   ): JsonSchema;
+  /**
+   * The object of `definition` in the bodies `mixedSchema` describes, the
+   * schema `ctx.objectRef` points at. `errorObjectSchemas()` in
+   * `@netvark/ban-core/openapi` reads it.
+   */
+  objectSchema?(definition: ResolvedDefinition, ctx: SchemaContext): JsonSchema;
 }

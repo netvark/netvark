@@ -107,6 +107,7 @@ describe('package surface', () => {
   it('openapi, otel, postgres and testing subpaths export their helpers', () => {
     expect(names(openapi)).toEqual(
       sorted([
+        'errorObjectSchemas',
         'errorResponse',
         'errorResponses',
         'errorSchema',

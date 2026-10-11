@@ -1,12 +1,17 @@
-import type { ErrorItem } from '../core/error-item';
-import type { ErrorStatusCode } from '../core/status';
 import type { JsonSchema } from '../formats/context';
 
 import { describe, expect, it } from 'vitest';
 
-import { createBan } from '../core/create-ban';
-import { jsonApi, responseStatus } from '../formats/json-api';
+import { jsonApi } from '../formats/json-api';
 import { compileWithAjv } from '../test-support/ajv';
+import {
+  CODES,
+  CT,
+  mixing,
+  schemaOf,
+  sent,
+  subsets,
+} from '../test-support/mixed-catalog';
 import { errorResponses, errorSchema } from './index';
 
 /**
@@ -18,64 +23,6 @@ import { errorResponses, errorSchema } from './index';
  * schema, no status is described that no body is sent with, and each
  * status lists exactly the codes its bodies carry.
  */
-
-const ERRORS = {
-  QUERY_INVALID: { status: 400, title: 'Query Invalid' },
-  QUERY_UNKNOWN: { status: 400, title: 'Query Unknown' },
-  ID_REFUSED: { status: 403, title: 'Id Refused' },
-  TYPE_CONFLICT: { status: 409, title: 'Type Conflict' },
-  ATTRIBUTE_INVALID: { status: 422, title: 'Attribute Invalid' },
-  STORE_DOWN: { status: 503, title: 'Store Down' },
-} as const;
-type Code = keyof typeof ERRORS;
-const CODES = Object.keys(ERRORS) as ReadonlyArray<Code>;
-const CT = 'application/vnd.api+json';
-
-const mixing = createBan({
-  errors: ERRORS,
-  format: jsonApi({ mixedEntries: true }),
-  docsBaseUrl: 'https://errors.example.com',
-});
-
-function item(code: Code): ErrorItem {
-  const { status, title } = ERRORS[code];
-  return { status, code, title, detail: `${code} happened`, path: ['data'] };
-}
-
-/** Every non-empty subset, each in catalog order. */
-function subsets<T>(values: ReadonlyArray<T>): Array<Array<T>> {
-  const all: Array<Array<T>> = [[]];
-  for (const value of values) {
-    for (const subset of all.slice()) {
-      all.push([...subset, value]);
-    }
-  }
-  return all.filter((subset) => subset.length > 0);
-}
-
-/** The body and status of an error carrying one item per code, thrown as a library reporting several problems throws it. */
-function sent(codes: ReadonlyArray<Code>): { status: number; body: unknown } {
-  const errors = codes.map((code) => item(code));
-  const [only] = codes;
-  const error =
-    codes.length === 1 && only !== undefined
-      ? mixing.error(only, { errors })
-      : mixing.fromStatus(responseStatus(errors) as ErrorStatusCode, {
-          errors,
-        });
-  return { status: error.status, body: mixing.render(error).body };
-}
-
-function schemaOf(
-  responses: ReturnType<typeof errorResponses>,
-  status: string,
-): JsonSchema {
-  const schema = responses[status]?.content[CT]?.schema;
-  if (schema === undefined) {
-    throw new Error(`no ${status} response`);
-  }
-  return schema;
-}
 
 function codesOf(body: unknown): Array<string> {
   return (body as { errors: Array<{ code: string }> }).errors.map(

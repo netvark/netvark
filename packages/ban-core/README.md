@@ -440,6 +440,35 @@ its own codes, 400 also every client-error code once they span two statuses, and
 a server error is among them, which is how `responseStatus` picks the status of a combined document.
 Each object stays pinned to one entry's `status`, `code`, and `title`.
 
+Those responses repeat the object of every code they may carry, and 400 and 500 carry most of them,
+so in a document of many operations, place each object once and reference it. `objectRef` says where
+an entry's object lives; `errorObjectSchemas` gives the objects to put there:
+
+```ts
+import { errorObjectSchemas, errorResponses } from '@netvark/ban-core/openapi';
+
+const codes = ['QUERY_INVALID', 'ID_REFUSED', 'TYPE_CONFLICT', 'STORE_DOWN'];
+const name = (key: string) => `Error.${key}`;
+const objectRef = (key: string) => `#/components/schemas/${name(key)}`;
+
+const document = {
+  openapi: '3.1.2',
+  info: { title: 'Reports', version: '1' },
+  paths: {
+    '/reports': { get: { responses: errorResponses(ban, codes, { objectRef }) } },
+  },
+  components: {
+    schemas: Object.fromEntries(
+      Object.entries(errorObjectSchemas(ban, codes)).map(([key, schema]) => [name(key), schema]),
+    ),
+  },
+};
+```
+
+Map keys to names the same way in both places. Component names must match `^[a-zA-Z0-9.\-_]+$`, and
+a catalog key can be any string, so encode keys that might not. Both helpers throw `TypeError` for a
+format that does not combine entries, whose responses have no objects to share.
+
 ### Observe
 
 ```ts

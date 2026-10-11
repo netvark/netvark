@@ -16,10 +16,7 @@ import type {
 import type { ErrorFormat } from '../formats/types';
 
 import { indexByStatus } from '../core/definition';
-
-/** The statuses `responseStatus` sends a body of several statuses with (SPEC 7.2.4). */
-const BAD_REQUEST = 400;
-const INTERNAL_SERVER_ERROR = 500;
+import { byStatus, describe, mixedGroups } from './status-groups';
 
 /** The part of a `Ban` instance the helpers read. */
 export interface SchemaSource {
@@ -32,8 +29,15 @@ export interface SchemaSource {
 export interface OpenApiOptions {
   /** Default `draft-2020-12` (OpenAPI 3.1). Use `openapi-3.0` for 3.0 documents. */
   readonly dialect?: SchemaDialect | undefined;
-  /** Overrides the definition's description. */
+  /** Overrides the definition's description; `errorResponse` and `validationResponse` read it. */
   readonly description?: string | undefined;
+  /**
+   * Where the document holds each entry's error object, by catalog key;
+   * `errorResponses` reads it. Given, every response references the objects
+   * instead of inlining them, and `errorObjectSchemas` gives the objects to
+   * place there. Needs a format that combines entries (SPEC 7.2.4).
+   */
+  readonly objectRef?: ((key: string) => string) | undefined;
 }
 
 export interface MediaTypeObject {
@@ -64,6 +68,7 @@ function context(ban: SchemaSource, options: OpenApiOptions): SchemaContext {
   return {
     docsBaseUrl: ban.docsBaseUrl,
     dialect: options.dialect ?? 'draft-2020-12',
+    objectRef: options.objectRef,
   };
 }
 
@@ -126,59 +131,29 @@ function definitionsOf(
   return [...byKey.values()];
 }
 
-/** The definitions of each status, in the order given. */
-function byStatus(
-  definitions: ReadonlyArray<ResolvedDefinition>,
-): Map<number, Array<ResolvedDefinition>> {
-  const groups = new Map<number, Array<ResolvedDefinition>>();
-  for (const definition of definitions) {
-    const group = groups.get(definition.status) ?? [];
-    group.push(definition);
-    groups.set(definition.status, group);
-  }
-  return groups;
-}
-
-/**
- * The definitions a body of each status may carry when one body combines
- * entries. Such a body is sent with `responseStatus` of its objects (SPEC
- * 7.2.4): the status they share, else 400 when every one is a client error,
- * else 500. So each status carries its own entries; 400 also every 4xx
- * entry once the 4xx entries span two statuses; 500 every entry once the
- * entries span two statuses and one of them is 5xx.
- * @ref https://jsonapi.org/format/1.1/#errors-processing
- */
-function mixedGroups(
-  definitions: ReadonlyArray<ResolvedDefinition>,
-): Map<number, ReadonlyArray<ResolvedDefinition>> {
-  const groups: Map<number, ReadonlyArray<ResolvedDefinition>> = byStatus(
-    definitions,
-  );
-  const clientErrors = definitions.filter(
-    (definition) => definition.status < INTERNAL_SERVER_ERROR,
-  );
-  if (new Set(clientErrors.map((definition) => definition.status)).size > 1) {
-    groups.set(BAD_REQUEST, clientErrors);
-  }
-  const statuses = [...groups.keys()];
-  if (
-    statuses.length > 1 &&
-    statuses.some((status) => status >= INTERNAL_SERVER_ERROR)
-  ) {
-    groups.set(INTERNAL_SERVER_ERROR, definitions);
-  }
-  return groups;
-}
-
-function describe(definitions: ReadonlyArray<ResolvedDefinition>): string {
-  return definitions.map((definition) => definition.description).join(' or ');
-}
-
 /** A format that combines entries in one body (SPEC 7.2.4). */
 type MixingFormat = ErrorFormat & Required<Pick<ErrorFormat, 'mixedSchema'>>;
 
+/** A format that combines entries and gives each entry's object apart, so documents can reference it. */
+type ReferringFormat = MixingFormat &
+  Required<Pick<ErrorFormat, 'objectSchema'>>;
+
 function mixes(format: ErrorFormat): format is MixingFormat {
   return format.mixedSchema !== undefined;
+}
+
+function refers(format: ErrorFormat): format is ReferringFormat {
+  return mixes(format) && format.objectSchema !== undefined;
+}
+
+/** The format, when it can reference objects; `TypeError` naming `caller` otherwise. */
+function referring(format: ErrorFormat, caller: string): ReferringFormat {
+  if (!refers(format)) {
+    throw new TypeError(
+      `${caller} needs a format that combines entries in one body, such as jsonApi({ mixedEntries: true }); "${format.name}" does not`,
+    );
+  }
+  return format;
 }
 
 /** Each status's response when one body may combine entries: `mixedSchema` of the entries it may carry. */
@@ -207,7 +182,8 @@ function mixedResponses(
  * discriminate by `code` would fail `oneOf` by matching several (ADR 0011).
  * A format that combines entries in one body (`mixedSchema`, SPEC 7.2.4)
  * instead gives each status the document of every entry a body of that
- * status may carry.
+ * status may carry, whose objects are references when `objectRef` is
+ * given; `TypeError` when it is given for another format.
  * @ref https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.1.2
  */
 export function errorResponses(
@@ -217,7 +193,10 @@ export function errorResponses(
 ): Record<string, ResponseObject> {
   const ctx = context(ban, options);
   const definitions = definitionsOf(ban, refs);
-  const { format } = ban;
+  const format =
+    options.objectRef === undefined
+      ? ban.format
+      : referring(ban.format, 'objectRef');
   if (mixes(format)) {
     return mixedResponses(ban, format, definitions, ctx);
   }
@@ -235,6 +214,29 @@ export function errorResponses(
     );
   }
   return responses;
+}
+
+/**
+ * Each entry's error object, by catalog key: what `objectRef` points at, so
+ * the objects `errorResponses` references when given `objectRef`. Place
+ * them where `objectRef` says, for example `components.schemas`. Throws
+ * `TypeError` unless the format combines entries in one body and defines
+ * `objectSchema` (SPEC 7.2.4).
+ * @ref https://spec.openapis.org/oas/v3.1.2#components-object
+ */
+export function errorObjectSchemas(
+  ban: SchemaSource,
+  refs: ReadonlyArray<ErrorRef>,
+  options: OpenApiOptions = {},
+): Record<string, JsonSchema> {
+  const format = referring(ban.format, 'errorObjectSchemas');
+  const ctx = context(ban, options);
+  return Object.fromEntries(
+    definitionsOf(ban, refs).map((definition) => [
+      definition.key,
+      format.objectSchema(definition, ctx),
+    ]),
+  );
 }
 
 /** JSON Schema for `ban.validation()` bodies: the format's `errorsSchema` for the validation entry. */
