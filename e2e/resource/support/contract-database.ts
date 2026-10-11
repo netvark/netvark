@@ -26,14 +26,17 @@ const { Pool } = pg;
 
 /** The reference adapter's outbox table. */
 export const OUTBOX = 'contract_outbox';
-const OUTBOX_TABLE = `create table ${OUTBOX} (
+/** The outbox table's DDL, after the fixture's migrations. */
+export const OUTBOX_TABLE = `create table ${OUTBOX} (
   position int8 generated always as identity primary key,
   name text not null,
   version int4 not null,
   payload jsonb not null
 )`;
-const EVENTS = `select name, version, payload::text as payload from ${OUTBOX} order by position`;
-const RESET = `${contractFixture.seed}truncate table ${OUTBOX} restart identity;`;
+/** The outbox's events, in the order recorded. */
+export const EVENTS = `select name, version, payload::text as payload from ${OUTBOX} order by position`;
+/** The fixture's seed, and an empty outbox. */
+export const RESET = `${contractFixture.seed}truncate table ${OUTBOX} restart identity;`;
 /** Connections of the server's pool: enough for the concurrent case's two transactions. */
 const POOL_SIZE = 4;
 const POINT = /^\(([^,]+),([^,]+)\)$/u;
@@ -63,7 +66,8 @@ export interface ContractDatabase {
   readonly close: () => Promise<void>;
 }
 
-function eventOf(row: Row): DomainEvent {
+/** The event of a row of `EVENTS`. */
+export function eventOf(row: Row): DomainEvent {
   const { name, version, payload } = row;
   if (
     typeof name !== 'string' ||

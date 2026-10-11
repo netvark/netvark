@@ -23,7 +23,7 @@ const inWorkspace = (workspace: string) =>
   scopeValues(contractFixture.scopes, { workspace });
 
 beforeAll(async () => {
-  database = await contractDatabase();
+  database = contractDatabase();
   storage = createKyselyStorage(storageOptions(database.db));
   await database.reset();
   await database.exec(`insert into tasks (workspace_id, title, created_by) values

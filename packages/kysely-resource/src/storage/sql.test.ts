@@ -3,7 +3,7 @@ import type { PublicCatalog, PublicColumn } from '@netvark/catalog-core';
 import type { TestDatabase } from '../test-support/database';
 
 import { sql } from 'kysely';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { contractFixture } from '@netvark/resource-core/testing';
 
@@ -13,11 +13,8 @@ import { castType, columnOf, tableName, tableOf, typed } from './sql';
 const { catalog, resources } = contractFixture;
 const tasks = tableOf(catalog, resources.tasks);
 
-let database: TestDatabase;
+const database: TestDatabase = contractDatabase();
 
-beforeAll(async () => {
-  database = await contractDatabase();
-});
 afterAll(async () => {
   await database.close();
 });

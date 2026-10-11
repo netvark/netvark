@@ -6,7 +6,7 @@ import type { Kysely } from 'kysely';
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 import type { DefineDefaultedKeyset } from '@netvark/keyset-core';
-import type { ScopeValue } from '@netvark/resource-core/server';
+import type { ScopeValue, StorageAdapter } from '@netvark/resource-core/server';
 
 import type { KyselyTransaction } from './transaction';
 
@@ -44,8 +44,14 @@ export interface KyselyStorageOptions<TDatabase> {
   readonly outbox?: OutboxTable | undefined;
 }
 
-/** The storage adapter of resource SPEC 12.8 over Kysely. */
-export interface KyselyStorage {
+/**
+ * The storage adapter of resource SPEC 12.8 over Kysely, `list` aside,
+ * which pages through `@netvark/kysely-keyset`.
+ */
+export interface KyselyStorage extends Omit<
+  StorageAdapter<KyselyTransaction>,
+  'list' | 'transaction'
+> {
   /** The public catalog it was created with. */
   readonly catalog: PublicCatalog;
   /** The outbox table it was created with, its schema resolved; `undefined` without one. */

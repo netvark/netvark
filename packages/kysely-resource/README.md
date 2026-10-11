@@ -10,9 +10,9 @@ written down in
 section 18, and the decisions behind it in
 [ADR 0012](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0012-the-runtime-runs-declarations-over-the-storage-contract.md).
 
-Status: in development and unreleased. This first slice is the storage adapter's transaction
-protocol and scopes; reads and writes, `list`, failure mapping, the domain (`runtime.as(actor)`),
-boot checks, and the outbox relay follow in the 0.x line.
+Status: in development and unreleased. The storage adapter has its transaction protocol, scopes,
+reads and writes, quotas, row locks, and the outbox insert; `list`, failure mapping, the domain
+(`runtime.as(actor)`), boot checks, and the outbox relay follow in the 0.x line.
 
 ## Install
 
@@ -77,6 +77,46 @@ commit;
   one of its statements raised and rejects with it, unchanged, when the operation went on and
   resolved; an error the operation throws itself is rethrown unchanged.
 
+## Reads and writes
+
+The storage implements the storage contract of
+[resource SPEC 12.8](https://github.com/netvark/netvark/blob/main/docs/resource/SPEC.md); the
+runtime calls it, and you rarely do. What it does to your rows:
+
+- **Only what the input holds.** `create` inserts exactly the members present, plus the client id,
+  the server values, and the scope column, so your column defaults fill the rest; `update` sets
+  exactly the members present, and `null` clears a member. An absent member is never written as
+  `NULL`.
+- **Text both ways.** Every value goes out as a text parameter cast to its column's type,
+  `$1::text::"int8"`, so PostgreSQL parses it as it parses a literal, and every value comes back
+  cast to text, so no driver type parser changes it.
+- **Exact read forms.** `int8` and `numeric` read as strings, timestamps as ISO 8601 text, `json`
+  and `jsonb` as parsed values. A stored value no read form holds, such as `'infinity'`, `NaN`, a BC
+  date, or an array with a `NULL` element, fails the read instead of turning into something else.
+- **Codecs.** A codec field is stored through its storage codec over PostgreSQL's text, the same
+  object `resources.storage` names in `netvark.config`:
+
+  ```ts
+  createKyselyStorage({
+    // ...
+    codecs: {
+      point: {
+        read: (stored) => parsePoint(stored), // '(1.5,2)'
+        write: (point: Point) => `(${point.x},${point.y})`,
+      },
+    },
+  });
+  ```
+
+- **Row locks before writes.** `lock` takes `FOR NO KEY UPDATE` before an update and `FOR UPDATE`
+  before a remove, which also keeps another transaction from adding a reference to the row being
+  removed.
+- **Quotas per tenant.** `count` takes a transaction-scoped advisory lock keyed by the resource, the
+  quota, and the scope's value, so two requests of one tenant cannot both take the last slot, and
+  one tenant's count never waits for another tenant's.
+- **Events with the write.** `record` inserts each event into the outbox table in the operation's
+  transaction, so an event exists exactly when its write committed.
+
 ## Best practices
 
 **Write policies that read the parameter, and survive its absence.** Once a connection has run a
@@ -99,6 +139,19 @@ same `bigint` column scans the whole table. Without a parameter, the policy abov
 **Connect as a role that row security applies to.** A superuser and a role with `BYPASSRLS` skip
 every policy, and so does a table's owner unless the table has `FORCE ROW LEVEL SECURITY`. Run the
 API as its own role that owns nothing, and run migrations as the owner.
+
+**Keep stored values inside the read forms.** A CHECK constraint keeps out what the API cannot read
+back, so rows written by other paths stay readable:
+
+```sql
+alter table events add check (starts_at <> 'infinity' and starts_at <> '-infinity');
+alter table prices add check (amount <> 'NaN');
+```
+
+**Take your own advisory locks with two keys.** The quota lock uses the one-key form,
+`pg_advisory_xact_lock(bigint)`, on a hash of its key. PostgreSQL keeps the two-key form,
+`pg_advisory_xact_lock(int, int)`, in a key space of its own, so your locks never collide with a
+quota's.
 
 **Index each scoped table by its scope column first.** Every statement filters on it, so an index on
 `(organization_id, ...)` serves both the predicate and the policy.

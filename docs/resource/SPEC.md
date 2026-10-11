@@ -3131,26 +3131,34 @@ followed through its domains to the base type. A value outside the read form fai
 | `timestamptz`                                          | `YYYY-MM-DD HH:MM:SS[.f]+00` as `YYYY-MM-DDTHH:MM:SS[.f]Z`; anything else has none                               |
 | `json`, `jsonb`                                        | `JSON.parse(text)`; the JSON value `null` at the top has none                                                    |
 | `text`, `varchar`, `bpchar`, `citext`, `uuid`, an enum | the text                                                                                                         |
-| an array of any of these but `json` and `jsonb`        | the array literal read element by element; a `NULL` element or a nested array has none                           |
+| an array of any of these but `json` and `jsonb`        | the array literal read element by element; a `NULL` element, a nested array, or explicit bounds have none        |
 
 A codec field's text goes through its storage codec's `read`; a relationship's is the target's id.
-@ref https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO @ref
+Every selected value is text, so a driver that returns anything else, as a type parser registered
+for `text` would, fails the read with
+`TypeError('<type>.<member>: the driver returned a value that is not text')`. @ref
+https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO @ref
 https://www.postgresql.org/docs/18/datatype-boolean.html
 
 **Parameter text** (obligation 4). A write's value becomes the text its column's input function
 reads: a string as it is; a number with `String`; a boolean as `true` or `false`; a `json` or
-`jsonb` value with `JSON.stringify`; an array as an array literal whose elements are each
-double-quoted with `\` and `"` escaped; a codec field's value through its storage codec's `write`.
-The write schemas (6) have already refused every value outside the write forms of 5.1, so the
-adapter converts and never validates.
+`jsonb` value with `JSON.stringify`; an array, whose elements are never null (5.1), as an array
+literal whose elements are each double-quoted with `\` and `"` escaped; a codec field's value
+through its storage codec's `write`, which returns a string or fails the write with
+`TypeError('storage codec <name>: write returned a value that is not text')`. The write schemas (6)
+have already refused every value outside the write forms of 5.1, so the adapter converts and never
+validates; a value of another type throws
+`TypeError('no parameter text for a value of type <typeof>')`.
 
 **Rows** (obligations 4, 7, and 10). `get` and `lock` select the public row (12.8) where
 `"key" = $n::text::<key type>` and the scope holds; `lock` appends `for no key update` before an
 update and `for update` before a remove. `create` inserts exactly the members present in the input,
 the client id, the server values, and the scope columns from the transaction's values, and returns
-the public row with `returning`; with nothing to insert it runs `insert into ... default values`.
-`update` sets exactly the members present and returns the public row; without members it returns
-`get` of the row. `remove` deletes the row and answers whether one was deleted.
+the public row with `returning`; with nothing to insert it runs `insert into ... default values`. An
+insert a `BEFORE` trigger dropped returns no row, and `create` throws
+`Error('<type>: the insert returned no row')`. `update` sets exactly the members present and returns
+the public row; without members it returns `get` of the row. `remove` deletes the row and answers
+whether one was deleted.
 
 **List** (obligations 5 and 12). The adapter defines each resource's keyset once, with
 `defineKeyset(resource.keyset)` (keyset-core's `createDefineKeyset`, 11.2), and then:
@@ -3181,11 +3189,15 @@ https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS
 
 **Events** (obligation 9). `record` inserts each event into the outbox table in the operation's
 transaction, in order: `insert into "schema"."outbox" ("name", "version", "payload")` with
-`$1::text`, `$2::text::int4`, and `$3::text::jsonb`.
+`$1::text`, `$2::text::int4`, and `$3::text::jsonb`. With no events it runs nothing. With events and
+no outbox table it throws
+`Error('record: the storage has no outbox table; pass options.outbox to createKyselyStorage')`,
+which boot rules out for the runtime's operations (18.3).
 
-**Partitions** (obligation 11). `partitionRoot(names)` runs `PARTITION_ROOT_SQL` (9.5) in a
-transaction of its own and returns the names of its row, without a `constraint` member when the root
-has none, or `undefined` when no row comes back.
+**Partitions** (obligation 11). `partitionRoot(names)` runs `PARTITION_ROOT_SQL` (9.5) on `db` as a
+statement of its own, outside the operation's transaction, which has failed by then, and returns the
+names of its row, without a `constraint` member when the root has none, or `undefined` when no row
+comes back.
 
 **Errors** (obligation 6). A PostgreSQL error reaches the caller as the driver raised it, with its
 fields; Kysely does not wrap it, and neither does the adapter.

@@ -38,7 +38,7 @@ const POINT_TEXT: TextCodec = {
   },
 };
 
-/** A PGlite database holding the contract's schema. */
+/** A PGlite database holding the contract's schema, opened on first use. */
 export interface TestDatabase {
   readonly db: Kysely<unknown>;
   /** Runs SQL text of one or more statements outside Kysely, as a migration does. */
@@ -48,20 +48,35 @@ export interface TestDatabase {
   readonly close: () => Promise<void>;
 }
 
-/** Opens a database holding the contract's migrations. */
-export async function contractDatabase(): Promise<TestDatabase> {
-  const pglite = await PGlite.create();
-  for (const script of contractFixture.migrations) {
-    await pglite.exec(script);
-  }
-  const db = new Kysely<unknown>({ dialect: new PGliteDialect({ pglite }) });
+/**
+ * A database holding the contract's migrations and then `extra`'s. Kysely
+ * opens it on its first query, so a harness can hand its adapter to the
+ * contract suite before any test runs.
+ */
+export function contractDatabase(
+  extra: ReadonlyArray<string> = [],
+): TestDatabase {
+  let opened: Promise<PGlite> | undefined;
+  const open = async (): Promise<PGlite> => {
+    opened ??= (async () => {
+      const pglite = await PGlite.create();
+      for (const script of [...contractFixture.migrations, ...extra]) {
+        await pglite.exec(script);
+      }
+      return pglite;
+    })();
+    return opened;
+  };
+  const db = new Kysely<unknown>({
+    dialect: new PGliteDialect({ pglite: open }),
+  });
   return {
     db,
     exec: async (script) => {
-      await pglite.exec(script);
+      await (await open()).exec(script);
     },
     reset: async () => {
-      await pglite.exec(contractFixture.seed);
+      await (await open()).exec(contractFixture.seed);
     },
     close: async () => {
       await db.destroy();

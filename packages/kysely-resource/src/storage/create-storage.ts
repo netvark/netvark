@@ -10,6 +10,10 @@
 import type { KyselyStorage, KyselyStorageOptions } from './types';
 
 import { storageConfig } from './options';
+import { recordEvents } from './outbox';
+import { partitionRoot } from './partition';
+import { countRows } from './quota';
+import { deleteRow, insertRow, selectRow, updateRow } from './rows';
 import { KyselyTransaction } from './transaction';
 
 /** The storage adapter over `options.db`; throws `TypeError` for an option it cannot use. */
@@ -22,6 +26,18 @@ export function createKyselyStorage<TDatabase>(
     outbox: config.outbox,
     transaction: async (scopes, run) =>
       KyselyTransaction.run(config.db, scopes, run),
+    get: async (tx, resource, id) => selectRow(config, tx, resource, id),
+    lock: async (tx, resource, id, write) =>
+      selectRow(config, tx, resource, id, write),
+    create: async (tx, resource, input) =>
+      insertRow(config, tx, resource, input),
+    update: async (tx, resource, id, input) =>
+      updateRow(config, tx, resource, id, input),
+    remove: async (tx, resource, id) => deleteRow(config, tx, resource, id),
+    count: async (tx, resource, quota) =>
+      countRows(config, tx, resource, quota),
+    record: async (tx, events) => recordEvents(config.outbox, tx, events),
+    partitionRoot: async (names) => partitionRoot(config.db, names),
   };
   return Object.freeze(storage);
 }
