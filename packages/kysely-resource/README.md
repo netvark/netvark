@@ -14,8 +14,10 @@ Status: in development and unreleased. The storage adapter has its transaction p
 reads and writes, keyset pages with totals, `many` for includes, quotas, row locks, and the outbox
 insert, and the runtime maps what an operation throws to the client's error (a rule's rejection, a
 keyset refusal, a PostgreSQL integrity violation through its declared code, partitions included).
-`relayOutbox` delivers the events operations recorded. The domain (`runtime.as(actor)`) and its boot
-checks follow in the 0.x line.
+`relayOutbox` delivers the events operations recorded. `createResourceRuntime` checks the
+composition against the catalog and the role it connects as, then runs each operation as the actor
+through `runtime.as(actor)`; `checkResourceRuntime` runs the same static checks in CI, without a
+database. The HTTP host follows in the 0.x line.
 
 ## Install
 
@@ -51,6 +53,86 @@ instead of when the first event is written.
 
 The adapter runs on `db.withoutPlugins()`: your `CamelCasePlugin` or any other plugin keeps working
 for your own queries and never renames the adapter's identifiers or result keys.
+
+## Starting the runtime
+
+The runtime takes the storage, the full catalog `pg-catalog extract` writes (it holds the row
+security policies and the indexes the public catalog leaves out), and what your domain defines:
+
+```ts
+// src/server/runtime-options.ts
+import type { RuntimeOptions } from '@netvark/kysely-resource';
+
+import type { AppDomain } from './domain'; // what createDomainDefiners was given
+
+import { catalog } from '../generated/catalog';
+import { ContactsBehavior, OrganizationsBehavior } from './behaviors'; // what defineResource returned
+import { APP_ERRORS, QUOTAS, SCOPES, services } from './domain';
+import { storage } from './storage';
+
+export const options = {
+  storage,
+  catalog,
+  resources: { contacts: ContactsBehavior, organizations: OrganizationsBehavior }, // keyed by type
+  scopes: SCOPES, // a defineScope binding per scope
+  unscoped: ['organizations'], // the resources that run without a scope
+  quotas: QUOTAS,
+  services,
+  errors: APP_ERRORS,
+} satisfies RuntimeOptions<AppDomain>;
+```
+
+```ts
+// src/server/runtime.ts
+import { createResourceRuntime } from '@netvark/kysely-resource';
+
+import { options } from './runtime-options';
+
+export const runtime = await createResourceRuntime(options);
+for (const warning of runtime.warnings) {
+  logger.warn(warning);
+}
+
+// in a handler or a worker
+const contacts = runtime.as(actor).contacts;
+const page = await contacts.list({ sort: ['-createdAt'], page: { size: 50 } });
+const created = await contacts.create({ attributes: { name: 'Ada', kind: 'person' } });
+```
+
+```ts
+import { expect, it } from 'vitest';
+
+// src/server/runtime.test.ts: no database needed
+import { checkResourceRuntime } from '@netvark/kysely-resource';
+
+import { options } from './runtime-options';
+
+it('boots against the catalog', () => {
+  expect(checkResourceRuntime(options)).toEqual({ problems: [], warnings: [] });
+});
+```
+
+- **Static checks, without a connection.** Each behavior is keyed by its type and its table is in
+  the catalog; each scoped resource has a binding for its scope that names the declared column, and
+  each resource without one is listed in `unscoped`; each includable relationship's target has a
+  behavior; each create quota is in `quotas`; once a behavior has effects, the outbox table exists
+  with its four columns; and each scoped table enables row security with policies that read the
+  scope's parameter for every command its operations run, `all`, permissive, and restrictive
+  policies counted as PostgreSQL combines them.
+- **Connected checks, at startup.** The role must not be a superuser nor have `BYPASSRLS`, and row
+  security must apply to it on each scoped table (`row_security_active`): a table's owner skips
+  policies unless the table forces them.
+- **Problems refuse; warnings do not.** `createResourceRuntime` rejects with a `BootError` whose
+  `problems` lists every problem found, and whose message holds one per line. Warnings, about
+  indexes, come back on `runtime.warnings`. A message names tables, columns, roles, and parameters,
+  never a connection string.
+- **Typed operations.** With typed declarations, `runtime.as(actor).contacts` holds exactly the
+  operations the declaration declares, plus `include` when a relationship is includable; rows are
+  the resource's public rows, and `list` takes a request in its keyset fields, so a misspelled sort
+  fails to compile.
+- **Options mistakes throw first.** A key that is not an option, a storage that
+  `createKyselyStorage` did not return, or a copy of a behavior is a `TypeError` naming the option,
+  before any check.
 
 ## What a transaction runs
 
@@ -198,8 +280,26 @@ policy above as a bitmap index scan, while `organization_id::text = current_sett
 same `bigint` column scans the whole table. Without a parameter, the policy above matches no row.
 
 **Connect as a role that row security applies to.** A superuser and a role with `BYPASSRLS` skip
-every policy, and so does a table's owner unless the table has `FORCE ROW LEVEL SECURITY`. Run the
-API as its own role that owns nothing, and run migrations as the owner.
+every policy, and so does a table's owner unless the table has `FORCE ROW LEVEL SECURITY`;
+`createResourceRuntime` refuses each. Run the API as its own role that owns nothing, and run
+migrations as the owner:
+
+```sql
+create role api login password '...' nosuperuser nobypassrls; -- owns no table
+grant usage on schema public to api;
+grant select, insert, update, delete on contacts, organizations to api;
+```
+
+**Run `checkResourceRuntime` in CI.** It needs no database, so a behavior keyed by the wrong type, a
+missing binding, or a policy that forgets the parameter fails the test suite instead of the deploy.
+
+**Put the scope column in every unique index on a value clients write.** PostgreSQL checks
+uniqueness without row security, so `unique (email)` answers a 409 for an email another tenant
+holds, which tells the client it exists there. `unique (organization_id, email)` keeps each tenant's
+values to itself; boot warns about each unique index that leaves the scope out. An index that holds
+a reference to a row of the same tenant, such as `unique (subject_id, email)`, already keeps to the
+tenant, since the runtime refuses a reference to another tenant's row, and so does an index of
+shared rows, `unique (name) where organization_id is null`; boot warns about neither.
 
 **Keep stored values inside the read forms.** A CHECK constraint keeps out what the API cannot read
 back, so rows written by other paths stay readable:
@@ -220,7 +320,8 @@ quota's.
 **Index the sorts you page by behind the scope column.** A page orders by its sort keys and then by
 the key, and its seek leads with a range on the first sort key (keyset ADR 0016), so an index of the
 scope column, the sort keys in their directions, and the key lets PostgreSQL start at the cursor,
-read one page in order, and stop, however deep the page:
+read one page in order, and stop, however deep the page. Boot warns about each sortable field no
+index serves:
 
 ```sql
 create index contacts_organization_name on contacts (organization_id, name, id);

@@ -610,6 +610,9 @@ importers:
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8
+      '@netvark/pg-catalog':
+        specifier: workspace:^
+        version: link:../pg-catalog
       kysely:
         specifier: 'catalog:'
         version: 0.29.6

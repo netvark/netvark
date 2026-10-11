@@ -6,7 +6,7 @@ import {
   Organizations,
   Teams,
 } from '../test-support/domain-resources';
-import { defineResourceIn } from './define-resource';
+import { defineResourceIn, isResourceBehavior } from './define-resource';
 import { definePolicyIn, denyAll } from './policy';
 
 const slug = () => ({ slug: 'acme' });
@@ -30,6 +30,15 @@ describe('defineResource (SPEC 12.3)', () => {
     expect(behavior.serverValues).toEqual([]);
     expect(Object.isFrozen(behavior)).toBe(true);
     expect(Object.isFrozen(behavior.operations.remove?.rules)).toBe(true);
+  });
+
+  it('recognizes what it returned, and no copy of it', () => {
+    const behavior = defineResourceIn(Contacts, {});
+    expect(isResourceBehavior(behavior)).toBe(true);
+    expect(isResourceBehavior({ ...behavior })).toBe(false);
+    expect(isResourceBehavior(Contacts)).toBe(false);
+    expect(isResourceBehavior(null)).toBe(false);
+    expect(isResourceBehavior('contacts')).toBe(false);
   });
 
   it("keeps the resource's own policy", () => {

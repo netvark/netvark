@@ -15,7 +15,7 @@ import type {
   ResourceBehavior,
 } from '@netvark/resource-core/server';
 
-import type { ResourceOperations } from '../runtime/domain';
+import type { ResourceOperations } from '../runtime/operations-types';
 import type { DomainOptions } from '../runtime/types';
 import type { KyselyStorage } from '../storage/types';
 

@@ -20,7 +20,7 @@ import { contractDatabase, storageOptions } from './database';
 import { BEHAVIORS, MEMBER_ID } from './domain';
 
 /** The outbox the storage records events in (resource SPEC 18.6). */
-const OUTBOX = `create table contract_outbox (
+export const OUTBOX_TABLE = `create table contract_outbox (
   position int8 generated always as identity primary key,
   name text not null,
   version int4 not null,
@@ -29,7 +29,7 @@ const OUTBOX = `create table contract_outbox (
 
 /** The contract's schema with the outbox; `log` sees every query Kysely runs. */
 export function domainDatabase(log?: (event: LogEvent) => void): TestDatabase {
-  const database = contractDatabase([OUTBOX], log);
+  const database = contractDatabase([OUTBOX_TABLE], log);
   return {
     ...database,
     reset: async () => {

@@ -8,12 +8,16 @@
  * writes into the column on create (SPEC 12.8). `ScopeBindings` holds a
  * binding per scope of the definer, each over the same column, and
  * `scopeValues` reads an actor's values for `StorageAdapter.transaction`.
+ * `scopeColumnOf` gives the column a declaration scopes its resource by,
+ * which a runtime holds each binding to.
  * @ref https://www.postgresql.org/docs/18/runtime-config-custom.html
  * @ref https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADMIN-SET
  * @packageDocumentation
  */
+import type { AnyDeclaredResource } from '../declare/declared-resource';
 import type { ScopeRegistry } from '../declare/registries';
 
+import { internalsOf } from '../declare/declared-resource';
 import { isRecord } from '../internal/object';
 
 /** A tenant id as the session parameter and the scope column take it. */
@@ -107,4 +111,21 @@ export function scopeValues<TActor>(
       value,
     });
   });
+}
+
+/**
+ * The column `resource`'s declaration scopes it by, which its binding must
+ * name; `undefined` for a resource without a scope. Throws `TypeError` for
+ * a value `declareResource` did not return.
+ */
+export function scopeColumnOf(
+  resource: AnyDeclaredResource,
+): string | undefined {
+  const internals = internalsOf(resource);
+  if (internals === undefined) {
+    throw new TypeError(
+      'scopeColumnOf: the resource must be a resource declareResource returned',
+    );
+  }
+  return internals.scopeColumn;
 }

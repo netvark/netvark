@@ -722,7 +722,7 @@ keyset-core's `InvalidFilterValueError`, a client error like the parser's.
 `@netvark/resource-core/server` holds what only a server composes, typed by your application's own
 registries (SPEC 12): who acts and what they may do, each operation's behavior, tenant scopes,
 quotas, events, and the errors of rules and of the database. It touches no database: a storage
-adapter does, and a runtime runs each operation over one. `@netvark/kysely-resource` will ship both.
+adapter does, and a runtime runs each operation over one. `@netvark/kysely-resource` ships both.
 
 ### The domain
 
@@ -792,6 +792,10 @@ denied `list` or `create` is `FORBIDDEN` (403); a denied `get`, `update`, or `re
 supplies the server values, the columns an insert requires that no client member, scope, or client
 id covers, such as `created_by`; `tsc` requires it exactly when the table has such columns.
 
+`defineResource` freezes and records what it returns: `isResourceBehavior(value)` is `true` for
+exactly those objects and never for a copy, so a runtime refuses a behavior put together by hand,
+whose policy and operations nothing checked. `@netvark/kysely-resource` checks it at boot.
+
 ### Scopes, quotas, and events
 
 Export the definer's `scopes` `as const` and bind each scope to the actor, so `tsc` checks the
@@ -837,6 +841,11 @@ transaction only, which your row security policies read with `current_setting`, 
 `column = value` to every statement. `quotaExceeded(count, limit)` is `QUOTA_EXCEEDED` (403) once
 the count reaches the limit, and for a limit that is not a safe integer of at least zero.
 `ContactCreated.of(payload)` validates the payload; a changed payload is a new version.
+
+`scopeColumnOf(Contacts)` is the column the declaration scopes its table by, `'organization_id'`,
+and `undefined` for a resource without a scope. The adapter filters and writes the binding's
+`column`, so a runtime compares the two at boot: a binding that names another column would scope the
+table by the wrong one.
 
 ### Errors of rules and of the database
 

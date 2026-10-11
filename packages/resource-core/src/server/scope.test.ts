@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { defineScope, scopeValues } from './scope';
+import { Contacts, Organizations } from '../test-support/domain-resources';
+import { defineScope, scopeColumnOf, scopeValues } from './scope';
 
 interface AppActor {
   readonly organizationId: number;
@@ -108,4 +109,19 @@ describe('scopeValues (SPEC 12.5, 12.8)', () => {
       );
     },
   );
+});
+
+describe('scopeColumnOf (SPEC 12.5)', () => {
+  it("gives the column of the declaration's scope, and nothing for a resource without one", () => {
+    expect(scopeColumnOf(Contacts)).toBe('organization_id');
+    expect(scopeColumnOf(Organizations)).toBeUndefined();
+  });
+
+  it('refuses a value declareResource did not return', () => {
+    expect(() => scopeColumnOf({ ...Contacts })).toThrow(
+      new TypeError(
+        'scopeColumnOf: the resource must be a resource declareResource returned',
+      ),
+    );
+  });
 });

@@ -3,7 +3,8 @@
  * made again for JavaScript callers, each a `TypeError` naming the
  * resource and the option. The behavior comes back normalized and frozen:
  * `denyAll` when there is no policy, and empty `rules` and `effects` when
- * an operation gives none, so a runtime reads one shape.
+ * an operation gives none, so a runtime reads one shape, and recorded, so
+ * `isResourceBehavior` tells it from any other value.
  * @packageDocumentation
  */
 import type { DeclaredResource } from '../declare/declared-resource';
@@ -13,6 +14,14 @@ import { internalsOf } from '../declare/declared-resource';
 import { isRecord } from '../internal/object';
 import { denyAll, isPolicyFor } from './policy';
 import { serverValueColumns } from './server-values';
+
+/** The behaviors `defineResource` returned. */
+const BEHAVIORS = new WeakSet<object>();
+
+/** Whether `value` is a behavior `defineResource` returned, which a runtime takes and nothing else (SPEC 12.3, 18.3). */
+export function isResourceBehavior(value: unknown): value is ResourceBehavior {
+  return typeof value === 'object' && value !== null && BEHAVIORS.has(value);
+}
 
 /** The members each writing operation takes. */
 const MEMBERS = {
@@ -158,6 +167,7 @@ export function defineResourceIn(
     operations: operationBehaviors(type, declared, init['operations'], columns),
     serverValues: Object.freeze([...columns]),
   });
+  BEHAVIORS.add(behavior);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: each member was checked above against the shapes ResourceBehavior declares; behavior.test.ts covers every refusal
   return behavior as unknown as ResourceBehavior;
 }
