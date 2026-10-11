@@ -1,6 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Resolve the workspace packages this core builds on (ban-core,
+    // catalog-core, jsonapi-core, keyset-core) to their source through the
+    // `source` condition of their exports maps (written by tsdown's
+    // `devExports`), so it type-checks against them as they are edited,
+    // without a build in between. Consumers never see the condition.
+    // @ref https://tsdown.dev/options/package-exports#devexports
+    // @ref https://www.typescriptlang.org/tsconfig/#customConditions
+    "customConditions": ["source"]
+  },
   "include": ["src/**/*.ts", "*.config.ts"],
   "exclude": ["dist", "node_modules", "coverage"]
 }
