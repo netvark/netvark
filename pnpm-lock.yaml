@@ -588,9 +588,15 @@ importers:
 
   packages/kysely-resource:
     dependencies:
+      '@netvark/ban-core':
+        specifier: workspace:^
+        version: link:../ban-core
       '@netvark/catalog-core':
         specifier: workspace:^
         version: link:../catalog-core
+      '@netvark/jsonapi-core':
+        specifier: workspace:^
+        version: link:../jsonapi-core
       '@netvark/keyset-core':
         specifier: workspace:^
         version: link:../keyset-core
