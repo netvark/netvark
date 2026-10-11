@@ -339,17 +339,18 @@ order, a foreign @netvark/ban-core validation error, `getResponse` with the erro
 
 `ResourceDefinition<TType, TAttribute, TRelationship, TRow, TSort, TFilter, TCreate, TUpdate>`:
 
-| Member          | Meaning                                                                                                                                |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`          | The resource type; a member name                                                                                                       |
-| `attributes`    | Declared attribute names                                                                                                               |
-| `relationships` | By name: `{ type, cardinality: 'one' \| 'many', resource?: () => AnyResource }`                                                        |
-| `fields`        | `ReadonlySet` of attribute and relationship names                                                                                      |
-| `serialize`     | `(row: TRow) => { id; attributes?; relationships?; links?; meta? }`; attributes and relationships are restricted to the declared names |
-| `links`         | `{ self?: (id) => string; relationship?: (id, name) => { self?; related? } }`, resolved from `ResourceLinksInit` (5.1)                 |
-| `query`         | Resolved capabilities (5.2)                                                                                                            |
-| `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate> }`                                             |
-| `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                        |
+| Member          | Meaning                                                                                                                                      |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`          | The resource type; a member name                                                                                                             |
+| `attributes`    | Declared attribute names                                                                                                                     |
+| `relationships` | By name: `{ type, cardinality: 'one' \| 'many', resource?: () => AnyResource }`                                                              |
+| `fields`        | `ReadonlySet` of attribute and relationship names                                                                                            |
+| `serialize`     | `(row: TRow) => { id; attributes?; relationships?; links?; meta? }`; attributes and relationships are restricted to the declared names       |
+| `links`         | `{ self?: (id) => string; relationship?: (id, name) => { self?; related? } }`, resolved from `ResourceLinksInit` (5.1)                       |
+| `query`         | Resolved capabilities (5.2)                                                                                                                  |
+| `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate> }`                                                   |
+| `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                              |
+| `writable`      | `WritableFields = { create; update }`: each a `ReadonlySet` of the fields that operation accepts; every field when the init lists none (9.2) |
 
 `serialize` may return relationships as an id, `null`, an array of ids, an identifier object, an
 array of identifier objects, or `{ data?, links?, meta? }`. `AnyResource` erases every parameter;
@@ -366,10 +367,20 @@ namespace with them, `#document-resource-object-fields`), or is declared twice o
 relationship whose `type` is not a member name or whose `cardinality` is not `one` or `many`; a
 `serialize` that is not a function; a validator that is not a Standard Schema V1 object (`~standard`
 read with `in`, since zod 4, Valibot, and ArkType expose it as a prototype getter; `version` 1 and a
-`validate` function). Fills `links`, `query`, `validate`, and `clientIds` with defaults. The literal
-types of `type`, the field names, and the sort and filter names are inferred (`const` type
-parameters) and `NoInfer` keeps names flowing from the declarations into `serialize`, never the
-other way.
+`validate` function); a `writable.create` or `writable.update` name that is not a declared field or
+is listed twice. Fills `links`, `query`, `validate`, `clientIds`, and `writable` (each operation
+without a list accepts every field) with defaults. The literal types of `type`, the field names, and
+the sort and filter names are inferred (`const` type parameters) and `NoInfer` keeps names flowing
+from the declarations into `serialize` and `writable`, never the other way.
+
+Writable fields. `writable: WritableFieldsInit = { create?, update? }` lists, typed as the declared
+names, the fields each operation accepts, so a read-only field (`createdAt`, a counter) or one set
+once (a slug, an author) is declared, served, filterable, and sortable while a request that writes
+it is refused with 403 (9.2, 10.4, 11.4). The specification makes the update's refusal a MUST and
+the create's a MAY ("A server MUST return 403 Forbidden in response to an unsupported request to
+update a resource or relationship"; `#crud-updating-responses-403`, `#crud-creating-responses-403`);
+refusing beats a validator that strips the unknown key, which answers success for a write that never
+happened.
 
 Links (`links.ts`, ADR 0015). `links` is `ResourceLinksInit = { base?, self?, relationship? }`.
 Without `base`, the resolved `links` holds the builders given and nothing else. With `base`, a
@@ -694,10 +705,15 @@ object at `pointer` (default `/data`):
 5. `lid` is a 400 unless `lids` is true; with `lids`, an update MAY identify the resource by `lid`
    instead of `id`.
 6. `attributes`, when present, MUST be an object; each name MUST be a declared attribute (400 at
-   `pointer/attributes/<name>`); @-Members are skipped.
-7. `relationships`, when present, MUST be an object; each name MUST be a declared relationship and
-   each value a relationship object with a `data` member (400); `data` is parsed with 9.1 for the
-   declared cardinality and type, `lids` passed through (`#crud-updating-resource-relationships`).
+   `pointer/attributes/<name>`) that the operation writes (`writable`, 5.1; 403 `FORBIDDEN` at the
+   same pointer, `#crud-creating-responses-403`, `#crud-updating-responses-403`); @-Members are
+   skipped.
+7. `relationships`, when present, MUST be an object; each name MUST be a declared relationship (400)
+   that the operation writes (403 at `pointer/relationships/<name>`), and each value a relationship
+   object with a `data` member (400); `data` is parsed with 9.1 for the declared cardinality and
+   type, `lids` passed through (`#crud-updating-resource-relationships`). The 403 items join the
+   others in one error: a document refused only for the fields it writes answers 403, and one with
+   any other refusal answers 400 with every item (4.3).
 8. With no structural errors, the attributes (an empty object when absent) are validated by the
    definition's `create` or `update` Standard Schema; each issue becomes a `VALIDATION_FAILED` (422)
    object whose pointer is `pointer/attributes` plus the issue path. The issue's `code` and
@@ -793,7 +809,11 @@ header and report.
 | `relationshipValidator(resource, name, 'many')`            | `json`  | `ReadonlyArray<ResourceIdentifier>`                                                                                                                                                  |
 
 `relationshipValidator` throws `TypeError` at setup for an undeclared relationship or a cardinality
-that disagrees with the definition; `name` is typed as `RelationshipNameOf<TResource>`.
+that disagrees with the definition; `name` is typed as `RelationshipNameOf<TResource>`. A
+relationship that `writable.update` leaves out is refused with 403 `FORBIDDEN` before the body is
+read, whatever the method ("A server MUST return 403 Forbidden in response to an unsupported request
+to update a relationship", `#crud-updating-relationship-responses-403`), so an application may mount
+every relationship's route and let the definition decide.
 
 ### 10.5 Handlers (`handlers.ts`, ADR 0014)
 
@@ -921,17 +941,18 @@ identifiers, keeping `meta`.
 | `add`, no relationship target    | The target, when given, MAY only name a collection (no `id` or `lid`). The type comes from the target or from `data.type`. Unknown type: 404 at `.../ref/type` or `.../data/type`. No `create` handler: 403. `data` is parsed with 9.2 (`create`, `lids` on, pointer `.../data`), `lid` references resolved, the handler called, the returned row serialized as the result's `data`. A `data.lid` is defined from the result's id or the client-generated id; a handler that returns nothing for an operation with a `lid` is a `TypeError`. |
 | `update`, no relationship target | Type from the target or `data.type`; 404 and 403 as above. The id is the target's (`lid` resolved), else `data.id`, else `data.lid` resolved; a `data.lid` that disagrees with the target's `lid` is 409 at `.../data/lid`. `data` is parsed as an `update` with that id.                                                                                                                                                                                                                                                                    |
 | `remove`, no relationship target | A target is required (400). 404 and 403 as above. `remove({ id })`; the result is empty.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| any `op` with `ref.relationship` | The relationship MUST be declared (400 at `.../ref/relationship`). `add` and `remove` apply only to to-many relationships (400 at `.../op` for to-one). `data` is required and parsed as linkage of the declared cardinality and type with `lids` on (`add` and `remove`: always an array). No handler for the `op`: 403. The result is empty.                                                                                                                                                                                               |
+| any `op` with `ref.relationship` | The relationship MUST be declared (400 at `.../ref/relationship`). `add` and `remove` apply only to to-many relationships (400 at `.../op` for to-one). `data` is required and parsed as linkage of the declared cardinality and type with `lids` on (`add` and `remove`: always an array). No handler for the `op`, or a relationship that `writable.update` leaves out: 403. The result is empty.                                                                                                                                          |
 
 Results carry `data` only when a handler returned a row (extension: results for `remove` and
 relationship operations MUST NOT contain `data`).
 
 Tests: `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts` (the
 extension's examples, lid flow, the empty outcome, the host context, rollback, pointers),
-`process-semantics.test.ts` (every rule above), and `process-coverage.test.ts` in the core;
-`atomic/handler.test.ts` in `@netvark/hono-jsonapi` (405, 415, malformed JSON, 200 with the
-extension on `Content-Type`, 204, rendering and propagation after the rollback);
-`atomic.e2e.test.ts` over HTTP.
+`process-semantics.test.ts` (every rule above), `writable.test.ts` (the fields an `add` or an
+`update` writes, a relationship operation on a relationship updates do not write, no handler run),
+and `process-coverage.test.ts` in the core; `atomic/handler.test.ts` in `@netvark/hono-jsonapi`
+(405, 415, malformed JSON, 200 with the extension on `Content-Type`, 204, rendering and propagation
+after the rollback); `atomic.e2e.test.ts` over HTTP.
 
 ---
 
@@ -996,19 +1017,19 @@ its `*.test-d.ts`; `@netvark/hono-jsonapi`'s project resolves `@netvark/jsonapi-
 choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of the
 packages' own modules.
 
-| Area                           | Files                                                                                                                                               | What is pinned                                                                                                                                                                                   |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Internal                       | `object.test.ts`, `pointer.test.ts`                                                                                                                 | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                           |
-| Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                 | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
-| Negotiation                    | `negotiate.test.ts`                                                                                                                                 | each rule of 3.3                                                                                                                                                                                 |
-| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                  | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                                  |
-| Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                  | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
-| Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`       | every definition-time rejection, inference, the links convention, configured defaults                                                                                                            |
-| Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                   | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
-| Pagination                     | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                              | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
-| Requests                       | `resource-document.test.ts`, `resource-update.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                                      | pointers for every structural error, 403/409/422 cases, lids                                                                                                                                     |
-| Hono (`@netvark/hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts` | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
-| Atomic                         | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `process-coverage.test.ts`        | the extension's examples, the host context, and every processing rule                                                                                                                            |
+| Area                           | Files                                                                                                                                                            | What is pinned                                                                                                                                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal                       | `object.test.ts`, `pointer.test.ts`                                                                                                                              | prototype-safe reads, RFC 6901 escaping and unescaping                                                                                                                                           |
+| Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                              | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
+| Negotiation                    | `negotiate.test.ts`                                                                                                                                              | each rule of 3.3                                                                                                                                                                                 |
+| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`                                                                                                               | catalog closure and spreading, item mapping, both call forms, status derivation, document order                                                                                                  |
+| Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                               | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
+| Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`                    | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets                                                                              |
+| Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
+| Pagination                     | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                                           | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
+| Requests                       | `resource-document.test.ts`, `resource-update.test.ts`, `resource-writable.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                      | pointers for every structural error, 403/409/422 cases, the fields each operation writes, lids                                                                                                   |
+| Hono (`@netvark/hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts`              | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
+| Atomic                         | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `writable.test.ts`, `process-coverage.test.ts` | the extension's examples, the host context, and every processing rule                                                                                                                            |
 
 ### 14.1 End-to-end suite (`e2e/jsonapi/`)
 
@@ -1020,15 +1041,15 @@ snapshot transaction) built only from the packages: `store.ts` and `resources.ts
 `@netvark/jsonapi-core`, the routes and handlers `@netvark/hono-jsonapi`. Each file starts it on
 `@hono/node-server` and asserts over `fetch`.
 
-| File                          | Covers                                                                                                           |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `package-surface.e2e.test.ts` | the exact export lists of all four subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings |
-| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500               |
-| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                 |
-| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, update, relationship endpoints, delete               |
-| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                             |
-| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, 415 and 400 for bad requests                          |
-| `custom-catalog.e2e.test.ts`  | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException` |
+| File                          | Covers                                                                                                                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package-surface.e2e.test.ts` | the exact export lists of all four subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings                                                                                       |
+| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500                                                                                                     |
+| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                                                                                                       |
+| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, 403 for a field a write does not accept, alone and beside a 400, update, relationship endpoints and a read-only relationship's 403, delete |
+| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                   |
+| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                           |
+| `custom-catalog.e2e.test.ts`  | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                       |
 
 ### 14.2 Runtime smoke test (`e2e/jsonapi/smoke/`)
 

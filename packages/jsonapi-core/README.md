@@ -152,8 +152,20 @@ const Articles = defineResource({
     create: z.object({ title: z.string().min(1), body: z.string().default('') }),
     update: z.object({ title: z.string().min(1).optional(), body: z.string().optional() }),
   },
+  // The server stamps createdAt.
+  writable: {
+    create: ['title', 'body', 'author', 'tags'],
+    update: ['title', 'body', 'author', 'tags'],
+  },
 });
 ```
+
+`writable` lists the fields each write accepts; an operation without a list accepts every declared
+field. A field left out stays declared, so it is served, sorted, and filtered, while a create or an
+update that carries it is refused with 403 at its pointer, as JSON:API requires of an unsupported
+update; `relationshipValidator` and atomic operations refuse it the same way. List the fields rather
+than let a validator strip what it does not know: a stripped field answers 201 or 200 for a write
+that never happened.
 
 `serialize` returns ids for relationships and the package builds the identifier objects with the
 declared type; identifier objects pass through for polymorphic relationships. The attribute and
@@ -281,12 +293,13 @@ objects and their `type` links. A cursor your decoder rejects is reported with
 ### Parse request documents
 
 `parseCreateDocument` and `parseUpdateDocument` check a request document against the definition
-(type, client ids, undeclared fields, relationship cardinality and types), run the Standard Schema
-validator over the attributes, and return a `ParsedResourceObject` with `attributes` typed as the
-validator's output. Every problem carries an RFC 6901 pointer: `/data/attributes/title`,
-`/data/relationships/author/data/type`. A validator issue's `code` and `expected`, when they are
-strings, appear under `meta`, so a client can tell one failed rule from another without parsing the
-`detail`; nothing else of the issue is kept, so no value from the request reaches the response:
+(type, client ids, undeclared fields, fields the operation does not write, relationship cardinality
+and types), run the Standard Schema validator over the attributes, and return a
+`ParsedResourceObject` with `attributes` typed as the validator's output. Every problem carries an
+RFC 6901 pointer: `/data/attributes/title`, `/data/relationships/author/data/type`. A validator
+issue's `code` and `expected`, when they are strings, appear under `meta`, so a client can tell one
+failed rule from another without parsing the `detail`; nothing else of the issue is kept, so no
+value from the request reaches the response:
 
 ```json
 {

@@ -101,6 +101,24 @@ describe('defineResource types', () => {
     expectTypeOf(Tag.attributes).toEqualTypeOf<ReadonlyArray<never>>();
   });
 
+  it('lists only declared fields as writable', () => {
+    const Writable = defineResource({
+      type: 'articles',
+      attributes: ['title'],
+      relationships: { author: { type: 'people', cardinality: 'one' } },
+      serialize: (row: { id: string }) => ({ id: row.id }),
+      writable: { create: ['title', 'author'], update: ['title'] },
+    });
+    expectTypeOf(Writable.writable.update).toEqualTypeOf<ReadonlySet<string>>();
+    defineResource({
+      type: 'articles',
+      attributes: ['title'],
+      serialize: (row: { id: string }) => ({ id: row.id }),
+      // @ts-expect-error body is not a declared field
+      writable: { create: ['body'] },
+    });
+  });
+
   it('is assignable to AnyResource', () => {
     const any: AnyResource = Article;
     expectTypeOf(any.type).toEqualTypeOf<string>();

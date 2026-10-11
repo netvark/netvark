@@ -6,9 +6,11 @@
  * response lists, and its body passes that response's schema: negotiation,
  * the request document, the declaration's schemas, the policies, the
  * application's rules and quota, and the database's constraints, on
- * contacts; `openapi-refusals-calls` holds calls. A request document the server refuses as such
- * fails the documented request schema, and one refused for anything else
- * passes it (`support/refusals.ts`).
+ * contacts; `openapi-refusals-calls` holds calls, and
+ * `openapi-refusals-members` the members a write does not accept. A
+ * request document the server refuses as such fails the documented request
+ * schema, and one refused for anything else passes it
+ * (`support/refusals.ts`).
  * @ref https://jsonapi.org/format/1.1/#crud
  */
 import type { ApiSession } from './support/api-session.ts';
@@ -143,25 +145,6 @@ const REFUSALS: ReadonlyArray<Refusal> = [
     'VALIDATION_FAILED',
   ),
   create(
-    'a create with a read-only field',
-    contact({ name: 'Bea', createdAt: '2026-01-01T00:00:00Z' }),
-    UNPROCESSABLE,
-    'VALIDATION_FAILED',
-  ),
-  create(
-    'a create with a read-only relationship',
-    contact(
-      { name: 'Bea' },
-      {
-        relationships: {
-          organization: { data: { type: 'organizations', id: '1' } },
-        },
-      },
-    ),
-    UNPROCESSABLE,
-    'VALIDATION_FAILED',
-  ),
-  create(
     'a create the policy denies',
     contact({ name: 'Bea' }),
     FORBIDDEN,
@@ -208,13 +191,6 @@ const REFUSALS: ReadonlyArray<Refusal> = [
     NOT_FOUND,
     'NOT_FOUND',
     'viewer',
-  ),
-  patch(
-    'an update of an immutable field',
-    ADA,
-    update(ADA, { kind: 'company' }),
-    UNPROCESSABLE,
-    'VALIDATION_FAILED',
   ),
   patch(
     'an update outside the options',

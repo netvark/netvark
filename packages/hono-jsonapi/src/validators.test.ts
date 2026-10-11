@@ -209,6 +209,36 @@ describe('relationshipValidator', () => {
     });
   });
 
+  it('answers 403 for a relationship updates do not write, before reading the body', async () => {
+    const Locked = defineResource({
+      type: 'articles',
+      attributes: ['title'],
+      relationships: { author: { type: 'people', cardinality: 'one' } },
+      serialize: (row: { id: string }) => ({ id: row.id }),
+      writable: { update: ['title'] },
+    });
+    const locked = new Hono();
+    locked.patch(
+      '/articles/:id/relationships/author',
+      relationshipValidator(Locked, 'author', 'one'),
+      (c) => c.json({ linkage: c.req.valid('json') }),
+    );
+    const response = await locked.request('/articles/1/relationships/author', {
+      method: 'PATCH',
+      headers: JSON_API,
+      body: '{"data":',
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()) as ErrorBody).toMatchObject({
+      errors: [
+        {
+          code: 'FORBIDDEN',
+          detail: '"articles" does not accept "author" on update',
+        },
+      ],
+    });
+  });
+
   it('answers a wrong type with 409 at the identifier pointer', async () => {
     const response = await app.request('/articles/1/relationships/author', {
       method: 'PATCH',

@@ -53,6 +53,30 @@ const CONTACTS_RESOURCE = createDefineResource({ links: DEFINER_LINKS })({
     page: { default: 25, max: 50, range: false },
     search: 'filter[q]',
   },
+  // `createdAt` is read-only and `kind` immutable (SPEC 3.1, 9.4).
+  writable: {
+    create: [
+      'kind',
+      'name',
+      'alias',
+      'email',
+      'status',
+      'priority',
+      'tags',
+      'website',
+      'organization',
+    ],
+    update: [
+      'name',
+      'alias',
+      'email',
+      'status',
+      'priority',
+      'tags',
+      'website',
+      'organization',
+    ],
+  },
   clientIds: false,
 });
 
@@ -69,6 +93,7 @@ function shape(resource: AnyResource): unknown {
       ]),
     ),
     query: resource.query,
+    writable: resource.writable,
     clientIds: resource.clientIds,
     self: resource.links.self?.('c1'),
     relationship: resource.links.relationship?.('c1', 'organization'),
@@ -94,6 +119,13 @@ describe('resource (SPEC 11.1)', () => {
     expect(Contacts.resource.relationships['organization']?.resource?.()).toBe(
       Organizations.resource,
     );
+  });
+
+  it('writes nothing to a resource whose members are all read-only', () => {
+    expect(Organizations.resource.writable).toEqual({
+      create: new Set(),
+      update: new Set(),
+    });
   });
 
   it('validates the operations the declaration serves with its own validators', () => {

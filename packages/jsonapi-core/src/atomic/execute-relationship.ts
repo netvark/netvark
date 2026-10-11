@@ -85,6 +85,11 @@ export async function relationship<TTransaction, TContext>(
       operation.pointer,
       `"${target.type}.${name}" does not support ${operation.op}`,
     );
+  // A relationship the definition's updates do not write takes no change,
+  // whatever handlers the host registered (SPEC 9.2, `writable`).
+  if (!handlers.resource.writable.update.has(name)) {
+    throw unsupported();
+  }
   if (operation.op === 'update') {
     const handler = relationshipHandlers.update;
     if (handler === undefined) {

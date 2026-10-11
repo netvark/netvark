@@ -14,6 +14,8 @@ import type {
   ResourceDefinition,
   ResourceDefinitionInit,
   ResourceValidators,
+  WritableFields,
+  WritableFieldsInit,
 } from './types';
 
 import { assertMemberName } from '../document/member-name';
@@ -93,6 +95,29 @@ function assertValidators(
   }
 }
 
+/** Each write's fields: the declared fields a list names, each once, or every field without a list. */
+function resolveWritable(
+  writable: WritableFieldsInit<string> | undefined,
+  fields: ReadonlySet<string>,
+): WritableFields {
+  const resolve = (operation: 'create' | 'update'): ReadonlySet<string> => {
+    const names = writable?.[operation];
+    if (names === undefined) {
+      return fields;
+    }
+    for (const name of names) {
+      if (!fields.has(name)) {
+        throw new TypeError(
+          `writable.${operation}: "${name}" is not a declared field`,
+        );
+      }
+    }
+    assertUnique(`writable.${operation} field`, names);
+    return new Set(names);
+  };
+  return { create: resolve('create'), update: resolve('update') };
+}
+
 /**
  * Validates and resolves a resource definition. Throws a `TypeError` naming
  * the offending option; never throws for a valid definition.
@@ -156,15 +181,17 @@ export function defineResource(
   const validate = init.validate ?? {};
   assertValidators(validate);
   const relationshipNames = new Set(Object.keys(relationships));
+  const fields = new Set([...attributes, ...relationshipNames]);
   return {
     type: init.type,
     attributes: [...init.attributes],
     relationships,
-    fields: new Set([...attributes, ...relationshipNames]),
+    fields,
     serialize: init.serialize,
     links: resolveLinks(init.links ?? {}, init.type),
     query: resolveQueryCapabilities(init.query, relationshipNames),
     validate,
+    writable: resolveWritable(init.writable, fields),
     clientIds: init.clientIds ?? false,
   };
 }

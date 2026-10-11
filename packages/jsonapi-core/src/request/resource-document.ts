@@ -111,9 +111,9 @@ async function validateAttributes(
 
 /**
  * Parses the resource object at `options.pointer` (default `/data`). Throws
- * `BanError`: 400 for structure, 403 for a client-generated id the
- * definition does not accept, 409 for a type or id mismatch, 422 for
- * attribute validation issues.
+ * `BanError`: 400 for structure, 403 for a client-generated id or a field
+ * the definition does not accept for the operation, 409 for a type or id
+ * mismatch, 422 for attribute validation issues.
  */
 export async function parseResourceObject(
   resource: AnyResource,
@@ -145,6 +145,7 @@ export async function parseResourceObject(
   const attributes = parseAttributeNames(
     resource,
     ownMember(value, 'attributes'),
+    options.operation,
     `${pointer}/attributes`,
     errors,
   );

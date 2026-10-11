@@ -3,11 +3,14 @@
  * `@netvark/jsonapi-core` resource that the definer's `defineResource`
  * builds with the definer's `links`. Its attributes are every field's
  * public name, `write` fields included, so requests may carry them;
- * `serialize` turns a public row into its readable fields and relationship
- * ids and never emits a `write` field; its filters, sorts, and page are the
- * ones the keyset definition beside it holds (`keyset-definition.ts`). It
- * reads every relationship's target for the target's type, so the declared
- * resource builds it on first read (SPEC 3.8).
+ * `writable` lists the members each write carries by their access, so the
+ * parser refuses a `read` member on create or update and an `immutable`
+ * one on update with 403 (SPEC 9.4); `serialize` turns a public row into
+ * its readable fields and relationship ids and never emits a `write` field;
+ * its filters, sorts, and page are the ones the keyset definition beside it
+ * holds (`keyset-definition.ts`). It reads every relationship's target for
+ * the target's type, so the declared resource builds it on first read
+ * (SPEC 3.8).
  * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (sections 5 and 5.2)
  * @packageDocumentation
  */
@@ -27,6 +30,7 @@ import type { ResourceSpecs } from '../schema/resource-specs';
 import type { PublicRow } from '../server/storage';
 
 import { ownValue } from '../internal/object';
+import { schemaHolds } from '../schema/object-schemas';
 import { SEARCH_PARAMETER } from './query-names';
 
 /** What a JSON:API definition is built from: the checked declaration, its specs, and the definer's `defineResource`. */
@@ -104,6 +108,19 @@ function relationshipsOf(
   );
 }
 
+/** The public names of the fields and relationships each write carries (SPEC 3.1). */
+function writableMembers(specs: ResourceSpecs): {
+  readonly create: ReadonlyArray<string>;
+  readonly update: ReadonlyArray<string>;
+} {
+  const members = [...specs.fields, ...specs.relationships];
+  const carried = (write: 'create' | 'update'): ReadonlyArray<string> =>
+    members
+      .filter((spec) => schemaHolds(write, spec.access))
+      .map((spec) => spec.name);
+  return { create: carried('create'), update: carried('update') };
+}
+
 /** The public names of the relationships a client may include. */
 function includable(source: ResourceSource): ReadonlyArray<string> {
   const declared = source.declaration.relationships ?? {};
@@ -137,6 +154,7 @@ export function resourceDefinition(source: ResourceSource): AnyResource {
       ...(operations.has('create') ? { create: validate.create } : {}),
       ...(operations.has('update') ? { update: validate.update } : {}),
     },
+    writable: writableMembers(specs),
     clientIds: declaration.clientIds === true,
   });
 }

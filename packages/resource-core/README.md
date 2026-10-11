@@ -11,10 +11,10 @@ Status: in development and unreleased. This line implements the definer, the dec
 names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
 `defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
 derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), messages with
-their localization (SPEC 10), the JSON:API resource and the keyset definition a declaration derives
-(SPEC 11), the `server` subpath with `constraintError` and the storage adapter contract and its
-suite, `list` included (SPEC 9.5 and 12), and the `openapi` entry: the OpenAPI document, the
-surface, and its diff (SPEC 13). `forbiddenMembers` follows;
+their localization (SPEC 10), the JSON:API resource, with the members each write accepts, and the
+keyset definition a declaration derives (SPEC 9.4 and 11), the `server` subpath with
+`constraintError` and the storage adapter contract and its suite, `list` included (SPEC 9.5 and 12),
+and the `openapi` entry: the OpenAPI document, the surface, and its diff (SPEC 13);
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -311,8 +311,10 @@ CHECKs the catalog translates, its nullability, and its validators:
 | `write.create`, `write.update`                     | a resource object as `@netvark/jsonapi-core` parses it, `{ attributes, relationships }` | `ResourceIssue`s |
 
 `create` requires exactly the columns PostgreSQL requires on insert, `update` requires none, and
-both reject unknown keys. `read` strips unknown keys, so a client that validates responses keeps
-working when the server adds a field. No schema fills in a default: defaults stay in the database.
+both reject unknown keys; over JSON:API a declared member the operation does not write never reaches
+them, since the parser refuses it with 403 (SPEC 9.4). `read` strips unknown keys, so a client that
+validates responses keeps working when the server adds a field. No schema fills in a default:
+defaults stay in the database.
 
 The wire forms refuse what PostgreSQL would refuse or store differently from what was sent: a
 decimal with more fraction digits than `numeric(p, s)` keeps, trailing spaces past `varchar(n)`, a
@@ -624,10 +626,11 @@ A declared resource derives the two definitions a collection endpoint needs, fro
 and under the same public names (SPEC 11):
 
 - `Contacts.resource` is a `@netvark/jsonapi-core` resource: the attributes, the relationships,
-  `serialize` for public rows, the create and update validators of the served operations, and the
-  capabilities `parseQuery` holds a request to: the declared sorts, the filters with their
-  operators, the includes, `filter[q]` when the declaration has `search`, and the page bounds. It is
-  built on first read, since it names each relationship target's type.
+  `serialize` for public rows, the create and update validators of the served operations, the
+  members each write accepts (`writable`), and the capabilities `parseQuery` holds a request to: the
+  declared sorts, the filters with their operators, the includes, `filter[q]` when the declaration
+  has `search`, and the page bounds. It is built on first read, since it names each relationship
+  target's type.
 - `Contacts.keyset` is a `@netvark/keyset-core` definition without the cursor: the same filters and
   sorts with each column's keyset type, the search column and its configuration, the key `id`, the
   default sort, and the same page bounds.
@@ -646,6 +649,13 @@ await contacts.plan({ sort: ['-createdAt'], page: { size: 10 } });
 // @ts-expect-error: kind does not sort
 await contacts.plan({ sort: ['kind'] });
 ```
+
+`writable` follows the accesses (SPEC 9.4): a create writes the `readWrite`, `immutable`, and
+`write` members, an update the `readWrite` and `write` ones. A request that carries any other
+member, `createdAt` on a create or `kind` on an update, is refused where the route parses it
+(`bodyValidator`, `parseCreateDocument`, `parseUpdateDocument`) with 403 `FORBIDDEN` at the member's
+pointer, before any validator, policy, or statement runs; the relationship route and atomic
+operations refuse it the same way, so no route repeats the check.
 
 What `parseQuery` accepts, the keyset plans under the same names, and what it refuses the keyset
 refuses too, except a sort by `id`. The page bounds are resolved once for both, so a page size one
@@ -1051,7 +1061,9 @@ option, operator, or code, a loosened limit, and a new default page size break n
   last digits, and the next page repeats or skips a row. Order with each key's `nulls`, since
   PostgreSQL's default puts nulls first when descending, and never page with `offset`.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
-  database or the server sets, `write` only for values clients send but never read back.
+  database or the server sets, `write` only for values clients send but never read back. The access
+  is what a write may carry: a client that sends a `read` member, or an `immutable` one on update,
+  gets a 403 that names it, never a success that dropped it.
 - **Key resources by a scalar.** A `uuid`, `int8`, or `text` primary key carries an id; `json` and
   `jsonb` cannot, even though PostgreSQL accepts them as keys. Use `clientIds: true` with a key that
   accepts a client value, such as `uuid default gen_random_uuid()` or an identity `BY DEFAULT`.

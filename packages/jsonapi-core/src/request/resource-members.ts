@@ -13,7 +13,7 @@ import type { ErrorItem } from '@netvark/ban-core';
 
 import type { AnyResource } from '../resource/types';
 import type { RequestLinkage } from './identifiers';
-import type { ParseResourceOptions } from './types';
+import type { Operation, ParseResourceOptions } from './types';
 
 import { isAtMember } from '../document/member-name';
 import { errorItem } from '../errors/json-api-error';
@@ -115,6 +115,24 @@ export function parseIdentity(
   };
 }
 
+/**
+ * A 403 for a declared field the operation does not write (the definition's
+ * `writable`), so the field never reaches the validator.
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-403
+ * @ref https://jsonapi.org/format/1.1/#crud-creating-responses-403
+ */
+function notWritable(
+  resource: AnyResource,
+  operation: Operation,
+  name: string,
+  at: string,
+): ErrorItem {
+  return errorItem('FORBIDDEN', {
+    detail: `"${resource.type}" does not accept "${name}" on ${operation}`,
+    source: { pointer: at },
+  });
+}
+
 export function parseRelationships(
   resource: AnyResource,
   value: unknown,
@@ -142,6 +160,10 @@ export function parseRelationships(
       );
       continue;
     }
+    if (!resource.writable[options.operation].has(name)) {
+      errors.push(notWritable(resource, options.operation, name, at));
+      continue;
+    }
     if (!isRecord(relationship) || !hasOwnMember(relationship, 'data')) {
       errors.push(
         invalidDocument(
@@ -165,10 +187,11 @@ export function parseRelationships(
   return out;
 }
 
-/** Attribute names must be declared; values are checked by the validator. */
+/** Attribute names must be declared and written by the operation; values are checked by the validator. */
 export function parseAttributeNames(
   resource: AnyResource,
   value: unknown,
+  operation: Operation,
   pointer: string,
   errors: Array<ErrorItem>,
 ): Record<string, unknown> {
@@ -184,13 +207,15 @@ export function parseAttributeNames(
     if (isAtMember(name)) {
       continue;
     }
+    const at = `${pointer}/${toPointer([name]).slice(1)}`;
     if (!resource.attributes.includes(name)) {
       errors.push(
-        invalidDocument(
-          `${pointer}/${toPointer([name]).slice(1)}`,
-          `"${resource.type}" has no attribute "${name}"`,
-        ),
+        invalidDocument(at, `"${resource.type}" has no attribute "${name}"`),
       );
+      continue;
+    }
+    if (!resource.writable[operation].has(name)) {
+      errors.push(notWritable(resource, operation, name, at));
       continue;
     }
     out[name] = attribute;

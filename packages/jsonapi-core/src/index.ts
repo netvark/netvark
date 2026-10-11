@@ -140,6 +140,8 @@ export type {
   SerializedRelationships,
   SerializedResource,
   UpdateAttributesOf,
+  WritableFields,
+  WritableFieldsInit,
 } from './resource/types';
 
 export { BanError, isBanError } from '@netvark/ban-core';

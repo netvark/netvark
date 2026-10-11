@@ -6,8 +6,9 @@
  * validates responses keeps working when the server adds a member, and
  * requires no attribute, since a sparse fieldset may leave any out. A
  * request object is closed, as `@netvark/jsonapi-core`'s parser is: a
- * member it does not take is a 400, a create's `id` without client ids a
- * 403. `@`-members are skipped by the parser, so the schemas allow them.
+ * member the resource does not declare is a 400, one the operation does
+ * not write a 403 (SPEC 9.4), a create's `id` without client ids a 403.
+ * `@`-members are skipped by the parser, so the schemas allow them.
  * @ref https://jsonapi.org/format/1.1/#document-resource-objects
  * @ref https://jsonapi.org/format/1.1/#document-member-names-at-members
  * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (section 9.2)
