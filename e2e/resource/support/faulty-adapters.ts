@@ -3,6 +3,7 @@
  * `contract-faults.ts` (resource SPEC 12.9): built over statements that
  * pass through a rewrite, wrapped, or handed past its guard.
  */
+import type { DefineDefaultedKeyset } from '@netvark/keyset-core';
 import type {
   DomainEvent,
   StorageAdapter,
@@ -42,15 +43,24 @@ const NULLABLE = [
   'secret',
 ];
 
-export function reference(transact: Transact): Adapter {
+export function reference(
+  transact: Transact,
+  defineKeyset: DefineDefaultedKeyset = DEFINE_KEYSET,
+): Adapter {
   return referenceAdapter({
     catalog: contractFixture.catalog,
     codecs: { point: POINT_TEXT },
     outbox: OUTBOX,
-    defineKeyset: DEFINE_KEYSET,
+    defineKeyset,
     transact,
   });
 }
+
+/** The suite's keyset definer, whose keysets plan without the caller's context. */
+export const CONTEXTLESS: DefineDefaultedKeyset = (init) => {
+  const keyset = DEFINE_KEYSET(init);
+  return { ...keyset, plan: async (request) => keyset.plan(request) };
+};
 
 function rewritten(client: SqlClient, rewrite: Rewrite): SqlClient {
   return {

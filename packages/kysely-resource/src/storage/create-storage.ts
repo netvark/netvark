@@ -7,8 +7,13 @@
  * @ref https://kysely-org.github.io/kysely-apidoc/classes/Kysely.html#withoutplugins
  * @packageDocumentation
  */
+import type { Keyset } from '@netvark/keyset-core';
+import type { DeclaredResource } from '@netvark/resource-core';
+
 import type { KyselyStorage, KyselyStorageOptions } from './types';
 
+import { listRows } from './list';
+import { manyRows } from './many';
 import { storageConfig } from './options';
 import { recordEvents } from './outbox';
 import { partitionRoot } from './partition';
@@ -21,11 +26,24 @@ export function createKyselyStorage<TDatabase>(
   options: KyselyStorageOptions<TDatabase>,
 ): KyselyStorage {
   const config = storageConfig(options);
+  const keysets = new WeakMap<DeclaredResource, Keyset>();
+  const keysetOf = (resource: DeclaredResource): Keyset => {
+    const known = keysets.get(resource);
+    if (known !== undefined) {
+      return known;
+    }
+    const keyset = config.defineKeyset(resource.keyset);
+    keysets.set(resource, keyset);
+    return keyset;
+  };
   const storage: KyselyStorage = {
     catalog: config.catalog,
     outbox: config.outbox,
     transaction: async (scopes, run) =>
       KyselyTransaction.run(config.db, scopes, run),
+    list: async (tx, resource, request, listOptions) =>
+      listRows(config, keysetOf(resource), tx, resource, request, listOptions),
+    many: async (tx, resource, ids) => manyRows(config, tx, resource, ids),
     get: async (tx, resource, id) => selectRow(config, tx, resource, id),
     lock: async (tx, resource, id, write) =>
       selectRow(config, tx, resource, id, write),

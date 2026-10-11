@@ -1,14 +1,24 @@
 import type { Generated, Kysely } from 'kysely';
 
 import type { StorageCodecs } from '@netvark/resource-core';
-import type { ScopeValue } from '@netvark/resource-core/server';
+import type {
+  PublicRow,
+  ScopeValue,
+  StorageAdapter,
+  StoragePage,
+} from '@netvark/resource-core/server';
 import type {
   ContractCodecs,
   TextStorageCodec,
 } from '@netvark/resource-core/testing';
 
 import type { KyselyTransaction } from './transaction';
-import type { KyselyStorage, KyselyStorageOptions, TextCodec } from './types';
+import type {
+  KyselyStorage,
+  KyselyStorageOptions,
+  ListOptions,
+  TextCodec,
+} from './types';
 
 import { sql } from 'kysely';
 import { describe, expectTypeOf, it } from 'vitest';
@@ -45,6 +55,19 @@ describe('createKyselyStorage (SPEC 18.2)', () => {
         tx.execute((db) => sql<{ id: string }>`select '1' as "id"`.compile(db)),
       ),
     ).resolves.toEqualTypeOf<ReadonlyArray<{ id: string }>>();
+  });
+
+  it('is the storage adapter of the contract, with the total of list and many', () => {
+    expectTypeOf<KyselyStorage>().toExtend<StorageAdapter<KyselyTransaction>>();
+    expectTypeOf<KyselyStorage['list']>()
+      .parameter(3)
+      .toEqualTypeOf<ListOptions | undefined>();
+    expectTypeOf<
+      KyselyStorage['list']
+    >().returns.resolves.toEqualTypeOf<StoragePage>();
+    expectTypeOf<KyselyStorage['many']>().returns.resolves.toEqualTypeOf<
+      ReadonlyArray<PublicRow>
+    >();
   });
 
   it('takes no transaction it did not open', () => {

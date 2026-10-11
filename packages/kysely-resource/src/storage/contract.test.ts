@@ -22,19 +22,12 @@ const OUTBOX = `create table contract_outbox (
   payload jsonb not null
 )`;
 const RESET = `${contractFixture.seed}truncate table contract_outbox restart identity;`;
-/** The cases that page with `list`, which the adapter does not have yet. */
-const NEEDS_LIST = /^obligation 5:|^obligation 2: every page of list/u;
 
 const database = contractDatabase([OUTBOX]);
 const storage = createKyselyStorage(storageOptions(database.db));
 
 const harness: ContractHarness<KyselyTransaction> = {
-  adapter: {
-    ...storage,
-    list: () => {
-      throw new Error('list: not implemented yet');
-    },
-  },
+  adapter: storage,
   reset: async () => {
     await database.exec(RESET);
   },
@@ -60,9 +53,6 @@ afterAll(async () => {
 
 describe('the storage contract (resource SPEC 12.9) on PGlite', () => {
   for (const contractCase of storageContract(harness)) {
-    it.skipIf(NEEDS_LIST.test(contractCase.name))(
-      contractCase.name,
-      contractCase.run,
-    );
+    it(contractCase.name, contractCase.run);
   }
 });

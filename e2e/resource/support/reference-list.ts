@@ -11,7 +11,9 @@
  * and ordered with its direction and null placement; the limit is the
  * plan's, one row past the page. A declared resource's definition has no
  * relations and searches a `tsvector` column (resource SPEC 11.2), so the
- * plan holds no `exists`, aggregate, or concatenation.
+ * plan holds no `exists`, aggregate, or concatenation. The cursors are
+ * bound to the transaction's scope values, each scope's name mapped to its
+ * value (obligation 12), so a cursor of one scope is refused in another.
  * @ref https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md (section 6, the query plan)
  * @ref https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST / LAST)
  * @ref https://www.postgresql.org/docs/18/functions-matching.html#FUNCTIONS-LIKE
@@ -179,7 +181,11 @@ export async function keysetPage(
   resource: DeclaredResource,
   request: StorageListRequest,
 ): Promise<StoragePage> {
-  const plan = await keyset.plan(request);
+  const plan = await keyset.plan(request, {
+    context: Object.fromEntries(
+      tx.scopes.map(({ scope, value }) => [scope, value]),
+    ),
+  });
   const statement = new Statement(context, resource, tx);
   const render = new PlanSql(context, statement);
   const where = [

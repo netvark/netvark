@@ -12,6 +12,7 @@ import { PARTITION_ROOT_SQL } from '@netvark/resource-core/server';
 
 import { OUTBOX } from './contract-database.ts';
 import {
+  CONTEXTLESS,
   outboxAfterRun,
   reference,
   rewriting,
@@ -245,6 +246,13 @@ export const FAULTS: ReadonlyArray<Fault> = [
     name: 'writes the outbox outside the transaction',
     fails: ['obligation 9: drops the events of a transaction that rolls back'],
     adapter: wrapping(outboxAfterRun),
+  },
+  {
+    name: 'binds its cursors to no context',
+    fails: [
+      'obligation 12: a cursor issued in one scope is refused in another',
+    ],
+    adapter: (database) => reference(database.transact, CONTEXTLESS),
   },
   {
     name: 'never writes the outbox',

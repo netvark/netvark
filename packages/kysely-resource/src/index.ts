@@ -11,6 +11,7 @@ export type { KyselyTransaction } from './storage/transaction';
 export type {
   KyselyStorage,
   KyselyStorageOptions,
+  ListOptions,
   OutboxTable,
   TextCodec,
 } from './storage/types';

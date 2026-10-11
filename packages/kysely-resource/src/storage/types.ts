@@ -6,7 +6,14 @@ import type { Kysely } from 'kysely';
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 import type { DefineDefaultedKeyset } from '@netvark/keyset-core';
-import type { ScopeValue, StorageAdapter } from '@netvark/resource-core/server';
+import type { DeclaredResource } from '@netvark/resource-core';
+import type {
+  PublicRow,
+  ScopeValue,
+  StorageAdapter,
+  StorageListRequest,
+  StoragePage,
+} from '@netvark/resource-core/server';
 
 import type { KyselyTransaction } from './transaction';
 
@@ -44,14 +51,17 @@ export interface KyselyStorageOptions<TDatabase> {
   readonly outbox?: OutboxTable | undefined;
 }
 
+/** What `list` does besides the page (SPEC 18.2). */
+export interface ListOptions {
+  /** Also count the rows of the scope the filter selects, with a second statement. */
+  readonly total?: boolean | undefined;
+}
+
 /**
- * The storage adapter of resource SPEC 12.8 over Kysely, `list` aside,
- * which pages through `@netvark/kysely-keyset`.
+ * The storage adapter of resource SPEC 12.8 over Kysely, with `many` for
+ * includes and the `total` option of `list` (SPEC 18.4).
  */
-export interface KyselyStorage extends Omit<
-  StorageAdapter<KyselyTransaction>,
-  'list' | 'transaction'
-> {
+export interface KyselyStorage extends StorageAdapter<KyselyTransaction> {
   /** The public catalog it was created with. */
   readonly catalog: PublicCatalog;
   /** The outbox table it was created with, its schema resolved; `undefined` without one. */
@@ -68,4 +78,21 @@ export interface KyselyStorage extends Omit<
     scopes: ReadonlyArray<ScopeValue>,
     run: (tx: KyselyTransaction) => Promise<TResult>,
   ): Promise<TResult>;
+  /**
+   * A page of the resource's rows in the transaction's scope, its cursors
+   * bound to the scope's values; with `options.total`, the count of the
+   * rows the filter selects.
+   */
+  list(
+    tx: KyselyTransaction,
+    resource: DeclaredResource,
+    request: StorageListRequest,
+    options?: ListOptions,
+  ): Promise<StoragePage>;
+  /** The rows of the resource whose key is any of `ids`, in the transaction's scope. */
+  many(
+    tx: KyselyTransaction,
+    resource: DeclaredResource,
+    ids: ReadonlyArray<string>,
+  ): Promise<ReadonlyArray<PublicRow>>;
 }

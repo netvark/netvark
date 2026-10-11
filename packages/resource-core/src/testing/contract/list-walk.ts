@@ -72,6 +72,26 @@ export async function listPage<TTransaction>(
   }
 }
 
+/** `cursor`, which must name a page. */
+export function present(cursor: string | null, what: string): string {
+  assertThat(cursor !== null, `${what}: expected a cursor, got null`);
+  return cursor ?? '';
+}
+
+/** The `code` of a keyset-core error, read by property, so it names the error whatever copy of the package threw it. */
+export function keysetCode(error: unknown): unknown {
+  return typeof error === 'object' && error !== null
+    ? Reflect.get(error, 'code')
+    : undefined;
+}
+
+/** The `reason` of a keyset-core `INVALID_CURSOR`, read by property as `keysetCode` reads the code. */
+export function keysetReason(error: unknown): unknown {
+  return typeof error === 'object' && error !== null
+    ? Reflect.get(error, 'reason')
+    : undefined;
+}
+
 /** The labels of a page's rows. */
 export function labels<TTransaction>(
   listing: Listing<TTransaction>,
