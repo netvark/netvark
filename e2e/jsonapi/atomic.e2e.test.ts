@@ -1,7 +1,8 @@
 /**
  * The Atomic Operations extension over HTTP (SPEC 11): the request
  * requirements, results in operation order, local ids across operations,
- * 204 for data-less results, and all-or-nothing failure.
+ * 204 for data-less results, and all-or-nothing failure, a field an
+ * operation does not write among the failures.
  * @ref https://jsonapi.org/ext/atomic/
  */
 import { describe, expect, it } from 'vitest';
@@ -128,5 +129,37 @@ describe('atomic operations', () => {
       { pointer: '/atomic:operations/0/op' },
       { pointer: '/atomic:operations/1' },
     ]);
+  });
+
+  it('refuses a field an operation does not write and rolls back the ones before it', async () => {
+    const before = blog.store().articles.size;
+    const rollbacks = blog.store().rollbacks;
+    const { status, body } = await blog.request(
+      '/operations',
+      operations([
+        {
+          op: 'add',
+          data: { type: 'articles', attributes: { title: 'Will vanish' } },
+        },
+        {
+          op: 'update',
+          ref: { type: 'articles', id: '1' },
+          data: {
+            type: 'articles',
+            id: '1',
+            attributes: { createdAt: '2020-01-01T00:00:00Z' },
+          },
+        },
+      ]),
+    );
+    expect(status).toBe(403);
+    expect((body as Results).errors).toMatchObject([
+      {
+        code: 'FORBIDDEN',
+        source: { pointer: '/atomic:operations/1/data/attributes/createdAt' },
+      },
+    ]);
+    expect(blog.store().articles.size).toBe(before);
+    expect(blog.store().rollbacks).toBe(rollbacks + 1);
   });
 });

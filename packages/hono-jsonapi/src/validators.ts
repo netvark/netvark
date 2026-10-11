@@ -24,6 +24,7 @@ import type {
 import { createMiddleware } from 'hono/factory';
 
 import {
+  jsonApiError,
   parseCreateDocument,
   parseQuery,
   parseToManyRelationshipDocument,
@@ -169,6 +170,9 @@ export function bodyValidator<E extends Env, P extends string>(
  * Reads and parses a relationship document for `resource`'s relationship
  * `name`, storing the linkage under `c.req.valid('json')`. The cardinality
  * is explicit so the stored type is exact; it must match the definition.
+ * A relationship the definition's updates do not write answers 403 before
+ * the body is read, as JSON:API requires for an unsupported update.
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403
  */
 export function relationshipValidator<
   TResource extends AnyResource,
@@ -207,7 +211,13 @@ export function relationshipValidator<E extends Env, P extends string>(
     );
   }
   const { type } = definition;
+  const writable = resource.writable.update.has(name);
   const parse = async (c: Context<E>): Promise<Linkage> => {
+    if (!writable) {
+      throw jsonApiError('FORBIDDEN', {
+        detail: `"${resource.type}" does not accept "${name}" on update`,
+      });
+    }
     const body = await readDocument(c);
     return cardinality === 'one'
       ? parseToOneRelationshipDocument(body, { type })

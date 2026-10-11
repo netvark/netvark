@@ -223,6 +223,14 @@ export function registerRoutes(app: Hono<JsonApiEnv>, store: Store): void {
     },
   );
 
+  // Mounted like every relationship's route; the validator refuses the
+  // update, since a person's articles are not writable.
+  app.patch(
+    '/people/:id/relationships/articles',
+    relationshipValidator(People, 'articles', 'many'),
+    (c) => c.body(null, 204),
+  );
+
   app.get('/people', (c) =>
     respond(
       c,

@@ -52,6 +52,8 @@ export const People = defineResource({
       twitter: z.string().nullable().default(null),
     }),
   },
+  // A person's articles are the articles that name them as author.
+  writable: { create: ['name', 'twitter'], update: ['name', 'twitter'] },
 });
 
 export const Tags = defineResource({
@@ -88,4 +90,9 @@ export const Articles = defineResource({
     search: 'filter[q]',
   },
   validate: { create: CreateArticle, update: UpdateArticle },
+  // The server stamps `createdAt`.
+  writable: {
+    create: ['title', 'body', 'author', 'tags'],
+    update: ['title', 'body', 'author', 'tags'],
+  },
 });

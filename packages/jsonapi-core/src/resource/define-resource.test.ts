@@ -205,6 +205,28 @@ describe('defineResource', () => {
     ).toThrow(TypeError);
   });
 
+  it('resolves the fields each write accepts, every field without a list', () => {
+    expect(articles().writable).toEqual({
+      create: new Set(['title', 'author']),
+      update: new Set(['title', 'author']),
+    });
+    expect(articles({ writable: { update: ['title'] } }).writable).toEqual({
+      create: new Set(['title', 'author']),
+      update: new Set(['title']),
+    });
+  });
+
+  it('refuses a writable list that names an undeclared field, or one twice', () => {
+    expect(() => articles({ writable: { create: ['body'] } })).toThrow(
+      new TypeError('writable.create: "body" is not a declared field'),
+    );
+    expect(() =>
+      articles({ writable: { update: ['title', 'title'] } }),
+    ).toThrow(
+      new TypeError('writable.update field "title" is declared more than once'),
+    );
+  });
+
   it('accepts a schema whose ~standard is a prototype getter (zod 4, valibot, ArkType)', () => {
     class ProtoSchema {
       public get ['~standard'](): {

@@ -1,7 +1,8 @@
 /**
  * Creating, updating, and deleting resources and relationships over HTTP
- * (SPEC 9, 10.4): request document validation with pointers, the 201 with
- * `Location`, 204 responses, and the relationship endpoints.
+ * (SPEC 9, 10.4): request document validation with pointers, the 403 for
+ * a field a write does not accept, the 201 with `Location`, 204
+ * responses, and the relationship endpoints.
  * @ref https://jsonapi.org/format/1.1/#crud
  */
 import { describe, expect, it } from 'vitest';
@@ -169,6 +170,70 @@ describe('mutations', () => {
     expect((wrong.body as Doc).errors?.[0]?.['source']).toEqual({
       pointer: '/data/0/type',
     });
+  });
+
+  it('refuses a field the write does not accept with a 403 at the field', async () => {
+    const stamp = '2020-01-01T00:00:00Z';
+    const before = blog.store().articles.size;
+    const created = await blog.request(
+      '/articles',
+      document('POST', {
+        data: {
+          type: 'articles',
+          attributes: { title: 'New', createdAt: stamp },
+        },
+      }),
+    );
+    expect(created.status).toBe(403);
+    expect((created.body as Doc).errors).toMatchObject([
+      { code: 'FORBIDDEN', source: { pointer: '/data/attributes/createdAt' } },
+    ]);
+    expect(blog.store().articles.size).toBe(before);
+
+    const updated = await blog.request(
+      '/articles/1',
+      document('PATCH', {
+        data: { type: 'articles', id: '1', attributes: { createdAt: stamp } },
+      }),
+    );
+    expect(updated.status).toBe(403);
+    expect(blog.store().articles.get('1')?.createdAt).toBe(
+      '2026-01-01T00:00:00Z',
+    );
+
+    const mixed = await blog.request(
+      '/articles',
+      document('POST', {
+        data: {
+          type: 'articles',
+          attributes: { title: 'New', colour: 'red', createdAt: stamp },
+        },
+      }),
+    );
+    expect(mixed.status).toBe(400);
+    expect(
+      (mixed.body as Doc).errors?.map((error) => [
+        error['code'],
+        error['source'],
+      ]),
+    ).toEqual([
+      ['INVALID_DOCUMENT', { pointer: '/data/attributes/colour' }],
+      ['FORBIDDEN', { pointer: '/data/attributes/createdAt' }],
+    ]);
+  });
+
+  it("refuses a relationship's update the resource does not accept before reading the body", async () => {
+    const { status, body } = await blog.request(
+      '/people/1/relationships/articles',
+      { ...document('PATCH', null), body: '{"data":' },
+    );
+    expect(status).toBe(403);
+    expect((body as Doc).errors).toMatchObject([
+      {
+        code: 'FORBIDDEN',
+        detail: '"people" does not accept "articles" on update',
+      },
+    ]);
   });
 
   it('deletes a resource with 204 and then 404s it', async () => {
