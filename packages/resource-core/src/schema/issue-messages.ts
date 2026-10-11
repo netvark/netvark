@@ -38,11 +38,16 @@ function characters(limit: string | undefined): string {
   return limit === '1' ? '1 character' : `${limit ?? ''} characters`;
 }
 
-function optionsOf(expected: string | undefined): string {
-  const values: unknown = JSON.parse(expected ?? '[]');
-  return Array.isArray(values) && values.length > 0
+/** The message of an `enum` issue: the allowed values, or their labels. */
+export function enumMessage(values: ReadonlyArray<string>): string {
+  return values.length > 0
     ? `Must be one of: ${values.join(', ')}.`
     : 'No value is allowed.';
+}
+
+function optionsOf(expected: string | undefined): string {
+  const values: unknown = JSON.parse(expected ?? '[]');
+  return enumMessage(Array.isArray(values) ? values.map(String) : []);
 }
 
 const MESSAGES: Readonly<

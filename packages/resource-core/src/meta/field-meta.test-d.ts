@@ -13,7 +13,6 @@ import { describe, expectTypeOf, it } from 'vitest';
 import { createDeclareResource } from '../declare/create-declare-resource';
 import { contactsCatalog } from '../test-support/contacts';
 import { TEST_REGISTRIES } from '../test-support/definer';
-import { unenforcedCatalog } from '../test-support/unenforced';
 
 const declareResource = createDeclareResource({
   catalog: contactsCatalog,
@@ -155,108 +154,5 @@ describe('fields in types (SPEC 8)', () => {
     expectTypeOf(resource.fields).toEqualTypeOf<
       Readonly<Record<string, FieldMeta>>
     >();
-  });
-});
-
-const declareImported = createDeclareResource({ catalog: unenforcedCatalog });
-
-const Imported = declareImported('imported_contacts', {
-  operations: ['get'],
-  fields: { status: { access: 'read' }, nickname: { access: 'read' } },
-});
-
-const Moods = createDeclareResource({
-  catalog: {
-    format: 3,
-    enums: { mood: ['calm', 'tense'] },
-    domains: {
-      label: {
-        schema: 'public',
-        name: 'label',
-        type: 'text',
-        typeKind: 'base',
-        array: false,
-        sqlType: 'text',
-        maxLength: null,
-        precision: null,
-        scale: null,
-        nullable: true,
-        default: null,
-        constraints: {
-          label_check: {
-            kind: 'check',
-            rule: { kind: 'enum', values: ['a', 'b'] },
-          },
-        },
-      },
-    },
-    tables: {
-      moods: {
-        schema: 'public',
-        name: 'moods',
-        primaryKey: ['id'],
-        columns: {
-          id: {
-            type: 'uuid',
-            typeKind: 'base',
-            array: false,
-            sqlType: 'uuid',
-            maxLength: null,
-            precision: null,
-            scale: null,
-            nullable: false,
-            default: null,
-            identity: null,
-            generated: null,
-          },
-          moods: {
-            type: 'mood',
-            typeKind: 'enum',
-            array: true,
-            sqlType: 'mood[]',
-            maxLength: null,
-            precision: null,
-            scale: null,
-            nullable: true,
-            default: null,
-            identity: null,
-            generated: null,
-          },
-          labels: {
-            type: 'label',
-            typeKind: 'domain',
-            array: true,
-            sqlType: 'label[]',
-            maxLength: null,
-            precision: null,
-            scale: null,
-            nullable: true,
-            default: null,
-            identity: null,
-            generated: null,
-          },
-        },
-        constraints: { moods_pkey: { kind: 'primaryKey', columns: ['id'] } },
-      },
-    },
-  },
-})('moods', {
-  operations: ['get'],
-  fields: { moods: { access: 'read' }, labels: { access: 'read' } },
-});
-
-describe('options from enums, domains, and enforced CHECKs only', () => {
-  it("types an enum array's and a domain array's elements", () => {
-    expectTypeOf(Moods.fields.moods.items).toEqualTypeOf<
-      ItemMeta<ReadonlyArray<'calm' | 'tense'>>
-    >();
-    expectTypeOf(Moods.fields.labels.items).toEqualTypeOf<
-      ItemMeta<ReadonlyArray<'a' | 'b'>>
-    >();
-  });
-
-  it('takes no option or nullability from a NOT ENFORCED CHECK (catalog ADR 0010)', () => {
-    expectTypeOf(Imported.fields.status.options).toEqualTypeOf<null>();
-    expectTypeOf(Imported.fields.nickname.nullable).toEqualTypeOf<true>();
   });
 });

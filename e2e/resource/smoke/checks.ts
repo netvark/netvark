@@ -5,7 +5,8 @@
  * their fixtures with the application's Zod, the composed schemas parse
  * and report issues, the field metadata describes the members and its
  * patterns compile with the flags `su`, the error catalog assembles and
- * renders through `@netvark/ban-core`, and mistakes throw the documented
+ * renders through `@netvark/ban-core`, an error document is localized with
+ * messages of the application's own, and mistakes throw the documented
  * `TypeError`s.
  * Codes are upper-cased by the runtime's `String.prototype.toUpperCase`, so
  * each runtime derives them here. No Node.js API, so the same module runs
@@ -15,13 +16,16 @@ import type { FieldMeta } from '@netvark/resource-core';
 
 import type { Checks } from './report.ts';
 
-import { createBan } from '@netvark/ban-core';
+import { createBan, fromRequest } from '@netvark/ban-core';
 import { jsonApi } from '@netvark/ban-core/formats/json-api';
 import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 import {
   createDeclareResource,
+  defaultMessages,
+  defineMessages,
   defineValidator,
   errorCatalog,
+  localizeErrors,
 } from '@netvark/resource-core';
 
 import { catalog } from '../fixtures/contacts/catalog.ts';
@@ -177,6 +181,41 @@ export const neutralChecks: Checks = {
     check(domain, 'no EMAIL_CHECK');
     check(Object.isFrozen(codes), 'catalog not frozen');
   },
+  'localizes a derived code with the messages of its constraint kind':
+    async () => {
+      const resources = [Organizations, Contacts, Meetings, Notes] as const;
+      const english = defaultMessages(resources);
+      const messages = defineMessages(
+        resources,
+        {},
+        {
+          ...english,
+          constraints: {
+            ...english.constraints,
+            exclusion: {
+              title: () => 'Konflikt',
+              detail: ({ fields }) => `${fields}: bereits belegt.`,
+            },
+          },
+        },
+      );
+      const ban = createBan({
+        format: jsonApi(),
+        errors: { ...ERROR_CATALOG, ...errorCatalog(resources) },
+      });
+      const handle = ban.handler({
+        transform: localizeErrors(messages, { resource: () => 'meetings' }),
+      });
+      const response = await handle(
+        ban.error('MEETING_ROOM_DOUBLE_BOOKED'),
+        fromRequest(new Request('https://api.test/meetings')),
+        null,
+      );
+      const text = JSON.stringify(await response.json());
+      check(response.status === 409, `status ${String(response.status)}`);
+      check(text.includes('"title":"Konflikt"'), text);
+      check(text.includes('"detail":"Room, During: bereits belegt."'), text);
+    },
   'refuses a list without a relationship target': () => {
     const message = messageOf(errorCatalog, [[Contacts]]);
     check(

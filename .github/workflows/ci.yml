@@ -30,7 +30,8 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # The type-aware lint of e2e/* resolves the packages into their dist/,
+      # The type-aware lint of e2e/* resolves the packages into their dist/
+      # and reads the messages e2e/resource's build compiles with Paraglide,
       # so build first. The packages resolve each other from source (the
       # `source` export condition) and need no build.
       - run: pnpm run build

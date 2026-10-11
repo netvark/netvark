@@ -1,8 +1,8 @@
 /**
  * The entry of a derived error code (SPEC 9.1): the status and title its
- * constraint's kind fixes, the kind, which localized messages key their
- * templates on (SPEC 10.1), and the public members the error's items point
- * at. JSON:API requires 404 when a request references a related resource
+ * constraint's kind fixes, the kind, whose texts localized messages give
+ * once for all its codes (SPEC 10.1), and the public members the error's
+ * items point at. JSON:API requires 404 when a request references a related resource
  * that does not exist and 409 for a client-generated id that exists, allows
  * 409 for a uniqueness violation, and reports an invalid attribute as 422
  * with a pointer in its examples.
@@ -40,7 +40,8 @@ interface KindStatus {
 const INVALID = { status: 422, title: 'Invalid Attribute' } as const;
 const CONFLICT = { status: 409, title: 'Conflict' } as const;
 
-const KIND_STATUS: KindStatus = {
+/** The status and title of each kind (SPEC 9.1). */
+export const KIND_STATUS: KindStatus = {
   check: INVALID,
   notNull: INVALID,
   unique: CONFLICT,
@@ -48,6 +49,17 @@ const KIND_STATUS: KindStatus = {
   exclusion: CONFLICT,
   foreignKey: { status: 404, title: 'Related Resource Not Found' },
 };
+
+/** The English detail of each kind (SPEC 9.1): constant, so it never repeats request data. */
+export const KIND_DETAIL: Readonly<Record<ConstraintKind, string>> =
+  Object.freeze({
+    check: 'The value violates a constraint.',
+    notNull: 'A value is required.',
+    unique: 'Another record already has this value.',
+    primaryKey: 'A record with this id already exists.',
+    exclusion: 'The value conflicts with another record.',
+    foreignKey: 'The related resource does not exist.',
+  });
 
 /** A derived code's entry, `ErrorEntry<'unique', 'email'>` for one code. */
 export interface ErrorEntry<

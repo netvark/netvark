@@ -189,6 +189,43 @@ type FieldsOf<
   }
 >;
 
+/** A value's options, or its elements'; `never` when any value goes. */
+type OptionValuesOf<TFacts> = TFacts extends {
+  readonly options: ReadonlyArray<infer TValue extends string>;
+}
+  ? TValue
+  : TFacts extends {
+        readonly items: {
+          readonly options: ReadonlyArray<infer TValue extends string>;
+        };
+      }
+    ? TValue
+    : never;
+
+type FieldOptions<
+  TContext extends DeclareContext,
+  TTableDef extends PublicTable,
+  TDecl extends Declaration,
+> = {
+  readonly [
+    K in keyof Fields<TDecl> & string as FieldNameOf<K, Fields<TDecl>[K]>
+  ]: MemberOf<Fields<TDecl>[K], 'codec'> extends string
+    ? never
+    : OptionValuesOf<ColumnFacts<TContext, TTableDef, ColumnOf<TTableDef, K>>>;
+};
+
+/**
+ * Each field's option values, or its elements', by public name, `never` for
+ * a field that takes any value: what `options` and `items.options` of
+ * `TypedFields` hold for the fields, read from the same column facts
+ * without the rest of each member's metadata, which costs most of it.
+ */
+export type TypedFieldOptions<
+  TContext extends DeclareContext,
+  TTable extends string,
+  TDecl extends Declaration,
+> = FieldOptions<TContext, TableDefOf<TContext, TTable>, TDecl>;
+
 /** The metadata of each member of the resource `TDecl` declares over `TTable`. */
 export type TypedFields<
   TContext extends DeclareContext,

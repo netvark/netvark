@@ -10,8 +10,8 @@ migrations. A wrong table, column, foreign key, constraint, codec, validator, or
 Status: in development and unreleased. This line implements the definer, the declaration, the public
 names and codes derived from it, the wire forms and Zod schemas, `defineCodec` and
 `defineValidator`, the boundary fixtures of the `testing` entry (SPEC sections 2 to 7), and the
-derived error codes with `errorCatalog` (SPEC 9.1 and 9.2). Field metadata, `forbiddenMembers`,
-messages, the `server` subpath, and OpenAPI follow;
+derived error codes with `errorCatalog` (SPEC 9.1 and 9.2), field metadata (SPEC 8), and messages
+with their localization (SPEC 10). `forbiddenMembers`, the `server` subpath, and OpenAPI follow;
 [`docs/resource/README.md`](https://github.com/netvark/netvark/blob/main/docs/resource/README.md)
 shows where the family is going.
 
@@ -494,6 +494,116 @@ errorCatalog: code SHORT_TEXT_CHECK is derived by organizations from domain shor
 `tsc` reports a relationship whose target the list leaves out at that resource in the list, with the
 same message as the runtime.
 
+## Messages and localization
+
+resource-core decides which message an error object needs and with which inputs; your i18n library
+holds the texts and picks the locale (ADR 0009). Every message is a function: a title or a label
+takes no inputs, a detail takes its kind's inputs. [Paraglide JS](https://paraglidejs.com) message
+functions fit as the compiler emits them:
+
+```ts
+// messages.ts
+import { defineMessages } from '@netvark/resource-core';
+
+import { APP_ERRORS } from './errors';
+import { m } from './paraglide/messages.js';
+import { Contacts } from './resources/contacts';
+import { Organizations } from './resources/organizations';
+
+export const messages = defineMessages([Organizations, Contacts], APP_ERRORS, {
+  errors: {
+    NOT_FOUND: { title: m.not_found_title, detail: m.not_found_detail },
+    // every code of @netvark/jsonapi-core, QUOTA_EXCEEDED, and every code of APP_ERRORS
+  },
+  constraints: {
+    unique: { title: m.conflict, detail: m.unique_detail }, // ({ field, fields })
+    // every constraint kind the resources have
+  },
+  validation: {
+    maxLength: m.max_length, // ({ field, limit })
+    enum: m.one_of, // ({ field, values })
+    // all thirteen issue kinds
+  },
+  fields: { contacts: { name: m.contact_name, createdAt: m.created_at /* every member */ } },
+  options: { contacts: { kind: { person: m.kind_person, company: m.kind_company } } },
+});
+```
+
+A missing code, constraint kind, issue kind, member label, or option label fails `tsc`, and so does
+an unknown key. Paraglide types each message with its variables across all locales, so a translation
+that uses a variable its kind does not receive fails the build too, in any locale. A derived code
+needs no entry, since its constraint kind's texts cover it; add one to `errors` only to override
+them. A detail receives:
+
+| Detail                                                                                               | Inputs                                                              |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| every detail                                                                                         | `field`: the label of the member the item points at, `id`, or empty |
+| a constraint kind's, a derived code's                                                                | `fields`: the labels of the constraint's members, joined with `, `  |
+| `minLength`, `maxLength`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf` | `limit`: the limit                                                  |
+| `enum`                                                                                               | `values`: the labels of the allowed options, joined with `, `       |
+| `format`, `type`                                                                                     | `format`, `type`: the expected format or type                       |
+
+`field` never holds a member name the request invented: a member the type does not have has no
+label. `localizeErrors` turns the messages into the `transform` of the ban handler. With Paraglide,
+run `paraglideMiddleware` around `next()`, so the error handler renders in the locale it resolved,
+and name that locale in the response:
+
+```ts
+// app.ts
+import type { Context } from 'hono';
+
+import { Hono } from 'hono';
+
+import { localizeErrors } from '@netvark/resource-core';
+
+import { ban } from './errors'; // createBan from @netvark/hono-ban
+import { messages } from './messages';
+import { getLocale } from './paraglide/runtime.js';
+import { paraglideMiddleware } from './paraglide/server.js';
+
+export const app = new Hono();
+
+app.use('*', async (c, next) =>
+  paraglideMiddleware(c.req.raw, async () => {
+    await next();
+    return c.res;
+  }),
+);
+
+const handle = ban.onError({
+  // The type whose labels name the members; annotate `c` when written inline.
+  transform: localizeErrors(messages, {
+    resource: (c: Context) => c.req.path.split('/')[1],
+  }),
+});
+
+app.onError(async (error, c) => {
+  const response = await handle(error, c);
+  response.headers.set('Content-Language', getLocale());
+  response.headers.append('Vary', 'Accept-Language');
+  return response;
+});
+```
+
+```jsonc
+// POST /contacts with Accept-Language: de and "kind": "robot": one object of the 422 response,
+// which carries Content-Language: de
+{
+  "status": "422",
+  "code": "VALIDATION_FAILED",
+  "title": "Validierung fehlgeschlagen",
+  "detail": "Art muss einer dieser Werte sein: Person, Firma.",
+  "source": { "pointer": "/data/attributes/kind" },
+  "meta": { "code": "enum", "expected": "[\"person\",\"company\"]" },
+}
+```
+
+`localizeErrors` replaces titles and details only; codes, statuses, pointers, and `meta` stay, so
+clients keep matching on codes. An object whose code has no texts passes through, and a message that
+throws makes the handler answer 500 and report it. Without an i18n library,
+`defaultMessages(resources, appErrors)` gives complete English messages, whose issue messages are
+the ones the schemas already produce.
+
 ## Best practices
 
 - **One definer per application.** Create it in one module and export `declareResource` from there.
@@ -571,6 +681,17 @@ same message as the runtime.
 - **Cover every CHECK without a rule.** Name the validator in the declaration's `rules`, and a
   domain's once in the definer's `domains`; prefer CHECKs `@netvark/pg-catalog` translates (length,
   range, `IN`, `IS NOT NULL`, simple patterns), which need no code at all.
+- **Localize with your i18n library, by kind first.** One message per issue kind and per constraint
+  kind covers every resource; override a derived code in `errors` only where the generic sentence is
+  not good enough. Reference each Paraglide message directly (`maxLength: m.max_length`), never as
+  `m[key]`, so unused ones are tree-shaken and `inlang check` sees which are used; write plurals as
+  variants on `limit`, never as two messages. Run `inlang check` in CI next to `tsc`.
+- **Name the locale and what chose it.** Set `Content-Language` from `getLocale()` on every error
+  response and add `Vary` for the request fields Paraglide's strategies read (`Accept-Language` for
+  `preferredLanguage`, `Cookie` for `cookie`), so caches keep one response per language.
+- **Pass `resource` to `localizeErrors`.** Member labels belong to a type, so without it no detail
+  can name the member. Return the type the request addresses; a type the messages do not label, such
+  as a path segment no resource has, names nothing.
 - **Enforce in the database what the API enforces.** A NOT ENFORCED CHECK or foreign key
   (PostgreSQL 18) is one the database records but never checks, so the schemas skip it, it takes no
   validator, and it has no error code; rows that break it can be read and saved again unchanged. To
@@ -596,7 +717,9 @@ memory, most of it to parse Zod's own declarations. A resource's codes are typed
 reads them: `errorCatalog` over all of stern's declarations, spread into `createBan`, took the check
 from 0.17 s and 129 MB to 0.36 s and 143 MB. `fields` is typed the same way: reading every
 declaration's `fields` took stern's check from 0.18 s to 0.35 s, about what reading each one's
-`schema.create` output costs.
+`schema.create` output costs. A full `defineMessages` mapping, one function per code, kind, member,
+and option, took stern's check from 0.19 s and 124 MB to 0.35 s and 161 MB, and the GitLab slice's,
+with 1,302 derived codes, from 0.28 s and 157 MB to 0.67 s and 198 MB.
 
 - **Checkers.** TypeScript 7 runs 4 checkers by default, each with its own view of the program, and
   every checker recomputes the declarations its files reach, since a relationship's target pulls in

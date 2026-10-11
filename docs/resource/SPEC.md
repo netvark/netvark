@@ -40,12 +40,12 @@ One package with four entry points (ADR 0008). It depends on `@netvark/catalog-c
 takes `zod` `^4.5.0` as a peer dependency. Nothing in it imports a framework, a query builder, a
 driver, or a Node.js module.
 
-| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `negotiateLanguage`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `forbiddenMembers`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `defineQuota`, `defineEvent`, `reject`, `denyAll`, `constraintError`, and the types `Actor`, `Policy`, `ResourceBehavior`, `ServerValuesOf`, `Scope`, `Quota`, `DomainEvent`, `Rejection`, `StorageAdapter`, `StorageRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `Surface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `@netvark/resource-core/testing` | `storageContract`, `boundaryFixtures`, and the types `ContractCase`, `ContractHarness`, `BoundaryFixture`, `ResourceBoundaries`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ```
 packages/resource-core/src/
@@ -59,7 +59,7 @@ packages/resource-core/src/
   meta/                     field metadata (8)
   errors/                   derived codes, errorCatalog, forbiddenMembers (9)
   registry/                 the checks of every list of resources: types, codes, targets (4.2)
-  messages/                 defineMessages, defaultMessages, templates, localizeErrors, negotiateLanguage (10)
+  messages/                 defineMessages, defaultMessages, the inputs, localizeErrors (10)
   jsonapi/                  the JSON:API resource definition and the keyset definition (11)
   server/                   the server subpath (12)
   openapi/                  the document, the surface, the diff (13)
@@ -1150,105 +1150,136 @@ https://www.postgresql.org/docs/18/protocol-error-fields.html
 
 ---
 
-## 10. Messages and localization (`messages/`)
+## 10. Messages and localization (`messages/`, ADR 0009)
+
+resource-core decides which message an error object needs and with which inputs; the application's
+i18n library holds the texts and picks the locale. Every message is a function, so a compiled
+Paraglide message function fills a slot as it stands, and closures fill it without any library.
 
 ### 10.1 `defineMessages(resources, appErrors, messages)`
 
 ```ts
-interface Messages<
-  TCodes extends string,
-  TDerived extends string,
-  TConstraints extends string,
-  TKinds extends string,
-  TFields,
-  TOptions,
-> {
-  readonly errors: { readonly [K in TCodes]: Text } & { readonly [K in TDerived]?: Text };
-  readonly constraints: { readonly [K in TConstraints]: Text }; // templates (10.3)
-  readonly validation: { readonly [K in TKinds]: string }; // templates (10.3)
-  readonly fields: TFields; // { [type]: { [public member]: label } }
-  readonly options: TOptions; // { [type]: { [field]: { [value]: label } } } for fields with options
+type Label = () => string; // a title or a label: no inputs
+type Message<TInputs extends object> = (inputs: TInputs) => string;
+
+interface ErrorText<TInputs extends object> {
+  readonly title: Label;
+  readonly detail: Message<TInputs>;
 }
-interface Text {
-  readonly title: string;
-  readonly detail: string;
+
+interface MessagesFor<TResources, TApp> {
+  readonly errors: { readonly [K in TCodes]: ErrorText<CodeInputs> } & {
+    readonly [K in TDerived]?: ErrorText<ConstraintInputs>;
+  } & { readonly [K in TBuiltins]?: ErrorText<CodeInputs> };
+  readonly constraints: { readonly [K in TKinds]: ErrorText<ConstraintInputs> };
+  readonly validation: { readonly [K in IssueKind]: Message<IssueInputs[K]> };
+  readonly fields: TFields; // { [type]: { [public member]: Label } }
+  readonly options: TOptions; // { [type]: { [field]: { [value]: Label } } } for fields with options
 }
 ```
 
-- `TCodes` is every code a response can carry that is not derived: `@netvark/jsonapi-core`'s
+- `TCodes` is every code a response can carry that no resource derives: `@netvark/jsonapi-core`'s
   `ErrorCode`s, `QUOTA_EXCEEDED`, and the keys of `appErrors` (the application's own
   `@netvark/ban-core` catalog fragment). Each needs a title and a detail.
-- `TDerived` is the resources' derived codes (9.1). Each is covered by the template of its
-  constraint kind in `constraints` (`check`, `notNull`, `unique`, `primaryKey`, `exclusion`,
-  `foreignKey`, only those the resources have), so a locale needs one sentence per kind, not one per
-  constraint; an entry in `errors` overrides the template for that code.
-- `TKinds` is the issue kinds the resources' schemas can raise (a resource without a `pattern` rule
-  does not need a `pattern` template) plus their validators' codes.
+- `TDerived` is the resources' derived codes (9.1). Each is covered by its constraint kind's texts
+  in `constraints` (`check`, `notNull`, `unique`, `primaryKey`, `exclusion`, `foreignKey`, exactly
+  those the resources have, as `TKinds`), so the messages need one title and detail per kind, not
+  one per constraint; an entry in `errors` overrides them for that code.
+- `TBuiltins` is the other `@netvark/ban-core` built-in codes (`TOO_MANY_REQUESTS`, ...). An entry
+  is optional; an object whose code has none keeps its catalog title and detail.
+- `validation` has a message for each of the thirteen issue kinds (6.4). A validator's issue carries
+  its constraint's code, a derived code, so `errors` and `constraints.check` cover it.
 - `fields` labels every public member of every resource; `options` labels every option of every
-  field that has options.
+  field that has options, or whose elements have, and is empty when none has.
 
-A missing key fails `tsc`, and so does an unknown one. At runtime `defineMessages` throws
-`TypeError` for the same mistakes and for a template naming a variable its kind does not have, so
-JavaScript callers learn at startup.
+A title and a label take no inputs: a title is constant per code except for localization (RFC 9457
+3.1.3). A detail takes its kind's inputs (10.3). A missing key fails `tsc`, and so do an unknown key
+and a message that needs an input its kind does not receive; `messages` takes no part in inference,
+so an unknown code is refused rather than read as an application code. A Paraglide message function
+is typed with its variables across all locales, so a translation that names a variable its kind does
+not have, in any locale, fails the build. Reference each message function directly in the object,
+never through a computed key, so the bundler tree-shakes and `inlang check` finds the unused ones.
+@ref https://www.rfc-editor.org/rfc/rfc9457#section-3.1.3 @ref
+https://paraglidejs.com/basics#dynamic-messages @ref https://paraglidejs.com/checking-translations
 
-### 10.2 `defaultMessages(resources, appErrors)`
+At runtime `defineMessages` runs the registry checks (4.2), then throws one `TypeError` listing
+every missing key (`defineMessages.messages.errors.NOT_FOUND: missing`), unknown key
+(`not a key these messages take`), and value that is not a function or not an object, so JavaScript
+callers learn at startup. A function's inputs are left to TypeScript: a Paraglide function also
+takes an optional `options`, so its arity says nothing. It returns a frozen copy, which
+`localizeErrors` recognizes; a copy of that copy is not recognized until it passes through
+`defineMessages` again.
 
-A complete English locale built mechanically: catalog titles and generic details for the codes that
-are not derived, the titles and details of 9.1 as the constraint templates, an English template per
-issue kind, labels made from public names (`createdAt` is "Created at"), and option labels equal to
-the values. An application uses it as is or spreads it under its own `en`.
+### 10.2 `defaultMessages(resources, appErrors?)`
 
-### 10.3 Templates
+Complete English messages built mechanically: catalog titles and generic details for the codes no
+resource derives, an application code's `description` (or else its title) as its detail, the titles
+and details of 9.1 per constraint kind, the English issue messages of 6.4, so a response localized
+with them reads as one that was not, labels made from public names (`createdAt` is "Created at"),
+and option labels equal to the values. An application without an i18n library uses them as they are;
+one with Paraglide maps its own message functions, and may spread the parts it has not translated
+yet.
 
-A template is plain text with `{name}` placeholders; no other syntax exists, and literal braces are
-not supported. Variables per kind:
+### 10.3 Inputs
 
-| Template                                                                                             | Variables                                                       |
-| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| every issue kind                                                                                     | `{field}`: the member's label from `fields`                     |
-| every constraint kind                                                                                | `{fields}`: the labels of the error's members, joined with `, ` |
-| `minLength`, `maxLength`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf` | `{limit}`: `expected`                                           |
-| `enum`                                                                                               | `{values}`: the option labels, joined with `, `                 |
-| `format`                                                                                             | `{format}`: `expected`                                          |
-| `type`                                                                                               | `{type}`: `expected`                                            |
+| Message                                                                                              | Inputs                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| every detail                                                                                         | `field`: the label of the member the object's item points at, in the request's type; `id` for `/data/id`; empty when it points at no member |
+| a constraint kind's detail, a derived code's                                                         | `fields`: the labels of the constraint's members (`ErrorEntry.fields`), joined with `, `                                                    |
+| `minLength`, `maxLength`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf` | `limit`: `expected`                                                                                                                         |
+| `enum`                                                                                               | `values`: the labels of the options `expected` lists, joined with `, `; a value without a label as it is                                    |
+| `format`                                                                                             | `format`: `expected`                                                                                                                        |
+| `type`                                                                                               | `type`: `expected`                                                                                                                          |
 
-### 10.4 `localizeErrors(locales, { language, fallback })`
+The member is the pointer segment after `data/attributes` or `data/relationships`, with `data` at
+the root or under one Atomic Operations operation (`/atomic:operations/0/data/...`). A member the
+type does not have is never named, since its name came from the request: an `additionalProperties`
+issue names a member the client invented. A `pattern` issue's source is no input. @ref
+https://jsonapi.org/ext/atomic/
+
+### 10.4 `localizeErrors(messages, { resource })`
 
 Returns a `transform` for `@netvark/ban-core`'s handler (ban SPEC 6.2), the localization point:
 
-- `locales` maps BCP 47 language tags to `defineMessages` results; `language(ctx)` returns the
-  request's `Accept-Language` value from the handler context; `fallback` names a key of `locales`
-  (default: the first).
-- The language is `negotiateLanguage(header, Object.keys(locales), fallback)`.
-- For a JSON:API document (`{ errors: [...] }`), each error object is paired with the error's item
-  at the same index, or with the error itself when it has none. `title` becomes the code's localized
-  title, the override in `errors` or else its constraint template for a derived code. `detail`
-  becomes, for an item whose `reason` is an issue kind, its template filled from the item (the
-  member from the pointer, `expected`, the options); for an item whose `reason` is a validator's
-  code, that code's detail; otherwise the code's detail, filled the same way.
-- `status`, `code`, `source`, `id`, `links`, and `meta` are never changed. A body of another shape
-  passes through untouched.
+- `messages` is what `defineMessages` or `defaultMessages` returned; anything else is a `TypeError`.
+  `resource(ctx)` returns the type of the resource the request addresses, whose labels name the
+  members; without it, `field` is empty, except in a derived code's texts, which take the labels of
+  the first type that derives the code.
+- For a JSON:API document (`errors` and no top-level members besides `jsonapi`, `links`, `meta`, and
+  extension members), the objects pair with the error's items by index when there are as many of
+  each. The handler re-renders an oversized body as one object but passes the same error, items and
+  all (ban SPEC 6.8), so then no object pairs. @ref
+  https://jsonapi.org/format/1.1/#document-top-level
+- `title` becomes the code's title: its own entry in `errors`, else its constraint kind's for a
+  derived code. An application code whose rendered `code` differs from its key is found by key.
+- `detail` becomes, for an item whose `reason` is an issue kind, that kind's message; for an item
+  whose `reason` is a derived code (a validator's issue, 7.2), that code's detail, else its
+  constraint kind's; otherwise the object's code's detail. Each takes its inputs (10.3).
+- An object whose code has no texts and a body of another shape pass through untouched. `status`,
+  `code`, `source`, `id`, `links`, and `meta` are never changed, and the body is never mutated.
+- A message function that throws makes the handler answer 500 through its fallback and report the
+  failure (ban SPEC 6.4).
 
-The transform cannot set headers. The host sets `Content-Language` to the negotiated tag and adds
-`Vary: Accept-Language` to every response whose body depends on it (`@netvark/hono-resource` does
-both). @ref https://www.rfc-editor.org/rfc/rfc9110#section-8.5 @ref
-https://www.rfc-editor.org/rfc/rfc9110#section-12.5.5
+The language is the message functions' own. With Paraglide it is the locale `paraglideMiddleware`
+resolved, which holds inside Hono's `onError` when the middleware wraps `next()`. The transform
+cannot set headers: the host sets `Content-Language` to that locale (`getLocale()`) and adds `Vary`
+for the request fields the choice read (`Accept-Language` for Paraglide's `preferredLanguage`
+strategy, `Cookie` for its cookie strategy). @ref https://www.rfc-editor.org/rfc/rfc9110#section-8.5
+@ref https://www.rfc-editor.org/rfc/rfc9110#section-12.5.5 @ref
+https://paraglidejs.com/server-side-rendering
 
-### 10.5 `negotiateLanguage(header, available, fallback)`
+The transform's context type comes from `resource` alone: written inside `ban.onError({ ... })`, the
+handler's context is not inferred yet when the transform's is, and TypeScript would read it as
+`never`. So `localizeErrors(messages)` fits any handler, and a `resource` written there annotates
+its parameter (`(c: Context) => ...`).
 
-Parses `Accept-Language` (RFC 9110 12.5.4): comma-separated language ranges with optional `q`
-weights from 0 to 1 with up to three decimals; a malformed member is skipped and `q=0` excludes. The
-ranges are tried in descending weight, ties in header order, each by RFC 4647 Lookup: compare
-case-insensitively, then drop the last subtag (and a single-character subtag left before it) until a
-tag of `available` matches. `*` matches nothing in Lookup and is skipped. No match returns
-`fallback`. @ref https://www.rfc-editor.org/rfc/rfc9110#section-12.5.4 @ref
-https://www.rfc-editor.org/rfc/rfc4647#section-3.4
-
-Tests: `define-messages.test-d.ts` (a locale missing one code, constraint kind, issue kind, label,
-or option fails; an unknown key fails; a derived code needs no entry), `define-messages.test.ts`,
-`templates.test.ts`, `negotiate-language.test.ts` (the RFC examples, weights, ties, malformed
-members), `localize-errors.test.ts` (a 422 with two items and a 409 become the expected German
-document).
+Tests: `define-messages.test-d.ts` (a missing code, constraint kind, issue kind, label, or option
+fails; an unknown key fails and is not read as an application code; a derived code needs no entry
+and its override receives `fields`; a message needing an input its kind lacks fails; Paraglide's
+compiled shape fits), `define-messages.test.ts`, `default-messages.test.ts`, `english.test.ts`,
+`error-inputs.test.ts`, `localize-errors.test.ts` (a 422 with two items and a 409 become the
+expected German document; the oversized body; what passes through), `localize-errors.test-d.ts`, and
+`e2e/resource/localization.e2e.test.ts` (15.4).
 
 ---
 
@@ -1712,10 +1743,15 @@ ones an insert needs, and a member left out holds its stated `default`
 (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
 both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
 them, rendered by `createBan`; `constraintError` against the same violations; localized error
-documents; that a row breaking every NOT ENFORCED constraint is stored by the database and accepted
-by the schemas, while the enforced CHECK beside them refuses in both (`not-enforced.e2e.test.ts`);
-the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
-workerd for the root and `openapi` entries.
+documents (`localization.e2e.test.ts`): messages the Paraglide compiler builds from
+`localization/messages/`, mapped with `defineMessages` and served through Hono and
+`@netvark/hono-ban`, answer a 422 in German with option labels, in English with its plural forms, in
+the base locale for a language the project lacks, in a regional tag's language, and a 409 with a
+code's own texts, each with `Content-Language` and `Vary`, while `tsc` accepts the mapping and
+refuses a translation that names a variable its kind does not receive; that a row breaking every NOT
+ENFORCED constraint is stored by the database and accepted by the schemas, while the enforced CHECK
+beside them refuses in both (`not-enforced.e2e.test.ts`); the package surface (every value export
+listed); and the runtime smoke test on Bun, Deno, and workerd for the root and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -1935,6 +1971,30 @@ each one's `schema.create` output instead:
 
 Flattening each entry's facts with a mapped type costs 9 percent of the instantiations and no check
 time, so hovers show one object.
+
+The ninth record covers section 10. On Node.js 24, `defaultMessages` took 8 ms over stern's 111
+declarations (17 codes no resource derives, 4 constraint kinds, 1,367 member labels, and 479 option
+labels on 63 fields) and 9 ms over the GitLab slice's 60 (1,487 member labels, no options), and
+`defineMessages` checked a full mapping in 2 ms. A script mapped every message to a function that
+names its slot and echoes its inputs, as a translation's functions would, and rendered through the
+ban handler with `localizeErrors` every derived code, 745 and 1,302, in that mapping and in English,
+and an `enum` issue on each of stern's 63 fields with options. Every object took its constraint
+kind's title and a detail given the labels of its members, every `enum` detail the labels of its
+options, and no English text held a placeholder; a response took 0.03 ms. Leaving one member label
+out made `defineMessages` throw naming its path and `tsc` fail once, at that type's labels. In
+types, as medians of five runs, with one function per code, constraint kind, issue kind, member, and
+option:
+
+| Catalog            | File                                 | Instantiations | Check time | Peak memory |
+| ------------------ | ------------------------------------ | -------------- | ---------- | ----------- |
+| stern              | the declarations                     | 411,577        | 0.186 s    | 124 MB      |
+| stern              | plus a full `defineMessages` mapping | 884,323        | 0.353 s    | 161 MB      |
+| GitLab 17.11 slice | the declarations                     | 495,111        | 0.277 s    | 157 MB      |
+| GitLab 17.11 slice | plus a full `defineMessages` mapping | 1,107,182      | 0.671 s    | 198 MB      |
+
+The option labels are typed from each column's options (`TypedFieldOptions`), not from `fields`,
+whose full metadata the first version built for every member to read them: 1,164,397 instantiations
+and 0.469 s on stern.
 
 ### 15.6 The Zod floor
 

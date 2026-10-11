@@ -15,9 +15,12 @@ describe('package surface (SPEC 1)', () => {
     expect(Object.keys(core).toSorted()).toEqual([
       'ISSUE_KINDS',
       'createDeclareResource',
+      'defaultMessages',
       'defineCodec',
+      'defineMessages',
       'defineValidator',
       'errorCatalog',
+      'localizeErrors',
     ]);
   });
 

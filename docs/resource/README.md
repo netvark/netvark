@@ -96,9 +96,10 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   keywords (`maxLength`, `enum`, ...) with their limit; database rejections carry the constraint's
   code with the right status: 409 for a duplicate, 404 for a missing related resource, 422 for a
   CHECK.
-- **Messages typed over all of it.** `defineMessages` requires a label for every field, a sentence
-  for every issue kind and constraint kind your resources can produce, and every option label; a
-  missing one fails `tsc`. `localizeErrors` turns the server's errors into the viewer's language.
+- **Messages typed over all of it.** `defineMessages` maps your i18n library's message functions
+  (Paraglide's `m.*`) to every code, issue kind, constraint kind, field, and option your resources
+  can produce; a missing one, or a translation using a variable its kind does not receive, fails
+  `tsc`. `localizeErrors` turns the server's errors into the request's locale.
 - **Definitions for the rest of the stack.** `Contacts.resource` is a `@netvark/jsonapi-core`
   definition and `Contacts.keyset` a `@netvark/keyset-core` one, and `openapi([...])` documents
   every operation, parameter, schema, and error code, with every example validated.
@@ -138,9 +139,11 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   still cannot leak rows.
 - **Review the surface with the migration.** Commit the surface snapshot; a column rename shows up
   as a breaking change, and `as` with the old name keeps the contract.
-- **Localize by kind first.** One sentence per issue kind and per constraint kind covers every
-  resource; override a single code only where the generic sentence is not good enough. Send
-  `Content-Language` and `Vary: Accept-Language` with localized responses.
+- **Localize with your i18n library, by kind first.** One message per issue kind and per constraint
+  kind covers every resource; override a single code only where the generic sentence is not good
+  enough. Reference Paraglide's messages directly, never as `m[key]`, write plurals as variants, and
+  run `inlang check` in CI. Run `paraglideMiddleware` around the error handler, set
+  `Content-Language` from `getLocale()`, and vary on what the locale strategy read.
 - **Keep declarations browser-safe.** Declarations, codecs, validators, and messages go in modules a
   browser can import; policies, scopes, and quotas go in modules that import
   `@netvark/resource-core/server`.

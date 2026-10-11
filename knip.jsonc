@@ -28,15 +28,19 @@
     },
     "e2e/resource": {
       // As e2e/*, plus: the generated catalogs (all exports public); the
-      // extraction config the pg-catalog bin loads; and `fails/`, which
-      // fails.e2e.test.ts compiles with tsc instead of importing.
+      // extraction config the pg-catalog bin loads; `fails/`, which
+      // fails.e2e.test.ts compiles with tsc instead of importing; and
+      // `localization/transform-forms.ts`, which only the type check reads.
+      // The inlang project loads the message-format plugin by path.
       "entry": [
         "smoke/worker.ts",
         "fixtures/*/*catalog.ts",
         "fixtures/*/netvark.config.mjs",
-        "fails/*.ts"
+        "fails/*.ts",
+        "localization/transform-forms.ts"
       ],
-      "project": ["**/*.ts", "**/*.mjs"]
+      "project": ["**/*.ts", "**/*.mjs"],
+      "ignoreDependencies": ["@inlang/plugin-message-format"]
     }
   }
 }
