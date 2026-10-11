@@ -790,12 +790,16 @@ postgres.js (`code`; `severity` from field `V`, absent behind PgBouncer and befo
 `db-errors` (`nativeError`); Kysely rethrows the driver error, and TypeORM and MikroORM copy its
 fields onto their own error. A severity field is required because Node system errors (`EPIPE`) and
 Prisma (`P2002`) also use five-character codes. `readPostgresFields(error)` returns
-`{ sqlstate, errorClass, constraint, table, schema, column }`, the SQLSTATE from `code` else
-`errno`, each object field from the node-postgres name else the postgres.js name (`constraint_name`,
-`table_name`, `schema_name`, `column_name`). `PostgresErrorLike` declares every member optional;
-`postgres.test-d.ts` checks postgres.js's `PostgresError` against it field by field. Prisma is out
-of scope: its client error carries no `cause` and its adapter converts the pg error into its own
-payload.
+`{ sqlstate, errorClass, constraint, table, schema, column, dataType }`, the SQLSTATE from `code`
+else `errno`, each object field from the node-postgres name else the postgres.js name
+(`constraint_name`, `table_name`, `schema_name`, `column_name`, and `data type_name`, with the space
+of the protocol's "Data type name"), and a field that is not a string as undefined (Bun's `column`
+is a number when the server sent no field `c`). `dataType` is field `d`, which PostgreSQL sets when
+a domain's CHECK or NOT NULL fails: the domain's name, the only field that tells apart two domains'
+constraints of the same name, since such a violation carries no table or column. `PostgresErrorLike`
+declares every member optional; `postgres.test-d.ts` checks postgres.js's `PostgresError` against it
+field by field. Prisma is out of scope: its client error carries no `cause` and its adapter converts
+the pg error into its own payload.
 
 Algorithm for a recognized error with fields `f` and the thrown value `thrown`:
 
@@ -1545,8 +1549,8 @@ wherever the package publishes a schema, validated with Ajv (`e2e/ban/support/aj
 | `validation-zod`, `validation-zod-direct`, `validation-zod-openapi` | `zValidator` hook for every target, pointer escaping, typed passthrough, `validationKey`, `fromZodError`, `toIssues`, `OpenAPIHono` `defaultHook` parity                                                                                                                                                                                                                                                                                                                |
 | `validation-valibot-standard-valibot`, `-standard-schema`           | `vValidator` and `sValidator` hooks (Zod and Valibot schemas), `expected`/`received` mapping, direct converters, `ban.validation()`, JSON:API `source` for Valibot issues                                                                                                                                                                                                                                                                                               |
 | `openapi-document`, `openapi-responses`                             | served 3.1 (`doc31`) and 3.0 (`doc`) documents, `const` versus `enum`, `anyOf` grouping, real error bodies validated against the served schemas, `RangeError`s                                                                                                                                                                                                                                                                                                          |
-| `postgresql-pglite`, `postgresql-pglite-options`                    | PGlite (PostgreSQL 18) raising every table row it can and the fallthrough codes over HTTP, directly and through Drizzle (wrapper on the report, driver error on the error); `constraints`, `columns`, and `codes`; `includeStack` rendering the driver stack and not the ORM wrapper's; no server text in any body                                                                                                                                                      |
-| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/ban/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`; `severity_local`, `constraint_name`/`table_name`/`column_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`                                         |
+| `postgresql-pglite`, `postgresql-pglite-options`                    | PGlite (PostgreSQL 18) raising every table row it can and the fallthrough codes over HTTP, directly and through Drizzle (wrapper on the report, driver error on the error); `constraints`, `columns`, and `codes`; a domain CHECK's fields (`dataType`, no table or column); `includeStack` rendering the driver stack and not the ORM wrapper's; no server text in any body                                                                                            |
+| `postgresql-node-postgres`, `postgresql-postgres-js`                | the real `pg` and `postgres` drivers connected over the wire protocol to the file's PGlite (`e2e/ban/support/pglite-socket.ts`): every built-in row and fallthrough again, the driver's own error class and field spelling (`constraint`/`table`/`column`/`dataType`; `severity_local`, `constraint_name`/`table_name`/`column_name`/`data type_name`) normalized by `readPostgresFields`, and issue mappings with the driver error as `report.error.cause`             |
 | `postgresql-options`                                                | hand-built errors in the node-postgres, Neon, postgres.js (with and without field V), Bun, and Sequelize shapes; Prisma and Node errno shapes left unhandled; `retryAfter` on 503 only; an issue mapping rendered by JSON:API with `source.pointer` and validated against `errorsSchema`                                                                                                                                                                                |
 | `otel-correlation`, `otel-sources`                                  | real `NodeTracerProvider` spans: body and report trace id equal the exported span, option wins over `traceparent`, no span outside the middleware, `{ trace }` form, invalid span contexts ignored, JSON:API `meta.traceId`                                                                                                                                                                                                                                             |
 

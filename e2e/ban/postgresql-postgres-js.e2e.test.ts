@@ -119,6 +119,19 @@ describe('built-in rows through postgres.js', () => {
       table: 'users',
       schema: 'public',
       column: 'email',
+      dataType: undefined,
+    });
+    const domain = findPostgresError(
+      (await call(h, '/domain-check')).report.cause,
+    );
+    expect(domain).toMatchObject({
+      code: '23514',
+      'data type_name': 'short_code',
+    });
+    expect(readPostgresFields(domain ?? {})).toMatchObject({
+      constraint: 'short_code_check',
+      table: undefined,
+      dataType: 'short_code',
     });
   });
 });

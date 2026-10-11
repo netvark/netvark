@@ -5,7 +5,9 @@
  * with the Paraglide messages, which read that locale, and the error
  * handler names it in `Content-Language` and varies on `Accept-Language`.
  * The 422 carries resource issues as `@netvark/jsonapi-core` items do
- * (SPEC 9.3); the 409 is built as `constraintError` builds it (SPEC 9.5).
+ * (SPEC 9.3); the 409 is what `constraintError` makes of PostgreSQL's
+ * refusal of a contact whose email another contact has (SPEC 9.5), on
+ * PGlite with the contacts application's schema and seed.
  * @ref https://paraglidejs.com/getting-started/standalone-servers
  * @ref https://www.rfc-editor.org/rfc/rfc9110#section-8.5
  * @packageDocumentation
@@ -16,14 +18,19 @@ import type { Context } from 'hono';
 import type { ErrorItem } from '@netvark/hono-ban';
 import type { ResourceIssue } from '@netvark/resource-core';
 
+import type { OracleDatabase } from '../support/oracle-database.ts';
+
 import { Hono } from 'hono';
 
 import { createBan } from '@netvark/hono-ban';
 import { jsonApi } from '@netvark/hono-ban/formats/json-api';
 import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 import { errorCatalog, localizeErrors } from '@netvark/resource-core';
+import { constraintError } from '@netvark/resource-core/server';
 
 import { Contacts } from '../resources/contacts.ts';
+import { CONTACTS_SCHEMA, openPglite } from '../support/oracle-database.ts';
+import { SEED, VIOLATIONS } from '../support/violations.ts';
 import { contactMessages, RESOURCES } from './contact-messages.ts';
 import { getLocale } from './paraglide/runtime.js';
 import { paraglideMiddleware } from './paraglide/server.js';
@@ -59,6 +66,32 @@ function attributesOf(document: unknown): unknown {
     : undefined;
 }
 
+/** An insert of a contact whose email Ada, of the seed, has in another case. */
+function takenEmail(): string {
+  const taken = VIOLATIONS.find(({ code }) => code === 'CONTACT_EMAIL_TAKEN');
+  if (taken === undefined) {
+    throw new Error('support/violations.ts has no CONTACT_EMAIL_TAKEN');
+  }
+  return taken.sql;
+}
+
+const TAKEN = takenEmail();
+
+let contacts: Promise<OracleDatabase> | undefined;
+
+async function openContacts(): Promise<OracleDatabase> {
+  const database = await openPglite(CONTACTS_SCHEMA);
+  for (const sql of SEED) {
+    await database.query(sql);
+  }
+  return database;
+}
+
+/** Closes the contacts database, when a request opened it. */
+export async function closeContacts(): Promise<void> {
+  await (await contacts)?.close();
+}
+
 export const app = new Hono();
 
 app.use('*', async (c, next) =>
@@ -79,15 +112,18 @@ app.post('/contacts', async (c) => {
   return c.body(null, 204);
 });
 
-app.post('/contacts/taken', () => {
-  throw ban.error('CONTACT_EMAIL_TAKEN', {
-    errors: [
-      {
-        detail: 'Another record already has this value.',
-        path: ['data', 'attributes', 'email'],
-      },
-    ],
-  });
+app.post('/contacts/taken', async () => {
+  contacts ??= openContacts();
+  const database = await contacts;
+  try {
+    await database.query(TAKEN);
+  } catch (error) {
+    throw (
+      constraintError(error, { resource: Contacts, operation: 'create' }) ??
+      error
+    );
+  }
+  throw new Error('PostgreSQL accepted a contact whose email is taken');
 });
 
 app.get('/contacts/:id', () => {

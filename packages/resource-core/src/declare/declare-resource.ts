@@ -76,7 +76,7 @@ export function declareResourceIn(
     declaration,
   );
   const frozen = freezeDeclaration(declaration);
-  const { errors, origins } = deriveErrors({
+  const { errors, origins, domainChecks } = deriveErrors({
     catalog: context.catalog,
     domains: context.domains,
     table,
@@ -121,6 +121,12 @@ export function declareResourceIn(
         return fields();
       },
     }),
-    { specs, catalog: context.catalog, errorOrigins: origins },
+    {
+      specs,
+      catalog: context.catalog,
+      errorOrigins: origins,
+      domainChecks,
+      scopeColumn,
+    },
   );
 }

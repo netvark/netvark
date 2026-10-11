@@ -12,6 +12,7 @@ export interface PgFixtureInit {
   readonly table?: string;
   readonly schema?: string;
   readonly column?: string;
+  readonly dataType?: string;
   readonly detail?: string;
   readonly message?: string;
 }
@@ -26,6 +27,7 @@ export class PgError extends Error {
   readonly table: string | undefined;
   readonly schema: string | undefined;
   readonly column: string | undefined;
+  readonly dataType: string | undefined;
 
   constructor(init: PgFixtureInit) {
     super(init.message ?? `server message for ${init.code}`);
@@ -36,6 +38,7 @@ export class PgError extends Error {
     this.table = init.table;
     this.schema = init.schema;
     this.column = init.column;
+    this.dataType = init.dataType;
   }
 }
 
@@ -59,6 +62,7 @@ export interface PostgresJsFixtureInit {
   readonly table_name?: string;
   readonly schema_name?: string;
   readonly column_name?: string;
+  readonly 'data type_name'?: string;
 }
 
 /** postgres.js: `Object.assign(this, fields)` with the snake_case names. */
@@ -74,7 +78,9 @@ export interface BunFixtureInit {
   readonly errno: string;
   readonly constraint?: string;
   readonly table?: string;
-  readonly column?: string;
+  /** The column name, or the JavaScript error's source column when the server sends none. */
+  readonly column?: string | number;
+  readonly dataType?: string;
 }
 
 /** Bun: the SQLSTATE on `errno`, a constant on `code`. */

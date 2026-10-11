@@ -215,8 +215,8 @@ export const contacts = defineResource(Contacts, {
 
 `@netvark/kysely-resource` runs the operations against the storage contract: one transaction per
 operation that sets `app.organization_id` for row security, adds the scope predicate to every
-statement, writes only the members a request carried, and maps every PostgreSQL rejection to its
-declared code.
+statement, locks the row an update or a remove decides on, writes only the members a request
+carried, and maps every PostgreSQL rejection to its declared code.
 
 ### 3.7 A migration
 

@@ -146,6 +146,7 @@ describe('readPostgresFields', () => {
       table: 'users',
       schema: 'public',
       column: undefined,
+      dataType: undefined,
     });
   });
 
@@ -164,7 +165,46 @@ describe('readPostgresFields', () => {
       table: 'users',
       schema: 'public',
       column: 'email',
+      dataType: undefined,
     });
+  });
+
+  it("reads the domain of a domain constraint's violation in each spelling", () => {
+    const fields = {
+      sqlstate: '23514',
+      errorClass: '23',
+      constraint: 'short_code_check',
+      table: undefined,
+      schema: 'public',
+      column: undefined,
+      dataType: 'short_code',
+    };
+    const pg = new PgError({
+      code: '23514',
+      schema: 'public',
+      constraint: 'short_code_check',
+      dataType: 'short_code',
+    });
+    const postgresJs = postgresJsError({
+      code: '23514',
+      severity: 'ERROR',
+      schema_name: 'public',
+      constraint_name: 'short_code_check',
+      'data type_name': 'short_code',
+    });
+    // Bun's `column` is the JavaScript error's source column here, as probed.
+    const bun = Object.assign(
+      bunError({
+        errno: '23514',
+        constraint: 'short_code_check',
+        dataType: 'short_code',
+        column: 27,
+      }),
+      { schema: 'public' },
+    );
+    expect(readPostgresFields(pg)).toEqual(fields);
+    expect(readPostgresFields(postgresJs)).toEqual(fields);
+    expect(readPostgresFields(bun)).toEqual(fields);
   });
 
   it('reads the SQLSTATE from errno on Bun', () => {

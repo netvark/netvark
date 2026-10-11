@@ -11,11 +11,14 @@ import { publicCatalog } from '../fixtures/contacts/public-catalog.ts';
 import { codecs } from './codecs.ts';
 import { validators } from './validators.ts';
 
+/** The tenant scope, which the server binds to the actor (`runtime/domain.ts`). */
+export const scopes = { organization: { column: 'organization_id' } } as const;
+
 export const declareResource = createDeclareResource({
   catalog: publicCatalog,
   codecs,
   validators,
-  scopes: { organization: { column: 'organization_id' } },
+  scopes,
   domains: {
     email: { email_check: { validator: 'email' } },
     handle: { handle_check: { validator: 'lowercase' } },

@@ -39,6 +39,8 @@ export interface DerivedErrors {
   readonly errors: Readonly<Record<string, ErrorEntry>>;
   /** Code to origin: `contacts.contacts_email_unique`, or `domain email.email_check`. */
   readonly origins: ReadonlyMap<string, string>;
+  /** Domain reference name to CHECK name to code, for a violation that names the domain (SPEC 9.5). */
+  readonly domainChecks: ReadonlyMap<string, ReadonlyMap<string, string>>;
 }
 
 interface Derived {
@@ -47,6 +49,8 @@ interface Derived {
   /** How a message names the constraint. */
   readonly label: string;
   readonly entry: ErrorEntry;
+  /** A domain CHECK's domain and constraint. */
+  readonly domain?: { readonly name: string; readonly constraint: string };
 }
 
 /** The public members among `columns`, other than the scope column. */
@@ -134,6 +138,7 @@ function domainCodes(source: ErrorSource): ReadonlyArray<Derived> {
         origin: `domain ${domain}.${constraint}`,
         label: `domain ${domain}'s CHECK ${constraint}`,
         entry: errorEntry('check', fields),
+        domain: { name: domain, constraint },
       };
     });
   });
@@ -168,10 +173,18 @@ export function deriveErrors(source: ErrorSource): DerivedErrors {
     byCode.set(derived.code, derived);
   }
   const all = [...byCode.values()];
+  const domainChecks = new Map<string, Map<string, string>>();
+  for (const { code, domain } of all) {
+    if (domain !== undefined) {
+      const checks = domainChecks.get(domain.name) ?? new Map<string, string>();
+      domainChecks.set(domain.name, checks.set(domain.constraint, code));
+    }
+  }
   return {
     errors: Object.freeze(
       Object.fromEntries(all.map(({ code, entry }) => [code, entry])),
     ),
     origins: new Map(all.map(({ code, origin }) => [code, origin])),
+    domainChecks,
   };
 }

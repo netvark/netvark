@@ -36,3 +36,26 @@ export interface SyncStandardSchema<TInput, TOutput, TIssue> {
     readonly types?: StandardTypes<TInput, TOutput> | undefined;
   };
 }
+
+/** A Standard Schema V1 of any vendor, whose `validate` may be asynchronous. */
+export interface StandardSchema<TInput = unknown, TOutput = TInput> {
+  readonly '~standard': {
+    readonly version: 1;
+    readonly vendor: string;
+    readonly validate: (
+      value: unknown,
+    ) =>
+      | StandardSuccess<TOutput>
+      | StandardFailure<unknown>
+      | Promise<StandardSuccess<TOutput> | StandardFailure<unknown>>;
+    readonly types?: StandardTypes<TInput, TOutput> | undefined;
+  };
+}
+
+/** The input type of a Standard Schema. */
+export type StandardInput<TSchema extends StandardSchema> =
+  TSchema extends StandardSchema<infer TInput, unknown> ? TInput : never;
+
+/** The output type of a Standard Schema. */
+export type StandardOutput<TSchema extends StandardSchema> =
+  TSchema extends StandardSchema<unknown, infer TOutput> ? TOutput : never;

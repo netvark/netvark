@@ -164,6 +164,10 @@ const ban = createBan({
 });
 ```
 
+`readPostgresFields(error)` reads the fields such a `map` needs in every driver's spelling:
+`{ sqlstate, errorClass, constraint, table, schema, column, dataType }`. A violated domain CHECK has
+no table or column; `dataType` names the domain.
+
 ### Headers some statuses require
 
 HTTP makes the application, not the library, responsible for a few headers: a 401 MUST carry
