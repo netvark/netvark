@@ -1,7 +1,7 @@
 /**
- * A fixture's value as the rules report shows it (SPEC 10.3): JSON where
- * JSON writes the value as itself, JavaScript's notation where it does
- * not, so no value is shown as another. A registry's fixtures are any
+ * A value as the rules and surface reports show it (SPEC 10.3, 10.4): JSON
+ * where JSON writes the value as itself, JavaScript's notation where it
+ * does not, so no value is shown as another. A registry's fixtures are any
  * JavaScript values, and JSON writes `NaN` as `null`, drops an
  * `undefined` member, and has no text for a symbol, a bigint, or a cycle.
  * @ref https://tc39.es/ecma262/#sec-json.stringify
@@ -63,4 +63,41 @@ function show(value: unknown, open: Set<object>): string {
  */
 export function showValue(value: unknown): string {
   return show(value, new Set());
+}
+
+/** The characters of a value `showShort` shows before it cuts it. */
+const SHOWN = 60;
+
+/** `count` and `noun`, with an `s` unless the count is one. */
+export function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** The first `limit` code points of `text`, and how many it holds. */
+function cut(
+  text: string,
+  limit: number,
+): { readonly head: string; readonly length: number } {
+  let head = '';
+  let length = 0;
+  for (const character of text) {
+    if (length < limit) {
+      head += character;
+    }
+    length += 1;
+  }
+  return { head, length };
+}
+
+/** `value` as `showValue` writes it, cut after 60 code points with `…`, and a string's with its length. */
+export function showShort(value: unknown): string {
+  const { head, length } = cut(showValue(value), SHOWN);
+  if (length <= SHOWN) {
+    return head;
+  }
+  const characters =
+    typeof value === 'string'
+      ? ` (${plural(cut(value, 0).length, 'character')})`
+      : '';
+  return `${head}…${characters}`;
 }

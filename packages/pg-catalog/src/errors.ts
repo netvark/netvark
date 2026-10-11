@@ -23,9 +23,10 @@ export type PgCatalogErrorCode =
   | 'catalog_unreadable'
   | 'catalog_format'
   | 'resource_core_missing'
-  | 'registry_invalid';
+  | 'registry_invalid'
+  | 'surface_unreadable';
 
-/** A failure of an extraction, check, drift, or rules command. */
+/** A failure of an extraction, check, drift, rules, or surface command. */
 export class PgCatalogError extends Error {
   readonly code: PgCatalogErrorCode;
 

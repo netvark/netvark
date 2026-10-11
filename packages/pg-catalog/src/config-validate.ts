@@ -222,19 +222,26 @@ function storageCodec(value: unknown, path: string): void {
   }
 }
 
-/** `rules`: the registry function, which is not called, and the storage codecs. */
-function rules(value: unknown): void {
-  const config = options(value, 'rules', ['registry', 'storage']);
+/** `resources`: the registry function, which is not called, the storage codecs, and the surface file. */
+function resources(value: unknown): void {
+  const config = options(value, 'resources', [
+    'registry',
+    'storage',
+    'surface',
+  ]);
   if (typeof config['registry'] !== 'function') {
-    fail('rules.registry must be a function');
+    fail('resources.registry must be a function');
+  }
+  if (config['surface'] !== undefined) {
+    text(config['surface'], 'resources.surface');
   }
   if (config['storage'] === undefined) {
     return;
   }
   for (const [name, codec] of Object.entries(
-    options(config['storage'], 'rules.storage'),
+    options(config['storage'], 'resources.storage'),
   )) {
-    storageCodec(codec, `rules.storage.${name}`);
+    storageCodec(codec, `resources.storage.${name}`);
   }
 }
 
@@ -251,7 +258,7 @@ export function validateConfig(
     'schemas',
     'out',
     'drift',
-    'rules',
+    'resources',
   ]);
   textOrFunction(config['migrations'], 'migrations');
   if (config['database'] !== undefined) {
@@ -264,7 +271,7 @@ export function validateConfig(
   if (config['drift'] !== undefined) {
     drift(config['drift']);
   }
-  if (config['rules'] !== undefined) {
-    rules(config['rules']);
+  if (config['resources'] !== undefined) {
+    resources(config['resources']);
   }
 }

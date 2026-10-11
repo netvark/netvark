@@ -61,7 +61,7 @@ interface TeamOrNote {
   readonly note: string | null;
 }
 
-/** A storage codec over text, as `rules.storage` takes it. */
+/** A storage codec over text, as `resources.storage` takes it. */
 interface TextCodec<TValue> {
   readonly read: (stored: string) => TValue;
   readonly write: (value: TValue) => string;
@@ -126,13 +126,20 @@ export const VALIDATORS: {
 
 type Declare = (table: string, declaration: object) => object;
 
-/**
- * The resources over `catalog`; `validators` and `codecs` replace the
- * registries' entries, for the faults the tests plant.
- */
+/** What a test replaces in the registry. */
+export interface RegistryEdits {
+  /** Entries of the validator registry, for the faults the rules tests plant. */
+  readonly validators?: object;
+  /** Entries of the codec registry, likewise. */
+  readonly codecs?: object;
+  /** Fields of `teams`, for the changes the surface tests make. */
+  readonly teamFields?: object | undefined;
+}
+
+/** The resources over `catalog`, with `replaced`'s edits. */
 export function oracleRegistry(
   catalog: PublicCatalog,
-  replaced: { readonly validators?: object; readonly codecs?: object } = {},
+  replaced: RegistryEdits = {},
 ): ReadonlyArray<object> {
   const configure = createDeclareResource as unknown as (
     config: unknown,
@@ -149,6 +156,7 @@ export function oracleRegistry(
       name: { access: 'readWrite' },
       code: { access: 'readWrite' },
       slots: { access: 'readWrite', codec: 'slots' },
+      ...replaced.teamFields,
     },
     rules: { teams_code_check: { validator: 'noHyphen' } },
   });
@@ -161,8 +169,16 @@ export function oracleRegistry(
   return [teams, members];
 }
 
-/** The resources over the public catalog extracted from `ORACLE_MIGRATIONS`, as an application's registry module gives them. */
-export async function extractedRegistry(): Promise<ReadonlyArray<object>> {
+/**
+ * The resources over the public catalog extracted from
+ * `ORACLE_MIGRATIONS`, as an application's registry module gives them;
+ * `teamFields` replaces fields of `teams`.
+ */
+export async function extractedRegistry(
+  teamFields?: object,
+): Promise<ReadonlyArray<object>> {
   const catalog = await extractCatalog({ migrations: () => ORACLE_MIGRATIONS });
-  return oracleRegistry(toPublicCatalog(catalog, ORACLE_TABLES));
+  return oracleRegistry(toPublicCatalog(catalog, ORACLE_TABLES), {
+    teamFields,
+  });
 }

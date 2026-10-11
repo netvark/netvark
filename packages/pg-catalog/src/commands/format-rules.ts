@@ -5,43 +5,7 @@
  */
 import type { RuleCaseReport, RulesReport } from '../oracle/report';
 
-import { showValue } from './show-value';
-
-/** The characters of a value shown before it is cut. */
-const SHOWN = 60;
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
-/** The first `limit` code points of `text`, and how many it holds. */
-function cut(
-  text: string,
-  limit: number,
-): { readonly head: string; readonly length: number } {
-  let head = '';
-  let length = 0;
-  for (const character of text) {
-    if (length < limit) {
-      head += character;
-    }
-    length += 1;
-  }
-  return { head, length };
-}
-
-/** A value as `showValue` writes it, cut after `SHOWN` code points. */
-function shown(value: unknown): string {
-  const { head, length } = cut(showValue(value), SHOWN);
-  if (length <= SHOWN) {
-    return head;
-  }
-  const characters =
-    typeof value === 'string'
-      ? ` (${plural(cut(value, 0).length, 'character')})`
-      : '';
-  return `${head}…${characters}`;
-}
+import { plural, showShort } from './show-value';
 
 function caseLines(report: RuleCaseReport): ReadonlyArray<string> {
   if (report.problem !== null) {
@@ -50,7 +14,7 @@ function caseLines(report: RuleCaseReport): ReadonlyArray<string> {
   return [
     report.subject,
     ...report.disagreements.map(
-      ({ label, value, reason }) => `  ${label} ${shown(value)}: ${reason}`,
+      ({ label, value, reason }) => `  ${label} ${showShort(value)}: ${reason}`,
     ),
   ];
 }

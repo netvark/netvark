@@ -44,7 +44,7 @@ driver, or a Node.js module.
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
 | `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                        |
-| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ```
@@ -2161,14 +2161,15 @@ https://spec.openapis.org/registry/format/ @ref https://jsonapi.org/format/1.1/#
 ### 13.2 The surface and its diff
 
 `surfaceOf(resources)` returns a deterministic JSON value of what clients depend on, after the
-checks of 4.2: `{ resources }`, by type, each with its operations; per field its access, wire form,
-format, fraction digits, limits, options, nullability, requiredness on create, an array's elements,
-codec, operators, and sortability, read from the field metadata (8); per relationship its target,
-access, nullability, requiredness, operators, and include; the derived codes with their statuses;
-the search parameter, or `null`; and the page's default size, maximum, and range support, or `null`.
-Every map's keys are sorted, and so is every list whose order means nothing (operations, operators,
-patterns); an enum's options keep PostgreSQL's sort order. Committed next to the catalog, it is the
-snapshot of ADR 0003.
+checks of 4.2: `{ format, resources }`, `format` being `SURFACE_FORMAT` (1), raised whenever the
+surface changes shape, and `resources` by type, each with its operations; per field its access, wire
+form, format, fraction digits, limits, options, nullability, requiredness on create, an array's
+elements, codec, operators, and sortability, read from the field metadata (8); per relationship its
+target, access, nullability, requiredness, operators, and include; the derived codes with their
+statuses; the search parameter, or `null`; and the page's default size, maximum, and range support,
+or `null`. Every map's keys are sorted, and so is every list whose order means nothing (operations,
+operators, patterns); an enum's options keep PostgreSQL's sort order. Committed next to the catalog,
+it is the snapshot of ADR 0003.
 
 `diffSurfaces(before, after)` returns `ReadonlyArray<SurfaceChange>`, each
 `{ path, change, breaking, before, after }`: `path` names the type, then the keys down to what
@@ -2198,8 +2199,17 @@ column widened to `bigint` broke its wire form (`integer` to a `string` of `int6
 raised a minimum, renamed CHECKs removed their codes, and widened text limits and a new column
 default broke nobody (15.5).
 
-The command that writes the snapshot and fails CI on a breaking change is to join `rules --check` in
-`pg-catalog`'s CLI, which loads the registry already (catalog SPEC 10.3, 11.2; #91).
+`parseSurface(value)` reads a surface back from JSON, such as the committed snapshot: it returns the
+value as a `Surface` when it is one, and otherwise throws `TypeError` at the first member that is
+not, `parseSurface.format: format 2 is not supported (expected 1)` for another format, or the path
+and Zod's message for a member missing, unknown, or of the wrong kind
+(`parseSurface.resources.contacts.fields.email.nullable: Invalid input: expected boolean, received string`).
+A relationship's access and operators are a relationship's own (3.1, 3.4). `diffSurfaces` trusts its
+arguments' shape, so a snapshot read from a file goes through `parseSurface` first.
+
+`pg-catalog surface` writes the snapshot from the registry the configuration names, and
+`pg-catalog surface --check` prints its changes and exits 1 on a breaking one (catalog SPEC 10.4,
+11.2), next to `rules --check`, which loads the same registry.
 
 Tests: `document.test.ts` validates the contacts document against the official OpenAPI 3.1 schemas
 with Ajv 2020-12 (`schema-base`, Schema Objects against the OpenAPI dialect with formats asserted,
@@ -2214,7 +2224,9 @@ JSON Schema: each fixture the Zod schema accepts passes, and each it refuses fai
 looseness above; `paths.test.ts`, `parameters.test.ts`, `filter-schemas.test.ts`,
 `form-pattern.test.ts`, `pattern.test.ts`, `resource-schemas.test.ts`, `value-schema.test.ts`,
 `operation-codes.test.ts`, `component-names.test.ts`, and `examples.test.ts` for each part;
-`surface.test.ts`; and `diff.test.ts` with one case per row. End to end, 15.4.
+`surface.test.ts`; `diff.test.ts` with one case per row; and `parse-surface.test.ts`, which reads
+back every surface of the generated catalogs of 15.2 and refuses each kind of mistake. End to end,
+15.4.
 
 ---
 
@@ -2470,7 +2482,9 @@ document lists for its operation, read where a response's reference points, a 20
 matching its header's schema, while the request schema refuses exactly the requests the server
 refuses as documents (`support/openapi-contract.ts`, Ajv 2020-12 with the formats the document
 names); and the surface, recorded in a reviewed snapshot (`snapshots/surface.json`), diffs an edited
-declaration into exactly its four changes (`openapi-surface.e2e.test.ts`).
+declaration into exactly its four changes (`openapi-surface.e2e.test.ts`), and the built
+`pg-catalog surface` writes that snapshot byte for byte and `surface --check` prints those changes
+and exits 1 (`surface-cli.e2e.test.ts`).
 
 ### 15.5 Real catalogs
 
@@ -2906,6 +2920,38 @@ on stern's 48 `read` relationships over the scope column. The other faults need 
 NOT NULL domain, nested domains, citext, a NOT ENFORCED constraint, a `write` member, an inclusive
 and an exclusive bound at one value, a `bool` key, or an array with options, and none of the three
 catalogs declares one.
+
+The eighteenth record covers 13.2 and catalog SPEC 10.4. `pg-catalog surface` and `surface --check`
+ran from packed tarballs on Node.js 24 over each catalog's declarations as written; the time is the
+whole command, loading the declarations included:
+
+| Catalog            | Types | Members | Snapshot               | Write  | Check  |
+| ------------------ | ----- | ------- | ---------------------- | ------ | ------ |
+| stern              | 111   | 1,367   | 917 KB, 34,618 lines   | 0.24 s | 0.20 s |
+| GitLab 17.11 slice | 60    | 1,487   | 1,097 KB, 39,295 lines | 0.20 s | 0.21 s |
+| Pagila             | 4     | 20      | 15 KB, 569 lines       | 0.11 s | 0.10 s |
+
+Each file held the bytes of `surfaceOf` called directly, indented, and `parseSurface` read it back
+as the same surface; a second write left it unchanged, and the check found no changes. Indentation
+nearly doubles the 500 KB and 617 KB of compact JSON, and the limits, eight keys on every field
+whether set or not, are a quarter of each file; under gzip, as git stores it, stern's is 26 KB and
+the GitLab slice's 39 KB.
+
+On stern, the `in` operator added to contacts' `title` was one safe change, and the check exited 0.
+Removing `remove` from its operations, making `email` read-only, and renaming `department` to `team`
+with `as` added three breaking changes (the operation, the field `department`, and `email`'s access)
+and one safe one (the field `team`), and it exited 1. Written, the edits checked clean; with the
+declaration restored, the check reported the reverse, the two removals breaking and the three
+restorations safe, and writing gave back the original bytes. A missing file exited 1 and wrote
+nothing; a file cut short, a surface of format 2, and an operator `like` written into the file by
+hand exited 2, the last two with `parseSurface`'s path to the refused value; so did a configuration
+without `resources`, one without `resources.surface`, and a registry that returned the module rather
+than its list.
+
+Across versions, `pg-catalog surface` wrote the 36 declarations of the GitLab slice that master
+accepts (the fourteenth record) as declared over 17.11, and `surface --check` compared them as
+declared over master: the fourteenth record's 34 changes, path for path, the 12 breaking first, and
+exit 1, in 0.20 s.
 
 ### 15.6 The Zod floor
 

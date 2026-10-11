@@ -43,10 +43,10 @@ async function cli(...args: ReadonlyArray<string>): Promise<{
 }
 
 function configFile(slots: string | null): string {
-  const rules =
+  const resources =
     slots === null
       ? ''
-      : `rules: {
+      : `resources: {
     registry: async () => (await import(${JSON.stringify(REGISTRY_MODULE)})).extractedRegistry(),
     storage: { slots: ${slots} },
   },`;
@@ -55,7 +55,7 @@ function configFile(slots: string | null): string {
 export default {
   migrations: 'migrations',
   out: { catalog: 'catalog.ts', public: { file: 'public.ts', tables: ['members', 'teams', 'notes'] } },
-  ${rules}
+  ${resources}
 };
 `;
 }
@@ -89,13 +89,13 @@ describe('pg-catalog rules --check (SPEC 11.2)', () => {
     expect(run.code).toBe(1);
   });
 
-  it('exits 2 when the configuration has no rules', async () => {
+  it('exits 2 when the configuration has no resources', async () => {
     const run = await cli('rules', '--check', '--config', 'bare.config.mjs');
     expect(run).toEqual({
       code: 2,
       stdout: '',
       stderr:
-        'pg-catalog: rules is not configured: set rules.registry to a function that returns the declared resources\n',
+        'pg-catalog: resources is not configured: set resources.registry to a function that returns the declared resources\n',
     });
   });
 

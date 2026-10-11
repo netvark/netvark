@@ -1,7 +1,8 @@
 /**
  * `surfaceOf(resources)` (SPEC 13.2): what clients depend on, as a
  * deterministic JSON value to commit next to the catalog, the snapshot of
- * ADR 0003 that `diffSurfaces` compares. Per type: the operations; per
+ * ADR 0003 that `diffSurfaces` compares. It starts with its `format`. Per
+ * type: the operations; per
  * field its access, wire form, format, fraction digits, nullability,
  * requiredness on create, limits, options, an array's elements, codec,
  * operators, and sortability, all read from the field metadata (SPEC 8);
@@ -71,8 +72,16 @@ export interface ResourceSurface {
   readonly page: PageSurface | null;
 }
 
-/** By type. */
+/**
+ * The format `surfaceOf` writes, raised when the surface changes shape, so
+ * a snapshot of another format is refused instead of diffed member by
+ * member (`parseSurface`).
+ */
+export const SURFACE_FORMAT = 1;
+
+/** The format, then each type's surface by type. */
 export interface Surface {
+  readonly format: typeof SURFACE_FORMAT;
   readonly resources: Readonly<Record<string, ResourceSurface>>;
 }
 
@@ -173,6 +182,7 @@ export function surfaceOf(
   resources: ReadonlyArray<AnyDeclaredResource>,
 ): Surface {
   return {
+    format: SURFACE_FORMAT,
     resources: sortedObject(
       checkRegistry('surfaceOf', resources, {}).internals.map(
         (internals) =>

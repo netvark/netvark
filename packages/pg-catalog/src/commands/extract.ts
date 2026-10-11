@@ -13,7 +13,7 @@ import type {
 } from '../config';
 import type { MigrationSource } from '../migrations/load';
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 
@@ -22,6 +22,7 @@ import { toPublicCatalog } from '@netvark/catalog-core';
 import { catalogFile, DEFAULT_SCHEMAS } from '../config';
 import { PgCatalogError } from '../errors';
 import { readCatalog } from '../extract/read-catalog';
+import { readExisting } from '../internal/read-existing';
 import { loadMigrations } from '../migrations/load';
 import {
   renderCatalogModule,
@@ -95,17 +96,6 @@ function publicModule(catalog: Catalog, config: PublicFileConfig): string {
   return renderPublicCatalogModule(publicCatalog, {
     interface: config.interface,
   });
-}
-
-async function readExisting(path: string): Promise<Buffer | null> {
-  try {
-    return await readFile(path);
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
 }
 
 async function settle(

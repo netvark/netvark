@@ -39,7 +39,7 @@ export default defineExtraction({
       ],
     },
   },
-  rules: {
+  resources: {
     registry: async () => {
       const { KEYS, Links, Numbers, Others, Texts } =
         await import('../../support/oracle-resources.ts');

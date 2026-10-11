@@ -1,7 +1,8 @@
 /**
  * `@netvark/resource-core/openapi` (SPEC 13): the OpenAPI document of a
  * registry of declared resources, and the surface clients depend on with
- * the diff that tells a breaking change from a safe one.
+ * the diff that tells a breaking change from a safe one and the parse
+ * that reads a committed surface back.
  * @packageDocumentation
  */
 export type { SurfaceChange } from './diff';
@@ -23,4 +24,5 @@ export type {
 
 export { diffSurfaces } from './diff';
 export { openapi } from './document';
-export { surfaceOf } from './surface';
+export { parseSurface } from './parse-surface';
+export { SURFACE_FORMAT, surfaceOf } from './surface';

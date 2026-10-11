@@ -24,18 +24,21 @@ const CORE = [
 const PG_CATALOG = [
   'PgCatalogError',
   'checkRules',
+  'checkSurface',
   'defineExtraction',
   'drift',
   'extract',
   'extractCatalog',
   'formatDiff',
   'formatRules',
+  'formatSurface',
   'introspectCatalog',
   'isPgCatalogError',
   'parseCatalogModule',
   'renderCatalogModule',
   'renderKyselyTypes',
   'renderPublicCatalogModule',
+  'writeSurface',
 ].toSorted();
 
 describe('package surface (SPEC 1)', () => {

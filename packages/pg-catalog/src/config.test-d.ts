@@ -1,13 +1,18 @@
 import type { AnyDeclaredResource, StorageCodec } from '@netvark/resource-core';
+import type { SurfaceChange } from '@netvark/resource-core/openapi';
 import type { OracleCase } from '@netvark/resource-core/testing';
 
 import type { ExtractedFile, ExtractReport } from './commands/extract';
 import type {
+  SurfaceCheckReport,
+  SurfaceWriteReport,
+} from './commands/surface';
+import type {
   DatabaseConfig,
   ExtractionConfig,
   OutputConfig,
-  RulesConfig,
-  RulesStorageCodec,
+  ResourcesConfig,
+  TextStorageCodec,
   TypeOverride,
 } from './config';
 import type { RuleCaseReport, RulesReport } from './oracle/report';
@@ -19,6 +24,7 @@ import { describe, expectTypeOf, it } from 'vitest';
 
 import { extract, extractCatalog } from './commands/extract';
 import { checkRules } from './commands/rules';
+import { checkSurface, writeSurface } from './commands/surface';
 
 interface Slots {
   readonly from: number;
@@ -125,33 +131,49 @@ describe('command types (SPEC 10.1)', () => {
   });
 });
 
-describe('rules types (SPEC 10.3, 11.1)', () => {
+describe('resources types (SPEC 10.3, 10.4, 11.1)', () => {
   it('takes the registry as a function, synchronous or not, so extract never loads it', () => {
     expectTypeOf<{
       registry: () => ReadonlyArray<AnyDeclaredResource>;
-    }>().toExtend<RulesConfig>();
+    }>().toExtend<ResourcesConfig>();
     expectTypeOf<{
       registry: () => Promise<ReadonlyArray<AnyDeclaredResource>>;
-    }>().toExtend<RulesConfig>();
+    }>().toExtend<ResourcesConfig>();
     expectTypeOf<{
       registry: ReadonlyArray<AnyDeclaredResource>;
-    }>().not.toExtend<RulesConfig>();
+    }>().not.toExtend<ResourcesConfig>();
   });
 
   it("takes a codec's storage codec over text, typed by its value, and nothing that reads or writes anything else", () => {
-    expectTypeOf<StorageCodec<Slots, string>>().toExtend<RulesStorageCodec>();
+    expectTypeOf<StorageCodec<Slots, string>>().toExtend<TextStorageCodec>();
     expectTypeOf<{
       read: (stored: string) => Slots;
       write: (value: Slots) => Uint8Array;
-    }>().not.toExtend<RulesStorageCodec>();
+    }>().not.toExtend<TextStorageCodec>();
     expectTypeOf<{
       read: (stored: Uint8Array) => Slots;
       write: (value: Slots) => string;
-    }>().not.toExtend<RulesStorageCodec>();
+    }>().not.toExtend<TextStorageCodec>();
   });
 
   it("reports each case with the kinds resource-core's cases have", () => {
     expectTypeOf(checkRules).returns.resolves.toEqualTypeOf<RulesReport>();
     expectTypeOf<RuleCaseReport['kind']>().toEqualTypeOf<OracleCase['kind']>();
+  });
+
+  it("reports the surface's changes as resource-core's diff gives them", () => {
+    expectTypeOf(
+      writeSurface,
+    ).returns.resolves.toEqualTypeOf<SurfaceWriteReport>();
+    expectTypeOf(
+      checkSurface,
+    ).returns.resolves.toEqualTypeOf<SurfaceCheckReport>();
+    expectTypeOf<
+      SurfaceCheckReport['changes'][number]
+    >().toEqualTypeOf<SurfaceChange>();
+    expectTypeOf<{
+      registry: () => ReadonlyArray<AnyDeclaredResource>;
+      surface: 'api-surface.json';
+    }>().toExtend<ResourcesConfig>();
   });
 });
