@@ -4,10 +4,16 @@
  * an adapter maps: every wire form, an array, JSON, a type with a codec,
  * generated columns, a self-reference, a server value, and a default that
  * reads the scope's session parameter, so a case sees what the transaction
- * set. `public-catalog.ts` is what `pg-catalog extract` writes for these
+ * set. The second migration partitions `logs` by its id: ids below 1000 go
+ * to `logs_low`, the rest to `contract_archive.logs_high_rest`, a partition
+ * of `logs_high`, which is attached with its own primary key, so what a
+ * partition raises names a table two levels down, in another schema, and
+ * an index PostgreSQL named after that table.
+ * `public-catalog.ts` is what `pg-catalog extract` writes for these
  * migrations; `e2e/resource` proves it current. The schema has no row
  * security, so only the adapter's scope predicate keeps a row in its scope.
  * @ref https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADMIN-SET
+ * @ref https://www.postgresql.org/docs/18/sql-altertable.html (ATTACH PARTITION: the table must have the target's CHECK constraints)
  * @packageDocumentation
  */
 
@@ -40,6 +46,28 @@ create table tasks (
   constraint tasks_workspace_id_title_key unique (workspace_id, title)
 );
 `,
+  `create schema contract_archive;
+
+create table logs (
+  id int8 primary key,
+  owner_id int8 not null references workspaces (id),
+  note text not null constraint logs_note_check check (char_length(note) between 1 and 40)
+) partition by range (id);
+
+create table logs_low partition of logs for values from (minvalue) to (1000);
+
+create table contract_archive.logs_high (
+  id int8 not null,
+  owner_id int8 not null,
+  note text not null constraint logs_note_check check (char_length(note) between 1 and 40),
+  constraint logs_high_key primary key (id)
+) partition by range (id);
+
+create table contract_archive.logs_high_rest partition of contract_archive.logs_high
+  for values from (1000) to (maxvalue);
+
+alter table logs attach partition contract_archive.logs_high for values from (1000) to (maxvalue);
+`,
 ];
 
 /**
@@ -48,7 +76,7 @@ create table tasks (
  * with no read form. Identities restart, and the next workspace is 10.
  * `reset()` runs it before every case.
  */
-export const CONTRACT_SEED: string = `truncate table tasks, workspaces restart identity;
+export const CONTRACT_SEED: string = `truncate table logs, tasks, workspaces restart identity;
 insert into workspaces (id, name) values (1, 'One'), (2, 'Two'), (9, 'Unreadable');
 insert into tasks (id, workspace_id, title, starts_at, created_by)
   values ('00000000-0000-4000-8000-000000000009', 9, 'Forever', 'infinity', '00000000-0000-4000-8000-0000000000aa');

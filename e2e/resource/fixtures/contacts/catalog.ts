@@ -598,6 +598,177 @@ export const catalog = {
         "policies": {}
       }
     },
+    "calls": {
+      "schema": "public",
+      "name": "calls",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "gen_random_uuid()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "organization_id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "contact_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "minutes": {
+          "type": "int4",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "integer",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "note": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "calls_contact_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "contact_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "cascade",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE"
+        },
+        "calls_minutes_check": {
+          "kind": "check",
+          "columns": [
+            "minutes"
+          ],
+          "expression": "((minutes >= 1) AND (minutes <= 600))",
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "1",
+              "inclusive": true
+            },
+            "max": {
+              "value": "600",
+              "inclusive": true
+            }
+          },
+          "validated": true,
+          "enforced": true,
+          "definition": "CHECK (((minutes >= 1) AND (minutes <= 600)))"
+        },
+        "calls_organization_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "organization_id"
+          ],
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        "calls_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "calls_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX calls_pkey ON ONLY public.calls USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "contact_phones": {
       "schema": "public",
       "name": "contact_phones",

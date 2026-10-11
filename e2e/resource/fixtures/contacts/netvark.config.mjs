@@ -13,6 +13,7 @@ export default defineExtraction({
     public: {
       file: 'public-catalog.ts',
       tables: [
+        'calls',
         'contacts',
         'contact_phones',
         'import_batches',

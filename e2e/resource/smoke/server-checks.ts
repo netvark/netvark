@@ -54,6 +54,7 @@ const UNUSED_ADAPTER: StorageAdapter<never> = {
   remove: unused,
   count: unused,
   record: unused,
+  partitionRoot: unused,
 };
 
 /** What `authorized` rejected with; `allowed` when it resolved. */

@@ -278,6 +278,7 @@ server: createDomainDefiners, scopes, quotas ──▶ kysely-resource ──▶
 | 0007 | Schema issues are named by JSON Schema keywords; constraint violations carry the constraint's code |
 | 0008 | A host-free core with a server subpath and a storage contract                                      |
 | 0009 | Messages are functions; the i18n library owns the locale                                           |
+| 0010 | The database resolves the violations a partition raises                                            |
 
 ## 6. Later
 

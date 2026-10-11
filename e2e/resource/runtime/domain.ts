@@ -2,9 +2,10 @@
  * The contacts application's server domain (resource SPEC 12): who acts,
  * what they may do, the plans the runtime hands over as services, the
  * application's own codes, the events, the contacts quota, the tenant
- * scope bound to the session, and the behavior of contacts. A plan may
- * leave out company contacts, which a rule refuses with 402; an archived
- * contact keeps its name; every write records an event.
+ * scope bound to the session, and the behavior of contacts and calls. A
+ * plan may leave out company contacts, which a rule refuses with 402; an
+ * archived contact keeps its name; every write of a contact records an
+ * event. Calls are stored in partitions.
  * @ref https://www.rfc-editor.org/rfc/rfc9110#section-15.5.3 (402 Payment Required)
  */
 import type {
@@ -24,6 +25,7 @@ import {
   defineScope,
 } from '@netvark/resource-core/server';
 
+import { Calls } from '../resources/calls.ts';
 import { Contacts } from '../resources/contacts.ts';
 
 export type Permission =
@@ -155,4 +157,11 @@ export const ContactsBehavior = defineResource(Contacts, {
       effects: [({ row }) => [ContactRemoved.of({ id: row.id })]],
     },
   },
+});
+
+export const CallsBehavior = defineResource(Calls, {
+  policy: definePolicy(Calls, {
+    get: ({ actor }) => actor.can('contacts:read'),
+    create: ({ actor }) => actor.can('contacts:write'),
+  }),
 });

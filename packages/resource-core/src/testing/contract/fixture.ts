@@ -57,6 +57,8 @@ export interface ContractFixture {
     readonly workspaces: DeclaredResource;
     /** Scoped to a workspace, with client ids, the server value `created_by`, and a field of each kind. */
     readonly tasks: DeclaredResource;
+    /** Partitioned by its id, with client ids and an owner workspace. */
+    readonly logs: DeclaredResource;
   };
 }
 
@@ -106,6 +108,15 @@ const tasks: DeclaredResource = declareResource('tasks', {
   },
 });
 
+const logs: DeclaredResource = declareResource('logs', {
+  operations: ['create'],
+  clientIds: true,
+  fields: { note: { access: 'readWrite' } },
+  relationships: {
+    owner_id: { target: () => workspaces, access: 'readWrite' },
+  },
+});
+
 /** The schema, catalog, codec, scope, and declarations the contract's cases run on. */
 export const contractFixture: ContractFixture = Object.freeze({
   migrations: CONTRACT_MIGRATIONS,
@@ -119,5 +130,5 @@ export const contractFixture: ContractFixture = Object.freeze({
       session: 'contract.workspace_id',
     }),
   },
-  resources: { workspaces, tasks },
+  resources: { workspaces, tasks, logs },
 });

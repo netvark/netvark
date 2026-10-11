@@ -16,7 +16,7 @@ export type {
   UpdateBehavior,
   ValuesContext,
 } from './behavior-types';
-export type { ConstraintErrorOptions } from './constraint-error';
+export type { ConstraintErrorOptions } from './constraint-options';
 export type { DomainDefiners } from './domain';
 export type {
   Actor,
@@ -38,6 +38,7 @@ export type {
 } from './resource-types';
 export type { Scope, ScopeBindings, ScopeKey, ScopeValue } from './scope';
 export type { ServerValuesOf } from './server-values';
+export type { ViolationNames } from './violation-names';
 export type {
   PublicRow,
   StorageAdapter,
@@ -49,6 +50,7 @@ export type {
 export { constraintError } from './constraint-error';
 export { createDomainDefiners } from './domain';
 export { defineEvent } from './event';
+export { PARTITION_ROOT_SQL, partitionViolation } from './partition';
 export { denyAll } from './policy';
 export { defineQuota, quotaExceeded } from './quota';
 export { reject, Rejection, rejectionError } from './reject';

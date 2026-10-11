@@ -172,6 +172,15 @@ describe.each(DRIVERS)(
       expect(own({ code: '40001', schema: 'public' })).toBeUndefined();
     });
 
+    it('leaves to the ban a violation without the name its code is keyed by', () => {
+      const { column: _column, ...notNull } = VIOLATIONS.notNull;
+      const { constraint: _check, ...check } = VIOLATIONS.check;
+      const { constraint: _domain, ...domainCheck } = VIOLATIONS.domainCheck;
+      for (const violation of [notNull, check, domainCheck]) {
+        expect(own(violation)).toBeUndefined();
+      }
+    });
+
     it('keeps a code only when its kind is the one the SQLSTATE reports', () => {
       const index = { ...VIOLATIONS.check, code: '23505' };
       expect(

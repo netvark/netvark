@@ -9,7 +9,9 @@
  * values; `lock` reads the row `FOR NO KEY UPDATE` before an update and
  * `FOR UPDATE` before a remove, as those writes lock it; `count` takes a
  * transaction-scoped advisory lock keyed by the resource, the quota, and
- * the scope value; `record` writes to an outbox table in the transaction. PostgreSQL's errors reach the caller as the
+ * the scope value; `record` writes to an outbox table in the transaction;
+ * `partitionRoot` runs resource-core's `PARTITION_ROOT_SQL` in a
+ * transaction of its own. PostgreSQL's errors reach the caller as the
  * driver raised them, and a transaction whose run went on after a failed
  * statement rejects with that statement's error, since PostgreSQL turns
  * the COMMIT of an aborted transaction into a rollback that reports no
@@ -21,13 +23,20 @@
  * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/access/transam/xact.c (EndTransactionBlock: "Since COMMIT may actually do a ROLLBACK")
  */
 import type { DeclaredResource } from '@netvark/resource-core';
-import type { PublicRow, StorageAdapter } from '@netvark/resource-core/server';
+import type {
+  PublicRow,
+  StorageAdapter,
+  ViolationNames,
+} from '@netvark/resource-core/server';
 
 import type {
   ReferenceTransaction,
+  Row,
   SqlClient,
   SqlContext,
 } from './reference-sql.ts';
+
+import { PARTITION_ROOT_SQL } from '@netvark/resource-core/server';
 
 import { quoted, readRow, selectList } from './reference-sql.ts';
 import { guarded, scopeOf, Statement } from './reference-statement.ts';
@@ -53,6 +62,17 @@ const ROW_LOCKS = {
   update: ' for no key update',
   remove: ' for update',
 } as const;
+
+/** The names a row of `PARTITION_ROOT_SQL` holds, without a constraint when it has none. */
+function rootNames(row: Row): ViolationNames {
+  const { schema, table, constraint } = row;
+  if (typeof schema !== 'string' || typeof table !== 'string') {
+    throw new TypeError('partitionRoot: the query returned no table');
+  }
+  return typeof constraint === 'string'
+    ? { schema, table, constraint }
+    : { schema, table };
+}
 
 /** The adapter over `options.transact`. */
 export function referenceAdapter(
@@ -157,6 +177,15 @@ export function referenceAdapter(
       const [row] = await tx.client.query(sql, statement.parameters.values);
       return Number(row?.['count']);
     },
+    partitionRoot: async (names) =>
+      options.transact(async (client) => {
+        const [row] = await client.query(PARTITION_ROOT_SQL, [
+          names.schema,
+          names.table,
+          names.constraint ?? null,
+        ]);
+        return row === undefined ? undefined : rootNames(row);
+      }),
     record: async (tx, events) => {
       const sql = `insert into ${quoted(options.outbox)} (name, version, payload) values ($1::text, $2::text::int4, $3::text::jsonb)`;
       for (const event of events) {

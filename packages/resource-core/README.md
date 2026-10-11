@@ -728,19 +728,32 @@ the count reaches the limit, and for a limit that is not a safe integer of at le
 
 ### Errors of rules and of the database
 
-The runtime turns what an operation threw into the client's error:
+The runtime turns what an operation threw into the client's error, once the operation's transaction
+has ended:
 
 ```ts
 import type { ResourceBehavior } from '@netvark/resource-core/server';
 
-import { constraintError, Rejection, rejectionError } from '@netvark/resource-core/server';
+import {
+  constraintError,
+  partitionViolation,
+  Rejection,
+  rejectionError,
+} from '@netvark/resource-core/server';
 
 type Behavior = ResourceBehavior<AppDomain>;
 
-const failure = (error: unknown, behavior: Behavior, operation: 'create' | 'update' | 'remove') =>
-  error instanceof Rejection
-    ? rejectionError(error, { resource: behavior.resource, errors: APP_ERRORS })
-    : (constraintError(error, { resource: behavior.resource, operation }) ?? error);
+const failure = async (
+  error: unknown,
+  behavior: Behavior,
+  operation: 'create' | 'update' | 'remove',
+) => {
+  const { resource } = behavior;
+  if (error instanceof Rejection) return rejectionError(error, { resource, errors: APP_ERRORS });
+  const raised = partitionViolation(error, { resource, operation });
+  const partition = raised === undefined ? undefined : await adapter.partitionRoot(raised);
+  return constraintError(error, { resource, operation, partition }) ?? error;
+};
 ```
 
 `rejectionError` builds the code a rule rejected with, with an item per member it named.
@@ -752,6 +765,13 @@ fields, whichever driver threw it (node-postgres, PGlite, postgres.js, Neon, or 
 violation of a remove is `CONFLICT` (409), since it belongs to a row that references the removed
 one: a foreign key that blocks the delete, or an `ON DELETE` action whose result breaks a constraint
 of the referencing row.
+
+A row written through a partitioned table is stored in a partition, and PostgreSQL's error names
+that partition, and for a primary key or a unique constraint the partition's own index.
+`partitionViolation` says when a violation names a table other than the resource's, and the
+adapter's `partitionRoot` asks the database for the partitioned table's names, which
+`constraintError` then reads as `partition`. Partitions can be created at any time, so the catalog
+does not list them (ADR 0010).
 
 ### Storage adapters
 
@@ -769,10 +789,11 @@ interface StorageAdapter<TTransaction> {
   remove(tx, resource, id): Promise<boolean>;
   count(tx, resource, quota): Promise<number>; // under the quota's lock
   record(tx, events): Promise<void>; // to the outbox, in the transaction
+  partitionRoot(names): Promise<ViolationNames | undefined>; // outside any operation: PARTITION_ROOT_SQL
 }
 ```
 
-Its ten obligations are in SPEC 12.8; the [best practices](#best-practices) below cover the ones
+Its eleven obligations are in SPEC 12.8; the [best practices](#best-practices) below cover the ones
 that are easy to get wrong.
 
 ### The contract suite
@@ -825,7 +846,7 @@ const update = async (actor: AppActor, behavior: Behavior, id: string, request: 
       return row;
     });
   } catch (error) {
-    throw failure(error, behavior, 'update');
+    throw await failure(error, behavior, 'update');
   }
 };
 ```
@@ -964,6 +985,10 @@ get, and remove, is
 - **Record events in the operation's transaction.** Effects return events and the adapter writes
   them to an outbox with the write; deliver them after commit, so no consumer hears of a write that
   rolled back.
+- **Resolve a partition's violation before mapping it.** Run `partitionViolation`, the adapter's
+  `partitionRoot`, and `constraintError` with `partition` after the transaction ended, since the
+  aborted transaction runs no further query. Implement `partitionRoot` with `PARTITION_ROOT_SQL` as
+  it stands, and leave a SQL `NULL` constraint out of the answer rather than passing `null` on.
 
 ## Performance
 

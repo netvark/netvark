@@ -12,6 +12,7 @@ import { contractOf } from './contract/context';
 import { errorCases } from './contract/error-cases';
 import { eventCases } from './contract/event-cases';
 import { lockCases } from './contract/lock-cases';
+import { partitionCases } from './contract/partition-cases';
 import { quotaCases } from './contract/quota-cases';
 import { readCases } from './contract/read-cases';
 import { scopeCases } from './contract/scope-cases';
@@ -36,6 +37,7 @@ export function storageContract<TTransaction>(
     ...quotaCases(contract),
     ...eventCases(contract),
     ...lockCases(contract),
+    ...partitionCases(contract),
   ];
   return Object.freeze(
     cases.map(({ name, run }) =>

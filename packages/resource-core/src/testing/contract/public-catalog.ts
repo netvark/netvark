@@ -4,6 +4,87 @@ export const publicCatalog = {
   "enums": {},
   "domains": {},
   "tables": {
+    "logs": {
+      "schema": "public",
+      "name": "logs",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "owner_id": {
+          "type": "int8",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "bigint",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "note": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "logs_note_check": {
+          "kind": "check",
+          "columns": [
+            "note"
+          ],
+          "rule": {
+            "kind": "length",
+            "min": 1,
+            "max": 40
+          },
+          "enforced": true
+        },
+        "logs_owner_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "owner_id"
+          ],
+          "references": {
+            "table": "workspaces",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "logs_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
     "tasks": {
       "schema": "public",
       "name": "tasks",

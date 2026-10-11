@@ -8,6 +8,8 @@
  */
 import type { FaultyAdapter } from './faulty-adapters.ts';
 
+import { PARTITION_ROOT_SQL } from '@netvark/resource-core/server';
+
 import { OUTBOX } from './contract-database.ts';
 import {
   outboxAfterRun,
@@ -48,6 +50,10 @@ const O10_UPDATE =
   'obligation 10: a row locked for an update takes no other write until the transaction ends';
 const O10_REMOVE =
   'obligation 10: a row locked for a remove takes no new reference until the transaction ends';
+const O11_ROOT =
+  'obligation 11: partitionRoot names the partitioned table and its constraint for what a partition raised';
+const O11_NONE =
+  'obligation 11: partitionRoot answers undefined for a table that is not a partition';
 
 /** The defects, each with the cases that must fail. */
 export const FAULTS: ReadonlyArray<Fault> = [
@@ -218,6 +224,52 @@ export const FAULTS: ReadonlyArray<Fault> = [
     fails: [O10_REMOVE],
     concurrent: true,
     adapter: rewriting((sql) => sql.replace(ROW_LOCK, ' for no key update')),
+  },
+  {
+    name: 'resolves no partition',
+    fails: [O11_ROOT],
+    adapter: rewriting((sql) =>
+      sql === PARTITION_ROOT_SQL ? `${sql} limit 0` : sql,
+    ),
+  },
+  {
+    name: "keeps the name of the partition's own index",
+    fails: [O11_ROOT],
+    adapter: wrapping((adapter) => ({
+      ...adapter,
+      partitionRoot: async (names) => {
+        const root = await adapter.partitionRoot(names);
+        return root === undefined
+          ? undefined
+          : { ...root, constraint: names.constraint };
+      },
+    })),
+  },
+  {
+    name: 'answers a missing constraint as null',
+    fails: [O11_ROOT],
+    adapter: wrapping((adapter) => ({
+      ...adapter,
+      partitionRoot: async (names) => {
+        const root = await adapter.partitionRoot(names);
+        if (root === undefined || root.constraint !== undefined) {
+          return root;
+        }
+        // The defect passes on the SQL NULL of the row, which the type rules out.
+        const answer = { ...root };
+        Reflect.set(answer, 'constraint', null);
+        return answer;
+      },
+    })),
+  },
+  {
+    name: 'answers for a table that is not a partition',
+    fails: [O11_NONE],
+    adapter: wrapping((adapter) => ({
+      ...adapter,
+      partitionRoot: async (names) =>
+        (await adapter.partitionRoot(names)) ?? names,
+    })),
   },
   {
     name: 'writes the outbox outside the transaction',
