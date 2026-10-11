@@ -1,0 +1,74 @@
+/**
+ * The storage contract (resource SPEC 12.9) over the built
+ * `@netvark/kysely-resource`'s `createKyselyStorage`, on PGlite and on the
+ * server `RESOURCE_PG_URL` names, where its concurrent cases hold a row
+ * lock or a quota's lock in one transaction while a second, on another
+ * connection, tries to write past it (SPEC 18.7). The cases that page with
+ * `list` wait for the adapter's `list`.
+ */
+import type { KyselyTransaction } from '@netvark/kysely-resource';
+import type { ContractHarness } from '@netvark/resource-core/testing';
+
+import { sql } from 'kysely';
+import { afterAll, describe, it } from 'vitest';
+
+import { createKyselyStorage } from '@netvark/kysely-resource';
+import {
+  contractFixture,
+  storageContract,
+} from '@netvark/resource-core/testing';
+
+import {
+  EVENTS,
+  eventOf,
+  OUTBOX,
+  POINT_TEXT,
+  RESET,
+} from './support/contract-database.ts';
+import { DEFINE_KEYSET } from './support/keyset-definer.ts';
+import { kyselyDatabases } from './support/kysely-database.ts';
+
+/** The cases that page with `list`, which the adapter does not have yet. */
+const NEEDS_LIST = /^obligation 5:|^obligation 2: every page of list/u;
+
+describe.each(kyselyDatabases())(
+  'the storage contract over createKyselyStorage on %s',
+  (_name, open) => {
+    const database = open();
+    const storage = createKyselyStorage({
+      db: database.db,
+      catalog: contractFixture.catalog,
+      codecs: { point: POINT_TEXT },
+      defineKeyset: DEFINE_KEYSET,
+      outbox: { table: OUTBOX },
+    });
+    const harness: ContractHarness<KyselyTransaction> = {
+      adapter: {
+        ...storage,
+        list: () => {
+          throw new Error('list: not implemented yet');
+        },
+      },
+      reset: async () => {
+        await database.exec(RESET);
+      },
+      events: async () =>
+        (
+          await sql
+            .raw<Readonly<Record<string, unknown>>>(EVENTS)
+            .execute(database.db)
+        ).rows.map((row) => eventOf(row)),
+    };
+
+    afterAll(async () => {
+      await database.close();
+    });
+
+    for (const contractCase of storageContract(harness)) {
+      it.skipIf(NEEDS_LIST.test(contractCase.name))(
+        contractCase.name,
+        contractCase.run,
+      );
+    }
+  },
+);

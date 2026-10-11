@@ -58,8 +58,8 @@ async function namesOf(name: string): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-beforeAll(async () => {
-  database = await contractDatabase();
+beforeAll(() => {
+  database = contractDatabase();
   storage = createKyselyStorage(storageOptions(database.db));
 });
 afterAll(async () => {

@@ -37,8 +37,8 @@ describe.each(kyselyDatabases())('transactions on %s', (_name, open) => {
   let database: KyselyDatabase;
   let storage: KyselyStorage;
 
-  beforeAll(async () => {
-    database = await open();
+  beforeAll(() => {
+    database = open();
     storage = createKyselyStorage({
       db: database.db,
       catalog: contractFixture.catalog,
