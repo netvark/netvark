@@ -1,0 +1,874 @@
+{
+  "resources": {
+    "calls": {
+      "operations": [
+        "create",
+        "get"
+      ],
+      "fields": {
+        "minutes": {
+          "wire": "integer",
+          "format": "int32",
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": "1",
+            "exclusiveMinimum": null,
+            "maximum": "600",
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "note": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        }
+      },
+      "relationships": {
+        "contact": {
+          "target": "contacts",
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "operators": [],
+          "include": false
+        }
+      },
+      "codes": {
+        "CALLS_CONTACT_ID_FKEY": 404,
+        "CALLS_CONTACT_ID_NOT_NULL": 422,
+        "CALLS_MINUTES_CHECK": 422,
+        "CALLS_MINUTES_NOT_NULL": 422,
+        "CALLS_NOTE_NOT_NULL": 422,
+        "CALLS_PKEY": 409
+      },
+      "search": null,
+      "page": {
+        "default": 20,
+        "max": 50,
+        "range": false
+      }
+    },
+    "contacts": {
+      "operations": [
+        "create",
+        "get",
+        "list",
+        "remove",
+        "update"
+      ],
+      "fields": {
+        "createdAt": {
+          "wire": "string",
+          "format": "date-time",
+          "fractionDigits": 6,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "gte",
+            "lt"
+          ],
+          "sortable": true
+        },
+        "discount": {
+          "wire": "string",
+          "format": "decimal",
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": "0",
+            "exclusiveMinimum": null,
+            "maximum": "100",
+            "exclusiveMaximum": null,
+            "multipleOf": "0.01",
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "email": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "kind": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": [
+            "person",
+            "company"
+          ],
+          "access": "immutable",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": false
+        },
+        "name": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": 1,
+            "maxLength": 200,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "startsWithi"
+          ],
+          "sortable": true
+        },
+        "nickname": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": 1,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "priority": {
+          "wire": "integer",
+          "format": "int16",
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": "1",
+            "exclusiveMinimum": null,
+            "maximum": "5",
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "gte",
+            "lte"
+          ],
+          "sortable": true
+        },
+        "status": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": [
+            "active",
+            "archived"
+          ],
+          "access": "readWrite",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": false
+        },
+        "tags": {
+          "wire": "array",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": false,
+          "items": {
+            "wire": "string",
+            "format": null,
+            "fractionDigits": null,
+            "limits": {
+              "minLength": null,
+              "maxLength": null,
+              "minimum": null,
+              "exclusiveMinimum": null,
+              "maximum": null,
+              "exclusiveMaximum": null,
+              "multipleOf": null,
+              "patterns": []
+            },
+            "options": null
+          },
+          "codec": null,
+          "operators": [
+            "contains",
+            "overlaps"
+          ],
+          "sortable": false
+        },
+        "website": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": [
+              "^https://"
+            ]
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        }
+      },
+      "relationships": {
+        "organization": {
+          "target": "organizations",
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "operators": [],
+          "include": true
+        }
+      },
+      "codes": {
+        "CONTACTS_KIND_NOT_NULL": 422,
+        "CONTACTS_NAME_CHECK": 422,
+        "CONTACTS_NICKNAME_CHECK": 422,
+        "CONTACTS_PRIORITY_CHECK": 422,
+        "CONTACTS_STATUS_CHECK": 422,
+        "CONTACTS_STATUS_NOT_NULL": 422,
+        "CONTACTS_TAGS_NOT_NULL": 422,
+        "CONTACTS_WEBSITE_CHECK": 422,
+        "CONTACT_EMAIL_TAKEN": 409,
+        "CONTACT_NAME_REQUIRED": 422,
+        "CONTACT_NAME_TAKEN": 409,
+        "EMAIL_CHECK": 422,
+        "PERCENTAGE_CHECK": 422
+      },
+      "search": "filter[q]",
+      "page": {
+        "default": 20,
+        "max": 50,
+        "range": false
+      }
+    },
+    "meetings": {
+      "operations": [
+        "create",
+        "get",
+        "list",
+        "remove",
+        "update"
+      ],
+      "fields": {
+        "during": {
+          "wire": "any",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": "timeRange",
+          "operators": [],
+          "sortable": false
+        },
+        "notes": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "room": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": true
+        }
+      },
+      "relationships": {
+        "contact": {
+          "target": "contacts",
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "operators": [
+            "eq",
+            "isNull"
+          ],
+          "include": true
+        },
+        "organization": {
+          "target": "organizations",
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "operators": [],
+          "include": false
+        }
+      },
+      "codes": {
+        "MEETINGS_CONTACT_ID_FKEY": 404,
+        "MEETINGS_DURING_NOT_NULL": 422,
+        "MEETINGS_PKEY": 409,
+        "MEETINGS_ROOM_NOT_NULL": 422,
+        "MEETING_NEEDS_CONTACT_OR_NOTES": 422,
+        "MEETING_ROOM_DOUBLE_BOOKED": 409,
+        "MEETING_ROOM_NOT_LOWERCASE": 422
+      },
+      "search": null,
+      "page": {
+        "default": 20,
+        "max": 50,
+        "range": false
+      }
+    },
+    "notes": {
+      "operations": [
+        "create",
+        "get",
+        "list",
+        "remove",
+        "update"
+      ],
+      "fields": {
+        "body": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": 1,
+            "maxLength": 2000,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "contactName": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        },
+        "createdAt": {
+          "wire": "string",
+          "format": "date-time",
+          "fractionDigits": 6,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": true
+        },
+        "kind": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": [
+            "call",
+            "email",
+            "visit"
+          ],
+          "access": "immutable",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": false
+        },
+        "priorität": {
+          "wire": "integer",
+          "format": "int16",
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": "1",
+            "exclusiveMinimum": null,
+            "maximum": "3",
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": false
+        }
+      },
+      "relationships": {
+        "author": {
+          "target": "contacts",
+          "access": "immutable",
+          "nullable": true,
+          "required": false,
+          "operators": [],
+          "include": false
+        },
+        "contact": {
+          "target": "contacts",
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "operators": [],
+          "include": false
+        },
+        "organization": {
+          "target": "organizations",
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "operators": [],
+          "include": false
+        }
+      },
+      "codes": {
+        "NOTES_AUTHOR_FKEY": 404,
+        "NOTES_BODY_CHECK": 422,
+        "NOTES_BODY_NOT_NULL": 422,
+        "NOTES_CONTACT_ID_FKEY": 404,
+        "NOTES_TYPE_CHECK": 422,
+        "NOTES_TYPE_NOT_NULL": 422,
+        "NOTE_PRIORITY_OUT_OF_RANGE": 422
+      },
+      "search": null,
+      "page": {
+        "default": 20,
+        "max": 50,
+        "range": false
+      }
+    },
+    "organizations": {
+      "operations": [
+        "create",
+        "get",
+        "list",
+        "update"
+      ],
+      "fields": {
+        "country": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": [
+              "^[A-Z]{2}$"
+            ]
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": false
+        },
+        "createdAt": {
+          "wire": "string",
+          "format": "date-time",
+          "fractionDigits": 6,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "read",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [],
+          "sortable": true
+        },
+        "handle": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": true,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "name": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": 1,
+            "maxLength": 120,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "containsi",
+            "eq"
+          ],
+          "sortable": true
+        },
+        "seats": {
+          "wire": "integer",
+          "format": "int32",
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": null,
+            "minimum": null,
+            "exclusiveMinimum": "0",
+            "maximum": "2147483647",
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": []
+          },
+          "options": null,
+          "access": "readWrite",
+          "nullable": false,
+          "required": false,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "gte",
+            "lte"
+          ],
+          "sortable": true
+        },
+        "slug": {
+          "wire": "string",
+          "format": null,
+          "fractionDigits": null,
+          "limits": {
+            "minLength": null,
+            "maxLength": 63,
+            "minimum": null,
+            "exclusiveMinimum": null,
+            "maximum": null,
+            "exclusiveMaximum": null,
+            "multipleOf": null,
+            "patterns": [
+              "^[a-z0-9-]+$"
+            ]
+          },
+          "options": null,
+          "access": "immutable",
+          "nullable": false,
+          "required": true,
+          "items": null,
+          "codec": null,
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      "relationships": {},
+      "codes": {
+        "COUNTRY_CODE_CHECK": 422,
+        "HANDLE_CHECK": 422,
+        "ORGANIZATIONS_NAME_NOT_NULL": 422,
+        "ORGANIZATIONS_SEATS_CHECK": 422,
+        "ORGANIZATIONS_SEATS_NOT_NULL": 422,
+        "ORGANIZATIONS_SLUG_CHECK": 422,
+        "ORGANIZATIONS_SLUG_NOT_NULL": 422,
+        "ORGANIZATION_HANDLE_TAKEN": 409,
+        "ORGANIZATION_SLUG_TAKEN": 409,
+        "SHORT_TEXT_CHECK": 422
+      },
+      "search": null,
+      "page": {
+        "default": 20,
+        "max": 50,
+        "range": false
+      }
+    }
+  }
+}

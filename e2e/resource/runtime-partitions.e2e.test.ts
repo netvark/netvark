@@ -6,7 +6,8 @@
  * the adapter resolve the partitioned table's names first.
  */
 import type { RuntimeDatabase } from './runtime/database.ts';
-import type { ResourceInput, Runtime } from './runtime/runtime.ts';
+import type { ResourceInput } from './runtime/input.ts';
+import type { Runtime } from './runtime/runtime.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 

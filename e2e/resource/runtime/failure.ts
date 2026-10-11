@@ -19,7 +19,7 @@ import {
 import { APP_ERRORS } from './domain.ts';
 
 /** The operations a failure can come from. */
-export type FailedOperation = 'get' | 'create' | 'update' | 'remove';
+export type FailedOperation = 'list' | 'get' | 'create' | 'update' | 'remove';
 
 /** The client's error for what `operation` on `resource` threw. */
 export async function failure<TTransaction>(

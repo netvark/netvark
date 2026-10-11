@@ -1,7 +1,7 @@
 /**
  * A minimal runtime over `@netvark/resource-core/server` (resource SPEC
- * 12.3), the composition `@netvark/kysely-resource` will ship. An
- * operation validates its input with the declaration, then runs in one
+ * 12.3), the composition `@netvark/kysely-resource` will ship. A write
+ * validates its input with the declaration (`input.ts`), then runs in one
  * transaction scoped to the actor: the policy, the rules, the quota, the
  * write, and the effects, whose events the adapter records with the
  * write, so any failure rolls back everything. An update and a remove
@@ -10,22 +10,27 @@
  * code's error, a PostgreSQL integrity violation the declared code
  * `constraintError` finds, a partition's through the adapter's
  * `partitionRoot` (`failure.ts`), and a row the actor cannot see
- * `NOT_FOUND`, built as a denied `get` builds it.
+ * `NOT_FOUND`, built as a denied `get` builds it. A list asks the policy,
+ * then pages with the keyset request `keysetRequest` maps; an include asks
+ * the policy for the relationship, then reads each linked row in the
+ * actor's scope, in a transaction of its own, where a host's would share
+ * the list's or the get's.
  */
-import type { ResourceIssue } from '@netvark/resource-core';
+import type { DeclaredResource } from '@netvark/resource-core';
 import type {
   DomainEvent,
   Effect,
   PublicRow,
-  ResourceBehavior,
   StorageAdapter,
-  StorageWrite,
+  StorageListRequest,
+  StoragePage,
 } from '@netvark/resource-core/server';
 
-import type { AppActor, AppDomain, Services } from './domain.ts';
+import type { AppActor, Services } from './domain.ts';
+import type { FailedOperation } from './failure.ts';
+import type { Behavior, ResourceInput } from './input.ts';
 
-import { BanError, BUILTIN_CATALOG, createBan } from '@netvark/ban-core';
-import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import { BanError, BUILTIN_CATALOG } from '@netvark/ban-core';
 import {
   quotaExceeded,
   reject,
@@ -34,19 +39,23 @@ import {
 
 import { QUOTAS, SCOPES } from './domain.ts';
 import { failure } from './failure.ts';
-
-/** Any resource's behavior in the domain. */
-type Behavior = ResourceBehavior<AppDomain>;
-
-/** A create or an update as `@netvark/jsonapi-core` parses a resource object: each relationship as its `data`. */
-export interface ResourceInput {
-  readonly id?: string;
-  readonly attributes: Readonly<Record<string, unknown>>;
-  readonly relationships: Readonly<Record<string, unknown>>;
-}
+import { parsed } from './input.ts';
 
 /** The operations, each run as `actor`. */
 export interface Runtime {
+  readonly list: (
+    actor: AppActor,
+    behavior: Behavior,
+    request: StorageListRequest,
+  ) => Promise<StoragePage>;
+  /** The rows of `target` that `rows` link to over `relationship`, once the policy allows including it. */
+  readonly include: (
+    actor: AppActor,
+    behavior: Behavior,
+    relationship: string,
+    target: DeclaredResource,
+    rows: ReadonlyArray<PublicRow>,
+  ) => Promise<ReadonlyArray<PublicRow>>;
   readonly create: (
     actor: AppActor,
     behavior: Behavior,
@@ -70,71 +79,9 @@ export interface Runtime {
   ) => Promise<void>;
 }
 
-type Writing = 'create' | 'update' | 'remove';
-
-const ban = createBan({ errors: ERROR_CATALOG });
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /** The error of a missing row, which a denied `get`, `update`, or `remove` also is. */
 function notFound(): BanError {
   return new BanError({ ...BUILTIN_CATALOG.NOT_FOUND, code: 'NOT_FOUND' });
-}
-
-function invalid(issues: ReadonlyArray<ResourceIssue>): BanError {
-  return ban.error('VALIDATION_FAILED', {
-    errors: issues.map((issue) => ({
-      detail: issue.message,
-      path: ['data', ...issue.path],
-      reason: issue.code,
-    })),
-  });
-}
-
-/** A relationship's parsed `data` as its target's id, or `null`. */
-function targetId(linkage: unknown): string | null {
-  const id = isRecord(linkage) ? linkage['id'] : null;
-  if (typeof id !== 'string' && id !== null) {
-    throw new TypeError('a validated relationship has no id');
-  }
-  return id;
-}
-
-/** The members a validated write carried, relationships as target ids (SPEC 12.8). */
-function storageWrite(value: unknown, id: string | undefined): StorageWrite {
-  const attributes = isRecord(value) ? value['attributes'] : undefined;
-  const relationships = isRecord(value) ? value['relationships'] : undefined;
-  if (!isRecord(attributes) || !isRecord(relationships)) {
-    throw new TypeError('a validated write has no attributes or relationships');
-  }
-  return {
-    ...(id === undefined ? {} : { id }),
-    attributes,
-    relationships: Object.fromEntries(
-      Object.entries(relationships).map(([name, linkage]) => [
-        name,
-        targetId(linkage),
-      ]),
-    ),
-  };
-}
-
-/** The input as the declaration parses it; `VALIDATION_FAILED` with an item per issue otherwise. */
-function parsed(
-  behavior: Behavior,
-  write: 'create' | 'update',
-  input: ResourceInput,
-): StorageWrite {
-  const result = behavior.resource.write[write]['~standard'].validate({
-    attributes: input.attributes,
-    relationships: input.relationships,
-  });
-  if (result.issues !== undefined) {
-    throw invalid(result.issues);
-  }
-  return storageWrite(result.value, write === 'create' ? input.id : undefined);
 }
 
 /** The runtime over `adapter`, handing `services` to policies, rules, effects, and quotas. */
@@ -145,7 +92,7 @@ export function createRuntime<TTransaction>(
   const scoped = async <TResult>(
     actor: AppActor,
     behavior: Behavior,
-    operation: Writing | 'get',
+    operation: FailedOperation,
     run: (tx: TTransaction) => Promise<TResult>,
   ): Promise<TResult> => {
     try {
@@ -193,6 +140,29 @@ export function createRuntime<TTransaction>(
   };
 
   return {
+    list: async (actor, behavior, request) =>
+      scoped(actor, behavior, 'list', async (tx) => {
+        await behavior.policy.authorize('list', { actor, services });
+        return adapter.list(tx, behavior.resource, request);
+      }),
+    include: async (actor, behavior, relationship, target, rows) => {
+      await behavior.policy.authorizeInclude(relationship, { actor, services });
+      const ids = new Set(
+        rows
+          .map((row) => row[relationship])
+          .filter((id): id is string => typeof id === 'string'),
+      );
+      return scoped(actor, behavior, 'get', async (tx) => {
+        const found: Array<PublicRow> = [];
+        for (const id of ids) {
+          const row = await adapter.get(tx, target, id);
+          if (row !== undefined) {
+            found.push(row);
+          }
+        }
+        return found;
+      });
+    },
     create: async (actor, behavior, request) => {
       const input = parsed(behavior, 'create', request);
       const create = behavior.operations.create;

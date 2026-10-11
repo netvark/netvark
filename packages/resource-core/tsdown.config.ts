@@ -15,6 +15,7 @@ import { defineConfig } from 'tsdown';
 const config: UserConfig = defineConfig({
   entry: {
     index: 'src/index.ts',
+    openapi: 'src/openapi/index.ts',
     server: 'src/server/index.ts',
     testing: 'src/testing/index.ts',
   },

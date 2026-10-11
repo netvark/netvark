@@ -35,6 +35,10 @@
       "source": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./openapi": {
+      "source": "./src/openapi/index.ts",
+      "default": "./dist/openapi.js"
+    },
     "./server": {
       "source": "./src/server/index.ts",
       "default": "./dist/server.js"
@@ -48,6 +52,7 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js",
+      "./openapi": "./dist/openapi.js",
       "./server": "./dist/server.js",
       "./testing": "./dist/testing.js",
       "./package.json": "./package.json"
@@ -70,6 +75,8 @@
     "@netvark/keyset-core": "workspace:^"
   },
   "devDependencies": {
+    "ajv": "catalog:",
+    "ajv-formats": "catalog:",
     "zod": "catalog:"
   },
   "peerDependencies": {
