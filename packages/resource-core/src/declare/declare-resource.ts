@@ -25,6 +25,7 @@ import { linkageSchemas } from '../schema/linkage-schemas';
 import { resourceSpecs } from '../schema/resource-specs';
 import { writeValidators } from '../schema/write-schemas';
 import { checkMembers } from './check-columns';
+import { checkFilters } from './check-filters';
 import {
   checkClientIds,
   checkIdentity,
@@ -91,6 +92,7 @@ export function declareResourceIn(
     declaration: frozen,
     names,
   });
+  checkFilters(table, frozen, specs);
   checkExamples(table, frozen, specs.fields);
   const schema = lazy(() => attributeSchemas(specs.fields, specs.checks));
   const validate = lazy(() => attributeValidators(specs.fields, schema()));

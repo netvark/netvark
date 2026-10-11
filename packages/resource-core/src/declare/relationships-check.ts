@@ -1,9 +1,10 @@
 /**
- * The type-level check of `relationships` (SPEC 3.1, 3.2, 3.4). A key must
- * be a single-column foreign key, other than the id, to the primary key of
- * a public table, and that column must be able to carry a resource id.
- * Nothing here reads the target (SPEC 3.8). The runtime twin is
- * `checkRelationship` in `check-columns.ts`.
+ * The type-level check of `relationships` (SPEC 3.1, 3.2, 3.4, 11.3). A key
+ * must be a single-column foreign key, other than the id, to the primary
+ * key of a public table, and that column must be able to carry a resource
+ * id; its `filter` is checked as a field's. Nothing here reads the target
+ * (SPEC 3.8). The runtime twins are `checkRelationship` in
+ * `check-columns.ts` and `checkFilters` in `check-filters.ts`.
  * @packageDocumentation
  */
 import type { PublicColumn, PublicTable } from '@netvark/catalog-core';
@@ -20,6 +21,7 @@ import type {
   TableName,
 } from '../catalog/types';
 import type { AccessRequirement, OperationOf } from './access-check';
+import type { FilterRequirement } from './filter-check';
 import type { DeclareContext } from './registries';
 import type { KnownMembers, Requirement, RequireWhen } from './requirement';
 import type {
@@ -30,6 +32,14 @@ import type {
 } from './types';
 
 type RelationshipMember = keyof RelationshipDeclaration;
+
+type IdentifierRequirement<
+  TContext extends DeclareContext,
+  TColumn extends PublicColumn,
+> =
+  IsIdentifierColumn<TContext['catalog'], TColumn> extends true
+    ? unknown
+    : Requirement<`type ${CodecTypeName<TColumn>} cannot carry a resource id`>;
 
 /** The foreign key must reference the primary key of a public table (SPEC 3.1). */
 type ReferenceError<
@@ -66,7 +76,8 @@ type RelationshipKeyError<
 
 type RelationshipRequirements<
   TContext extends DeclareContext,
-  TColumn extends PublicColumn,
+  TTableDef extends PublicTable,
+  TColumn extends keyof TTableDef['columns'] & string,
   TOps,
   TRelationship,
   TScope extends boolean,
@@ -75,15 +86,25 @@ type RelationshipRequirements<
   RelationshipMember,
   'a relationship declaration'
 > &
-  (IsIdentifierColumn<TContext['catalog'], TColumn> extends true
-    ? unknown
-    : Requirement<`type ${CodecTypeName<TColumn>} cannot carry a resource id`>) &
+  IdentifierRequirement<TContext, TTableDef['columns'][TColumn]> &
   (TScope extends true
     ? RequireWhen<
         MemberOf<TRelationship, 'access'> extends 'read' ? false : true,
         'access: the scope column is read-only'
       >
-    : AccessRequirement<TColumn, TOps, MemberOf<TRelationship, 'access'>>);
+    : AccessRequirement<
+        TTableDef['columns'][TColumn],
+        TOps,
+        MemberOf<TRelationship, 'access'>
+      >) &
+  FilterRequirement<
+    TContext,
+    TTableDef,
+    TColumn,
+    MemberOf<TRelationship, 'filter'>,
+    undefined,
+    undefined
+  >;
 
 /**
  * The columns a relationship may name: a single-column foreign key, other
@@ -145,7 +166,8 @@ export type RelationshipsCheck<
   ]: K extends RelationshipColumn<TContext, TTableDef>
     ? RelationshipRequirements<
         TContext,
-        TTableDef['columns'][K],
+        TTableDef,
+        K,
         OperationOf<TDecl>,
         DeclaredMembers<TDecl, 'relationships'>[K],
         K extends TScopeColumn ? true : false

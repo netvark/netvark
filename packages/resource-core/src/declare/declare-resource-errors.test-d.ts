@@ -185,3 +185,50 @@ describe('declareResource: columns declared against SPEC 3.1', () => {
     });
   });
 });
+
+describe('declareResource: filters and sorts keyset-core cannot run (SPEC 11.3)', () => {
+  it('rejects an operator the keyset type does not take, and isNull on a non-null member', () => {
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error gt is not an operator of arrays
+        tags: { access: 'read', filter: ['gt'] },
+        // @ts-expect-error name cannot be null
+        name: { access: 'read', filter: ['isNull'] },
+        nickname: { access: 'read', filter: ['startsWith', 'isNull'] },
+      },
+      relationships: {
+        // @ts-expect-error organization_id cannot be null
+        organization_id: {
+          target: () => null,
+          access: 'read',
+          filter: ['isNull'],
+        },
+      },
+    });
+  });
+
+  it('rejects filter and sort on a member without a keyset type, and sort on an array', () => {
+    declareResource('audit.changes', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error jsonb is not filterable
+        payload: { access: 'read', filter: ['eq'] },
+      },
+    });
+    declareResource('meetings', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error a codec field is not sortable
+        during: { access: 'read', codec: 'range', sort: true },
+      },
+    });
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: {
+        // @ts-expect-error an array is not sortable
+        tags: { access: 'read', sort: true },
+      },
+    });
+  });
+});

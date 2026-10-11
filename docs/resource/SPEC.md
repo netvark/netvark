@@ -1390,17 +1390,38 @@ is server configuration, so the server passes it to its own `createDefineKeyset(
 | `date`, `timestamp`, `timestamptz`          | the same name                                    |
 | an array                                    | `array`, `of` the element's type                 |
 | a domain                                    | its base type's                                  |
-| `json`, `jsonb`, a codec field              | not filterable, not sortable                     |
+| `json`, `jsonb`, a codec field              | none: not filterable, not sortable               |
+| an array of an enum or of an `enum` rule    | none: keyset-core's arrays hold no enum          |
+| an enum without values                      | none: no labels, or `enum` rules that leave none |
 
 ### 11.3 Operators
 
-A field's declared `filter` MUST be a subset of the operators `@netvark/keyset-core` accepts for its
-keyset type (keyset SPEC 4.2), and `isNull` requires an effectively nullable field; both fail `tsc`
-and throw `TypeError`. The operator vocabulary is keyset-core's, so a filter the declaration allows
-is a filter the planner executes.
+A member's `filter` and `sort` are checked against its keyset type (11.2); each mistake fails `tsc`
+at the member and throws `TypeError` when the resource is declared:
 
-Tests: `resource-definition.test.ts` and `keyset-definition.test.ts` compare both derived
-definitions with hand-written ones for the contacts fixture; `operators.test-d.ts`.
+- `filter` MUST be a subset of the operators `@netvark/keyset-core` accepts for the keyset type
+  (keyset SPEC 4.2, its `OperatorsOf`), and `isNull` requires an effectively nullable member (6.1
+  step 4): `contacts.fields.tags.filter: operator "gt" is not available for array fields`,
+  `contacts.fields.name.filter: operator "isNull" is not available for non-null fields`. A text
+  column with an `enum` rule filters as an enum, with `eq`, `ne`, `in`, and `nin`.
+- A member without a keyset type takes no `filter`, not even an empty one, and no `sort: true`:
+  `import_rows.fields.payload.filter: type jsonb is not filterable`, and likewise `a codec field`,
+  `an array of enum values`, `an enum without values`.
+- An array takes no `sort: true` (keyset-core sorts scalars only):
+  `contacts.fields.tags.sort: an array field is not sortable`.
+- A relationship is checked by its foreign-key column the same way; its operators are `eq`, `ne`,
+  `in`, `nin`, and `isNull` (3.1), so a NOT NULL key refuses `isNull` and a `bool` key `in` and
+  `nin`.
+
+The operator vocabulary is keyset-core's, so a filter the declaration allows is a filter the planner
+executes. The types read an `enum` rule by its presence, as `ColumnValue` does, where the runtime
+intersects the rules' values (6.1 steps 2 and 3), so only the runtime refuses a text column whose
+rules leave no value.
+
+Tests: `keyset-type.test.ts` (11.2 at runtime); `check-filters.test.ts` and `filter-check.test-d.ts`
+(11.3, both twins, the second also pinning `KeysetTypeOf`); `e2e/resource/fails/filters.ts` (15.4);
+`resource-definition.test.ts` and `keyset-definition.test.ts` compare both derived definitions with
+hand-written ones for the contacts fixture.
 
 ---
 
@@ -1809,6 +1830,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a type without a wire form and no codec                                                          | `meetings.fields.during: type tstzrange has no wire form; name a codec`                                                                                     |
 | an operator `@netvark/keyset-core` does not have                                                 | `contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core`                                                                         |
 | an operator the keyset type does not accept, or `isNull` on a non-null field                     | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                                                                              |
+| `filter` or `sort: true` on a member without a keyset type, or `sort: true` on an array (11.3)   | `import_rows.fields.payload.filter: type jsonb is not filterable`                                                                                           |
 | empty or repeated operations, or `update` with no member writable on update                      | `contacts.operations: update needs a field or relationship writable on update`                                                                              |
 | a sort entry that is not sortable                                                                | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                                                          |
 | a search column that is not `tsvector`, or a config mismatch or omission                         | `contacts.search.config: the column is generated with config "simple"`                                                                                      |

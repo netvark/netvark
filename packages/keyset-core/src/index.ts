@@ -116,6 +116,7 @@ export {
   UnsupportedSortError,
 } from './errors';
 export { checkScalar } from './filter/values';
+export type { OperatorsOf } from './filter/operators';
 export { isOperator, OPERATORS, operatorsFor } from './filter/operators';
 export { escapeLike } from './internal/like';
 export { finishPage } from './page/finish';
