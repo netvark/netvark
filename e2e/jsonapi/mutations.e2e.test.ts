@@ -81,6 +81,15 @@ describe('mutations', () => {
         JSON.stringify(payload),
       ).toEqual({ pointer });
     }
+    // The validator's own code and expectation reach the client under meta.
+    const invalid = await blog.request(
+      '/articles',
+      document('POST', { data: { type: 'articles', attributes: {} } }),
+    );
+    expect((invalid.body as Doc).errors?.[0]?.['meta']).toEqual({
+      code: 'invalid_type',
+      expected: 'string',
+    });
     const wrongType = await blog.request('/articles', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
