@@ -96,7 +96,9 @@ export {
   defineKeyset,
   DEFAULT_MAX_PAGE_SIZE,
   DEFAULT_PAGE_SIZE,
+  isSearchConfig,
 } from './definition/define-keyset';
+export { isFieldName } from './definition/normalize-fields';
 export {
   createCursorCodec,
   CURSOR_VERSION,

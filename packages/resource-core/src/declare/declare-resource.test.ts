@@ -181,6 +181,12 @@ describe('declareResource: the shape of a declaration (SPEC 14)', () => {
     expect(typeErrorOf(field({ access: 'read', filter: ['like'] }))).toBe(
       'contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core',
     );
+    expect(typeErrorOf(field({ access: 'read', filter: [] }))).toBe(
+      'contacts.fields.name.filter: list at least one operator',
+    );
+    expect(
+      typeErrorOf(field({ access: 'read', filter: ['eq', 'in', 'eq'] })),
+    ).toBe('contacts.fields.name.filter[2]: "eq" is listed twice');
   });
 
   it('refuses a relationship outside the grammar', () => {
@@ -198,6 +204,24 @@ describe('declareResource: the shape of a declaration (SPEC 14)', () => {
       ),
     ).toBe(
       'contacts.relationships.organization_id.filter[0]: "gt" is not one of eq, ne, in, nin, isNull',
+    );
+    expect(
+      typeErrorOf(
+        relationship({ target: () => null, access: 'read', filter: [] }),
+      ),
+    ).toBe(
+      'contacts.relationships.organization_id.filter: list at least one operator',
+    );
+    expect(
+      typeErrorOf(
+        relationship({
+          target: () => null,
+          access: 'read',
+          filter: ['in', 'in'],
+        }),
+      ),
+    ).toBe(
+      'contacts.relationships.organization_id.filter[1]: "in" is listed twice',
     );
   });
 

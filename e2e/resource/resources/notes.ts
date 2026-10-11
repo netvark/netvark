@@ -4,7 +4,9 @@
  * `author` foreign key has no `_id` to drop, so its relationship takes
  * `as`; the `contact` field, renamed `contactName`, leaves `contact` to
  * the relationship over `contact_id`; and `notes_priorität_check` derives
- * a code outside A-Z, so the declaration gives one.
+ * a code outside A-Z, so the declaration gives one. `priorität` keeps its
+ * public name, a JSON:API member name but no `@netvark/keyset-core` field
+ * name, so nothing filters or sorts by it (SPEC 11.2).
  */
 import { Contacts } from './contacts.ts';
 import { declareResource } from './declare-resource.ts';
@@ -17,7 +19,7 @@ export const Notes = declareResource('notes', {
     type: { access: 'immutable', as: 'kind', filter: ['eq', 'in'] },
     contact: { access: 'readWrite', as: 'contactName' },
     body: { access: 'readWrite' },
-    priorität: { access: 'readWrite', sort: true },
+    priorität: { access: 'readWrite' },
     created_at: { access: 'read', sort: true },
   },
   relationships: {

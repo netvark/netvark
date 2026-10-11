@@ -34,7 +34,7 @@ type Relationships<TDecl extends Declaration> = DeclaredMembers<
 >;
 
 /** The declaration of member column `K`. */
-type MemberOfColumn<
+export type MemberOfColumn<
   TDecl extends Declaration,
   K extends string,
 > = K extends keyof Fields<TDecl>
@@ -44,7 +44,7 @@ type MemberOfColumn<
     : never;
 
 /** The public name of member column `K`; `never` for a relationship column that needs `as`. */
-type PublicNameOf<
+export type PublicNameOf<
   TDecl extends Declaration,
   K extends string,
 > = K extends keyof Fields<TDecl>
@@ -84,7 +84,10 @@ type GivenAsColumn<TDecl extends Declaration> =
  * The members whose name can fail: those that give `as`, listed only when
  * one does, and those whose column the table puts at risk.
  */
-type SuspectColumn<TTableDef extends PublicTable, TDecl extends Declaration> =
+export type SuspectColumn<
+  TTableDef extends PublicTable,
+  TDecl extends Declaration,
+> =
   | (GivesAs<TDecl> extends true ? GivenAsColumn<TDecl> & string : never)
   | Extract<MemberColumn<TDecl>, TableNameRisk<TTableDef>>;
 

@@ -1,9 +1,11 @@
 /**
  * The type-level check of `filter` and `sort` (SPEC 11.3), the twin of
- * `checkFilters`: the declared operators against keyset-core's
- * `OperatorsOf` for the member's keyset type, `isNull` against its
- * effective nullability, and `sort` against an array or a member without a
- * keyset type. A member that declares neither costs one comparison.
+ * `checkFilters`: the declared operators, listed once each, against
+ * keyset-core's `OperatorsOf` for the member's keyset type, `isNull`
+ * against its effective nullability, and `sort` against an array or a
+ * member without a keyset type. A member that declares neither costs one
+ * comparison; its public name is checked with the names
+ * (`names/keyset-names-check.ts`).
  *
  * `KeysetCheck` is keyed by the keyset type and the declared members,
  * which repeat across fields (`text`, `['eq']`, `true`), so TypeScript
@@ -17,6 +19,7 @@ import type { FieldType, OperatorsOf } from '@netvark/keyset-core';
 
 import type { KeysetTypeOf } from '../jsonapi/keyset-types';
 import type { IsNullable } from '../schema/member-types';
+import type { HasRepeat } from './lists';
 import type { DeclareContext } from './registries';
 import type { Requirement } from './requirement';
 
@@ -67,6 +70,21 @@ type NullCheck<
       : Requirement<'filter: operator "isNull" is not available for non-null fields'>
     : unknown;
 
+/**
+ * `filter` lists at least one operator, each once, as jsonapi-core requires
+ * of a filter field; a list typed only as an array is left to the runtime.
+ */
+type FilterListCheck<TFilter> =
+  TFilter extends ReadonlyArray<unknown>
+    ? number extends TFilter['length']
+      ? unknown
+      : TFilter extends readonly []
+        ? Requirement<'filter: list at least one operator'>
+        : HasRepeat<TFilter> extends true
+          ? Requirement<'filter: an operator is listed twice'>
+          : unknown
+    : unknown;
+
 type FilterCheck<
   TCatalog extends PublicCatalog,
   TTableDef extends PublicTable,
@@ -96,7 +114,15 @@ export type FilterRequirement<
   TSort,
   TCodec,
 > = [TFilter] extends [ReadonlyArray<unknown>]
-  ? FilterCheck<TContext['catalog'], TTableDef, TColumn, TFilter, TSort, TCodec>
+  ? FilterCheck<
+      TContext['catalog'],
+      TTableDef,
+      TColumn,
+      TFilter,
+      TSort,
+      TCodec
+    > &
+      FilterListCheck<TFilter>
   : [TSort] extends [true]
     ? FilterCheck<
         TContext['catalog'],

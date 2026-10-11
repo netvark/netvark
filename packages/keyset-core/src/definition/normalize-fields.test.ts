@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { operatorsFor } from '../filter/operators';
 import { thrown } from '../test-support/fixtures';
-import { assertName, normalizeFields } from './normalize-fields';
+import { assertName, isFieldName, normalizeFields } from './normalize-fields';
 import { normalizeRelations } from './normalize-relations';
 
 const NO_RELATIONS = normalizeRelations();
@@ -213,6 +213,27 @@ describe('normalizeFields', () => {
         assertName('x', 'first-name_2');
       }),
     ).toBeUndefined();
+  });
+
+  it('isFieldName accepts the request vocabulary and nothing else', () => {
+    for (const name of ['a', 'A', '1a', 'first-name_2', 'createdAt']) {
+      expect(isFieldName(name), name).toBe(true);
+    }
+    for (const name of [
+      '',
+      '-a',
+      '_a',
+      'a b',
+      'a.b',
+      'größe',
+      'constructor',
+      'prototype',
+      '__proto__',
+      1,
+      undefined,
+    ]) {
+      expect(isFieldName(name), String(name)).toBe(false);
+    }
   });
 
   it('ignores prototype keys injected through JSON', () => {

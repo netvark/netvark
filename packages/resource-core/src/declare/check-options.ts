@@ -9,6 +9,8 @@ import type { PageCapabilitiesInit } from '@netvark/jsonapi-core';
 import type { DefinerContext } from './check-config';
 import type { Declaration, Operation } from './types';
 
+import { isSearchConfig } from '@netvark/keyset-core';
+
 import {
   codecTypeName,
   isIdentifierColumn,
@@ -16,6 +18,7 @@ import {
   primaryKeyColumn,
 } from '../catalog/columns';
 import { describe, ownValue } from '../internal/object';
+import { SEARCH_CONFIG_SYNTAX } from '../jsonapi/keyset-names';
 import { checkPageInit, mergePage } from './check-page';
 
 /** The values of `Operation`, in the order the SPEC lists them. */
@@ -174,19 +177,46 @@ export function checkSearch(
       `${table}.search.config: required, because ${search.column} is not generated with a configuration`,
     );
   }
+  checkSearchConfig(table, search.config, generated);
 }
 
-/** `sort.default` names fields declared with `sort: true` (SPEC 3.7). */
+/** The configuration keyset-core receives, declared or generated, keeps to its `regconfig` syntax (SPEC 11.2). */
+function checkSearchConfig(
+  table: string,
+  declared: string | undefined,
+  generated: string | null,
+): void {
+  if (declared !== undefined && !isSearchConfig(declared)) {
+    throw new TypeError(
+      `${table}.search.config: "${declared}" is not a text search configuration @netvark/keyset-core accepts (${SEARCH_CONFIG_SYNTAX})`,
+    );
+  }
+  if (
+    declared === undefined &&
+    generated !== null &&
+    !isSearchConfig(generated)
+  ) {
+    throw new TypeError(
+      `${table}.search.column: the column is generated with config "${generated}", which @netvark/keyset-core does not accept (${SEARCH_CONFIG_SYNTAX})`,
+    );
+  }
+}
+
+/** `sort.default` names fields declared with `sort: true`, each once, as keyset-core requires (SPEC 3.7). */
 export function checkSort(table: string, declaration: Declaration): void {
+  const seen = new Set<string>();
   for (const [index, entry] of (declaration.sort?.default ?? []).entries()) {
     const name =
       typeof entry === 'string' ? entry.replace(/^-/u, '') : entry.field;
+    const path = `${table}.sort.default[${String(index)}]`;
     const field = ownValue(declaration.fields, name);
     if (field?.sort !== true) {
-      throw new TypeError(
-        `${table}.sort.default[${String(index)}]: "${name}" is not declared with sort: true`,
-      );
+      throw new TypeError(`${path}: "${name}" is not declared with sort: true`);
     }
+    if (seen.has(name)) {
+      throw new TypeError(`${path}: "${name}" is listed twice`);
+    }
+    seen.add(name);
   }
 }
 

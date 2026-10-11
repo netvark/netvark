@@ -131,6 +131,15 @@ describe('declareResource: search and sort', () => {
       sort: { default: ['-name'] },
     });
   });
+
+  it('rejects a default sort that names a field twice', () => {
+    declareResource('contacts', {
+      operations: ['list'],
+      fields: { name: { access: 'read', sort: true } },
+      // @ts-expect-error name is listed twice
+      sort: { default: ['-name', { field: 'name', direction: 'asc' }] },
+    });
+  });
 });
 
 describe('declareResource: rules and domains', () => {

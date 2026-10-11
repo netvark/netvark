@@ -282,6 +282,11 @@ JSON value has no string form to be one. PostgreSQL accepts a `jsonb` primary ke
 to it, since `jsonb` has a btree operator class, so the definer is what refuses them; the same rule
 holds for a relationship's foreign-key column, whose values are the target's ids.
 
+`@netvark/keyset-core` orders every page by the key (11.2), so its column MUST also have a keyset
+type. Every scalar form has one except an enum without values, an enum type without labels or a text
+key whose `enum` rules leave none; such a key fails `tsc` at the table name and throws
+`things: the primary key is an enum without values, which @netvark/keyset-core cannot order`.
+
 JSON:API ids are strings, so an id travels in its key's wire form when that form is a string
 (`text`, `uuid`, `int8`, `numeric`, a date, an enum label), and otherwise as one canonical text: an
 `int2` or `int4` key as integer text in `int8`'s spelling (5.1) within the type's range, a `real` or
@@ -351,10 +356,21 @@ runtime, since an input type has no runtime form.
 
 - `search.column` MUST be a `tsvector` column of the table. When the column is generated and the
   catalog records its `searchConfig`, that is the configuration; a declared `config` MUST equal it.
-  When it is not generated, `config` is REQUIRED. The search parameter is `filter[q]`
-  (`SEARCH_PARAMETER`).
-- `sort.default` entries name fields declared with `sort: true`; the key is appended by
-  `@netvark/keyset-core` (keyset SPEC 5).
+  When it is not generated, `config` is REQUIRED. The configuration MUST be a name
+  `@netvark/keyset-core` accepts, `^[a-z_][a-z0-9_]{0,62}$` (keyset SPEC 3.4, its `isSearchConfig`):
+  keyset-core emits it as a SQL literal, so it is an unqualified name such as `english` or `simple`,
+  which PostgreSQL resolves through the session's `search_path`. A declared `pg_catalog.english`
+  throws
+  `documents.search.config: "pg_catalog.english" is not a text search configuration @netvark/keyset-core accepts (^[a-z_][a-z0-9_]{0,62}$)`,
+  and a column generated with a configuration outside the extracted schemas, which the catalog
+  records qualified because PostgreSQL prints it so, cannot be searched:
+  `documents.search.column: the column is generated with config "app.unaccented", which @netvark/keyset-core does not accept (^[a-z_][a-z0-9_]{0,62}$)`.
+  The search parameter is `filter[q]` (`SEARCH_PARAMETER`). @ref
+  https://www.postgresql.org/docs/18/datatype-oid.html (a `regconfig` prints schema-qualified when
+  the search path would not find it)
+- `sort.default` entries name fields declared with `sort: true`, each once, whatever the direction:
+  `contacts.sort.default[1]: "name" is listed twice`. The key is appended by `@netvark/keyset-core`
+  (keyset SPEC 5), which refuses a repeated field.
 - `page` overrides the definer's `page` member by member.
 
 ### 3.8 Relationship targets
@@ -1377,6 +1393,29 @@ is server configuration, so the server passes it to its own `createDefineKeyset(
 - `search` is `{ vector: column, config, mode }`; `sort.default` maps columns to public names;
   `page` is the merged page.
 
+Those public names become the request's vocabulary of two definitions, and each refuses some
+JSON:API member names. keyset-core takes a field name that matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` and
+is not a prototype key (keyset SPEC 3, its `isFieldName`), and jsonapi-core's `filter` reserves `or`
+for the disjunction and, with `search`, `q` for the search parameter (jsonapi SPEC 5.2 and 6.8). So
+the public name of a member that filters or sorts holds only ASCII letters, digits, `_`, and `-`,
+and starts with a letter or a digit; a filtered member is not named `or`, nor `q` when the resource
+has `search`. A member that does neither keeps any member name (4.2). Each mistake fails `tsc` at
+the member and throws when the resource is declared:
+`notes.fields.size.filter: public name "größe" is outside @netvark/keyset-core's field names (^[A-Za-z0-9][A-Za-z0-9_-]*$)`,
+`contacts.fields.query.filter: public name "q" is the search parameter, filter[q]`.
+
+The runtime checks every member (`checkName` in `declare/check-filters.ts`). TypeScript checks the
+members the names check examines (4.2), those that give `as` or whose column is in the table's name
+risk, and the columns that derive a reserved name: `or` and `q`, and `or_id` and `q_id` for a
+relationship (`names/keyset-names-check.ts`). camelCase gives every other column a name of ASCII
+letters and digits, unless the column holds a letter outside ASCII, which PostgreSQL accepts
+unquoted (`größe`), or a character only a quoted identifier holds (`"nick name"`); only the runtime
+reports those. A first version that read every public name one character at a time took 26 and 56
+percent more instantiations on the real catalogs, about ten for each character, where the checks of
+this section add 4 and 2 percent (15.5). @ref
+https://jsonapi.org/format/1.1/#document-member-names-allowed-characters (a space and non-ASCII
+characters are allowed in member names but "not recommended, not URL safe")
+
 | Catalog `type`                              | Keyset type                                      |
 | ------------------------------------------- | ------------------------------------------------ |
 | `text`, `varchar`, `bpchar`, `citext`       | `text`                                           |
@@ -1404,7 +1443,11 @@ at the member and throws `TypeError` when the resource is declared:
   step 4): `contacts.fields.tags.filter: operator "gt" is not available for array fields`,
   `contacts.fields.name.filter: operator "isNull" is not available for non-null fields`. A text
   column with an `enum` rule filters as an enum, with `eq`, `ne`, `in`, and `nin`.
-- A member without a keyset type takes no `filter`, not even an empty one, and no `sort: true`:
+- `filter` lists at least one operator, each once, since jsonapi-core and keyset-core require a
+  non-empty list without repeats: `contacts.fields.name.filter: list at least one operator`,
+  `contacts.fields.name.filter[1]: "eq" is listed twice`. The types check a tuple; a list typed as
+  an array, whose length they cannot see, is left to the runtime.
+- A member without a keyset type takes no `filter` and no `sort: true`:
   `import_rows.fields.payload.filter: type jsonb is not filterable`, and likewise `a codec field`,
   `an array of enum values`, `an enum without values`.
 - An array takes no `sort: true` (keyset-core sorts scalars only):
@@ -1419,7 +1462,13 @@ intersects the rules' values (6.1 steps 2 and 3), so only the runtime refuses a 
 rules leave no value.
 
 Tests: `keyset-type.test.ts` (11.2 at runtime); `check-filters.test.ts` and `filter-check.test-d.ts`
-(11.3, both twins, the second also pinning `KeysetTypeOf`); `e2e/resource/fails/filters.ts` (15.4);
+(11.3, both twins, the second also pinning `KeysetTypeOf`); `check-filters-names.test.ts` and
+`names/keyset-names-check.test-d.ts` (the public names and the primary key of 11.2, both twins);
+`keyset-checks.test-d.ts` (the primary key and the search configuration through `declareResource`'s
+types); `declare-search-sort.test.ts` (3.7); `jsonapi/keyset-names.test.ts` and `.test-d.ts`, which
+hold the type-level grammars to keyset-core's `isFieldName` and `isSearchConfig` over one case table
+(`test-support/keyset-name-cases.ts`); `e2e/resource/fails/filters.ts`,
+`e2e/resource/fails/definitions.ts`, and `definitions.e2e.test.ts` (15.4);
 `resource-definition.test.ts` and `keyset-definition.test.ts` compare both derived definitions with
 hand-written ones for the contacts fixture.
 
@@ -1816,6 +1865,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | a table outside the public catalog                                                               | `declareResource: "accounts" is not a table of the public catalog`                                                                                          |
 | no single-column primary key                                                                     | `contact_phones: a resource needs a single-column primary key`                                                                                              |
 | a primary key whose type cannot carry a resource id (3.4)                                        | `import_batches: the primary key's type jsonb cannot carry a resource id`                                                                                   |
+| a primary key keyset-core cannot order (3.4)                                                     | `things: the primary key is an enum without values, which @netvark/keyset-core cannot order`                                                                |
 | `clientIds` on a primary key that takes no client value (3.4)                                    | `organizations.clientIds: the primary key is an identity column generated always, which takes no client value`                                              |
 | an unknown column, foreign key, constraint, scope, codec, or validator                           | `contacts.fields.nick: "nick" is not a column of contacts`                                                                                                  |
 | a column declared against 3.1                                                                    | `contacts.fields.organization_id: a foreign-key column is declared under relationships`                                                                     |
@@ -1831,9 +1881,11 @@ option, in the two forms of 3; its message names the option relative to the decl
 | an operator `@netvark/keyset-core` does not have                                                 | `contacts.fields.name.filter[0]: "like" is not an operator of @netvark/keyset-core`                                                                         |
 | an operator the keyset type does not accept, or `isNull` on a non-null field                     | `contacts.fields.tags.filter: operator "gt" is not available for array fields`                                                                              |
 | `filter` or `sort: true` on a member without a keyset type, or `sort: true` on an array (11.3)   | `import_rows.fields.payload.filter: type jsonb is not filterable`                                                                                           |
+| an empty `filter`, or one that lists an operator twice (11.3)                                    | `contacts.fields.name.filter: list at least one operator`                                                                                                   |
+| a filtered or sortable member's public name that keyset-core or jsonapi-core refuses (11.2)      | `notes.fields.size.filter: public name "größe" is outside @netvark/keyset-core's field names (^[A-Za-z0-9][A-Za-z0-9_-]*$)`                                 |
 | empty or repeated operations, or `update` with no member writable on update                      | `contacts.operations: update needs a field or relationship writable on update`                                                                              |
-| a sort entry that is not sortable                                                                | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                                                          |
-| a search column that is not `tsvector`, or a config mismatch or omission                         | `contacts.search.config: the column is generated with config "simple"`                                                                                      |
+| a sort entry that is not sortable, or a field listed twice (3.7)                                 | `contacts.sort.default[0]: "kind" is not declared with sort: true`                                                                                          |
+| a search column not `tsvector`; a config missing, mismatched, or refused by keyset-core (3.7)    | `contacts.search.config: the column is generated with config "simple"`                                                                                      |
 | a page default above the max page size                                                           | `contacts.page.default: 200 exceeds the max page size 100`                                                                                                  |
 | a CHECK without a rule over written columns and no validator (3.5)                               | `meetings.rules.meetings_contact_or_notes: a CHECK without a rule needs a validator`                                                                        |
 | a validator on a CHECK with a rule, or on another constraint kind                                | `contacts.rules.contacts_name_check.validator: the CHECK has a rule, which enforces it already`                                                             |
@@ -1859,9 +1911,10 @@ accept every value of the domain (3.6). Their messages are
 `validator: "<name>" does not accept every value of domain <domain>`.
 
 Tests: one case per row in the `declare-*.test.ts`, `create-declare-resource.test.ts`,
-`derive-names-errors.test.ts`, `define-codec.test.ts`, `define-validator.test.ts`,
-`derive-errors.test.ts`, `domain-codes.test.ts`, and `check-registry.test.ts` files;
-`e2e/resource/fails/` holds each compile-time form, matched by its text.
+`check-filters.test.ts`, `check-filters-names.test.ts`, `derive-names-errors.test.ts`,
+`define-codec.test.ts`, `define-validator.test.ts`, `derive-errors.test.ts`, `domain-codes.test.ts`,
+and `check-registry.test.ts` files; `e2e/resource/fails/` holds each compile-time form, matched by
+its text.
 
 ---
 
@@ -1951,30 +2004,32 @@ by `jsonb`, a `notes` table whose columns need `as` and `code`, and a partial un
 PostgreSQL 18 schema of NOT ENFORCED constraints (`fixtures/postgres18`, run on PGlite and on a
 server of major 18 or later), the catalogs `@netvark/pg-catalog` extracts from them (checked with
 `extract --check`), and declarations over them. It proves: the declarations type-check, and a
-`fails/` directory of declarations fails `tsc` with the expected errors; the derived names, recorded
-in a reviewed snapshot (`snapshots/names.json`), and a derived code TypeScript leaves to the
-runtime; the derived schemas, metadata, and definitions; that a client that follows `fields` alone
-sends values PostgreSQL stores as sent, while each value one step past a stated bound, outside the
-stated options or form, or with a fraction digit too many is refused or changed, and the schemas
-give the metadata's verdict on each (`fields.e2e.test.ts`, over every column type of the oracle and
-the ids of each key type); that the `required` members of the contacts application are exactly the
-ones an insert needs, and a member left out holds its stated `default`
-(`fields-create.e2e.test.ts`); the derived error codes, recorded in a reviewed snapshot
-(`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on PGlite and
-both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog` assembles from
-them, rendered by `createBan`; `constraintError` against the same violations, each mapped to its
-code's error; localized error documents (`localization.e2e.test.ts`): messages the Paraglide
-compiler builds from `localization/messages/`, mapped with `defineMessages` and served through Hono
-and `@netvark/hono-ban`, answer a 422 in German with option labels, in English with its plural
-forms, in the base locale for a language the project lacks, in a regional tag's language, and a 409,
-which `constraintError` makes of a real violation, with a code's own texts, each with
-`Content-Language` and `Vary`, while `tsc` accepts the mapping and refuses a translation that names
-a variable its kind does not receive; that a row breaking every NOT ENFORCED constraint is stored by
-the database and accepted by the schemas, while the enforced CHECK beside them refuses in both
-(`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
-the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
-12.9); the package surface (every value export listed); and the runtime smoke test on Bun, Deno, and
-workerd for the root, `server`, `testing`, and `openapi` entries.
+`fails/` directory of declarations fails `tsc` with the expected errors, and each one a derived
+definition would refuse (`fails/definitions.ts`) throws the same reason from JavaScript
+(`definitions.e2e.test.ts`); the derived names, recorded in a reviewed snapshot
+(`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
+metadata, and definitions; that a client that follows `fields` alone sends values PostgreSQL stores
+as sent, while each value one step past a stated bound, outside the stated options or form, or with
+a fraction digit too many is refused or changed, and the schemas give the metadata's verdict on each
+(`fields.e2e.test.ts`, over every column type of the oracle and the ids of each key type); that the
+`required` members of the contacts application are exactly the ones an insert needs, and a member
+left out holds its stated `default` (`fields-create.e2e.test.ts`); the derived error codes, recorded
+in a reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
+(`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
+catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
+same violations, each mapped to its code's error; localized error documents
+(`localization.e2e.test.ts`): messages the Paraglide compiler builds from `localization/messages/`,
+mapped with `defineMessages` and served through Hono and `@netvark/hono-ban`, answer a 422 in German
+with option labels, in English with its plural forms, in the base locale for a language the project
+lacks, in a regional tag's language, and a 409, which `constraintError` makes of a real violation,
+with a code's own texts, each with `Content-Language` and `Vary`, while `tsc` accepts the mapping
+and refuses a translation that names a variable its kind does not receive; that a row breaking every
+NOT ENFORCED constraint is stored by the database and accepted by the schemas, while the enforced
+CHECK beside them refuses in both (`not-enforced.e2e.test.ts`); the storage contract, passed by the
+reference adapter on PGlite and on the server and failed by each of its defects
+(`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`, 12.9); the package surface (every value
+export listed); and the runtime smoke test on Bun, Deno, and workerd for the root, `server`,
+`testing`, and `openapi` entries.
 
 ### 15.5 Real catalogs
 
@@ -2219,6 +2274,34 @@ The option labels are typed from each column's options (`TypedFieldOptions`), no
 whose full metadata the first version built for every member to read them: 1,164,397 instantiations
 and 0.469 s on stern.
 
+The tenth record covers section 11's checks of the definitions a declaration derives. A script
+compared the runtime and type-level checks on probes it built from each catalog, one declaration per
+line, compiled together: for every column a field can name, each keyset-core operator and
+`sort: true` (23,260 probes on stern, 27,540 on the GitLab slice); and for every declarable table,
+public names given with `as` (`okName`, `9lives`, `a-b_c`, `größe`, `nick name`, `or`, `q`, `abc_`,
+`constructor`, `toString`, `hasOwnProperty`) on a field that filters, sorts, or does neither and on
+a relationship that filters or not, `or` and `q` beside `search` on stern's three generated
+`tsvector` columns, empty and repeated `filter` lists, repeated `sort.default` entries, search
+configurations, and each table's empty declaration (7,079 probes on stern, 3,306 on the GitLab
+slice). The two checks accepted the same probes and, where both refused, gave the same reason.
+Neither catalog has a primary key keyset-core cannot order or a search configuration it refuses:
+stern's three columns are generated with `simple`, and the GitLab slice has none. Compiled against
+catalogs extracted before the catalog types had names (catalog ADR 0011), each refused relationship
+printed the whole catalog in its message, and 60 of them took 18.9 s and 5.3 GB; against the named
+types, all 1,834 took 1.2 s. In types, as medians of five runs:
+
+| Catalog            | Checks                       | Instantiations | Check time | Peak memory |
+| ------------------ | ---------------------------- | -------------- | ---------- | ----------- |
+| stern              | operators and sort (11.3)    | 471,980        | 0.184 s    | 134 MB      |
+| stern              | plus the definitions' checks | 489,983        | 0.187 s    | 135 MB      |
+| GitLab 17.11 slice | operators and sort (11.3)    | 569,406        | 0.269 s    | 158 MB      |
+| GitLab 17.11 slice | plus the definitions' checks | 580,496        | 0.279 s    | 163 MB      |
+
+The operator and sort check had added 15 percent instantiations and 4 and 6 percent check time to
+the ninth record's declarations. The first version of the name checks read every public name one
+character at a time: 596,534 and 890,902 instantiations, 0.218 s and 0.378 s. Examining only the
+members the names check already examines (11.2) removed nearly all of it.
+
 ### 15.6 The Zod floor
 
 A CI job runs the package's unit tests with `zod` 4.5.0, the floor of the peer range;
@@ -2245,9 +2328,12 @@ A CI job runs the package's unit tests with `zod` 4.5.0, the floor of the peer r
 
 | Name                                         | Value                                                                                                        | Exported |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------- |
-| `CATALOG_FORMAT`                             | 1, from `@netvark/catalog-core`                                                                              | no       |
+| `CATALOG_FORMAT`                             | 3, from `@netvark/catalog-core`                                                                              | no       |
 | `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE` | 20 and 100, from `@netvark/keyset-core`                                                                      | no       |
 | `SEARCH_PARAMETER`                           | `filter[q]`                                                                                                  | no       |
+| `SEARCH_MEMBER`, `FILTER_OR_MEMBER`          | `q` and `or`, the members of `filter` jsonapi-core reserves (11.2)                                           | no       |
+| `FIELD_NAME_SYNTAX`                          | `^[A-Za-z0-9][A-Za-z0-9_-]*$`, keyset-core's field names, which its `isFieldName` tests                      | no       |
+| `SEARCH_CONFIG_SYNTAX`                       | `^[a-z_][a-z0-9_]{0,62}$`, keyset-core's search configurations, which its `isSearchConfig` tests             | no       |
 | `CODE_PATTERN`                               | `^[A-Z][A-Z0-9_]*$`                                                                                          | no       |
 | `ID_SUFFIX`                                  | `_id`                                                                                                        | no       |
 | `NOT_NULL_SUFFIX`                            | `_not_null`                                                                                                  | no       |
