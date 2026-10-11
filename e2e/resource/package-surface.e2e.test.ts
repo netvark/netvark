@@ -35,6 +35,7 @@ describe('package surface (SPEC 1)', () => {
       'defineQuota',
       'defineScope',
       'denyAll',
+      'keysetRequest',
       'partitionViolation',
       'quotaExceeded',
       'reject',
