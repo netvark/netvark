@@ -2,8 +2,9 @@
  * `@netvark/resource-core/server`: what only a server composes, typed by
  * the application's registries (SPEC 12, ADR 0008): the domain definers,
  * policies, behavior, scopes, quotas, events, `reject`, the database
- * rejections of SPEC 9.5, and the storage adapter contract. Nothing here
- * touches a database; adapters implement the contract.
+ * rejections of SPEC 9.5, the storage adapter contract, and the runtime
+ * contract hosts take (SPEC 12.10). Nothing here touches a database;
+ * adapters and runtimes implement the contracts.
  * @packageDocumentation
  */
 export type {
@@ -40,6 +41,14 @@ export type {
   PublicRowOf,
   UpdateInputOf,
 } from './resource-types';
+export type {
+  Domain,
+  ListOptions,
+  ResourceInput,
+  ResourceOperations,
+  ResourceRuntime,
+  RuntimeResources,
+} from './runtime';
 export type { Scope, ScopeBindings, ScopeKey, ScopeValue } from './scope';
 export type { ServerValuesOf } from './server-values';
 export type { ViolationNames } from './violation-names';

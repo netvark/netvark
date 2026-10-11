@@ -8,30 +8,29 @@
  * each operation's lifecycle for `runtime.as(actor)`, which HTTP hosts and
  * workers call alike; `checkResourceRuntime` runs the static checks in CI;
  * `relayOutbox` delivers the events operations recorded, after they
- * committed.
+ * committed. The runtime's types are `@netvark/resource-core/server`'s
+ * contract (resource SPEC 12.10), re-exported here.
  * @ref https://kysely.dev/
  * @packageDocumentation
  */
 export type { BootReport } from './boot/report';
 export type { OutboxEvent, RelayOptions } from './outbox/relay';
-export type {
-  Domain,
-  ResourceOperations,
-  ResourceRuntime,
-} from './runtime/operations-types';
-export type {
-  ResourceInput,
-  RuntimeOptions,
-  RuntimeResources,
-} from './runtime/types';
+export type { RuntimeOptions } from './runtime/types';
 export type { KyselyTransaction } from './storage/transaction';
 export type {
   KyselyStorage,
   KyselyStorageOptions,
-  ListOptions,
   OutboxTable,
   TextCodec,
 } from './storage/types';
+export type {
+  Domain,
+  ListOptions,
+  ResourceInput,
+  ResourceOperations,
+  ResourceRuntime,
+  RuntimeResources,
+} from '@netvark/resource-core/server';
 
 export { checkResourceRuntime } from './boot/check-runtime';
 export { BootError } from './boot/report';

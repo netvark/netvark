@@ -8,6 +8,7 @@ import type { PublicCatalog } from '@netvark/catalog-core';
 import type { DefineDefaultedKeyset } from '@netvark/keyset-core';
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
+  ListOptions,
   PublicRow,
   ScopeValue,
   StorageAdapter,
@@ -49,12 +50,6 @@ export interface KyselyStorageOptions<TDatabase> {
   readonly defineKeyset: DefineDefaultedKeyset;
   /** Where events are written; needed once a behavior has effects. */
   readonly outbox?: OutboxTable | undefined;
-}
-
-/** What `list` does besides the page (SPEC 18.2). */
-export interface ListOptions {
-  /** Also count the rows of the scope the filter selects, with a second statement. */
-  readonly total?: boolean | undefined;
 }
 
 /**

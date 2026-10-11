@@ -130,6 +130,10 @@ it('boots against the catalog', () => {
   operations the declaration declares, plus `include` when a relationship is includable; rows are
   the resource's public rows, and `list` takes a request in its keyset fields, so a misspelled sort
   fails to compile.
+- **The runtime contract.** `runtime.resources` lists each behavior's declared resource, in the
+  order of `resources`. The runtime's types, `ResourceRuntime`, `Domain`, `ResourceOperations`,
+  `ResourceInput`, and `ListOptions`, are `@netvark/resource-core/server`'s, re-exported here, so a
+  host or a worker that is given the runtime types it without Kysely or a driver.
 - **Options mistakes throw first.** A key that is not an option, a storage that
   `createKyselyStorage` did not return, or a copy of a behavior is a `TypeError` naming the option,
   before any check.

@@ -1,32 +1,39 @@
 /**
- * The domain's types (resource SPEC 18.4) over typed declarations: a
+ * The runtime contract's types (SPEC 12.10) over typed declarations: a
  * resource has exactly the operations it declares, and `include` when a
  * relationship is includable; its rows are its public rows, and its list
  * takes a request in its own keyset fields. A resource typed wide may
- * have any of them. `createResourceRuntime` infers the domain and each
- * resource from the behaviors it is given.
+ * have any of them, and what its behaviors type passes where a host
+ * takes the wide types.
  */
-import type { Page } from '@netvark/kysely-keyset';
-import type {
-  PublicRowOf,
-  StorageListRequest,
-} from '@netvark/resource-core/server';
+import type { Page } from '@netvark/keyset-core';
 
-import type { Member, TestDomain } from '../test-support/domain';
-import type {
-  Domain,
-  ResourceOperations,
-  ResourceRuntime,
-} from './operations-types';
-import type { RuntimeOptions } from './types';
+import type { DeclaredResource } from '../declare/declared-resource';
+import type { Actor } from './domain-types';
+import type { PublicRowOf } from './resource-types';
+import type { Domain, ResourceOperations, ResourceRuntime } from './runtime';
+import type { StorageListRequest } from './storage';
 
 import { describe, expectTypeOf, it } from 'vitest';
 
-import { createDeclareResource } from '@netvark/resource-core';
-import { createDomainDefiners } from '@netvark/resource-core/server';
-import { contractFixture } from '@netvark/resource-core/testing';
+import { createDeclareResource } from '../declare/create-declare-resource';
+import { contractFixture } from '../testing/contract/fixture';
+import { createDomainDefiners } from './domain';
 
-import { createResourceRuntime } from './create-runtime';
+type Permission = 'tasks:read' | 'tasks:write';
+interface Member extends Actor<Permission> {
+  readonly workspace: string;
+}
+const APP_ERRORS = {
+  TASK_LOCKED: { status: 409, title: 'Task Locked' },
+} as const;
+interface TestDomain {
+  readonly actor: Member;
+  readonly permissions: Permission;
+  readonly quotas: never;
+  readonly services: undefined;
+  readonly errors: typeof APP_ERRORS;
+}
 
 const declareResource = createDeclareResource({
   catalog: contractFixture.catalog,
@@ -52,9 +59,9 @@ const { defineResource, definePolicy } = createDomainDefiners<TestDomain>();
 const TasksBehavior = defineResource(Tasks, {
   operations: { create: { values: ({ actor }) => ({ created_by: actor.id }) } },
   policy: definePolicy(Tasks, {
-    list: () => true,
-    get: () => true,
-    create: () => true,
+    list: ({ actor }) => actor.can('tasks:read'),
+    get: ({ actor }) => actor.can('tasks:read'),
+    create: ({ actor }) => actor.can('tasks:write'),
     include: { workspace: () => true },
   }),
 });
@@ -62,13 +69,18 @@ const WorkspacesBehavior = defineResource(Workspaces, {
   policy: definePolicy(Workspaces, { get: () => true }),
 });
 
+type Resources = {
+  readonly tasks: typeof TasksBehavior;
+  readonly workspaces: typeof WorkspacesBehavior;
+};
 type TaskOperations = ResourceOperations<typeof Tasks>;
 declare const tasks: TaskOperations;
 declare const otherTasks: TaskOperations;
 declare const wide: ResourceOperations;
-declare const options: RuntimeOptions<TestDomain>;
+declare const runtime: ResourceRuntime<TestDomain, Resources>;
+declare const member: Member;
 
-describe('ResourceOperations (resource SPEC 18.4)', () => {
+describe('ResourceOperations (SPEC 12.10)', () => {
   it('has exactly the operations the declaration declares, and include when a relationship is includable', () => {
     expectTypeOf<keyof TaskOperations>().toEqualTypeOf<
       'list' | 'get' | 'create' | 'include'
@@ -123,36 +135,25 @@ describe('ResourceOperations (resource SPEC 18.4)', () => {
   });
 });
 
-describe('Domain (resource SPEC 18.4)', () => {
+describe('Domain and ResourceRuntime (SPEC 12.10)', () => {
   it('keys the operations by type, each typed by its behavior', () => {
-    type Typed = Domain<{
-      readonly tasks: typeof TasksBehavior;
-      readonly workspaces: typeof WorkspacesBehavior;
-    }>;
-    expectTypeOf<keyof Typed>().toEqualTypeOf<'tasks' | 'workspaces'>();
-    expectTypeOf<Typed['tasks']>().toEqualTypeOf<TaskOperations>();
+    expectTypeOf<keyof Domain<Resources>>().toEqualTypeOf<
+      'tasks' | 'workspaces'
+    >();
+    expectTypeOf<Domain<Resources>['tasks']>().toEqualTypeOf<TaskOperations>();
   });
 
-  it('is what createResourceRuntime runs as the actor, the domain inferred from the behaviors', () => {
-    const runtime = createResourceRuntime({
-      ...options,
-      resources: { tasks: TasksBehavior, workspaces: WorkspacesBehavior },
-    });
-    expectTypeOf(runtime)
-      .resolves.toHaveProperty('as')
-      .parameter(0)
-      .toEqualTypeOf<Member>();
-    expectTypeOf(runtime)
-      .resolves.toHaveProperty('as')
-      .returns.toHaveProperty('tasks')
-      .toEqualTypeOf<TaskOperations>();
+  it('runs as the domain actor, and lists the declared resources wide and read-only', () => {
+    expectTypeOf(runtime.as).parameter(0).toEqualTypeOf<Member>();
+    expectTypeOf(runtime.as(member).tasks).toEqualTypeOf<TaskOperations>();
+    expectTypeOf(runtime.resources).toEqualTypeOf<
+      ReadonlyArray<DeclaredResource>
+    >();
+    // @ts-expect-error resources is read-only
+    runtime.resources = [];
   });
 
-  it('passes where a host takes the domain typed wide, down to each operation', () => {
-    type Resources = {
-      readonly tasks: typeof TasksBehavior;
-      readonly workspaces: typeof WorkspacesBehavior;
-    };
+  it('passes where a host takes the runtime typed wide, down to each operation', () => {
     expectTypeOf<TaskOperations>().toExtend<ResourceOperations>();
     expectTypeOf<Domain<Resources>>().toExtend<Domain>();
     expectTypeOf<ResourceRuntime<TestDomain, Resources>>().toExtend<

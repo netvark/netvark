@@ -15,13 +15,13 @@
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
   DomainShape,
+  ListOptions,
   PublicRow,
   ResourceBehavior,
   StorageListRequest,
   StoragePage,
 } from '@netvark/resource-core/server';
 
-import type { ListOptions } from '../storage/types';
 import type { Run } from './operation';
 
 import { ownValue } from '../internal/object';

@@ -2186,8 +2186,8 @@ after it could commit, and because an operations request is all or nothing. @ref
 https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed atomically") @ref
 https://www.postgresql.org/docs/18/tutorial-transactions.html
 
-Tests: `server/runtime-types.test-d.ts` (typed operations pass where the wide types are taken, and
-stay read-only), and the runtime's own suites (18.7).
+Tests: `server/runtime.test-d.ts` (typed operations pass where the wide types are taken, and stay
+read-only), and the runtime's own suites (18.7).
 
 ## 13. OpenAPI and the API diff (`openapi/`)
 

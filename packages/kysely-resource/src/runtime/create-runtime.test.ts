@@ -2,8 +2,9 @@
  * `createResourceRuntime` (resource SPEC 18.3, 18.4) on PGlite, which has
  * roles and row security as a server has: the static checks, then the
  * connected ones as the role the session runs as. A role row security
- * applies to starts the runtime, whose domain runs each operation as the
- * actor; a superuser, a role with BYPASSRLS, and a role that owns a
+ * applies to starts the runtime, which lists the declared resource of
+ * each behavior and whose domain runs each operation as the actor; a
+ * superuser, a role with BYPASSRLS, and a role that owns a
  * scoped table without FORCE are refused, each with every other problem.
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -17,7 +18,7 @@ import {
 } from '../test-support/boot-catalog';
 import { bootOptions } from '../test-support/boot-options';
 import { contractDatabase } from '../test-support/database';
-import { member } from '../test-support/domain';
+import { BEHAVIORS, member } from '../test-support/domain';
 import { domainStorage, OUTBOX_TABLE } from '../test-support/domain-database';
 import { createResourceRuntime } from './create-runtime';
 
@@ -87,6 +88,23 @@ describe('createResourceRuntime (resource SPEC 18.3, 18.4)', () => {
     expect(created).toMatchObject({ title: 'Boot', workspace: '1' });
     expect(mine?.rows).toEqual([created]);
     expect(theirs?.rows).toEqual([]);
+  });
+
+  it('lists the declared resource of each behavior, in the order of resources', async () => {
+    const options = await liveOptions();
+    const { tasks, workspaces, logs } = BEHAVIORS;
+    const runtime = await as('boot_app', async () =>
+      createResourceRuntime({
+        ...options,
+        resources: { workspaces, logs, tasks },
+      }),
+    );
+    expect(runtime.resources).toHaveLength(3);
+    expect(runtime.resources[0]).toBe(workspaces.resource);
+    expect(runtime.resources[1]).toBe(logs.resource);
+    expect(runtime.resources[2]).toBe(tasks.resource);
+    expect(Object.isFrozen(runtime.resources)).toBe(true);
+    expect(Object.isFrozen(runtime)).toBe(true);
   });
 
   it('carries the warnings of the static checks, and starts despite them', async () => {
