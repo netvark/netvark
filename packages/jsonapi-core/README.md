@@ -284,7 +284,20 @@ objects and their `type` links. A cursor your decoder rejects is reported with
 (type, client ids, undeclared fields, relationship cardinality and types), run the Standard Schema
 validator over the attributes, and return a `ParsedResourceObject` with `attributes` typed as the
 validator's output. Every problem carries an RFC 6901 pointer: `/data/attributes/title`,
-`/data/relationships/author/data/type`.
+`/data/relationships/author/data/type`. A validator issue's `code` and `expected`, when they are
+strings, appear under `meta`, so a client can tell one failed rule from another without parsing the
+`detail`; nothing else of the issue is kept, so no value from the request reaches the response:
+
+```json
+{
+  "status": "422",
+  "code": "VALIDATION_FAILED",
+  "title": "Validation Failed",
+  "detail": "Too big: expected string to have <=200 characters",
+  "source": { "pointer": "/data/attributes/title" },
+  "meta": { "code": "too_big" }
+}
+```
 
 ```ts
 const { attributes, relationships } = await parseCreateDocument(Articles, await request.json());

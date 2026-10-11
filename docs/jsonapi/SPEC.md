@@ -294,13 +294,14 @@ spread into `errors` and renders this package's errors the same way;
 
 An error object is an `ErrorItem` on `error.errors`:
 
-- `errorItem(code, { detail, source?, meta? })`: the entry's `status`, `code`, `title`, and `type`
-  (when it declares one), then the occurrence's `detail`, address, and `meta`. The address is the
-  `source` as @netvark/ban-core locates it: `pointer` is a path with no location (`pathFromPointer`,
-  RFC 6901 unescaping), `parameter` is a one-segment path in `query`, `header` one in `header`; one
-  item addresses one part of the request, with that precedence when several are given. The format
-  renders them back as `source.pointer`, `source.parameter`, and `source.header` (@netvark/ban-core
-  SPEC 7.2.2); a parameter or header item also carries `meta.location`.
+- `errorItem(code, { detail, source?, meta?, reason?, expected? })`: the entry's `status`, `code`,
+  `title`, and `type` (when it declares one), then the occurrence's `detail`, address, `meta`, and a
+  validator's `reason` and `expected` (rendered as `meta.code` and `meta.expected`). The address is
+  the `source` as @netvark/ban-core locates it: `pointer` is a path with no location
+  (`pathFromPointer`, RFC 6901 unescaping), `parameter` is a one-segment path in `query`, `header`
+  one in `header`; one item addresses one part of the request, with that precedence when several are
+  given. The format renders them back as `source.pointer`, `source.parameter`, and `source.header`
+  (@netvark/ban-core SPEC 7.2.2); a parameter or header item also carries `meta.location`.
 - `jsonApiError(code, { detail?, source?, meta?, cause?, headers? })`: one error object from the
   catalog. With no `source` and no `meta` it is
   `jsonApiBan.error(code, { detail, cause, headers })`; otherwise the error carries one item, and a
@@ -699,8 +700,11 @@ object at `pointer` (default `/data`):
    declared cardinality and type, `lids` passed through (`#crud-updating-resource-relationships`).
 8. With no structural errors, the attributes (an empty object when absent) are validated by the
    definition's `create` or `update` Standard Schema; each issue becomes a `VALIDATION_FAILED` (422)
-   object whose pointer is `pointer/attributes` plus the issue path. Without a validator the
-   attributes pass through.
+   object whose pointer is `pointer/attributes` plus the issue path. The issue's `code` and
+   `expected`, when they are strings, become the item's `reason` and `expected`, which
+   `@netvark/ban-core`'s JSON:API format renders as `meta.code` and `meta.expected`; nothing else of
+   a vendor's issue is kept, so no value from the request reaches the response. Without a validator
+   the attributes pass through.
 
 Returns
 `ParsedResourceObject<TAttributes, TLinkage> = { type, id, lid, attributes, relationships, meta }`

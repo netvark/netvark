@@ -76,6 +76,25 @@ describe('errorItem', () => {
     ).toEqual([]);
   });
 
+  it("keeps a validator's reason and expected, and leaves them out when absent", () => {
+    expect(
+      errorItem('VALIDATION_FAILED', {
+        detail: 'Must be at most 200 characters.',
+        reason: 'maxLength',
+        expected: '200',
+      }),
+    ).toMatchObject({ reason: 'maxLength', expected: '200' });
+    expect(
+      Object.keys(
+        errorItem('VALIDATION_FAILED', {
+          detail: 'x',
+          reason: undefined,
+          expected: undefined,
+        }),
+      ),
+    ).toEqual(['status', 'code', 'title', 'detail']);
+  });
+
   it('locates parameters in the query and headers in the headers', () => {
     expect(
       errorItem('INVALID_QUERY_PARAMETER', {

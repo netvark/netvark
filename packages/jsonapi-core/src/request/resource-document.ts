@@ -13,7 +13,10 @@
 import type { ErrorItem } from '@netvark/ban-core';
 
 import type { Meta, ResourceLinkage } from '../document/types';
-import type { StandardSchema } from '../internal/standard-schema-types';
+import type {
+  StandardSchema,
+  StandardSchemaIssue,
+} from '../internal/standard-schema-types';
 import type {
   AnyResource,
   CreateAttributesOf,
@@ -57,10 +60,40 @@ export interface ParsedResourceObject<
   readonly meta: Meta | undefined;
 }
 
+/** `issue[name]` when the vendor's issue has it as a string. */
+function stringMember(
+  issue: StandardSchemaIssue,
+  name: 'code' | 'expected',
+): string | undefined {
+  const value: unknown = Reflect.get(issue, name);
+  return typeof value === 'string' ? value : undefined;
+}
+
 /**
- * Runs the Standard Schema validator; issues become 422 error items whose
- * pointer is the attributes pointer plus the issue path.
+ * A 422 item for one issue: the attributes pointer plus the issue path, and
+ * the issue's `code` and `expected` when they are strings, which
+ * `@netvark/ban-core`'s JSON:API format renders as `meta.code` and
+ * `meta.expected`. Nothing else of the issue is kept, so a value from the
+ * request never reaches the response.
  */
+function issueItem(issue: StandardSchemaIssue, pointer: string): ErrorItem {
+  return errorItem('VALIDATION_FAILED', {
+    detail: issue.message,
+    source: {
+      pointer:
+        pointer +
+        toPointer(
+          (issue.path ?? []).map((segment) =>
+            typeof segment === 'object' ? String(segment.key) : String(segment),
+          ),
+        ),
+    },
+    reason: stringMember(issue, 'code'),
+    expected: stringMember(issue, 'expected'),
+  });
+}
+
+/** Runs the Standard Schema validator; issues become 422 error items (`issueItem`). */
 async function validateAttributes(
   schema: StandardSchema<unknown, unknown> | undefined,
   attributes: Record<string, unknown>,
@@ -73,24 +106,7 @@ async function validateAttributes(
   if (result.issues === undefined) {
     return result.value;
   }
-  throw jsonApiError(
-    result.issues.map((issue) =>
-      errorItem('VALIDATION_FAILED', {
-        detail: issue.message,
-        source: {
-          pointer:
-            pointer +
-            toPointer(
-              (issue.path ?? []).map((segment) =>
-                typeof segment === 'object'
-                  ? String(segment.key)
-                  : String(segment),
-              ),
-            ),
-        },
-      }),
-    ),
-  );
+  throw jsonApiError(result.issues.map((issue) => issueItem(issue, pointer)));
 }
 
 /**

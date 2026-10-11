@@ -61,6 +61,10 @@ export interface ErrorItemInit {
    */
   readonly source?: ErrorSource | undefined;
   readonly meta?: Meta | undefined;
+  /** A validator's own code for the problem (`maxLength`), rendered as `meta.code`; never a catalog code. */
+  readonly reason?: string | undefined;
+  /** What the validator expected (`200`), rendered as `meta.expected`. */
+  readonly expected?: string | undefined;
 }
 
 export interface JsonApiErrorOptions {
@@ -117,6 +121,8 @@ export function errorItem(
     detail: init.detail,
     ...address(init.source),
     ...(init.meta === undefined ? {} : { meta: init.meta }),
+    ...(init.reason === undefined ? {} : { reason: init.reason }),
+    ...(init.expected === undefined ? {} : { expected: init.expected }),
   };
 }
 
