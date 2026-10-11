@@ -45,7 +45,7 @@ driver, or a Node.js module.
 | Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform` |
-| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`                                                                                        |
+| `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`             |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -1360,6 +1360,23 @@ contacts application's `calls` and resolves it with `PARTITION_ROOT_SQL`, on PGl
 PostgreSQL server; `runtime-partitions.e2e.test.ts`, whose duplicate client id and missing contact
 reach the client as the codes of `calls`; and the contract's cases of obligation 11.
 
+**Relationship targets.** PostgreSQL checks a foreign key without row security, so a write that
+names another scope's row passes it, while a missing row fails it with 23503: the difference would
+tell an actor which ids another tenant holds. The runtime therefore looks every target up in the
+actor's scope before the write (12.3), and answers a target it does not find exactly as the foreign
+key answers a missing one. `relationshipTargets(resource, write, { pointer = '/data' })` lists what
+to look up: for each relationship of the `StorageWrite` with a target id, in the order it carries
+them, `{ relationship, resource, id, error }`, where `resource` is the declared resource the foreign
+key references and `error` is the relationship's `foreignKey` code as `constraintError` makes it
+(the same status, title, detail, and item at `<pointer>/relationships/<name>`), without a cause. It
+leaves out a target the write clears (`null`), one whose foreign key PostgreSQL does not enforce,
+which has no code (9.1) and accepts any id, and a create's reference to its own client id, which the
+foreign key accepts because it checks the row once it is inserted. It throws `TypeError` for a
+resource `declareResource` did not return, a relationship the resource does not have, and a pointer
+that is not an RFC 6901 JSON Pointer. Tests: `relationship-targets.test.ts`. @ref
+https://www.postgresql.org/docs/18/ddl-rowsecurity.html (referential integrity checks always bypass
+row security)
+
 ---
 
 ## 10. Messages and localization (`messages/`, ADR 0009)
@@ -1809,17 +1826,27 @@ must supply, in column order. JavaScript mistakes throw `TypeError`, among them
 `defineResource: contacts: operations.update: "quota" is not one of rules, effects`, and
 `defineResource: contacts: policy must come from definePolicy(contacts, ...) or be denyAll`.
 
-Every operation runs the same lifecycle inside one transaction: policy, rules, quota, write,
-effects; any failure rolls back everything, effects included. A get, an update, or a remove whose
-URL id `schema.id` refuses answers `NOT_FOUND` before the transaction: no row has that id, and
-PostgreSQL would refuse the text (SQLSTATE 22P02, a 500) or read another spelling as the key, such
-as a `uuid` without hyphens or an `int8` with a leading zero (3.4). One it takes is looked up as it
-outputs it, the spelling the row's key reads back in, so a `uuid` in upper case names its row and
-the runtime passes the key on as the server sends it. JSON:API answers a missing resource with 404
-on fetch, update, and remove. An update and a remove read their row with `lock` (12.8), so the row
-the policy and the rules decide on is the row the write changes: under READ COMMITTED a plain read
-takes no lock, and another transaction could change or remove the row between the read and the
-write. @ref https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED @ref
+Every operation runs the same lifecycle inside one transaction: policy, rules, relationship targets,
+quota, write, effects; any failure rolls back everything, effects included. Before a create or an
+update writes, every target its relationships name is looked up in the actor's scope, under the
+scope predicate and the target table's row security: PostgreSQL checks a foreign key without row
+security, so a write naming another scope's row would pass it where a missing row fails it, and the
+difference would tell the actor which ids another tenant holds. A target the lookup does not find
+answers exactly as the foreign key answers a missing one (`relationshipTargets`, 9.5); the foreign
+key still refuses a target removed after the lookup. A runtime over this contract alone looks a
+target up with `get`; the Kysely runtime selects a constant instead (18.4), so a value without a
+read form never fails the lookup. The lookup follows the policy and the rules, so an actor they
+refuse learns nothing of the targets, and precedes the quota's lock, which serializes the creates of
+one scope. A get, an update, or a remove whose URL id `schema.id` refuses answers `NOT_FOUND` before
+the transaction: no row has that id, and PostgreSQL would refuse the text (SQLSTATE 22P02, a 500) or
+read another spelling as the key, such as a `uuid` without hyphens or an `int8` with a leading zero
+(3.4). One it takes is looked up as it outputs it, the spelling the row's key reads back in, so a
+`uuid` in upper case names its row and the runtime passes the key on as the server sends it.
+JSON:API answers a missing resource with 404 on fetch, update, and remove. An update and a remove
+read their row with `lock` (12.8), so the row the policy and the rules decide on is the row the
+write changes: under READ COMMITTED a plain read takes no lock, and another transaction could change
+or remove the row between the read and the write. @ref
+https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED @ref
 https://jsonapi.org/format/1.1/#fetching-resources-responses-404 @ref
 https://jsonapi.org/format/1.1/#crud-updating-responses-404 @ref
 https://jsonapi.org/format/1.1/#crud-deleting-responses-404
@@ -3316,16 +3343,16 @@ operations the declaration declares (3.3), and `include` when it declares an inc
 relationship. Each operation runs the lifecycle of 12.3 in one transaction of `storage.transaction`,
 with every scope the actor has, `scopeValues(scopes, actor)` (12.5), for an unscoped resource too: a
 policy on its table may read them, as one on the tenants table reads the tenant. An actor without a
-value for every scope runs no operation.
+value for every scope runs no operation: `scopeValues` throws its `TypeError` before any statement.
 
-| Operation                  | Runs                                                                                                                                 | Resolves to           |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| `list(request?, options?)` | policy `list`; `storage.list` with the request and `options.total`                                                                   | `Page` of public rows |
-| `get(id)`                  | `storage.get`; policy `get` with the row                                                                                             | the public row        |
-| `create(input)`            | input validation; policy `create`; rules; quota; server values; `storage.create`; effects, whose events `storage.record` writes      | the created row       |
-| `update(id, input)`        | input validation; `storage.lock(..., 'update')`; policy `update`; rules; `storage.update`; effects with the row and the previous row | the updated row       |
-| `remove(id)`               | `storage.lock(..., 'remove')`; policy `remove`; rules; `storage.remove`; effects                                                     | `undefined`           |
-| `include(name, rows)`      | policy `include` for the relationship; the target rows the rows link to, each id once, with `storage.many`                           | the target's rows     |
+| Operation                  | Runs                                                                                                                                                       | Resolves to           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `list(request?, options?)` | policy `list`; `storage.list` with the request and `options.total`                                                                                         | `Page` of public rows |
+| `get(id)`                  | `storage.get`; policy `get` with the row                                                                                                                   | the public row        |
+| `create(input)`            | input validation; policy `create`; rules; relationship targets; quota; server values; `storage.create`; effects, whose events `storage.record` writes      | the created row       |
+| `update(id, input)`        | input validation; `storage.lock(..., 'update')`; policy `update`; rules; relationship targets; `storage.update`; effects with the row and the previous row | the updated row       |
+| `remove(id)`               | `storage.lock(..., 'remove')`; policy `remove`; rules; `storage.remove`; effects                                                                           | `undefined`           |
+| `include(name, rows)`      | policy `include` for the relationship; the target rows the rows link to, each id once, with `storage.many`                                                 | the target's rows     |
 
 - `request` is a keyset request addressed by public names (12.8), typed by the declaration
   (`KeysetRequestOf`); a host builds it from `parseQuery` with `keysetRequest` (11.2).
@@ -3333,14 +3360,24 @@ value for every scope runs no operation.
   parses it, each relationship as its linkage; a missing member is `{}`. `write.create` or
   `write.update` validates it (6.2). A create's `id` is validated by `schema.id` when the
   declaration takes client ids, and stored as that schema outputs it; on any other resource it is
-  refused.
+  refused, as `@netvark/jsonapi-core` refuses it in a request. An update's row is named by its `id`
+  argument, so the input's own `id` is not read. A refusal's items point where a request document
+  holds the member (9.3): `/data/attributes/<name>/...`, `/data/relationships/<name>/data/...`, and
+  `/data/id`.
+- Relationship targets (12.3): for each target `relationshipTargets` lists, the runtime runs
+  `select 1 as "found" from <target table> where "key" = $1::text::<key type> and <scope predicate>`
+  in the operation's transaction, and rejects with the listed error when it finds no row. The
+  statement reads no column, so a target holding a value without a read form is found too.
 - The id of `get`, `update`, and `remove` is refused as `NOT_FOUND` before the transaction when
   `schema.id` refuses it, and otherwise looked up as `schema.id` outputs it (3.4, 12.3).
 - `include` reads in a transaction of its own. `many(tx, resource, ids)` selects the public rows
   whose key is any of `ids`, in the scope, in one statement,
   `where "key" = any($1::text::<key type>[])`; a linked row the actor cannot see is left out, as a
-  `get` of it would answer `NOT_FOUND`. JSON:API requires every included resource to be linked from
-  the primary data and none that was not requested, and does not require every linked one. @ref
+  `get` of it would answer `NOT_FOUND`. An id outside the target key's form names no row and is left
+  out too, and without an id `include` runs no statement. The target's behavior is the one
+  `resources` holds for the relationship's target type, which boot requires (18.3). JSON:API
+  requires every included resource to be linked from the primary data and none that was not
+  requested, and does not require every linked one. @ref
   https://jsonapi.org/format/1.1/#document-compound-documents @ref
   https://jsonapi.org/format/1.1/#fetching-includes
 - After the transaction commits, the events it recorded go to `afterCommit` (18.6).
@@ -3358,6 +3395,7 @@ What an operation rejects with, each a `BanError` a host renders as it is:
 | a policy that denies an include                                                          | `FORBIDDEN` (403) at the `include` parameter (12.2)                                                                  |
 | a rule's `Rejection`                                                                     | `rejectionError` with `errors` (12.4)                                                                                |
 | a quota used up                                                                          | `QUOTA_EXCEEDED` (403) (12.6)                                                                                        |
+| a relationship target the lookup does not find (12.3)                                    | the relationship's `foreignKey` code (404) at `/data/relationships/<name>`, as `relationshipTargets` lists it (9.5)  |
 | a PostgreSQL integrity violation                                                         | `constraintError` (9.5), with `partitionRoot`'s names for a violation a partition raised, once the transaction ended |
 | a keyset refusal (keyset SPEC 9)                                                         | the Cursor Pagination profile's errors, below                                                                        |
 
@@ -3399,23 +3437,40 @@ const delivered = await relayOutbox({
 });
 ```
 
-`relayOutbox` runs one transaction: it selects the oldest `limit` rows,
-`select "position"::text, "name", "version"::text, "payload"::text ... order by "position" limit $1 for update skip locked`,
-calls `deliver` with them in that order as `OutboxEvent`s, `{ position, name, version, payload }`
-with `position` as text, deletes them, `where "position" = any($1::text::int8[])`, and commits; it
-resolves to the number delivered, and the application calls it on a timer or when woken. When
-`deliver` rejects, the transaction rolls back and `relayOutbox` rejects with that error, leaving the
-rows for the next run. Delivery is therefore at least once: a consumer deduplicates by `position`.
-Rows another relay holds are skipped, so concurrent relays never deliver one row at once, and each
-run delivers in `position` order. The outbox table should have no row security, or the relay's role
-must read every row. @ref https://www.postgresql.org/docs/18/sql-select.html#SQL-FOR-UPDATE-SHARE
-@ref https://microservices.io/patterns/data/transactional-outbox.html
+`relayOutbox` runs one READ COMMITTED transaction, whatever `default_transaction_isolation` says: it
+selects the oldest `limit` rows (100 when not given),
+`select "position"::text as "position", ... from <outbox> as "outbox" order by "outbox"."position" limit $1::text::int8 for update skip locked`,
+ordering by the table's column, since a bare `"position"` would name the text the select list casts
+it to and sort `'10'` before `'2'`; it calls `deliver` with them in that order as `OutboxEvent`s,
+`{ position, name, version, payload }` with `position` as text, since an `int8` may exceed 2^53,
+`version` a number, and `payload` parsed from the JSON PostgreSQL printed, deletes them,
+`where "position" = any($1::text::int8[])`, and commits; it resolves to the number delivered, and
+the application calls it on a timer or when woken. An empty outbox resolves to 0 without calling
+`deliver`. Like the storage, the relay runs on `db.withoutPlugins()`, so a plugin of the
+application's never renames its identifiers or keys, and it checks its options before any query,
+throwing `TypeError` for a key that is not an option, a `db` that is not a Kysely instance, an
+`outbox` that is not `{ table, schema? }`, a `deliver` that is not a function, and a `limit` that is
+not a positive integer. When `deliver` rejects, the transaction rolls back and `relayOutbox` rejects
+with that error, leaving the rows for the next run. Delivery is therefore at least once: a consumer
+deduplicates by `position`. Rows another relay holds are skipped, so concurrent relays never deliver
+one row at once, and each run delivers in `position` order. The isolation level is the relay's own
+because under SERIALIZABLE two runs that read and delete rows of one page form a read/write
+dependency cycle, so one fails with a serialization failure after its delivery and delivers again on
+the next run. The outbox table should have no row security, or the relay's role must read every row.
+The relay's role needs `SELECT`, `UPDATE`, which `FOR UPDATE` requires, and `DELETE` on it; the
+API's role needs only `INSERT`, for which an identity column needs no sequence grant, so a request
+never reads another tenant's events. @ref https://www.postgresql.org/docs/18/sql-select.html
+(Description: `FOR UPDATE` "requires UPDATE privilege as well") @ref
+https://www.postgresql.org/docs/18/sql-select.html#SQL-FOR-UPDATE-SHARE @ref
+https://www.postgresql.org/docs/18/sql-select.html#SQL-ORDERBY @ref
+https://www.postgresql.org/docs/18/transaction-iso.html#XACT-SERIALIZABLE @ref
+https://microservices.io/patterns/data/transactional-outbox.html
 
 `afterCommit(events)` is called after an operation's transaction committed, with the events it
 recorded, when there are any, and awaited before the operation resolves. It is a best-effort wake-up
 for the relay, never the delivery: a process that stops between the commit and the call loses only
-the call. What it throws or rejects with goes to `report` when given and is otherwise dropped; it
-never reaches the operation's caller, whose write has committed.
+the call. What it throws or rejects with goes to `report` when given and is otherwise dropped, as is
+what `report` itself throws; neither reaches the operation's caller, whose write has committed.
 
 ### 18.7 Test plan
 
@@ -3428,6 +3483,10 @@ never reaches the operation's caller, whose write has committed.
 - The storage contract (12.9) over `createKyselyStorage`, on PGlite in the package and on PGlite and
   a PostgreSQL server in `e2e/resource` (`RESOURCE_PG_URL`), with obligation 12: a cursor issued in
   one workspace is refused in another.
+- The relay on PGlite in the package (order past nine positions, a rejected delivery, a position
+  past 2^53, no plugins) and on the server in `e2e/resource`, whose sessions default to
+  SERIALIZABLE: a second run delivers the rows the first does not hold, without waiting for it, both
+  commit, and a run whose delivery rejects leaves its rows to the next.
 - `e2e/resource` drives the domain alone, with no HTTP, over the contacts application on PGlite and
   the server, as a role that is neither superuser nor `BYPASSRLS`: one organization never sees
   another's rows with row security on and the policy allowing everything, and with the predicate

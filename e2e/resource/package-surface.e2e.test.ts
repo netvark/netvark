@@ -43,6 +43,7 @@ describe('package surface (SPEC 1, 18.1)', () => {
       'quotaExceeded',
       'reject',
       'rejectionError',
+      'relationshipTargets',
       'scopeValues',
     ]);
   });
@@ -67,7 +68,10 @@ describe('package surface (SPEC 1, 18.1)', () => {
   });
 
   it('@netvark/kysely-resource exports the documented values', () => {
-    expect(Object.keys(runtime).toSorted()).toEqual(['createKyselyStorage']);
+    expect(Object.keys(runtime).toSorted()).toEqual([
+      'createKyselyStorage',
+      'relayOutbox',
+    ]);
   });
 
   it('resolves package.json through the exports map', async () => {

@@ -29,6 +29,10 @@ export type { Policy, PolicyContexts, PolicyInit } from './policy';
 export type { Quota, QuotaContext } from './quota';
 export type { Reject, RejectionErrorOptions, RejectOptions } from './reject';
 export type {
+  RelationshipTarget,
+  RelationshipTargetsOptions,
+} from './relationship-targets';
+export type {
   CreateInputOf,
   IncludableOf,
   MemberNameOf,
@@ -55,4 +59,5 @@ export { PARTITION_ROOT_SQL, partitionViolation } from './partition';
 export { denyAll } from './policy';
 export { defineQuota, quotaExceeded } from './quota';
 export { reject, Rejection, rejectionError } from './reject';
+export { relationshipTargets } from './relationship-targets';
 export { defineScope, scopeValues } from './scope';

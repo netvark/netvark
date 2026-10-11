@@ -15,6 +15,7 @@ export type {
   ContractFixture,
   Point,
 } from './contract/fixture';
+export type { ContractPublicCatalog } from './contract/public-catalog';
 export type { ContractCase, ContractHarness } from './contract/types';
 export type { BoundaryFixture } from './fixture';
 export type { TextStorageCodec } from './oracle/members';

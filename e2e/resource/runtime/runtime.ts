@@ -2,11 +2,14 @@
  * A minimal runtime over `@netvark/resource-core/server` (resource SPEC
  * 12.3), the composition `@netvark/kysely-resource` will ship. A write
  * validates its input with the declaration (`input.ts`), then runs in one
- * transaction scoped to the actor: the policy, the rules, the quota, the
- * write, and the effects, whose events the adapter records with the
- * write, so any failure rolls back everything. An update and a remove
- * read their row with `lock`, so the row the policy and the rules decide
- * on is the row the write changes. A rule's `Rejection` becomes its
+ * transaction scoped to the actor: the policy, the rules, the relationship
+ * targets, the quota, the write, and the effects, whose events the adapter
+ * records with the write, so any failure rolls back everything. Each
+ * target the write names is looked up as the actor, since PostgreSQL
+ * checks a foreign key without row security, and one the lookup does not
+ * find is answered as its foreign key answers a missing row. An update and
+ * a remove read their row with `lock`, so the row the policy and the rules
+ * decide on is the row the write changes. A rule's `Rejection` becomes its
  * code's error, a PostgreSQL integrity violation the declared code
  * `constraintError` finds, a partition's through the adapter's
  * `partitionRoot` (`failure.ts`), and a row the actor cannot see
@@ -26,6 +29,7 @@ import type {
   StorageAdapter,
   StorageListRequest,
   StoragePage,
+  StorageWrite,
 } from '@netvark/resource-core/server';
 
 import type { AppActor, Services } from './domain.ts';
@@ -36,6 +40,7 @@ import { BanError, BUILTIN_CATALOG } from '@netvark/ban-core';
 import {
   quotaExceeded,
   reject,
+  relationshipTargets,
   scopeValues,
 } from '@netvark/resource-core/server';
 
@@ -129,6 +134,22 @@ export function createRuntime<TTransaction>(
     }
     await adapter.record(tx, events);
   };
+  /**
+   * Throws the foreign key's error for the first target the actor's scope
+   * does not hold (resource SPEC 9.5, 12.3). `get` reads the target's
+   * columns; an adapter's own runtime can select a constant instead.
+   */
+  const checkTargets = async (
+    tx: TTransaction,
+    behavior: Behavior,
+    input: StorageWrite,
+  ): Promise<void> => {
+    for (const target of relationshipTargets(behavior.resource, input)) {
+      if ((await adapter.get(tx, target.resource, target.id)) === undefined) {
+        throw target.error;
+      }
+    }
+  };
   const checkQuota = async (
     tx: TTransaction,
     actor: AppActor,
@@ -187,6 +208,7 @@ export function createRuntime<TTransaction>(
         for (const rule of create?.rules ?? []) {
           await rule({ actor, services, reject, input });
         }
+        await checkTargets(tx, behavior, input);
         if (create?.quota !== undefined) {
           await checkQuota(tx, actor, behavior, create.quota);
         }
@@ -222,6 +244,7 @@ export function createRuntime<TTransaction>(
         for (const rule of update?.rules ?? []) {
           await rule({ ...context, reject });
         }
+        await checkTargets(tx, behavior, input);
         const row = await adapter.update(tx, behavior.resource, id, input);
         if (row === undefined) {
           throw notFound();

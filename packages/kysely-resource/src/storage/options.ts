@@ -15,6 +15,12 @@ import type { KyselyStorage, KyselyStorageOptions, TextCodec } from './types';
 
 import { CATALOG_FORMAT } from '@netvark/catalog-core';
 
+import {
+  checkDb,
+  checkKeys,
+  outboxName,
+  plain,
+} from '../internal/kysely-options';
 import { isRecord } from '../internal/object';
 
 const CALLER = 'createKyselyStorage';
@@ -25,9 +31,6 @@ const OPTIONS: ReadonlySet<string> = new Set([
   'defineKeyset',
   'outbox',
 ]);
-const OUTBOX_OPTIONS: ReadonlySet<string> = new Set(['table', 'schema']);
-/** The schema of an outbox table that names none: the schema PostgreSQL creates in every database, and the catalog's default. */
-const DEFAULT_OUTBOX_SCHEMA = 'public';
 
 /** The options as the adapter uses them. */
 export interface StorageConfig {
@@ -37,28 +40,6 @@ export interface StorageConfig {
   readonly codecs: Readonly<Record<string, TextCodec>>;
   readonly defineKeyset: DefineDefaultedKeyset;
   readonly outbox: KyselyStorage['outbox'];
-}
-
-function checkKeys(
-  path: string,
-  value: Readonly<Record<string, unknown>>,
-  known: ReadonlySet<string>,
-): void {
-  for (const key of Object.keys(value)) {
-    if (!known.has(key)) {
-      throw new TypeError(`${CALLER}: ${path}.${key} is not an option`);
-    }
-  }
-}
-
-function checkDb(value: unknown): void {
-  if (
-    !isRecord(value) ||
-    typeof value['withoutPlugins'] !== 'function' ||
-    typeof value['transaction'] !== 'function'
-  ) {
-    throw new TypeError(`${CALLER}: options.db must be a Kysely instance`);
-  }
 }
 
 /** The checks resource-core's definer applies to its catalog, so one object serves both. */
@@ -114,35 +95,6 @@ function checkDefiner(value: unknown): void {
   }
 }
 
-function isName(value: unknown): value is string {
-  return typeof value === 'string' && value !== '';
-}
-
-function outboxName(value: unknown): KyselyStorage['outbox'] {
-  if (value === undefined) {
-    return undefined;
-  }
-  const path = `${CALLER}: options.outbox`;
-  if (!isRecord(value)) {
-    throw new TypeError(`${path} must be { table, schema? }`);
-  }
-  checkKeys('options.outbox', value, OUTBOX_OPTIONS);
-  const { table, schema = DEFAULT_OUTBOX_SCHEMA } = value;
-  if (!isName(table)) {
-    throw new TypeError(`${path}.table must be a table name`);
-  }
-  if (!isName(schema)) {
-    throw new TypeError(`${path}.schema must be a schema name`);
-  }
-  return Object.freeze({ schema, table });
-}
-
-/** `db` without its plugins, typed for statements over any table. */
-function plain<TDatabase>(db: Kysely<TDatabase>): Kysely<AnyDatabase> {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: every table and column the adapter names comes from the catalog the declarations were checked against, so the application's DB type adds nothing to its statements
-  return db.withoutPlugins() as unknown as Kysely<AnyDatabase>;
-}
-
 /** The checked options; throws `TypeError` naming the first option the adapter cannot use. */
 export function storageConfig<TDatabase>(
   options: KyselyStorageOptions<TDatabase>,
@@ -151,8 +103,8 @@ export function storageConfig<TDatabase>(
   if (!isRecord(value)) {
     throw new TypeError(`${CALLER}: options must be an object`);
   }
-  checkKeys('options', value, OPTIONS);
-  checkDb(value['db']);
+  checkKeys(CALLER, 'options', value, OPTIONS);
+  checkDb(CALLER, value['db']);
   checkCatalog(value['catalog']);
   checkCodecs(value['codecs']);
   checkDefiner(value['defineKeyset']);
@@ -161,6 +113,9 @@ export function storageConfig<TDatabase>(
     catalog: options.catalog,
     codecs: options.codecs ?? {},
     defineKeyset: options.defineKeyset,
-    outbox: outboxName(value['outbox']),
+    outbox:
+      value['outbox'] === undefined
+        ? undefined
+        : outboxName(CALLER, value['outbox']),
   };
 }
