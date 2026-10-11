@@ -1850,9 +1850,14 @@ const SCOPE_BINDINGS = {
 
 - `column` MUST equal the column of the same scope in the definer's `scopes`, which `ScopeBindings`
   checks; `satisfies` makes a missing or extra scope a compile error.
-- `session` names a custom configuration parameter, two dotted identifiers
-  (`^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$`), which row security policies read with
-  `current_setting`. @ref https://www.postgresql.org/docs/18/runtime-config-custom.html
+- `session` names a custom configuration parameter, which row security policies read with
+  `current_setting`: two or more simple identifiers joined by dots, such as `app.organization_id` or
+  `app.user.organization_id`, each starting with a letter, `_`, or a character outside ASCII and
+  going on with those, digits, or `$`, as PostgreSQL requires of every custom parameter name;
+  anything else throws `TypeError`. @ref
+  https://www.postgresql.org/docs/18/runtime-config-custom.html @ref
+  https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/misc/guc.c
+  (`valid_custom_variable_name`)
 - `scopeValues(SCOPE_BINDINGS, actor)` gives each scope's `{ scope, column, session, value }` for
   `StorageAdapter.transaction`, and throws `TypeError` when a binding's value is not a string or a
   finite number, so an actor without a tenant never runs unscoped.

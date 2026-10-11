@@ -23,7 +23,7 @@ export type ScopeKey = string | number;
 export interface Scope<TColumn extends string = string, TActor = never> {
   readonly column: TColumn;
   readonly value: (actor: TActor) => ScopeKey;
-  /** A custom parameter: two dotted identifiers, such as `app.organization_id`. */
+  /** A custom parameter: two or more identifiers joined by dots, such as `app.organization_id`. */
   readonly session: string;
 }
 
@@ -41,8 +41,14 @@ export interface ScopeValue {
   readonly value: ScopeKey;
 }
 
-/** What PostgreSQL accepts as a custom parameter name without quoting. */
-const SESSION = /^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/u;
+/**
+ * What PostgreSQL accepts as a custom parameter name: two or more simple
+ * identifiers joined by dots, each starting with a letter, `_`, or a
+ * character outside ASCII, and going on with those, digits, or `$`.
+ * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/misc/guc.c (valid_custom_variable_name: "two or more simple identifiers separated by dots")
+ */
+const SESSION =
+  /^[A-Za-z_\P{ASCII}][\w$\P{ASCII}]*(?:\.[A-Za-z_\P{ASCII}][\w$\P{ASCII}]*)+$/u;
 
 /** A scope's binding, frozen; throws `TypeError` for a binding JavaScript got wrong. */
 export function defineScope<const TColumn extends string, TActor>(
@@ -64,7 +70,7 @@ export function defineScope<const TColumn extends string, TActor>(
   const session = value['session'];
   if (typeof session !== 'string' || !SESSION.test(session)) {
     throw new TypeError(
-      `defineScope: ${value['column']}: session must be two dotted identifiers, such as app.organization_id`,
+      `defineScope: ${value['column']}: session must be two or more identifiers joined by dots, such as app.organization_id`,
     );
   }
   return Object.freeze({ column: scope.column, value: scope.value, session });
