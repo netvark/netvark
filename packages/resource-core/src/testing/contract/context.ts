@@ -93,6 +93,7 @@ export function defaultTask(
     createdIn: workspace,
     priority: 'normal',
     rank: null,
+    checklist: null,
     workspace,
     parent: null,
   };

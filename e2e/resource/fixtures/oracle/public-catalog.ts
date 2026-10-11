@@ -1588,6 +1588,19 @@ const value = {
           "default": null,
           "identity": null,
           "generated": null
+        },
+        "flags": {
+          "type": "bool",
+          "typeKind": "base",
+          "array": true,
+          "sqlType": "boolean[]",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
         }
       },
       "constraints": {

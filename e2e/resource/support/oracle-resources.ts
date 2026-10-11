@@ -71,6 +71,7 @@ export const Others = declareResource('others', {
     calm: rw,
     days: rw,
     keys: rw,
+    flags: rw,
   },
 });
 

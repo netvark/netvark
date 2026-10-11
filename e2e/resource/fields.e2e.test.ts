@@ -202,7 +202,7 @@ describe('the probes the field metadata gives', () => {
       probes.some((probe) => testsStated(probe)),
     );
     // A citext key and a numeric key without a scale state nothing a probe tests.
-    expect(stated.length).toBe(46);
+    expect(stated.length).toBe(47);
   });
 
   it("describe a bool key's ids and the options, as the emitted declarations type them", () => {
