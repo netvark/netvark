@@ -34,6 +34,24 @@ export interface FinishOptions {
 }
 
 /**
+ * Throws for a null value on a key whose field is not declared nullable:
+ * the seek and the order treat such a key as holding no nulls (ADR 0016),
+ * so pages would skip or misplace every row that holds one.
+ */
+function assertNullable(
+  plan: QueryPlan,
+  values: ReadonlyArray<CursorValue>,
+): void {
+  plan.keys.forEach((key, index) => {
+    if (values[index] === null && !key.nullable) {
+      throw new TypeError(
+        `sort key ${key.field} is null, but the field is not declared nullable`,
+      );
+    }
+  });
+}
+
+/**
  * `values(row)` returns the row's sort-key values in `plan.keys` order,
  * each a string or `null`, as the adapter selected them.
  */
@@ -60,6 +78,7 @@ export async function finishPage<TRow>(
           'sort key values must be one string or null per plan key',
         );
       }
+      assertNullable(plan, keyValues);
       return codec.encode(keyValues, plan.context);
     }),
   );

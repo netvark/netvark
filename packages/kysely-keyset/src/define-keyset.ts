@@ -1,3 +1,5 @@
+import type { SelectType } from 'kysely';
+
 /**
  * `createDefineKeyset<DB>()` (SPEC 10.1): a `defineKeyset` that checks
  * every table and column name of a definition against the application's
@@ -33,11 +35,20 @@ type ColumnOf<
   TTable extends keyof TDatabase,
 > = keyof TDatabase[TTable] & string;
 
-/** A column field whose `column` is one of the table's. */
-export type TypedColumnFieldInit<
-  TDatabase,
-  TTable extends keyof TDatabase,
-> = ColumnFieldInit & { readonly column: ColumnOf<TDatabase, TTable> };
+/**
+ * A column field whose `column` is one of the table's, declared
+ * `nullable: true` when the column's selected type includes `null`: the
+ * seek trusts a field's nullability (keyset ADR 0016), so a nullable column
+ * declared otherwise would have its pages skip every row whose value is
+ * null.
+ */
+export type TypedColumnFieldInit<TDatabase, TTable extends keyof TDatabase> = {
+  readonly [TColumn in ColumnOf<TDatabase, TTable>]: ColumnFieldInit & {
+    readonly column: TColumn;
+  } & (null extends SelectType<TDatabase[TTable][TColumn]>
+      ? { readonly nullable: true }
+      : unknown);
+}[ColumnOf<TDatabase, TTable>];
 
 /** A relation to one of the database's tables, joined on its columns. */
 export interface TypedRelationInit<

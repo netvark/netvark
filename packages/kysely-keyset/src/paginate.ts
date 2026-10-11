@@ -84,6 +84,9 @@ function orderAndSelect<TRow>(
       (eb) => renderTarget(eb, key.target, context),
       (ob) => {
         const directed = key.direction === 'asc' ? ob.asc() : ob.desc();
+        if (key.nulls === null) {
+          return directed;
+        }
         return key.nulls === 'first'
           ? directed.nullsFirst()
           : directed.nullsLast();

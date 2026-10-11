@@ -10,9 +10,10 @@ import type { RawBuilder, SqlBool } from 'kysely';
  * where the scope predicate, the plan's filter, and its seek hold. Each
  * sort key is selected as text, under its plan alias behind a `.`, which no
  * public name holds (resource SPEC 4.2), so no member's alias meets it,
- * and ordered with its direction and null placement; the plan's limit is
- * one row past the page. With `total`, a second statement counts the rows
- * of the scope the filter selects. `list` never counts rows to find a page.
+ * and ordered with its direction and, on a nullable key, its null
+ * placement (keyset ADR 0016); the plan's limit is one row past the page.
+ * With `total`, a second statement counts the rows of the scope the filter
+ * selects. `list` never counts rows to find a page.
  * @ref https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md (section 6, the query plan)
  * @ref https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST / LAST)
  * @packageDocumentation
@@ -46,7 +47,9 @@ import { readRow } from './values';
 
 const DIRECTIONS: Readonly<Record<PlanKey['direction'], RawBuilder<unknown>>> =
   { asc: sql`asc`, desc: sql`desc` };
-const NULLS: Readonly<Record<PlanKey['nulls'], RawBuilder<unknown>>> = {
+const NULLS: Readonly<
+  Record<NonNullable<PlanKey['nulls']>, RawBuilder<unknown>>
+> = {
   first: sql`nulls first`,
   last: sql`nulls last`,
 };
@@ -110,10 +113,10 @@ export async function listRows(
     (key) =>
       sql`cast(${renderTarget(eb, key.target, render)} as text) as ${sql.id(keyAlias(key))}`,
   );
-  const order = plan.keys.map(
-    (key) =>
-      sql`${renderTarget(eb, key.target, render)} ${DIRECTIONS[key.direction]} ${NULLS[key.nulls]}`,
-  );
+  const order = plan.keys.map((key) => {
+    const directed = sql`${renderTarget(eb, key.target, render)} ${DIRECTIONS[key.direction]}`;
+    return key.nulls === null ? directed : sql`${directed} ${NULLS[key.nulls]}`;
+  });
   const fetched = await tx.execute((db) =>
     sql<Row>`select ${selectList(resource)}, ${sql.join(keys)} from ${from} where ${conjunction(sought)} order by ${sql.join(order)} limit ${plan.limit}`.compile(
       db,

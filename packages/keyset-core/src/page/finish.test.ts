@@ -147,21 +147,36 @@ describe('finishPage', () => {
     expect(empty.prev).toBe(after);
   });
 
-  it('passes the total through and encodes null key values', async () => {
-    const first = await plan({ page: { size: 1 } });
+  it('passes the total through and encodes the null value of a nullable key', async () => {
+    const first = await plan({ sort: ['age'], page: { size: 1 } });
     const page = await finishPage(
       first,
       codec,
       [{ id: 'n', keyset0: null }],
-      values,
-      {
-        total: 42,
-      },
+      (row) => [row.keyset0, row.id],
+      { total: 42 },
     );
     expect(page.total).toBe(42);
-    expect(await decodeAll(page, first.context)).toEqual([
-      { ok: true, values: [null] },
-    ]);
+    expect(
+      await Promise.all(
+        page.cursors.map(async (cursor) =>
+          codec.decode(cursor, first.context, 2),
+        ),
+      ),
+    ).toEqual([{ ok: true, values: [null, 'n'] }]);
+  });
+
+  it('refuses a null value on a key whose field is not declared nullable', async () => {
+    const first = await plan({ page: { size: 1 } });
+    expect(
+      await rejected(
+        finishPage(first, codec, [{ id: 'n', keyset0: null }], values),
+      ),
+    ).toEqual(
+      new TypeError(
+        'sort key id is null, but the field is not declared nullable',
+      ),
+    );
   });
 
   it('rejects key values of the wrong shape', async () => {

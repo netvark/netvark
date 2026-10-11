@@ -106,9 +106,12 @@ const contacts = defineKeyset({
 - **Fields** are the request's vocabulary; `column` is the database's. The twelve scalar types are
   `text`, `integer`, `bigint`, `decimal`, `float`, `boolean`, `uuid`, `enum` (with `values`),
   `date`, `time`, `timestamp`, `timestamptz`; `array` takes an element type in `of`. `nullable`
-  (default `false`) enables `isNull`; `sortable` (default `true`; always `false` for arrays) keeps a
-  field out of `sort`; `operators` narrows the operators the type allows; `collation: 'insensitive'`
-  on `text` compares, matches, and sorts through `lower()`.
+  (default `false`) enables `isNull` and tells the planner where nulls can be: a field that is not
+  nullable gets no null branch in the seek and no null placement in the order, and a null sort value
+  from it is a `TypeError`, so declare it for every column that can hold `null`. `sortable` (default
+  `true`; always `false` for arrays) keeps a field out of `sort`; `operators` narrows the operators
+  the type allows; `collation: 'insensitive'` on `text` compares, matches, and sorts through
+  `lower()`.
 - **Aggregates** are values over a relation's rows: `count`, or `max`, `min`, `sum`, `avg` of a
   column, with the type the function produces. They sort and filter like any other field, with the
   key breaking their ties.

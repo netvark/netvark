@@ -11,6 +11,13 @@ const created: ColumnTarget = {
   type: 'timestamptz',
   lower: false,
 };
+const name: ColumnTarget = {
+  kind: 'column',
+  table: 'contacts',
+  column: 'name',
+  type: 'text',
+  lower: false,
+};
 const id: ColumnTarget = {
   kind: 'column',
   table: 'contacts',
@@ -19,13 +26,24 @@ const id: ColumnTarget = {
   lower: false,
 };
 
-const createdAsc = { target: created, direction: 'asc' } as const;
-const createdDesc = { target: created, direction: 'desc' } as const;
-const idAsc = { target: id, direction: 'asc' } as const;
+/** `created_at` is nullable; `name` and the key `id` are not. */
+const createdAsc = {
+  target: created,
+  direction: 'asc',
+  nullable: true,
+} as const;
+const createdDesc = {
+  target: created,
+  direction: 'desc',
+  nullable: true,
+} as const;
+const nameAsc = { target: name, direction: 'asc', nullable: false } as const;
+const nameDesc = { target: name, direction: 'desc', nullable: false } as const;
+const idAsc = { target: id, direction: 'asc', nullable: false } as const;
 
 function compare(
   target: ColumnTarget,
-  operator: '=' | '>' | '<',
+  operator: '=' | '>' | '>=' | '<' | '<=',
   value: string,
 ): Predicate {
   return { kind: 'compare', target, operator, value };
@@ -35,19 +53,31 @@ function isNull(target: ColumnTarget, negate = false): Predicate {
   return { kind: 'null', target, negate };
 }
 
-describe('seekPredicate', () => {
-  it('after a value, ascending: greater values and the nulls that sort last', () => {
-    expect(seekPredicate([createdAsc], ['2024'], 'after')).toEqual({
-      kind: 'or',
-      items: [compare(created, '>', '2024'), isNull(created)],
-    });
+function and(...items: ReadonlyArray<Predicate>): Predicate {
+  return { kind: 'and', items };
+}
+
+function or(...items: ReadonlyArray<Predicate>): Predicate {
+  return { kind: 'or', items };
+}
+
+describe('seekPredicate over one key', () => {
+  it('after a value of a nullable key: greater values and the nulls that sort last', () => {
+    expect(seekPredicate([createdAsc], ['2024'], 'after')).toEqual(
+      or(compare(created, '>', '2024'), isNull(created)),
+    );
+    expect(seekPredicate([createdDesc], ['2024'], 'after')).toEqual(
+      or(compare(created, '<', '2024'), isNull(created)),
+    );
   });
 
-  it('after a value, descending: smaller values and the nulls', () => {
-    expect(seekPredicate([createdDesc], ['2024'], 'after')).toEqual({
-      kind: 'or',
-      items: [compare(created, '<', '2024'), isNull(created)],
-    });
+  it('after a value of a key that is not nullable: the comparison alone', () => {
+    expect(seekPredicate([nameAsc], ['m'], 'after')).toEqual(
+      compare(name, '>', 'm'),
+    );
+    expect(seekPredicate([nameDesc], ['m'], 'after')).toEqual(
+      compare(name, '<', 'm'),
+    );
   });
 
   it('before a value: the opposite comparison, never a null', () => {
@@ -59,6 +89,13 @@ describe('seekPredicate', () => {
     );
   });
 
+  it('without a key nothing lies beyond the cursor', () => {
+    expect(seekPredicate([], [], 'after')).toEqual({
+      kind: 'literal',
+      value: false,
+    });
+  });
+
   it('after a null there is nothing on that key; before a null, every value', () => {
     expect(seekPredicate([createdAsc], [null], 'after')).toEqual({
       kind: 'literal',
@@ -68,48 +105,84 @@ describe('seekPredicate', () => {
       isNull(created, true),
     );
   });
+});
 
-  it('breaks ties on the next key with prefix equality', () => {
-    expect(seekPredicate([createdDesc, idAsc], ['2024', 'k'], 'after')).toEqual(
-      {
-        kind: 'or',
-        items: [
-          {
-            kind: 'or',
-            items: [compare(created, '<', '2024'), isNull(created)],
-          },
-          {
-            kind: 'and',
-            items: [
-              compare(created, '=', '2024'),
-              { kind: 'or', items: [compare(id, '>', 'k'), isNull(id)] },
-            ],
-          },
-        ],
-      },
+describe('seekPredicate over several keys', () => {
+  it('leads with a range on a first key that is not nullable, after and before', () => {
+    expect(seekPredicate([nameAsc, idAsc], ['m', 'k'], 'after')).toEqual(
+      and(
+        compare(name, '>=', 'm'),
+        or(
+          compare(name, '>', 'm'),
+          and(compare(name, '=', 'm'), compare(id, '>', 'k')),
+        ),
+      ),
+    );
+    expect(seekPredicate([nameDesc, idAsc], ['m', 'k'], 'after')).toEqual(
+      and(
+        compare(name, '<=', 'm'),
+        or(
+          compare(name, '<', 'm'),
+          and(compare(name, '=', 'm'), compare(id, '>', 'k')),
+        ),
+      ),
+    );
+    expect(seekPredicate([nameAsc, idAsc], ['m', 'k'], 'before')).toEqual(
+      and(
+        compare(name, '<=', 'm'),
+        or(
+          compare(name, '<', 'm'),
+          and(compare(name, '=', 'm'), compare(id, '<', 'k')),
+        ),
+      ),
+    );
+    expect(seekPredicate([nameDesc, idAsc], ['m', 'k'], 'before')).toEqual(
+      and(
+        compare(name, '>=', 'm'),
+        or(
+          compare(name, '>', 'm'),
+          and(compare(name, '=', 'm'), compare(id, '<', 'k')),
+        ),
+      ),
     );
   });
 
-  it('matches a null prefix with IS NULL so rows inside the null run can continue', () => {
-    expect(seekPredicate([createdAsc, idAsc], [null, 'k'], 'after')).toEqual({
-      kind: 'or',
-      items: [
-        { kind: 'literal', value: false },
-        {
-          kind: 'and',
-          items: [
-            isNull(created),
-            { kind: 'or', items: [compare(id, '>', 'k'), isNull(id)] },
-          ],
-        },
-      ],
-    });
-    expect(seekPredicate([createdAsc, idAsc], [null, 'k'], 'before')).toEqual({
-      kind: 'or',
-      items: [
-        isNull(created, true),
-        { kind: 'and', items: [isNull(created), compare(id, '<', 'k')] },
-      ],
-    });
+  it('after a value of a nullable first key, no range holds the nulls, so none leads', () => {
+    expect(seekPredicate([createdDesc, idAsc], ['2024', 'k'], 'after')).toEqual(
+      or(
+        or(compare(created, '<', '2024'), isNull(created)),
+        and(compare(created, '=', '2024'), compare(id, '>', 'k')),
+      ),
+    );
+  });
+
+  it('before a value of a nullable first key, the range leads, since no null sorts before a value', () => {
+    expect(seekPredicate([createdAsc, idAsc], ['2024', 'k'], 'before')).toEqual(
+      and(
+        compare(created, '<=', '2024'),
+        or(
+          compare(created, '<', '2024'),
+          and(compare(created, '=', '2024'), compare(id, '<', 'k')),
+        ),
+      ),
+    );
+  });
+
+  it('after a null, the nulls lead and the null prefix continues inside them', () => {
+    expect(seekPredicate([createdAsc, idAsc], [null, 'k'], 'after')).toEqual(
+      and(
+        isNull(created),
+        or(
+          { kind: 'literal', value: false },
+          and(isNull(created), compare(id, '>', 'k')),
+        ),
+      ),
+    );
+  });
+
+  it('before a null, every value of the first key may lie before it, so nothing leads', () => {
+    expect(seekPredicate([createdAsc, idAsc], [null, 'k'], 'before')).toEqual(
+      or(isNull(created, true), and(isNull(created), compare(id, '<', 'k'))),
+    );
   });
 });

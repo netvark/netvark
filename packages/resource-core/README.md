@@ -1098,8 +1098,9 @@ option, operator, or code, a loosened limit, and a new default page size break n
 - **Page with the plan, not around it.** Pass every value of the plan as a parameter of its column's
   type, a cursor's values too: they are the text each key was selected as. Read back through a
   driver's `Date` or `number`, a `timestamptz` loses its microseconds and an `int8` past 2^53 its
-  last digits, and the next page repeats or skips a row. Order with each key's `nulls`, since
-  PostgreSQL's default puts nulls first when descending, and never page with `offset`.
+  last digits, and the next page repeats or skips a row. Order with each key's `nulls` where it is
+  set, since PostgreSQL's default puts nulls first when descending, and with no placement where it
+  is `null`, so a plain index serves the order; never page with `offset`.
 - **Pick the narrowest access.** `immutable` for values fixed at creation, `read` for columns the
   database or the server sets, `write` only for values clients send but never read back. The access
   is what a write may carry: a client that sends a `read` member, or an `immutable` one on update,

@@ -95,13 +95,13 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
   'signs cursors with Web Crypto and reads them back': async () => {
     const plan = await contacts.plan({
-      sort: ['-createdAt'],
+      sort: ['-age'],
       page: { size: 2 },
     });
     const rows = [
-      { id: 'a', keyset0: '2024-01-01 00:00:00+00', keyset1: 'a' },
+      { id: 'a', keyset0: '40', keyset1: 'a' },
       { id: 'b', keyset0: null, keyset1: 'b' },
-      { id: 'c', keyset0: '2023-01-01 00:00:00+00', keyset1: 'c' },
+      { id: 'c', keyset0: '20', keyset1: 'c' },
     ];
     const page = await contacts.page(plan, rows, (row) => [
       row.keyset0,
@@ -111,10 +111,10 @@ const CHECKS: Readonly<Record<string, Check>> = {
     equal(page.hasNext, true, 'hasNext');
     check(typeof page.next === 'string', 'next cursor');
     const next = await contacts.plan({
-      sort: ['-createdAt'],
+      sort: ['-age'],
       page: { size: 2, after: page.next },
     });
-    equal(next.seek?.kind, 'or', 'seek from the cursor');
+    equal(next.seek?.kind, 'and', 'seek from the cursor');
   },
   'renders SQL through Kysely without a database': async () => {
     const events: Array<QueryEvent> = [];
@@ -147,7 +147,12 @@ const CHECKS: Readonly<Record<string, Check>> = {
       sql.includes("websearch_to_tsquery('simple', $"),
       `text search: ${sql}`,
     );
-    check(sql.includes('asc nulls last'), `null placement: ${sql}`);
+    check(
+      sql.includes(
+        'order by lower("contacts"."name") asc, "contacts"."id" asc limit $',
+      ),
+      `order without null placement on keys that are not nullable: ${sql}`,
+    );
     check(sql.includes('limit $'), `limit: ${sql}`);
   },
   'binds cursors to the caller context': async () => {
@@ -163,7 +168,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     );
     check(typeof page.next === 'string', 'next cursor');
     const resumed = await contacts.plan({ page: { after: page.next } }, acme);
-    equal(resumed.seek?.kind, 'or', 'resumes under the same context');
+    equal(resumed.seek?.kind, 'compare', 'resumes under the same context');
     try {
       await contacts.plan(
         { page: { after: page.next } },

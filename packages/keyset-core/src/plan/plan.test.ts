@@ -46,7 +46,8 @@ describe('createPlanner', () => {
           lower: false,
         },
         direction: 'asc',
-        nulls: 'last',
+        nulls: null,
+        nullable: false,
       },
     ]);
     expect(result.context).toMatch(/^[A-Za-z0-9_-]{43}$/u);
@@ -57,7 +58,7 @@ describe('createPlanner', () => {
     expect(keyAlias(12)).toBe('keyset12');
   });
 
-  it('orders by the requested sort with nulls last and the key as tie-breaker', async () => {
+  it('orders by the requested sort, nulls last on nullable keys, the key breaking ties', async () => {
     const result = await plan({ sort: ['-lastName', 'age'] });
     expect(
       result.keys.map(({ alias, field, direction, nulls }) => [
@@ -69,7 +70,7 @@ describe('createPlanner', () => {
     ).toEqual([
       ['keyset0', 'lastName', 'desc', 'last'],
       ['keyset1', 'age', 'asc', 'last'],
-      ['keyset2', 'id', 'asc', 'last'],
+      ['keyset2', 'id', 'asc', null],
     ]);
     expect(result.keys[0]?.target).toMatchObject({
       column: 'last_name',

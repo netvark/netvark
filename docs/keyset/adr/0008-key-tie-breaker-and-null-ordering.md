@@ -1,6 +1,7 @@
 # ADR 0008: The key is a mandatory tie-breaker; `NULLS LAST` forward, inverted on backward pages
 
-- Status: accepted
+- Status: accepted; partly superseded by ADR 0016 (the seek consults nullability and leads with a
+  range on the first key; a key that is not nullable gets no null placement)
 - Date: 2026-10-08
 
 ## Context

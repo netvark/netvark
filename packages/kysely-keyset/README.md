@@ -207,12 +207,13 @@ select "id", "name",
   cast("contacts"."created_at" as text) as "keyset0",
   cast("contacts"."id" as text) as "keyset1"
 from "contacts"
-order by "contacts"."created_at" desc nulls last, "contacts"."id" asc nulls last
+order by "contacts"."created_at" desc, "contacts"."id" asc
 limit $1   -- [21]
 ```
 
 One more row than the page size is fetched to learn whether a next page exists. The key is appended
-to every sort, so the order is total; every key gets an explicit `nulls last`.
+to every sort, so the order is total. A nullable key gets an explicit `nulls last`; a key that is
+not nullable gets no placement, so the order is the one a plain index has (see Best practices).
 
 The next page, through the cursor of the last row (the quick start's request with its filter and
 search):
@@ -228,13 +229,19 @@ where (("contacts"."status" = $1
                   and "contact_emails"."email" like $2))
     and to_tsvector('simple', concat_ws(' ', "contacts"."name", "contacts"."bio"))
         @@ websearch_to_tsquery('simple', $3))
-  and (("contacts"."created_at" < $4 or "contacts"."created_at" is null)
-    or ("contacts"."created_at" = $5
-        and ("contacts"."id" > $6 or "contacts"."id" is null)))
-order by "contacts"."created_at" desc nulls last, "contacts"."id" asc nulls last
-limit $7
--- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
+  and ("contacts"."created_at" <= $4
+    and ("contacts"."created_at" < $5
+      or ("contacts"."created_at" = $6 and "contacts"."id" > $7)))
+order by "contacts"."created_at" desc, "contacts"."id" asc
+limit $8
+-- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
 ```
+
+The seek leads with a range on the first key, `created_at <= $4`, that every row of the disjunction
+after it lies in: PostgreSQL starts an index scan there, at the cursor, instead of filtering every
+entry before it, which it would do with the disjunction alone. The range is there only where it is
+exact: after a value on a nullable first key the rows after the cursor include its nulls, so that
+seek has none.
 
 The cursor's values are bound as text parameters that PostgreSQL casts back to the columns' types,
 so a `timestamptz` keeps its microseconds and a `numeric` its digits. Every request value is a
@@ -244,10 +251,11 @@ The page before a cursor runs inverted so that `limit` keeps the rows nearest th
 rows are reversed back into request order:
 
 ```sql
-... where ("contacts"."created_at" > $1
-       or ("contacts"."created_at" = $2 and "contacts"."id" < $3))
-order by "contacts"."created_at" asc nulls first, "contacts"."id" desc nulls first
-limit $4
+... where ("contacts"."created_at" >= $1
+  and ("contacts"."created_at" > $2
+    or ("contacts"."created_at" = $3 and "contacts"."id" < $4)))
+order by "contacts"."created_at" asc, "contacts"."id" desc
+limit $5
 ```
 
 An insensitive sort, an aggregate sort, and an `isNull` filter:
@@ -259,11 +267,11 @@ select "id", "name",
         where "contact_emails"."contact_id" = "contacts"."id") as text) as "keyset1",
   cast("contacts"."id" as text) as "keyset2"
 from "contacts"
-where not "contacts"."age" is null
-order by lower("contacts"."name") asc nulls last,
+where "contacts"."age" is not null
+order by lower("contacts"."name") asc,
   (select count(*) as "value" from "contact_emails"
-   where "contact_emails"."contact_id" = "contacts"."id") desc nulls last,
-  "contacts"."id" asc nulls last
+   where "contact_emails"."contact_id" = "contacts"."id") desc,
+  "contacts"."id" asc
 limit $1
 ```
 
@@ -349,12 +357,25 @@ Keep both definitions' page bounds equal, since each applies its own default and
   request share cursors, so a cursor from one tenant is accepted by the other and seeks with the
   first tenant's values. Pass it from one place, such as the module that builds the scoped query, so
   no endpoint forgets it; an endpoint that does issues cursors the others reject.
-- **Index for the sorts you offer.** A keyset query is a range scan over the sort columns followed
-  by the key: `create index on contacts (created_at, id)` serves `-createdAt` in both directions. An
-  insensitive field sorts and compares through `lower()`, so index the expression:
-  `create index on contacts (lower(name), id)`. An aggregate sort computes a correlated subquery per
-  candidate row; keep it for small relations, or maintain the value in a column (a trigger or a
-  generated column where PostgreSQL allows it) and declare that column as a plain field.
+- **Declare `nullable` truthfully.** It decides where nulls can be: a field that is not nullable
+  gets no null branch in the seek and no null placement in the order, and a page that meets a null
+  in it throws a `TypeError` instead of skipping the row. The typed definer requires
+  `nullable: true` for a column whose type includes `null`; make the column `NOT NULL` where the
+  data allows rather than declaring a nullable one as not nullable.
+- **Index for the sorts you offer.** Every page is an index range scan that starts at its cursor,
+  however deep, when an index holds the sort columns in the sort's directions followed by the key:
+  `create index on contacts (created_at desc, id)` for `-createdAt`, whose appended key ascends.
+  `(created_at, id)` serves it too, read backward with an incremental sort of each tie (PostgreSQL
+  13 and later), and serves `createdAt` forward. A nullable column sorted descending needs the
+  query's placement in the index: `(age desc nulls last, id)`. In a multi-tenant table the scope
+  column leads: `(organization_id, created_at desc, id)`. The range bounds the first key only: a
+  first key with many equal values (a status, a bulk-loaded timestamp) still reads the entries of
+  its tie before the cursor, and a nullable first key has no range after a value, so sort large
+  tables by `NOT NULL` columns with few ties. An insensitive field sorts and compares through
+  `lower()`, so index the expression: `create index on contacts (lower(name), id)`. An aggregate
+  sort computes a correlated subquery per candidate row; keep it for small relations, or maintain
+  the value in a column (a trigger or a generated column where PostgreSQL allows it) and declare
+  that column as a plain field.
 - **Prefer a stored `tsvector` for search.** `search: { columns }` computes `to_tsvector` per row at
   query time; a generated column with a GIN index answers the same query from the index:
 

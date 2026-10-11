@@ -1,3 +1,5 @@
+import type { LogEvent } from 'kysely';
+
 /**
  * What the tests run against: the storage contract's schema (resource SPEC
  * 12.9) on PGlite through Kysely's PGlite dialect, whose single connection
@@ -51,10 +53,11 @@ export interface TestDatabase {
 /**
  * A database holding the contract's migrations and then `extra`'s. Kysely
  * opens it on its first query, so a harness can hand its adapter to the
- * contract suite before any test runs.
+ * contract suite before any test runs; `log` sees every query it runs.
  */
 export function contractDatabase(
   extra: ReadonlyArray<string> = [],
+  log?: (event: LogEvent) => void,
 ): TestDatabase {
   let opened: Promise<PGlite> | undefined;
   const open = async (): Promise<PGlite> => {
@@ -69,6 +72,7 @@ export function contractDatabase(
   };
   const db = new Kysely<unknown>({
     dialect: new PGliteDialect({ pglite: open }),
+    ...(log === undefined ? {} : { log }),
   });
   return {
     db,

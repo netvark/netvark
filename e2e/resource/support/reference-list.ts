@@ -199,7 +199,8 @@ export async function keysetPage(
       `cast(${render.target(key.target)} as text) as ${quoted(key.alias)}`,
   );
   const order = plan.keys.map(
-    (key) => `${render.target(key.target)} ${key.direction} nulls ${key.nulls}`,
+    (key) =>
+      `${render.target(key.target)} ${key.direction}${key.nulls === null ? '' : ` nulls ${key.nulls}`}`,
   );
   const sql = `select ${[selectList(resource), ...keys].join(', ')} from ${statement.name} where ${where} order by ${order.join(', ')} limit ${String(plan.limit)}`;
   const rows = await tx.client.query(sql, statement.parameters.values);

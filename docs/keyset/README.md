@@ -101,12 +101,12 @@ where (("contacts"."status" = $1
                   and "contact_emails"."email" like $2))
     and to_tsvector('simple', concat_ws(' ', "contacts"."name", "contacts"."bio"))
         @@ websearch_to_tsquery('simple', $3))
-  and (("contacts"."created_at" < $4 or "contacts"."created_at" is null)
-    or ("contacts"."created_at" = $5
-        and ("contacts"."id" > $6 or "contacts"."id" is null)))
-order by "contacts"."created_at" desc nulls last, "contacts"."id" asc nulls last
-limit $7
--- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
+  and ("contacts"."created_at" <= $4
+    and ("contacts"."created_at" < $5
+      or ("contacts"."created_at" = $6 and "contacts"."id" > $7)))
+order by "contacts"."created_at" desc, "contacts"."id" asc
+limit $8
+-- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
 ```
 
 A request that sorts on `bio`, filters `age` with `contains`, asks for 500 rows, or sends a cursor
@@ -131,7 +131,7 @@ const contacts = defineKeyset({
 });
 
 const plan = await contacts.plan({ sort: ['-createdAt'], page: { size: 25, after } });
-// plan.keys: [{ alias: 'keyset0', target: { kind: 'column', column: 'created_at', ... }, direction: 'desc', nulls: 'last' }, ...]
+// plan.keys: [{ alias: 'keyset0', target: { kind: 'column', column: 'created_at', ... }, direction: 'desc', nulls: null, nullable: false }, ...]
 // plan.filter, plan.seek: predicate trees to render; plan.limit: 26
 
 const rows = await runYourQuery(plan); // select ..., cast(created_at as text) as keyset0, cast(id as text) as keyset1
