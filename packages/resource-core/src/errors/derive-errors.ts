@@ -51,6 +51,8 @@ interface Derived {
   readonly entry: ErrorEntry;
   /** A domain CHECK's domain and constraint. */
   readonly domain?: { readonly name: string; readonly constraint: string };
+  /** Whether the definer gave the code, rather than deriving it from the constraint's name. */
+  readonly given?: boolean;
 }
 
 /** The public members among `columns`, other than the scope column. */
@@ -139,12 +141,17 @@ function domainCodes(source: ErrorSource): ReadonlyArray<Derived> {
         label: `domain ${domain}'s CHECK ${constraint}`,
         entry: errorEntry('check', fields),
         domain: { name: domain, constraint },
+        given: rule?.code !== undefined,
       };
     });
   });
 }
 
-/** A domain CHECK's code must match the pattern and be the resource's only code of that name. */
+/**
+ * A domain CHECK's code must match the pattern and be the resource's only
+ * code of that name; the definer's `domains` can give any domain CHECK a
+ * code (SPEC 3.6), and a given code matched the pattern there.
+ */
 function checkDomainCode(
   table: string,
   derived: Derived,
@@ -152,12 +159,12 @@ function checkDomainCode(
 ): void {
   if (!isCode(derived.code)) {
     throw new TypeError(
-      `${table}: ${derived.label} derives code "${derived.code}", which is not A-Z, 0-9, _; rename the constraint`,
+      `${table}: ${derived.label} derives code "${derived.code}", which is not A-Z, 0-9, _; give it a code in createDeclareResource domains`,
     );
   }
   if (takenBy !== undefined) {
     throw new TypeError(
-      `${table}: ${derived.label} derives code ${derived.code}, which ${takenBy.label} also takes`,
+      `${table}: ${derived.label} ${derived.given === true ? 'takes' : 'derives'} code ${derived.code}, which ${takenBy.label} also takes; set code on one of them`,
     );
   }
 }

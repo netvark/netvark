@@ -134,6 +134,26 @@ describe('createDeclareResource', () => {
       validators: { email: TEST_REGISTRIES.validators.email },
       domains: {
         email: {
+          // @ts-expect-error email_format is not a CHECK of the domain
+          email_format: { validator: 'email' },
+        },
+      },
+    });
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: {
+        email: {
+          // @ts-expect-error email_check has no rule, so it needs a validator
+          email_check: { code: 'EMAIL_INVALID' },
+        },
+      },
+    });
+    createDeclareResource({
+      catalog: contactsCatalog,
+      validators: { email: TEST_REGISTRIES.validators.email },
+      domains: {
+        email: {
           // @ts-expect-error phone is not a validator
           email_check: { validator: 'phone' },
         },
@@ -159,6 +179,33 @@ describe('createDeclareResource', () => {
         },
       },
     });
+  });
+
+  it('takes a code alone for a domain CHECK with a rule (SPEC 3.6)', () => {
+    createDeclareResource({
+      catalog: contactsCatalog,
+      domains: { short_text: { short_text_check: { code: 'NAME_LENGTH' } } },
+    });
+    createDeclareResource({
+      catalog: contactsCatalog,
+      domains: {
+        short_text: {
+          // @ts-expect-error a code is A-Z, 0-9, and _
+          short_text_check: { code: 'name length' },
+        },
+      },
+    });
+    const declareResource = createDeclareResource({
+      catalog: contactsCatalog,
+      domains: { short_text: { short_text_check: { code: 'NAME_LENGTH' } } },
+    });
+    const organizations = declareResource('organizations', {
+      operations: ['get', 'update'],
+      fields: { name: { access: 'readWrite' } },
+    });
+    expectTypeOf<keyof typeof organizations.errors>().toEqualTypeOf<
+      'NAME_LENGTH' | 'ORGANIZATIONS_NAME_NOT_NULL'
+    >();
   });
 
   it("checks a domain validator's input against the domain's values (SPEC 3.6, 7.2)", () => {

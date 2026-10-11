@@ -56,14 +56,13 @@ function specContext(context: DefinerContext): SpecContext {
         ownValue(context.domains, domain) ?? {},
         constraint,
       );
+      const name = rule?.validator;
       const validator =
-        rule === undefined
-          ? undefined
-          : ownValue(context.validators, rule.validator);
-      return rule === undefined || validator === undefined
+        name === undefined ? undefined : ownValue(context.validators, name);
+      return rule === undefined || name === undefined || validator === undefined
         ? undefined
         : {
-            name: rule.validator,
+            name,
             validator,
             code: domainCode(constraint, rule),
             check: { domain, constraint },

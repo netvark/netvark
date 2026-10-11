@@ -53,7 +53,7 @@ export interface DeclareResourceConfig<
   readonly validators?: TValidators | undefined;
   /** Scope names to the column holding the actor's tenant (SPEC 3.2). */
   readonly scopes?: TScopes | undefined;
-  /** Validators for domain CHECKs without a rule (SPEC 3.6). */
+  /** Validators for domain CHECKs without a rule, and codes for any domain CHECK (SPEC 3.6). */
   readonly domains?: TDomains | undefined;
   /** Merged under every declaration's links (`@netvark/jsonapi-core`). */
   readonly links?: ResourceLinksInit | undefined;

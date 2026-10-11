@@ -2,10 +2,11 @@ import type { input } from 'zod/v4/core';
 
 /**
  * The type-level check of the definer's `domains` (SPEC 3.6): each key is a
- * domain of the catalog, each constraint one of its CHECKs without a rule,
- * each validator a name of the validator registry whose input accepts
- * what the domain's columns hold (SPEC 7.2), and each given code a code.
- * The runtime twin is `checkDomains` in `check-config.ts`.
+ * domain of the catalog and each constraint one of its CHECKs; a CHECK
+ * without a rule names a validator of the registry whose input accepts
+ * what the domain's columns hold (SPEC 7.2), a CHECK with a rule names
+ * none, and each given code is a code. The runtime twin is `checkDomains`
+ * in `check-config.ts`.
  * @packageDocumentation
  */
 import type { PublicCatalog, PublicDomain } from '@netvark/catalog-core';
@@ -19,6 +20,7 @@ import type {
   ValidatorRegistry,
 } from './registries';
 import type { Requirement } from './requirement';
+import type { MemberOf } from './types';
 
 type UntranslatedDomainCheck<TDomain extends PublicDomain> = {
   [K in keyof TDomain['constraints']]: TDomain['constraints'][K] extends {
@@ -41,10 +43,11 @@ type GivenDomainCode<TRule> = TRule extends {
   : unknown;
 
 /**
- * The requirement that a rule name a validator whose input accepts every
- * value of the domain. A wrong name is a `Requirement` too, not a narrower
- * `validator` type: the rule's literal would intersect with it and reduce
- * to `never`, hiding the message (`requirement.ts`).
+ * The requirement that the entry of a CHECK without a rule name a
+ * validator whose input accepts every value of the domain. A wrong name is
+ * a `Requirement` too, not a narrower `validator` type: the rule's literal
+ * would intersect with it and reduce to `never`, hiding the message
+ * (`requirement.ts`).
  */
 type DomainValidatorRequirement<
   TCatalog extends PublicCatalog,
@@ -52,13 +55,20 @@ type DomainValidatorRequirement<
   TValidators extends ValidatorRegistry,
   TDomain extends string,
   TValidator,
-> = TValidator extends keyof TValidators & string
-  ? [DomainInput<TCatalog, TCodecs, TDomain>] extends [
-      input<TValidators[TValidator]['schema']>,
-    ]
-    ? unknown
-    : Requirement<`validator: "${TValidator}" does not accept every value of domain ${TDomain}`>
-  : Requirement<`validator: "${TValidator & string}" is not a validator of createDeclareResource`>;
+> = [TValidator] extends [undefined]
+  ? Requirement<'validator: a CHECK without a rule needs a validator'>
+  : TValidator extends keyof TValidators & string
+    ? [DomainInput<TCatalog, TCodecs, TDomain>] extends [
+        input<TValidators[TValidator]['schema']>,
+      ]
+      ? unknown
+      : Requirement<`validator: "${TValidator}" does not accept every value of domain ${TDomain}`>
+    : Requirement<`validator: "${TValidator & string}" is not a validator of createDeclareResource`>;
+
+/** The entry of a CHECK with a rule gives its code alone: the rule enforces the CHECK already. */
+type RuledEntryRequirement<TValidator> = [TValidator] extends [undefined]
+  ? unknown
+  : Requirement<'validator: the CHECK has a rule, which enforces it already'>;
 
 /** `domains`, key by key. */
 export interface DomainsCheck<
@@ -73,17 +83,21 @@ export interface DomainsCheck<
           ? {
               readonly [
                 K in keyof TDomains[D]
-              ]: K extends UntranslatedDomainCheck<TCatalog['domains'][D]>
+              ]: K extends keyof TCatalog['domains'][D]['constraints']
                 ? DomainRule &
                     GivenDomainCode<TDomains[D][K]> &
-                    DomainValidatorRequirement<
-                      TCatalog,
-                      TCodecs,
-                      TValidators,
-                      D & string,
-                      TDomains[D][K]['validator']
-                    >
-                : `${K & string} is not a CHECK without a rule of domain ${D & string}`;
+                    (K extends UntranslatedDomainCheck<TCatalog['domains'][D]>
+                      ? DomainValidatorRequirement<
+                          TCatalog,
+                          TCodecs,
+                          TValidators,
+                          D & string,
+                          MemberOf<TDomains[D][K], 'validator'>
+                        >
+                      : RuledEntryRequirement<
+                          MemberOf<TDomains[D][K], 'validator'>
+                        >)
+                : `${K & string} is not a CHECK of domain ${D & string}`;
             }
           : `"${D & string}" is not a domain of the public catalog`;
       }

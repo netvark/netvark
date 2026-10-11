@@ -133,16 +133,27 @@ function checkDomainRule(
     ownValue(catalog.domains, domainName)?.constraints ?? {},
     constraintName,
   );
-  if (constraint?.rule !== null) {
+  if (constraint === undefined) {
     throw new TypeError(
-      constraint === undefined
-        ? `${path}: "${constraintName}" is not a CHECK of domain ${domainName}`
-        : `${path}: the CHECK has a rule, which enforces it already`,
+      `${path}: "${constraintName}" is not a CHECK of domain ${domainName}`,
     );
   }
   const rule = expectRecord(path, value);
   expectKnownKeys(path, rule, ['validator', 'code']);
   const validator = rule['validator'];
+  if (constraint.rule !== null) {
+    if (validator !== undefined) {
+      throw new TypeError(
+        `${path}.validator: the CHECK has a rule, which enforces it already`,
+      );
+    }
+    return checkDomainCode(path, rule['code'], constraintName);
+  }
+  if (validator === undefined) {
+    throw new TypeError(
+      `${path}.validator: a CHECK without a rule needs a validator`,
+    );
+  }
   if (
     typeof validator !== 'string' ||
     ownValue(validators, validator) === undefined

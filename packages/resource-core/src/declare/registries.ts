@@ -28,14 +28,19 @@ export interface ScopeColumn {
 /** Scopes by name. */
 export type ScopeRegistry = Readonly<Record<string, ScopeColumn>>;
 
-/** The validator covering one domain CHECK without a rule (SPEC 3.6). */
+/**
+ * The definer's entry for one domain CHECK (SPEC 3.6): the validator that
+ * covers a CHECK without a rule, or, for a CHECK whose rule enforces it
+ * already, only its code.
+ */
 export interface DomainRule {
-  readonly validator: string;
-  /** The error code its issues carry, in place of the constraint name upper-cased (SPEC 6.4). */
+  /** The validator a CHECK without a rule needs; a CHECK with a rule takes none. */
+  readonly validator?: string | undefined;
+  /** The CHECK's error code, in place of the constraint name upper-cased (SPEC 6.4). */
   readonly code?: string | undefined;
 }
 
-/** Validators for domain CHECKs, by domain reference name and constraint name. */
+/** Entries for domain CHECKs, by domain reference name and constraint name. */
 export type DomainRules = Readonly<
   Record<string, Readonly<Record<string, DomainRule>>>
 >;
