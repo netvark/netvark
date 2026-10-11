@@ -9,7 +9,7 @@
  */
 import type { OracleCase } from '@netvark/resource-core/testing';
 
-import type { ExtractionConfig, RulesConfig } from '../config';
+import type { ExtractionConfig, ResourcesConfig } from '../config';
 import type { OracleModule } from '../oracle/oracle-module';
 import type { RulesReport } from '../oracle/report';
 
@@ -24,6 +24,7 @@ import { runCases } from '../oracle/run-cases';
 import { replay } from '../replay';
 import { openTarget } from '../target/open-target';
 import { useSession } from '../target/session';
+import { callRegistry, resourcesOf } from './registry';
 
 export interface RulesOptions {
   /** The directory relative paths resolve against; default the process's working directory. */
@@ -36,13 +37,6 @@ export interface RulesOptions {
  * (resource SPEC 4.2, 7.3).
  */
 const ORACLE_MISTAKE = /^oracleCases[.:]/u;
-
-function isObjectList(value: unknown): value is ReadonlyArray<object> {
-  return (
-    Array.isArray(value) &&
-    value.every((item) => typeof item === 'object' && item !== null)
-  );
-}
 
 /** The tables `out.public.tables` lists that no declared resource reads. */
 function unusedTables(
@@ -63,10 +57,10 @@ function unusedTables(
 function casesOf(
   oracle: OracleModule,
   resources: ReadonlyArray<object>,
-  rules: RulesConfig,
+  settings: ResourcesConfig,
 ): ReadonlyArray<OracleCase> {
   try {
-    return oracle.oracleCases(resources, { storage: rules.storage });
+    return oracle.oracleCases(resources, { storage: settings.storage });
   } catch (error) {
     if (error instanceof TypeError && ORACLE_MISTAKE.test(error.message)) {
       throw new PgCatalogError('registry_invalid', `rules: ${error.message}`, {
@@ -78,36 +72,24 @@ function casesOf(
 }
 
 /**
- * Checks the declared resources `config.rules.registry` returns against
- * the database `config`'s migrations build. Fails with `config_invalid`
- * when `rules` is not configured, `resource_core_missing` when
- * `@netvark/resource-core` cannot be loaded, and `registry_invalid` when
- * the registry function returns anything but a list of objects or
- * `oracleCases` refuses the registry or the storage codecs; then as
- * `extractCatalog` fails. What the registry function throws is thrown.
- * The database is closed, and a server's throwaway database dropped,
- * before it returns.
+ * Checks the declared resources `config.resources.registry` returns
+ * against the database `config`'s migrations build. Fails with
+ * `config_invalid` when `resources` is not configured,
+ * `resource_core_missing` when `@netvark/resource-core` cannot be loaded,
+ * and `registry_invalid` when the registry function returns anything but
+ * a list of objects or `oracleCases` refuses the registry or the storage
+ * codecs; then as `extractCatalog` fails. What the registry function
+ * throws is thrown. The database is closed, and a server's throwaway
+ * database dropped, before it returns.
  */
 export async function checkRules(
   config: ExtractionConfig,
   options: RulesOptions = {},
 ): Promise<RulesReport> {
-  const { rules } = config;
-  if (rules === undefined) {
-    throw new PgCatalogError(
-      'config_invalid',
-      'rules is not configured: set rules.registry to a function that returns the declared resources',
-    );
-  }
+  const settings = resourcesOf(config);
   const oracle = await importOracle();
-  const resources: unknown = await rules.registry();
-  if (!isObjectList(resources)) {
-    throw new PgCatalogError(
-      'registry_invalid',
-      'rules.registry must return an array of declared resources',
-    );
-  }
-  const cases = casesOf(oracle, resources, rules);
+  const resources = await callRegistry(settings);
+  const cases = casesOf(oracle, resources, settings);
   const migrations = await loadMigrations(
     config.migrations,
     options.cwd ?? process.cwd(),

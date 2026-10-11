@@ -26,7 +26,9 @@ TypeScript value:
 4. **Keep the loop closed.** `extract --check` proves the committed files current in CI, and `drift`
    compares a live database with the committed catalog on a schedule (ADR-0008). The oracle
    (`rules --check`) runs the fixtures of the declared resources through their Zod schemas and
-   through the replayed database, and reports each value they disagree on (ADR-0012).
+   through the replayed database, and reports each value they disagree on (ADR-0012);
+   `surface --check` compares the committed API surface of those declarations with the current one
+   and fails on a breaking change.
 
 ### Who it is for
 

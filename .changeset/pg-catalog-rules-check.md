@@ -10,9 +10,9 @@ migrations build.
   apply: each member's boundary values, each validator's fixtures, and each codec's round trip. It
   prints each fixture on which the schema and PostgreSQL disagree, and exits 1 on a disagreement or
   on a case whose table, column, CHECK, or domain the migrations do not create.
-- Configure it with `rules: { registry, storage }`: `registry` returns the declared resources, so
-  only this command loads them, and `storage` gives a storage codec over text for each codec.
-  `defineExtraction` checks both.
+- Configure it with `resources: { registry, storage }`: `registry` returns the declared resources,
+  so only the commands over them load them, and `storage` gives a storage codec over text for each
+  codec. `defineExtraction` checks both.
 - Refusals are caught inside the database, so a case takes one round trip and PGlite runs any number
   of them.
 - A table of `out.public.tables` that no declaration reads gets a warning.

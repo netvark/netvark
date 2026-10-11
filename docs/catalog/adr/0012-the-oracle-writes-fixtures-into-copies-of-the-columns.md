@@ -46,8 +46,8 @@ and a refusal is an error: PostgreSQL refuses 3,690 of stern's 12,288 member fix
 - `@netvark/resource-core/testing` builds the cases (`oracleCases`): the probe, each fixture's
   texts, and a judge that turns the database's verdict into a disagreement or none. It knows the
   schemas, the wire forms, and what agreement means; `@netvark/pg-catalog` knows the database. The
-  registry's codecs reach the oracle through storage codecs over text (`rules.storage`), since the
-  oracle writes and reads text, whatever an application's driver converts.
+  registry's codecs reach the oracle through storage codecs over text (`resources.storage`), since
+  the oracle writes and reads text, whatever an application's driver converts.
 - A validator's probe drops the columns' NOT NULL: a CHECK passes `NULL`, so the CHECK alone decides
   its fixtures. A member's and a codec's keep it, since a member's schema judges `null` too.
 

@@ -137,8 +137,9 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
 - **Scope tenant data twice.** Declare `scope` and add a row security policy that reads the scope's
   session parameter; the runtime sets the parameter and adds the predicate, so a policy mistake
   still cannot leak rows.
-- **Review the surface with the migration.** Commit the surface snapshot; a column rename shows up
-  as a breaking change, and `as` with the old name keeps the contract.
+- **Review the surface with the migration.** Commit the surface snapshot `pg-catalog surface`
+  writes, in the pull request that changes it; a column rename shows up as a breaking change, and
+  `as` with the old name keeps the contract.
 - **Localize with your i18n library, by kind first.** One message per issue kind and per constraint
   kind covers every resource; override a single code only where the generic sentence is not good
   enough. Reference Paraglide's messages directly, never as `m[key]`, write plurals as variants, and
@@ -148,7 +149,7 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   browser can import; policies, scopes, and quotas go in modules that import
   `@netvark/resource-core/server`.
 - **Run the gates in CI.** `pg-catalog extract --check` keeps the catalog current, `rules --check`
-  runs the oracle, and the surface diff blocks unintended breaking changes.
+  runs the oracle, and `surface --check` blocks breaking changes the snapshot does not record.
 
 ## Documentation
 

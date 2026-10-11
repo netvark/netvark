@@ -1038,19 +1038,21 @@ with the server, whose refusals the error responses document. An example that th
 refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the build fails instead of
 the document lying.
 
-The surface is the part of the document a client can break on, as sorted JSON: per type the
-operations, each member's access, form, limits, options, nullability, requiredness, operators, and
-sortability, the codes with their statuses, and the page bounds. Commit it next to the catalog and
-diff it in CI:
+The surface is the part of the document a client can break on, as sorted JSON: its `format`, then
+per type the operations, each member's access, form, limits, options, nullability, requiredness,
+operators, and sortability, the codes with their statuses, and the page bounds. Commit it next to
+the catalog and diff it in CI. `pg-catalog surface` writes it from the registry your
+`netvark.config.ts` names, and `pg-catalog surface --check` prints each change and exits 1 on a
+breaking one (see `@netvark/pg-catalog`'s README). From code, `parseSurface` reads a committed
+surface back, refusing a file of another `format` or with a member out of place, and `diffSurfaces`
+compares it:
 
 ```ts
-import type { Surface } from '@netvark/resource-core/openapi';
-
 import { readFile } from 'node:fs/promises';
 
-import { diffSurfaces, surfaceOf } from '@netvark/resource-core/openapi';
+import { diffSurfaces, parseSurface, surfaceOf } from '@netvark/resource-core/openapi';
 
-const committed: Surface = JSON.parse(await readFile('api/surface.json', 'utf8'));
+const committed = parseSurface(JSON.parse(await readFile('api-surface.json', 'utf8')));
 const breaking = diffSurfaces(committed, surfaceOf(resources)).filter((change) => change.breaking);
 // [{ path: ['contacts', 'fields', 'email', 'access'], change: 'changed', breaking: true,
 //    before: 'readWrite', after: 'read' }]
@@ -1145,10 +1147,10 @@ option, operator, or code, a loosened limit, and a new default page size break n
 - **Answer the planner's refusals as the parser's.** Map keyset-core's `InvalidCursorError` to
   `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and `InvalidFilterValueError` at its
   `filter[<field>][<operator>]`, as the document's 400 lists them; left unmapped, they answer 500.
-- **Commit the surface and review its diff.** Write `surfaceOf(resources)` next to the catalog, and
-  fail CI on a breaking change unless the API's major version changes with it. A migration that
-  renames a column, tightens a CHECK, or widens an `integer` to a `bigint` shows up there as the
-  public change it is.
+- **Commit the surface and review its diff.** Write it with `pg-catalog surface` next to the
+  catalog, run `pg-catalog surface --check` in CI, and record a breaking change only with the API
+  major version that announces it. A migration that renames a column, tightens a CHECK, or widens an
+  `integer` to a `bigint` shows up there as the public change it is.
 - **Read responses tolerantly.** Handle error codes, options, and members your client does not know,
   and validate responses with schemas that allow them, as `read` and the document's response schemas
   do: the diff counts adding them as safe.

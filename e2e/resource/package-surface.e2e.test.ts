@@ -56,8 +56,10 @@ describe('package surface (SPEC 1)', () => {
 
   it('@netvark/resource-core/openapi exports the documented values', () => {
     expect(Object.keys(openapi).toSorted()).toEqual([
+      'SURFACE_FORMAT',
       'diffSurfaces',
       'openapi',
+      'parseSurface',
       'surfaceOf',
     ]);
   });

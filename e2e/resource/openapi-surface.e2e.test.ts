@@ -11,10 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import { diffSurfaces, surfaceOf } from '@netvark/resource-core/openapi';
 
-import { Contacts } from './resources/contacts.ts';
-import { declareResource } from './resources/declare-resource.ts';
-import { Organizations } from './resources/organizations.ts';
 import { APP_RESOURCES } from './runtime/api.ts';
+import { AFTER, BEFORE } from './support/surface-edits.ts';
 
 describe('the surface of the contacts application', () => {
   it('matches the reviewed snapshot', async () => {
@@ -24,21 +22,7 @@ describe('the surface of the contacts application', () => {
   });
 
   it('tells breaking changes from safe ones between two versions', () => {
-    const { fields } = Contacts.declaration;
-    const edited = declareResource('contacts', {
-      ...Contacts.declaration,
-      operations: ['list', 'get', 'create', 'update'],
-      fields: {
-        ...fields,
-        nickname: { access: 'read' },
-        email: { access: 'readWrite', filter: ['eq', 'in'] },
-        priority: { access: 'readWrite', filter: ['gte', 'lte'] },
-      },
-    });
-    const changes = diffSurfaces(
-      surfaceOf([Organizations, Contacts]),
-      surfaceOf([Organizations, edited]),
-    );
+    const changes = diffSurfaces(surfaceOf(BEFORE), surfaceOf(AFTER));
     expect(
       changes.map(({ path, change, breaking }) => ({
         path: path.join('.'),

@@ -2,9 +2,10 @@
  * `runCli` (SPEC 11.2): runs the command the arguments name, writes results
  * to standard output and errors to standard error as
  * `pg-catalog: <message>`, and returns the exit code: 0 when the files are
- * current, nothing drifted, or the declarations and the database agree; 1
- * when a file is stale, the database drifted, or they disagree; 2 when the
- * command could not run.
+ * current, nothing drifted, the declarations and the database agree, or
+ * the surface has no breaking change; 1 when a file is stale, the database
+ * drifted, they disagree, or the surface broke; 2 when the command could
+ * not run.
  * @packageDocumentation
  */
 import type { ExtractionConfig } from '../config';
@@ -17,7 +18,9 @@ import { drift } from '../commands/drift';
 import { extract } from '../commands/extract';
 import { formatDiff } from '../commands/format-diff';
 import { formatRules } from '../commands/format-rules';
+import { formatSurface } from '../commands/format-surface';
 import { checkRules } from '../commands/rules';
+import { checkSurface, writeSurface } from '../commands/surface';
 import { findConfigFile, loadConfigFile } from '../config-file';
 import { isPgCatalogError, PgCatalogError } from '../errors';
 import { parseCommand, USAGE, UsageError } from './arguments';
@@ -113,6 +116,26 @@ async function runRules(
   return failed ? EXIT_DIFFERENT : EXIT_OK;
 }
 
+async function runSurface(
+  command: Extract<CliCommand, { name: 'surface' }>,
+  io: CliIo,
+): Promise<number> {
+  const { config, directory } = await loadConfig(command.config, io.cwd);
+  if (!command.check) {
+    const report = await writeSurface(config, { cwd: directory });
+    io.stdout(
+      `${report.status.padEnd(STATUS_WIDTH)} ${relative(io.cwd, report.file)}\n`,
+    );
+    return EXIT_OK;
+  }
+  const report = await checkSurface(config, { cwd: directory });
+  io.stdout(`${formatSurface(report, relative(io.cwd, report.file))}\n`);
+  const broken =
+    report.status === 'missing' ||
+    report.changes.some((change) => change.breaking);
+  return broken ? EXIT_DIFFERENT : EXIT_OK;
+}
+
 async function run(args: ReadonlyArray<string>, io: CliIo): Promise<number> {
   const command = parseCommand(args);
   if (command.name === 'help') {
@@ -125,6 +148,9 @@ async function run(args: ReadonlyArray<string>, io: CliIo): Promise<number> {
   }
   if (command.name === 'rules') {
     return runRules(command, io);
+  }
+  if (command.name === 'surface') {
+    return runSurface(command, io);
   }
   return command.name === 'extract'
     ? runExtract(command, io)

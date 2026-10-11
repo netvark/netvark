@@ -52,9 +52,22 @@ const RELATIONSHIP_KEYS: ReadonlyArray<string> = [
   'description',
 ];
 /** The values of `Access`. */
-const ACCESS_MODES = ['read', 'readWrite', 'immutable', 'write'] as const;
-const RELATIONSHIP_ACCESS = ['read', 'readWrite', 'immutable'] as const;
-const RELATIONSHIP_OPERATORS = ['eq', 'ne', 'in', 'nin', 'isNull'] as const;
+export const ACCESS_MODES = [
+  'read',
+  'readWrite',
+  'immutable',
+  'write',
+] as const;
+/** The accesses a relationship takes: never `write` (SPEC 3.1). */
+export const RELATIONSHIP_ACCESS = ['read', 'readWrite', 'immutable'] as const;
+/** The values of `RelationshipOperator`. */
+export const RELATIONSHIP_OPERATORS = [
+  'eq',
+  'ne',
+  'in',
+  'nin',
+  'isNull',
+] as const;
 const SEARCH_MODES = ['websearch', 'plain', 'phrase'] as const;
 const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 

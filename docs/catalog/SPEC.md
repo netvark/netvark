@@ -33,14 +33,14 @@ Contents
 
 Two packages (ADR 0002). `@netvark/catalog-core` is the model and the pure functions over it; it has
 no dependencies and runs anywhere the other cores run. `@netvark/pg-catalog` replays, extracts,
-renders, compares, checks declared resources against the database (10.3), and runs the CLI; it
-depends on `@netvark/catalog-core` (and re-exports all of it) and on `pg`, and takes
-`@electric-sql/pglite` and `@netvark/resource-core` as optional peer dependencies.
+renders, compares, checks declared resources against the database (10.3), records their API surface
+(10.4), and runs the CLI; it depends on `@netvark/catalog-core` (and re-exports all of it) and on
+`pg`, and takes `@electric-sql/pglite` and `@netvark/resource-core` as optional peer dependencies.
 
-| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `toCamelCase`, `toSnakeCase`, `CATALOG_FORMAT`; and the types of sections 2 to 4 and 9.2 (`CamelCaseOptions`, `Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`)                                            |
-| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `checkRules`, `formatRules`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `CatalogFileConfig`, `PublicFileConfig`, `CatalogModuleOptions`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `RulesConfig`, `RulesStorageCodec`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `RulesOptions`, `RulesReport`, `RuleCaseReport`, `RuleDisagreement`, `PgCatalogErrorCode`; and the `pg-catalog` bin |
+| Package                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@netvark/catalog-core` | Values: `toPublicCatalog`, `diffCatalogs`, `toCamelCase`, `toSnakeCase`, `CATALOG_FORMAT`; and the types of sections 2 to 4 and 9.2 (`CamelCaseOptions`, `Catalog`, `CatalogTable`, `CatalogColumn`, `ColumnDefault`, `ColumnGenerated`, `TypeKind`, `Identity`, `Constraint`, `PrimaryKeyConstraint`, `UniqueConstraint`, `ForeignKeyConstraint`, `CheckConstraint`, `ExclusionConstraint`, `ReferentialAction`, `CatalogIndex`, `RowSecurity`, `Policy`, `PolicyCommand`, `CatalogDomain`, `DomainConstraint`, `Rule`, `LengthRule`, `RangeRule`, `RangeBound`, `EnumRule`, `NotNullRule`, `PatternRule`, `PublicCatalog`, `PublicTable`, `PublicColumn`, `PublicColumnDefault`, `PublicColumnGenerated`, `PublicConstraint` and its five kinds, `PublicDomain`, `PublicDomainConstraint`, `CatalogDiff`, `CatalogChange`, `JsonValue`)                                                                                                                                                              |
+| `@netvark/pg-catalog`   | Everything of `@netvark/catalog-core` (the same bindings), plus `defineExtraction`, `extract`, `drift`, `extractCatalog`, `introspectCatalog`, `renderCatalogModule`, `renderPublicCatalogModule`, `parseCatalogModule`, `renderKyselyTypes`, `formatDiff`, `checkRules`, `formatRules`, `writeSurface`, `checkSurface`, `formatSurface`, `PgCatalogError`, `isPgCatalogError`; the types `ExtractionConfig`, `MigrationSource`, `Migration`, `DatabaseConfig`, `PgliteExtension`, `OutputConfig`, `CatalogFileConfig`, `PublicFileConfig`, `CatalogModuleOptions`, `TypesConfig`, `TypeOverride`, `DriftEnvironment`, `ResourcesConfig`, `TextStorageCodec`, `DriftOptions`, `DriftReport`, `ExtractOptions`, `ExtractReport`, `ExtractedFile`, `ExtractCatalogOptions`, `IntrospectOptions`, `KyselyTypesOptions`, `RulesOptions`, `RulesReport`, `RuleCaseReport`, `RuleDisagreement`, `SurfaceOptions`, `SurfaceWriteReport`, `SurfaceCheckReport`, `PgCatalogErrorCode`; and the `pg-catalog` bin |
 
 `e2e/catalog/package-surface.e2e.test.ts` asserts the exact value export lists against the built
 packages and that the re-exports are the core's own bindings.
@@ -70,6 +70,7 @@ packages/pg-catalog/src/
   migrations/order.ts          orderMigrations(), naturalCompare() (5)
   migrations/load.ts           loadMigrations() (5)
   internal/code-units.ts       compareCodeUnits(), the order of every key (2.10)
+  internal/read-existing.ts    readExisting(): a file a command compares with what it writes (10.1, 10.4)
   target/session.ts            SqlSession, SESSION_SETTINGS, useSession() (6, 7.1)
   target/pglite.ts             openPglite() (6.1)
   target/server.ts             openThrowawayDatabase(), openLiveDatabase() (6.2, 10.2)
@@ -104,9 +105,13 @@ packages/pg-catalog/src/
   commands/extract.ts          extractCatalog(), extract() (10.1)
   commands/drift.ts            introspectCatalog(), drift() (10.2)
   commands/format-diff.ts      formatDiff() (10.2)
+  commands/registry.ts         resourcesOf(), callRegistry(): the configured declared resources (10.3, 10.4)
   commands/rules.ts            checkRules() (10.3)
   commands/format-rules.ts     formatRules() (10.3)
-  commands/show-value.ts       showValue(): a fixture's value in a report (10.3)
+  commands/show-value.ts       showValue(), showShort(), plural(): values and counts in a report (10.3, 10.4)
+  commands/surface.ts          writeSurface(), checkSurface() (10.4)
+  commands/format-surface.ts   formatSurface() (10.4)
+  surface/openapi-module.ts    OpenapiModule, importOpenapi(): resource-core's OpenAPI entry (10.4)
   oracle/oracle-module.ts      OracleModule, importOracle(): the optional resource-core peer (10.3)
   oracle/probe-sql.ts          the probe, template, and attempt function SQL (10.3)
   oracle/probe.ts              buildProbe(), dropProbe() (10.3)
@@ -1003,15 +1008,15 @@ a table's columns holding some of its CHECKs, or a value of a domain), and each 
 texts to write and a judge of the database's verdict. This package builds the probes, writes the
 texts, and hands each verdict to its judge; what the schemas say is resource-core's to decide.
 
-1. Without `config.rules`, it fails with `config_invalid`
-   (`rules is not configured: set rules.registry to a function that returns the declared resources`).
+1. Without `config.resources`, it fails with `config_invalid`
+   (`resources is not configured: set resources.registry to a function that returns the declared resources`).
 2. It imports `@netvark/resource-core/testing`; an optional peer dependency (14) that cannot be
    loaded fails with `resource_core_missing`
    (`rules --check needs @netvark/resource-core, whose declarations it checks: <reason>`).
-3. It calls and awaits `rules.registry()`. Anything but an array of objects is `registry_invalid`
-   (`rules.registry must return an array of declared resources`); what the function throws is
-   thrown.
-4. `oracleCases(resources, { storage: rules.storage })` builds the cases. A `TypeError` whose
+3. It calls and awaits `resources.registry()`. Anything but an array of objects is
+   `registry_invalid` (`resources.registry must return an array of declared resources`); what the
+   function throws is thrown.
+4. `oracleCases(registry, { storage: resources.storage })` builds the cases. A `TypeError` whose
    message starts with `oracleCases:` or `oracleCases.`, a registry the checks of resource SPEC 4.2
    refuse or a codec without a storage codec, becomes `registry_invalid` with the message
    `rules: <message>`; anything else is thrown.
@@ -1089,15 +1094,63 @@ interface RuleDisagreement {
 resource reads: the public catalog ships them to browsers, but no resource serves them.
 
 `formatRules(report)` gives the summary line, `<n> cases, <m> fixtures: no disagreements`, or with
-`<d> disagreements` and `<c> cases could not run` joined by `, `; then, after a blank line, each
-case with a problem or a disagreement: its subject, then `  could not run: <problem>` or one line
-per disagreement, `  <label> <value>: <reason>`; then, after a blank line,
-`warning: out.public.tables lists <table>, which no declared resource reads` for each unused table.
-A value is JSON where JSON writes it as itself, and JavaScript's notation where it does not (`NaN`,
-`-0`, `10n`, `undefined`, `Symbol(x)`, `[function f]`, `Date(2026-01-05T09:00:00.000Z)`, `[cycle]`
-where an object holds itself; `commands/show-value.ts`), since a registry's fixtures are any values;
-it is cut after 60 code points with `…`, and a string's with its length, `(70 characters)`. The text
-is for people and may change between minor versions; the report is the format for machines.
+`<d> disagreements` and `<c> cases could not run` joined by `, `, each noun singular for one; then,
+after a blank line, each case with a problem or a disagreement: its subject, then
+`  could not run: <problem>` or one line per disagreement, `  <label> <value>: <reason>`; then,
+after a blank line, `warning: out.public.tables lists <table>, which no declared resource reads` for
+each unused table. A value is JSON where JSON writes it as itself, and JavaScript's notation where
+it does not (`NaN`, `-0`, `10n`, `undefined`, `Symbol(x)`, `[function f]`,
+`Date(2026-01-05T09:00:00.000Z)`, `[cycle]` where an object holds itself; `commands/show-value.ts`),
+since a registry's fixtures are any values; it is cut after 60 code points with `…`, and a string's
+with its length, `(70 characters)`. The text is for people and may change between minor versions;
+the report is the format for machines.
+
+### 10.4 surface and surface --check (`commands/surface.ts`, `commands/format-surface.ts`)
+
+`writeSurface(config, { cwd })` and `checkSurface(config, { cwd })` keep the snapshot of the API
+surface of the declared resources that resource SPEC 13.2 describes: `surfaceOf(registry)` of
+`@netvark/resource-core/openapi`, committed next to the catalog, and compared with the declarations
+by `diffSurfaces`, which marks each change breaking or safe. Neither loads the migrations or opens a
+database; the surface comes from the declarations alone.
+
+1. Without `config.resources`, it fails with `config_invalid`, as `rules --check` does (10.3); with
+   it but without `resources.surface`, with `config_invalid`
+   (`resources.surface is not configured: set it to the file the surface is written to, such as api-surface.json`).
+2. It imports `@netvark/resource-core/openapi`; an optional peer dependency (14) that cannot be
+   loaded fails with `resource_core_missing`
+   (`surface needs @netvark/resource-core, whose declarations it describes: <reason>`).
+3. It calls and awaits `resources.registry()`, with the failures of 10.3 step 3.
+4. `surfaceOf(registry)` gives the surface. A `TypeError` whose message starts with `surfaceOf:` or
+   `surfaceOf.`, a registry the checks of resource SPEC 4.2 refuse, becomes `registry_invalid` with
+   the message `surface: <message>`; anything else is thrown.
+
+The file is `resources.surface`, resolved against `cwd`, and its text is the surface as JSON
+indented by two spaces with a final newline, deterministic since the surface is (resource SPEC
+13.2). `writeSurface` writes it, creating directories, unless the file already holds those bytes,
+and returns `{ file, status }` with `status` `written` or `unchanged`. `checkSurface` writes nothing
+and returns `{ file, status, changes }`:
+
+- `missing` when there is no file, with no changes;
+- otherwise the file is parsed as JSON and read with `parseSurface`; a file that is not JSON fails
+  with `surface_unreadable`
+  (`the surface file <file> does not hold valid JSON; write it again with pg-catalog surface`), and
+  one `parseSurface` refuses, such as a surface of another `format`, with `surface_unreadable` and
+  its message
+  (`the surface file <file> is not a surface this version reads (<message>); write it again with pg-catalog surface`);
+- then `changes` is `diffSurfaces(committed, current)`, in its order, and `status` is `changed` when
+  there is one and `unchanged` when there is none, however the file is formatted.
+
+`formatSurface(report, file)` gives `<file>: missing; write it with pg-catalog surface`,
+`<file>: no changes`, or the summary line `<file>: <n> changes, <b> breaking` (`1 change` for one,
+`none breaking` when none is), then, after a blank line, the heading `Breaking` and its changes, the
+heading `Safe` and its changes (a heading without changes is left out), each in the diff's order,
+and finally `Run pg-catalog surface to record them.`, the parts separated by blank lines. A change
+is a line of its own, two spaces in: `+` for an addition, `-` for a removal, or `~`, a space, the
+path joined with `.`, each segment that is not letters, digits, `_`, and `-` written as a JSON
+string (`tasks.fields.status.options."in progress"`), and for a changed value
+`: <before> -> <after>`, each as `showShort` writes it: as `showValue` (10.3) writes it, cut after
+60 code points with `…`. The text is for people and may change between minor versions; the report is
+the format for machines.
 
 ---
 
@@ -1112,7 +1165,7 @@ interface ExtractionConfig {
   readonly schemas?: ReadonlyArray<string>; // default ['public']; the first is the default schema
   readonly out: OutputConfig;
   readonly drift?: Readonly<Record<string, DriftEnvironment>>;
-  readonly rules?: RulesConfig;
+  readonly resources?: ResourcesConfig;
 }
 type MigrationSource = () => ReadonlyArray<Migration> | Promise<ReadonlyArray<Migration>>;
 interface Migration {
@@ -1159,21 +1212,23 @@ interface CamelCaseOptions {
 interface DriftEnvironment {
   readonly url: string | (() => string | undefined);
 }
-interface RulesConfig {
+interface ResourcesConfig {
   readonly registry: () => ReadonlyArray<object> | Promise<ReadonlyArray<object>>; // the declared resources
-  readonly storage?: Readonly<Record<string, RulesStorageCodec>>; // by codec name
+  readonly storage?: Readonly<Record<string, TextStorageCodec>>; // by codec name, for rules --check
+  readonly surface?: string; // the surface snapshot file, for surface
 }
-interface RulesStorageCodec {
+interface TextStorageCodec {
   readonly read: (stored: string) => unknown; // the text PostgreSQL prints, to the codec's value
   readonly write: (value: never) => string; // the codec's value, to the text PostgreSQL reads
 }
 ```
 
-`rules.registry` returns the resources `declareResource` built, typically by importing the module
-that lists them, so only `rules --check` loads the declarations and the schemas they import.
-`rules.storage` gives a storage codec over text for every codec a declared field names (resource
-SPEC 7.1): the oracle writes text and reads text, whatever the driver of the application's own
-storage adapter converts.
+`resources.registry` returns the resources `declareResource` built, typically by importing the
+module that lists them, so only `rules --check` and `surface` load the declarations and the schemas
+they import. `resources.storage` gives a storage codec over text for every codec a declared field
+names (resource SPEC 7.1): the oracle writes text and reads text, whatever the driver of the
+application's own storage adapter converts. `resources.surface` is the file `surface` writes the API
+surface to and `surface --check` compares, relative to the configuration file.
 
 `defineExtraction` validates eagerly and returns the config unchanged; a mistake throws `TypeError`
 naming the option. It rejects unknown keys at every level (a misspelled `postgres:` fails instead of
@@ -1182,14 +1237,15 @@ that are empty, longer than 63 bytes, starting with `pg_`, or equal to `informat
 duplicate schemas or public tables, an empty `public.tables`, an interface name outside
 `INTERFACE_NAME` (9.1) or one both modules share
 (`out.public.interface must differ from the catalog's interface, ExtractedCatalog`), and environment
-names outside `^[A-Za-z0-9][A-Za-z0-9_-]*$`, a `rules.registry` that is not a function, and a
-storage codec whose `read` or `write` is not one (`rules.storage.vector.write must be a function`);
-the registry is not called. Each message starts with `defineExtraction: ` and names the option by
-its path (`out.types.camelCase.upperCase must be a boolean`); an option set to `undefined` counts as
-absent, as a JavaScript configuration may write it. URL functions are called only when a command
-needs the URL, so a missing environment variable only fails the command that needs it. Relative
-paths resolve against the configuration file's directory, or the `cwd` option of the programmatic
-API.
+names outside `^[A-Za-z0-9][A-Za-z0-9_-]*$`, a `resources.registry` that is not a function, a
+storage codec whose `read` or `write` is not one
+(`resources.storage.vector.write must be a function`), and a `resources.surface` that is not a
+non-empty string; the registry is not called. Each message starts with `defineExtraction: ` and
+names the option by its path (`out.types.camelCase.upperCase must be a boolean`); an option set to
+`undefined` counts as absent, as a JavaScript configuration may write it. URL functions are called
+only when a command needs the URL, so a missing environment variable only fails the command that
+needs it. Relative paths resolve against the configuration file's directory, or the `cwd` option of
+the programmatic API.
 
 The CLI loads `--config <file>`, or else the first of `netvark.config.ts`, `netvark.config.mts`,
 `netvark.config.js`, and `netvark.config.mjs` in the working directory, with a dynamic `import()`;
@@ -1206,6 +1262,7 @@ the message says what to do instead. @ref https://nodejs.org/api/typescript.html
 pg-catalog extract [--check] [--config <file>]
 pg-catalog drift --env <name> [--json] [--config <file>]
 pg-catalog rules --check [--config <file>]
+pg-catalog surface [--check] [--config <file>]
 pg-catalog --help
 pg-catalog --version
 ```
@@ -1224,6 +1281,9 @@ https://nodejs.org/api/util.html#utilparseargsconfig
   spaces.
 - `rules --check` prints `formatRules` (10.3). `rules` has no form that writes, so without `--check`
   it is a usage error (`rules needs --check`), as are `--env` and `--json`.
+- `surface` prints its file's status as `extract` prints a file's line, and `surface --check` prints
+  `formatSurface` (10.4) with the path relative to the working directory; `--env` and `--json` are
+  usage errors.
 - A missing or unknown command, an extra argument, an option the command does not take, and `drift`
   without `--env` are usage errors, followed by `Run pg-catalog --help for usage.` A
   `PgCatalogError` prints its message. Any other error, such as one a function of the configuration
@@ -1235,6 +1295,8 @@ https://nodejs.org/api/util.html#utilparseargsconfig
 | `extract --check` | every file current       | a file is stale or missing                   | as above                                                     |
 | `drift`           | no differences           | differences                                  | as above, or an unreadable committed catalog                 |
 | `rules --check`   | no disagreements         | a disagreement, or a case that could not run | as `extract`, or a registry that cannot be loaded or checked |
+| `surface`         | file written or current  | (never)                                      | as `rules --check`                                           |
+| `surface --check` | no change, or safe ones  | a breaking change, or no file                | as `rules --check`, or an unreadable file                    |
 
 ---
 
@@ -1260,8 +1322,9 @@ all of them. `defineExtraction` and `toPublicCatalog` throw `TypeError` for prog
 | `camel_case_mismatch`   | with `types.camelCase`, table or column keys that `CamelCasePlugin` would not turn back into their names; the message lists every one                                                                                  |
 | `catalog_unreadable`    | the committed catalog file is missing or not a catalog module                                                                                                                                                          |
 | `catalog_format`        | the committed catalog was written in another `format`                                                                                                                                                                  |
-| `resource_core_missing` | `rules --check` cannot import `@netvark/resource-core/testing`; the message ends with the reason                                                                                                                       |
-| `registry_invalid`      | `rules.registry` returns anything but an array of objects, or `oracleCases` refuses the registry or the storage codecs, with its message after `rules: `                                                               |
+| `resource_core_missing` | `rules --check` cannot import `@netvark/resource-core/testing`, or `surface` its `openapi` entry; the message ends with the reason                                                                                     |
+| `registry_invalid`      | `resources.registry` returns anything but an array of objects, or `oracleCases` refuses the registry or the storage codecs, with its message after `rules: `, or `surfaceOf` the registry, after `surface: `           |
+| `surface_unreadable`    | the committed surface file is not JSON, or not a surface `parseSurface` reads, such as one of another format                                                                                                           |
 
 ---
 
@@ -1272,16 +1335,16 @@ thresholds of 90% over `packages/*/src/`. Every test names the rule or choice it
 database code, so `@netvark/pg-catalog`'s own tests run it against PGlite in-process, a real
 PostgreSQL 18; nothing is mocked.
 
-| Area                  | Files                                                                                                                                                                                                                                                                                  | What is pinned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Core                  | `public.test.ts`, `public-unique-indexes.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                                   | every kept and dropped member, `enforced: false` on NOT ENFORCED, the unique indexes that join the constraints, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                                                                                                                                                                                                                     |
-| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                                                                        | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                                                                      | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                                                                   | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                                                                                                                                                                                     |
-| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts`                                              | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                                                                                                                                                                              |
-| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                                                                         | exact output text, the named interface and the names refused, parse round trip, the module shape before the interface, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out                                                                       |
-| Commands, config, CLI | `extract.test.ts`, `extract-interfaces.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `config-validate.test.ts`, `config-validate-out.test.ts`, `config-validate-rules.test.ts`, `config-file.test.ts`, `arguments.test.ts`, `main.test.ts`, `main-rules.test.ts` | statuses, writes only on change, the configured interfaces, every validation message, loading each kind of configuration file, every usage error, output and exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                                                                                                                                              |
-| Rules oracle          | `probe.test.ts`, `attempt.test.ts`, `run-cases.test.ts`, `rules.test.ts`, `format-rules.test.ts`, `show-value.test.ts`                                                                                                                                                                 | a probe's types, modifiers, collations, NOT NULL kept or left out, only the named CHECKs, an application function a CHECK calls, quoted and `%` names, a domain, and each problem; assignment semantics, every refusal's SQLSTATE and constraint, U+0000 and unpaired surrogates, 3,000 refusals on one PGlite; `checkRules` over a registry of every case kind finding no disagreement, then a faulty validator, a faulty codec, and stale migrations, each error, on PGlite and a server; the exact report text and every value notation |
+| Area                  | Files                                                                                                                                                                                                                                                                                                                                                           | What is pinned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Core                  | `public.test.ts`, `public-unique-indexes.test.ts`, `diff.test.ts`, `model.test-d.ts`, `json.test.ts`                                                                                                                                                                                                                                                            | every kept and dropped member, `enforced: false` on NOT ENFORCED, the unique indexes that join the constraints, enum and domain closure, ordering, change paths and order, format mismatch, generated literals assignable to the model                                                                                                                                                                                                                                                                                                     |
+| Migrations            | `order.test.ts`, `load.test.ts`                                                                                                                                                                                                                                                                                                                                 | Flyway detection and ordering, natural order, ignored and undo files, duplicates                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Normalization         | `modifiers.test.ts`, `defaults.test.ts`, `search-config.test.ts`, `names.test.ts`                                                                                                                                                                                                                                                                               | typmod decoding on both encodings, every default form, hidden casts, keys                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Recognizer            | `tokenize.test.ts`, `parse.test.ts`, `recognize*.test.ts`, `subject.test.ts`, `constants.test.ts`, `pattern.test.ts`                                                                                                                                                                                                                                            | table-driven over the exact text PostgreSQL 14 and 18 deparse; every rejected shape; every accepted pattern matched by PostgreSQL and JavaScript alike                                                                                                                                                                                                                                                                                                                                                                                     |
+| Extraction            | `read-catalog.test.ts`, `read-tables.test.ts`, `read-constraints.test.ts`, `read-domains.test.ts`, `read-rules.test.ts`, `rules-oracle.test.ts`, `queries.test.ts`, `codes.test.ts`, `replay.test.ts`, `pglite.test.ts`, `server.test.ts`                                                                                                                       | every model member against a PGlite schema, extension-owned objects, settings, failures with positions; rules end to end with NOT VALID, NOT ENFORCED, and domain collations, and the database's verdict on values around every bound, on PGlite and a server                                                                                                                                                                                                                                                                              |
+| Rendering             | `catalog-module.test.ts`, `kysely-types.test.ts`, `kysely-collisions.test.ts`, `kysely-mapping.test.ts`, `kysely-names.test.ts`, `camel-case.test.ts`, `kysely-driver.test.ts`                                                                                                                                                                                  | exact output text, the named interface and the names refused, parse round trip, the module shape before the interface, every mapping row, nullability along domain chains, overrides, names and collisions, the camelCase conversions equal to Kysely's plugin under every option; on a server, node-postgres accepting a value of every insert alternative of every row and returning values of the select type, and refusing the values the insert types leave out                                                                       |
+| Commands, config, CLI | `extract.test.ts`, `extract-interfaces.test.ts`, `drift.test.ts`, `format-diff.test.ts`, `config.test.ts`, `config-validate.test.ts`, `config-validate-out.test.ts`, `config-validate-resources.test.ts`, `config-file.test.ts`, `arguments.test.ts`, `main.test.ts`, `main-rules.test.ts`, `main-surface.test.ts`, `surface.test.ts`, `format-surface.test.ts` | statuses, writes only on change, the configured interfaces, every validation message, loading each kind of configuration file, every usage error, output and exit codes; drift on PGlite over a socket and on a server against a catalog PGlite extracted, as a role with `CONNECT` and `USAGE` only, and `schema_usage`; the exact diff text                                                                                                                                                                                              |
+| Rules oracle          | `probe.test.ts`, `attempt.test.ts`, `run-cases.test.ts`, `rules.test.ts`, `format-rules.test.ts`, `show-value.test.ts`                                                                                                                                                                                                                                          | a probe's types, modifiers, collations, NOT NULL kept or left out, only the named CHECKs, an application function a CHECK calls, quoted and `%` names, a domain, and each problem; assignment semantics, every refusal's SQLSTATE and constraint, U+0000 and unpaired surrogates, 3,000 refusals on one PGlite; `checkRules` over a registry of every case kind finding no disagreement, then a faulty validator, a faulty codec, and stale migrations, each error, on PGlite and a server; the exact report text and every value notation |
 
 ### 13.1 End-to-end suite (`e2e/catalog/`)
 
@@ -1307,7 +1370,10 @@ produce for them, reviewed by hand, and `db-camel.ts`, the types rendered with `
 `rules --check` reads declarations, so its end-to-end tests live with `@netvark/resource-core`'s
 (resource SPEC 15.4): `e2e/resource/rules.e2e.test.ts` runs `checkRules` over the oracle's and the
 contacts application's declarations, on PGlite and on the server, and finds no disagreement, and
-finds each fault it plants; `rules-cli.e2e.test.ts` runs the built bin.
+finds each fault it plants; `rules-cli.e2e.test.ts` runs the built bin. `surface-cli.e2e.test.ts`
+runs the built bin's `surface` over the contacts application: the file it writes equals the reviewed
+`snapshots/surface.json` byte for byte, and after the edits `openapi-surface.e2e.test.ts` diffs,
+`surface --check` prints exactly those changes and exits 1.
 
 `e2e/catalog/smoke/` runs `extractCatalog` on Bun and Deno against PGlite, and `drift` against
 PGlite behind a socket server, and `toPublicCatalog` and `diffCatalogs` in workerd. CI runs the
@@ -1324,8 +1390,9 @@ where `server.e2e.test.ts`, `kysely.e2e.test.ts`, and `drift.e2e.test.ts` reach 
 - `@netvark/pg-catalog`: `platform: 'node'`, two entries (`index` and `cli`), `bin` `pg-catalog`
   pointing at `dist/cli.mjs` with a `#!/usr/bin/env node` line, dependencies `@netvark/catalog-core`
   (`workspace:^`) and `pg`, `@electric-sql/pglite` `^0.5.0` and `@netvark/resource-core` `^0.1.0` as
-  optional peer dependencies (`rules --check` imports the latter on demand, so `extract` and `drift`
-  never load it), and `sideEffects` listing only the bin.
+  optional peer dependencies (`rules --check` imports the latter's `testing` entry and `surface` its
+  `openapi` entry on demand, so `extract` and `drift` never load it), and `sideEffects` listing only
+  the bin.
 - The `exports` maps, `source` conditions, `publishConfig`, `files`, and release flow follow the
   keyset family (its SPEC 12).
 

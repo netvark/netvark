@@ -77,7 +77,7 @@ const oracleConfig = (
   migrations: 'migrations',
   database: database ?? { pglite: { extensions: ['citext'] } },
   out: { catalog: 'catalog.ts' },
-  rules: { registry: () => ORACLE },
+  resources: { registry: () => ORACLE },
 });
 
 const contactsConfig = (
@@ -105,7 +105,10 @@ const contactsConfig = (
       ],
     },
   },
-  rules: { registry: () => CONTACTS, storage: { timeRange: timeRangeText } },
+  resources: {
+    registry: () => CONTACTS,
+    storage: { timeRange: timeRangeText },
+  },
   ...changes,
 });
 
@@ -156,7 +159,7 @@ describe.each(targets())(
           migrations: 'migrations',
           ...(database === undefined ? {} : { database }),
           out: { catalog: 'catalog.ts' },
-          rules: { registry: () => POSTGRES18 },
+          resources: { registry: () => POSTGRES18 },
         },
         { cwd: POSTGRES18_DIR },
       );
@@ -197,7 +200,7 @@ describe('checkRules on PGlite reports the faults a review misses', () => {
       rules: { meetings_room_lowercase: { validator: 'lowercase' } },
     });
     const report = await checkRules(
-      contactsConfig(undefined, { rules: { registry: () => [rooms] } }),
+      contactsConfig(undefined, { resources: { registry: () => [rooms] } }),
       {
         cwd: CONTACTS_DIR,
       },
@@ -210,7 +213,7 @@ describe('checkRules on PGlite reports the faults a review misses', () => {
   it('a storage codec whose text the database refuses', async () => {
     const report = await checkRules(
       contactsConfig(undefined, {
-        rules: {
+        resources: {
           registry: () => CONTACTS,
           storage: {
             timeRange: {

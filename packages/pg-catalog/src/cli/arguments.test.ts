@@ -56,6 +56,19 @@ describe('parseCommand (SPEC 11.2)', () => {
     });
   });
 
+  it('reads surface, writing or with --check, with its configuration', () => {
+    expect(parseCommand(['surface'])).toEqual({
+      name: 'surface',
+      check: false,
+      config: undefined,
+    });
+    expect(parseCommand(['surface', '--check', '--config', 'c.mjs'])).toEqual({
+      name: 'surface',
+      check: true,
+      config: 'c.mjs',
+    });
+  });
+
   const mistakes: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
     [[], 'missing command'],
     [['generate'], 'unknown command generate'],
@@ -72,6 +85,12 @@ describe('parseCommand (SPEC 11.2)', () => {
     [['rules'], 'rules needs --check'],
     [['rules', '--check', '--json'], 'rules does not take --json'],
     [['rules', '--check', '--env', 'production'], 'rules does not take --env'],
+    [['surface', 'now'], 'unexpected argument now'],
+    [['surface', '--json'], 'surface does not take --json'],
+    [
+      ['surface', '--check', '--env', 'production'],
+      'surface does not take --env',
+    ],
   ];
 
   it.each(mistakes)('rejects %j: %s', (args, message) => {
@@ -96,17 +115,18 @@ describe('parseCommand (SPEC 11.2)', () => {
 });
 
 describe('USAGE', () => {
-  it('lists the five forms of SPEC 11.2 and the exit codes', () => {
-    expect(USAGE.split('\n').slice(0, 6)).toEqual([
+  it('lists the six forms of SPEC 11.2 and the exit codes', () => {
+    expect(USAGE.split('\n').slice(0, 7)).toEqual([
       'Usage:',
       '  pg-catalog extract [--check] [--config <file>]',
       '  pg-catalog drift --env <name> [--json] [--config <file>]',
       '  pg-catalog rules --check [--config <file>]',
+      '  pg-catalog surface [--check] [--config <file>]',
       '  pg-catalog --help',
       '  pg-catalog --version',
     ]);
     expect(USAGE).toContain(
-      'Exit codes: 0 current, no drift, or no disagreement; 1 stale, drift, or\na disagreement; 2 could not run.',
+      'Exit codes: 0 current, no drift, no disagreement, or no breaking change; 1\nstale, drift, a disagreement, or a breaking change; 2 could not run.',
     );
   });
 });

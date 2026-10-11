@@ -6,8 +6,9 @@
  * `drift` compares a live database with the committed catalog;
  * `checkRules` runs the fixtures of the declared resources of
  * `@netvark/resource-core` through their schemas and the replayed
- * database; `defineExtraction` checks the configuration the `pg-catalog`
- * bin reads.
+ * database; `writeSurface` and `checkSurface` keep the snapshot of their
+ * API surface and tell a breaking change from a safe one;
+ * `defineExtraction` checks the configuration the `pg-catalog` bin reads.
  * It re-exports all of `@netvark/catalog-core`, the model and the pure
  * functions over it. See `docs/catalog/SPEC.md` for the contract.
  * @packageDocumentation
@@ -20,8 +21,8 @@ export type {
   ExtractionConfig,
   OutputConfig,
   PublicFileConfig,
-  RulesConfig,
-  RulesStorageCodec,
+  ResourcesConfig,
+  TextStorageCodec,
   TypeOverride,
   TypesConfig,
 } from './config';
@@ -43,6 +44,13 @@ export { formatDiff } from './commands/format-diff';
 export type { RulesOptions } from './commands/rules';
 export { checkRules } from './commands/rules';
 export { formatRules } from './commands/format-rules';
+export type {
+  SurfaceCheckReport,
+  SurfaceOptions,
+  SurfaceWriteReport,
+} from './commands/surface';
+export { checkSurface, writeSurface } from './commands/surface';
+export { formatSurface } from './commands/format-surface';
 export type {
   RuleCaseReport,
   RuleDisagreement,

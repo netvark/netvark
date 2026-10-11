@@ -65,6 +65,7 @@ catalog.tables.contacts.constraints.contacts_organization_id_fkey.references;
 pg-catalog extract [--check] [--config <file>]
 pg-catalog drift --env <name> [--json] [--config <file>]
 pg-catalog rules --check [--config <file>]
+pg-catalog surface [--check] [--config <file>]
 pg-catalog --help
 pg-catalog --version
 ```
@@ -75,13 +76,16 @@ pg-catalog --version
 | `extract --check` | every file current       | a file is stale or missing                   | it could not run |
 | `drift`           | no differences           | differences                                  | it could not run |
 | `rules --check`   | no disagreements         | a disagreement, or a case that could not run | it could not run |
+| `surface`         | file written or current  | never                                        | it could not run |
+| `surface --check` | no breaking change       | a breaking change, or no file                | it could not run |
 
 `extract` prints one line per file: its status (`written`, `unchanged`, `stale`, or `missing`) and
 its path. `drift` prints the differences, or with `--json` the `CatalogDiff` itself (see
 [Drift](#drift)). `rules --check` prints each disagreement (see
-[Checking declarations against the database](#checking-declarations-against-the-database)). Failures
-go to standard error as `pg-catalog: <message>`, and a mistake in the arguments adds a pointer to
-`--help`.
+[Checking declarations against the database](#checking-declarations-against-the-database)).
+`surface` prints the file's status (`written` or `unchanged`) and path, and `surface --check` each
+change from it (see [The API surface](#the-api-surface)). Failures go to standard error as
+`pg-catalog: <message>`, and a mistake in the arguments adds a pointer to `--help`.
 
 Without `--config`, the CLI loads the first of `netvark.config.ts`, `netvark.config.mts`,
 `netvark.config.js`, and `netvark.config.mjs` in the working directory. Relative paths in it resolve
@@ -454,7 +458,7 @@ export default defineExtraction({
     catalog: 'src/generated/catalog.ts',
     public: { file: 'src/generated/public-catalog.ts', tables: ['meetings', 'contact_phones'] },
   },
-  rules: {
+  resources: {
     registry: async () => (await import('./src/resources/index.ts')).resources,
     storage: { timeRange: timeRangeText },
   },
@@ -503,49 +507,117 @@ From code, `checkRules(config, { cwd })` returns the report, `{ cases, unusedTab
 case's subject, fixture count, problem, and disagreements, and `formatRules(report)` gives the text,
 which may change between minor versions.
 
+## The API surface
+
+`pg-catalog surface` writes the API surface of the declared resources, what their clients depend on,
+to a JSON file you commit: per type its operations, and per field and relationship its access, wire
+form, limits, options, nullability, requiredness, operators, and sortability, with the error codes
+and their statuses (`surfaceOf` of `@netvark/resource-core/openapi`). `pg-catalog surface --check`
+compares the committed file with the declarations and prints each change, marked breaking when a
+client written against the file may fail: a type, operation, member, code, operator, or option
+removed; an access that loses a capability; a member that becomes required on create; a wire form,
+format, or codec changed; a limit tightened. It exits 1 on a breaking change, and 0 when every
+change is safe, such as a member, an operator, or an option added.
+
+```ts
+// netvark.config.ts
+export default defineExtraction({
+  migrations: 'db/migrations',
+  out: {
+    catalog: 'src/generated/catalog.ts',
+    public: { file: 'src/generated/public-catalog.ts', tables: ['contacts', 'organizations'] },
+  },
+  resources: {
+    registry: async () => (await import('./src/resources/index.ts')).resources,
+    surface: 'api-surface.json',
+  },
+});
+```
+
+```bash
+pnpm exec pg-catalog surface           # write api-surface.json, and commit it
+pnpm exec pg-catalog surface --check   # in CI: exit 1 on a breaking change
+```
+
+On the repository's contacts application, after its declaration withdraws `remove`, makes `nickname`
+read-only, filters `email` with `in` too, and stops sorting `priority`, the check prints:
+
+```text
+api-surface.json: 4 changes, 3 breaking
+
+Breaking
+  - contacts.operations.remove
+  ~ contacts.fields.nickname.access: "readWrite" -> "read"
+  ~ contacts.fields.priority.sortable: true -> false
+
+Safe
+  + contacts.fields.email.operators.in
+
+Run pg-catalog surface to record them.
+```
+
+The command reads the declarations alone: it replays no migration and needs no database. When a
+breaking change is meant, run `pg-catalog surface` and commit the file with the change, so the
+review shows it. A missing file fails the check, and a file that is not JSON, or that a version with
+another surface `format` wrote, fails with `surface_unreadable`; write it again with
+`pg-catalog surface`.
+
+From code, `writeSurface(config, { cwd })` returns `{ file, status }`, and
+`checkSurface(config, { cwd })` returns `{ file, status, changes }` with each change as
+`diffSurfaces` gives it; `formatSurface(report, file)` gives the text, which may change between
+minor versions.
+
 ## Errors
 
 Every failure is a `PgCatalogError` (`isPgCatalogError` narrows it) with a `code`, a message naming
 the object or file, and PostgreSQL's error as `cause` where there is one. The CLI prints the message
 and exits 2. `defineExtraction` throws a `TypeError` instead, since its mistakes are in the code:
 
-| `code`                  | When                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `config_invalid`        | no configuration file, a file that fails to load or validate, a URL function returned nothing, an unknown drift environment, or a malformed contrib extension name |
-| `pglite_missing`        | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                                                                        |
-| `migrations_invalid`    | the directory is missing or empty, or two Flyway migrations share a version                                                                                        |
-| `migration_failed`      | a migration fails during replay                                                                                                                                    |
-| `connection_failed`     | connecting to the server, or creating or dropping the throwaway database, fails; the message gives the reason, never the URL                                       |
-| `unsupported_server`    | the server is older than PostgreSQL 14                                                                                                                             |
-| `schema_usage`          | the role `drift` connects as lacks `USAGE` on a configured schema                                                                                                  |
-| `unsafe_name`           | an object to be written as a key is named `__proto__`                                                                                                              |
-| `duplicate_key`         | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                                                                               |
-| `public_table_unknown`  | `out.public.tables` names a table the catalog does not hold                                                                                                        |
-| `name_collision`        | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                                                                                |
-| `camel_case_mismatch`   | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                                                                      |
-| `catalog_unreadable`    | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module                                                   |
-| `catalog_format`        | `parseCatalogModule` was given a catalog written in another format                                                                                                 |
-| `resource_core_missing` | `rules --check` cannot load `@netvark/resource-core`                                                                                                               |
-| `registry_invalid`      | `rules.registry` returned anything but a list of declared resources, or the declarations or storage codecs are refused, such as a codec without a storage codec    |
+| `code`                  | When                                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config_invalid`        | no configuration file, a file that fails to load or validate, a URL function returned nothing, an unknown drift environment, or a malformed contrib extension name  |
+| `pglite_missing`        | the PGlite target is used without `@electric-sql/pglite`, or a contrib extension is unknown                                                                         |
+| `migrations_invalid`    | the directory is missing or empty, or two Flyway migrations share a version                                                                                         |
+| `migration_failed`      | a migration fails during replay                                                                                                                                     |
+| `connection_failed`     | connecting to the server, or creating or dropping the throwaway database, fails; the message gives the reason, never the URL                                        |
+| `unsupported_server`    | the server is older than PostgreSQL 14                                                                                                                              |
+| `schema_usage`          | the role `drift` connects as lacks `USAGE` on a configured schema                                                                                                   |
+| `unsafe_name`           | an object to be written as a key is named `__proto__`                                                                                                               |
+| `duplicate_key`         | two objects map to the same key, such as a table `"a.b"` and table `b` of schema `a`                                                                                |
+| `public_table_unknown`  | `out.public.tables` names a table the catalog does not hold                                                                                                         |
+| `name_collision`        | two objects get the same name in the Kysely types, such as tables `a_b` and `"a.b"`                                                                                 |
+| `camel_case_mismatch`   | with `camelCase`, names `CamelCasePlugin` would not turn back into themselves; all are listed                                                                       |
+| `catalog_unreadable`    | `drift` cannot read the committed catalog, or `parseCatalogModule` was given a file that is not a catalog module                                                    |
+| `catalog_format`        | `parseCatalogModule` was given a catalog written in another format                                                                                                  |
+| `resource_core_missing` | `rules --check` or `surface` cannot load `@netvark/resource-core`                                                                                                   |
+| `registry_invalid`      | `resources.registry` returned anything but a list of declared resources, or the declarations or storage codecs are refused, such as a codec without a storage codec |
+| `surface_unreadable`    | `surface --check` found a surface file that is not JSON, or not a surface this version reads                                                                        |
 
 ## Best practices
 
 - **Commit the generated files, and exclude them from formatters and linters.** Their bytes are what
-  `check` compares; a formatter that rewrites their quotes makes every check fail, and a linter
-  flags the empty interface that names the catalog.
+  `extract --check` compares; a formatter that rewrites their quotes makes every check fail, a
+  linter flags the empty interface that names the catalog, and the next `pg-catalog surface`
+  rewrites a surface file a formatter reflowed, line by line.
 - **Name the interfaces after the application.** `interface: 'ContactsCatalog'` says which catalog a
   compile error is about, which matters once a repository holds more than one.
 - **Run the checks in CI.** `pg-catalog extract --check` writes nothing and exits 1 when a migration
-  changed and the files were not extracted again, and `pg-catalog rules --check` exits 1 when a
-  schema and the database disagree. Both run against PGlite with no secrets.
-- **Load the registry lazily.** Import the declarations inside `rules.registry`, as in
-  `async () => (await import('./src/resources/index.ts')).resources`: then only `rules --check`
-  loads them, Zod, and what they import, and `extract` and `drift` stay fast.
+  changed and the files were not extracted again, `pg-catalog rules --check` exits 1 when a schema
+  and the database disagree, and `pg-catalog surface --check` exits 1 when a migration or a
+  declaration breaks a client. All run against PGlite or no database, with no secrets.
+- **Record the surface in the pull request that changes it.** When `surface --check` lists changes,
+  run `pg-catalog surface` and commit the file with the migration or declaration that made them: the
+  diff shows reviewers every renamed field, new requirement, and withdrawn operator, safe changes
+  included, so the file stays the surface clients see. A renamed column shows up as a removal and an
+  addition; keep the old name with `as` while clients use it.
+- **Load the registry lazily.** Import the declarations inside `resources.registry`, as in
+  `async () => (await import('./src/resources/index.ts')).resources`: then only `rules --check` and
+  `surface` load them, Zod, and what they import, and `extract` and `drift` stay fast.
 - **Write codec fixtures as the database gives them back.** A codec's fixture is a round-trip value:
   write instants in UTC (`2026-03-02T08:00:00Z`, not `09:00:00+01:00`), numbers at the precision the
   column keeps, and a vector with the dimensions its column declares.
 - **Write storage codecs over PostgreSQL's text.** The check writes literals and reads `::text`, so
-  a storage codec in `rules.storage` handles `{a,b}`, `\x0102`, and `2026-03-02 08:00:00+00`,
+  a storage codec in `resources.storage` handles `{a,b}`, `\x0102`, and `2026-03-02 08:00:00+00`,
   whatever your driver parses them into.
 - **Give validators values of their column.** A `reject` fixture the column's type refuses, such as
   `'x'` for an `integer`, says nothing of the CHECK, so it is reported; a fixture with no text form,

@@ -8,7 +8,7 @@
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 
-import type { ExtractionConfig, RulesConfig } from '../config';
+import type { ExtractionConfig, ResourcesConfig } from '../config';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -38,7 +38,7 @@ beforeAll(async () => {
 });
 
 function config(
-  rules: Partial<RulesConfig> = {},
+  resources: Partial<ResourcesConfig> = {},
   changes: Partial<ExtractionConfig> = {},
 ): ExtractionConfig {
   return {
@@ -47,10 +47,10 @@ function config(
       catalog: 'catalog.ts',
       public: { file: 'public.ts', tables: [...ORACLE_TABLES] },
     },
-    rules: {
+    resources: {
       registry: () => oracleRegistry(catalog),
       storage: { slots: slotsText },
-      ...rules,
+      ...resources,
     },
     ...changes,
   };
@@ -177,24 +177,24 @@ describe('checkRules (SPEC 10.3)', () => {
 });
 
 describe('checkRules refuses a configuration it cannot run', () => {
-  it('without rules', async () => {
-    const { rules: _rules, ...withoutRules } = config();
-    await expect(checkRules(withoutRules)).rejects.toThrow(
+  it('without resources', async () => {
+    const { resources: _resources, ...withoutResources } = config();
+    await expect(checkRules(withoutResources)).rejects.toThrow(
       new PgCatalogError(
         'config_invalid',
-        'rules is not configured: set rules.registry to a function that returns the declared resources',
+        'resources is not configured: set resources.registry to a function that returns the declared resources',
       ),
     );
   });
 
   const registries: ReadonlyArray<
-    readonly [string, RulesConfig['registry'], string]
+    readonly [string, ResourcesConfig['registry'], string]
   > = [
     [
       'a registry function that returns no array',
       // A JavaScript configuration can return anything.
       () => ({}) as never,
-      'rules.registry must return an array of declared resources',
+      'resources.registry must return an array of declared resources',
     ],
     [
       'a registry with something other than a declared resource',
