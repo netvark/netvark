@@ -24,6 +24,7 @@ import { contractFixture } from '@netvark/resource-core/testing';
 
 import { OUTBOX_TABLE } from './contract-database.ts';
 import { throwawayDatabase } from './oracle-database.ts';
+import { connectionsClosed, endPool } from './pool-closed.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Pool } = pg` for ESM
 const { Pool } = pg;
@@ -106,7 +107,7 @@ function serverDatabase(url: string): KyselyDatabase {
           await pool.query(script);
         }
       } catch (error) {
-        await pool.end();
+        await endPool(pool);
         await database.drop();
         throw error;
       }
@@ -144,10 +145,13 @@ function serverDatabase(url: string): KyselyDatabase {
         return;
       }
       const { pool, drop } = await opened;
+      // Kysely's destroy ends the pool when a query opened it, without waiting for its connections.
+      const closed = connectionsClosed(pool);
       await db.destroy();
       if (!pool.ended) {
         await pool.end();
       }
+      await closed;
       await drop();
     },
   };
