@@ -3,15 +3,23 @@
  * conforming implementation of the Unicode Bidirectional Algorithm, once
  * with the values isolated by the built core and once as plain
  * interpolation, and compared with the layout UAX #9 prescribes for an
- * isolate: a neutral outside, a paragraph of its own inside.
+ * isolate: a neutral outside, a paragraph of its own inside. The same
+ * sentences then go through a compile as messages: the built binding writes
+ * them as the core does, and Paraglide's own interpolation reorders them.
  */
+import type { Catalogs } from './support/catalogs';
 import type { Direction, Sentence } from './support/layout';
+import type { Messages } from './support/project';
 
-import { describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { isolate } from '@netvark/intl-core';
+import { compile } from '@netvark/paraglide-intl';
 
 import { isolatedLayout, layout, write } from './support/layout';
+import { importMessages, message, writeProject } from './support/project';
 
 interface Case {
   readonly name: string;
@@ -115,6 +123,84 @@ describe('isolate in a laid out sentence', () => {
       const cleaned = withoutControls(sentence);
       expect(layout(write(cleaned, isolate), direction)).toBe(
         isolatedLayout(cleaned, direction),
+      );
+    },
+  );
+});
+
+const LOCALE: Readonly<Record<Direction, string>> = { ltr: 'en', rtl: 'ar' };
+
+function values(sentence: Sentence): ReadonlyArray<string> {
+  return sentence.flatMap((part) =>
+    typeof part === 'string' ? [] : [part.value],
+  );
+}
+
+/** The sentence as a message's text, its values as the inputs `v0`, `v1`, ... */
+function pattern(sentence: Sentence): string {
+  let next = 0;
+  return write(sentence, () => {
+    next += 1;
+    return `{v${next - 1}}`;
+  });
+}
+
+function inputs(sentence: Sentence): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    values(sentence).map((value, index) => [`v${index}`, value]),
+  );
+}
+
+/** The cases, each with the key of its message. */
+const MESSAGES = [...REORDERED, ...IN_ORDER].map(
+  ({ name, direction, sentence }, index) => ({
+    name,
+    direction,
+    sentence,
+    key: `case_${index}`,
+  }),
+);
+
+/** One message per case, the same text in both locales. */
+function catalogs(): Catalogs {
+  const messages = Object.fromEntries(
+    MESSAGES.map(({ key, sentence }) => [key, pattern(sentence)]),
+  );
+  return { en: messages, ar: messages };
+}
+
+describe('compiled messages in a laid out sentence', () => {
+  let isolated: Messages = {};
+  let plain: Messages = {};
+
+  beforeAll(async () => {
+    const { dir, project, outdir } = await writeProject(catalogs());
+    await compile({ project, outdir });
+    await compile({ project, outdir: join(dir, 'plain'), isolate: false });
+    isolated = await importMessages(outdir);
+    plain = await importMessages(join(dir, 'plain'));
+  });
+
+  it.each(MESSAGES)(
+    'keeps $name in place, written as the core writes it',
+    ({ key, direction, sentence }) => {
+      const text = message(isolated, key)(inputs(sentence), {
+        locale: LOCALE[direction],
+      });
+      expect(text).toBe(write(sentence, isolate));
+      expect(layout(text, direction)).toBe(isolatedLayout(sentence, direction));
+    },
+  );
+
+  it.each(MESSAGES.slice(0, REORDERED.length))(
+    "Paraglide's own interpolation of $name is reordered",
+    ({ key, direction, sentence }) => {
+      const text = message(plain, key)(inputs(sentence), {
+        locale: LOCALE[direction],
+      });
+      expect(text).toBe(write(sentence, String));
+      expect(layout(text, direction)).not.toBe(
+        isolatedLayout(sentence, direction),
       );
     },
   );
