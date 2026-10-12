@@ -350,6 +350,30 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
 
+  e2e/intl:
+    devDependencies:
+      '@netvark/intl-core':
+        specifier: workspace:*
+        version: link:../../packages/intl-core
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.4
+      bidi-js:
+        specifier: 1.1.0
+        version: 1.1.0
+      miniflare:
+        specifier: 'catalog:'
+        version: 4.20260730.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@arethetypeswrong/core@0.18.5)(oxc-resolver@11.24.2)(publint@0.3.25)(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+
   e2e/jsonapi:
     devDependencies:
       '@hono/node-server':
@@ -654,6 +678,8 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
+
+  packages/intl-core: {}
 
   packages/jsonapi-client:
     dependencies:

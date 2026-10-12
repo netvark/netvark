@@ -161,7 +161,8 @@ first so the scope is settled before code exists, then:
    `vitest.config.ts`.
 4. Add it to the family's e2e package: a `package-surface` entry listing its exports, a feature file
    that drives it against a real host, and the smoke module. A new family gets a new `e2e/<family>`
-   package and a `docs/<family>` directory, copied from a sibling.
+   package, named in the `e2e` job's `family` matrix in `.github/workflows/ci.yml`, and a
+   `docs/<family>` directory, copied from a sibling.
 5. Document it: the family `README.md`, `DESIGN.md`, `SPEC.md`, an ADR, the root `README.md` table,
    and the package dropdown in `.github/ISSUE_TEMPLATE/feature_request.yml`.
 6. Add a `minor` changeset for its first release.

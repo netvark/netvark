@@ -1,0 +1,54 @@
+/**
+ * Package surface. The core must resolve through its published `exports`
+ * map at runtime and export exactly what SPEC 1 lists. Value imports on
+ * purpose: a missing dist file or a wrong `exports` entry fails here before
+ * any feature test runs.
+ */
+import { readdir, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+import * as core from '@netvark/intl-core';
+
+function names(module: object): Array<string> {
+  return Object.keys(module).toSorted();
+}
+
+/** SPEC 1: the core's values. */
+const CORE = [
+  'FIRST_STRONG_ISOLATE',
+  'POP_DIRECTIONAL_ISOLATE',
+  'isolate',
+].toSorted();
+
+describe('package surface', () => {
+  it('@netvark/intl-core exports the documented values', () => {
+    expect(names(core)).toEqual(CORE);
+  });
+
+  it('ships every bidi control as an escape, never as the character', async () => {
+    const dist = dirname(
+      fileURLToPath(import.meta.resolve('@netvark/intl-core')),
+    );
+    const files = await readdir(dist);
+    expect(files).toContain('index.js');
+    for (const file of files) {
+      const text = await readFile(join(dist, file), 'utf8');
+      expect({ file, controls: text.match(/\p{Bidi_Control}/gu) }).toEqual({
+        file,
+        controls: null,
+      });
+    }
+  });
+
+  it('resolves package.json through the exports map', async () => {
+    const corePkg = (await import('@netvark/intl-core/package.json', {
+      with: { type: 'json' },
+    })) as {
+      default: { name: string };
+    };
+    expect(corePkg.default.name).toBe('@netvark/intl-core');
+  });
+});
