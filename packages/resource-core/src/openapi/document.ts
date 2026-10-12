@@ -39,13 +39,20 @@ import { ERROR_CATALOG } from '@netvark/jsonapi-core';
 import { errorCatalog } from '../errors/error-catalog';
 import { checkRegistry } from '../registry/check-registry';
 import {
+  atomicOperation,
+  atomicSchemas,
+  lidTypes,
+  operationsPath,
+  servesOperations,
+} from './atomic-operations';
+import {
   errorKey,
   errorRef,
   errorResponseRef,
   schemaKey,
 } from './component-names';
 import { checkExamples, exampleObjects } from './examples';
-import { operationCodes } from './operation-codes';
+import { atomicCodes, operationCodes } from './operation-codes';
 import { pathItems } from './operations';
 import { readPaths } from './paths';
 import {
@@ -94,8 +101,10 @@ export interface OpenApiDocument {
   };
 }
 
+/** The resource's component schemas, with the ones its operations read when the document lists the operations endpoint, whose lid types `lids` holds. */
 function componentSchemas(
   internals: DeclaredInternals,
+  lids: ReadonlySet<string> | undefined,
 ): ReadonlyArray<readonly [string, JsonSchema]> {
   const { type } = internals.resource.names;
   const operations = new Set(internals.resource.declaration.operations);
@@ -118,6 +127,7 @@ function componentSchemas(
           ] as const,
         ]
       : []),
+    ...(lids === undefined ? [] : atomicSchemas(internals, lids)),
   ];
 }
 
@@ -138,6 +148,10 @@ function serverOf(
 /** The error responses of each operation, and the components they reference. */
 interface ErrorDocumentation {
   readonly responses: OperationContext['errors'];
+  /** The error responses of `codes`; a `TypeError` for a code the catalog lacks. */
+  readonly codes: (
+    codes: ReadonlyArray<string>,
+  ) => ReturnType<OperationContext['errors']>;
   /** The object of every code a response built so far references, by component key, in catalog order. */
   readonly objects: () => ReadonlyArray<readonly [string, JsonSchema]>;
   /** The response of every code a status built so far carries alone, by component key, in catalog order. */
@@ -163,20 +177,22 @@ function errorDocumentation(
   };
   const inCatalogOrder = (codes: ReadonlySet<string>): Array<string> =>
     Object.keys(ban.catalog).filter((code) => codes.has(code));
+  const responsesOf = (codes: ReadonlyArray<string>) => {
+    const unknown = codes.find((code) => !Object.hasOwn(ban.catalog, code));
+    if (unknown !== undefined) {
+      throw new TypeError(
+        `openapi: codes: ${unknown} is not a code of the catalog; give it in appErrors`,
+      );
+    }
+    for (const code of codes) {
+      referenced.add(code);
+    }
+    return errorResponses(ban, codes, { objectRef: errorRef, responseRef });
+  };
   return {
-    responses: (internals: DeclaredInternals, operation: DocumentOperation) => {
-      const codes = operationCodes(internals, operation, options.codes);
-      const unknown = codes.find((code) => !Object.hasOwn(ban.catalog, code));
-      if (unknown !== undefined) {
-        throw new TypeError(
-          `openapi: codes: ${unknown} is not a code of the catalog; give it in appErrors`,
-        );
-      }
-      for (const code of codes) {
-        referenced.add(code);
-      }
-      return errorResponses(ban, codes, { objectRef: errorRef, responseRef });
-    },
+    responses: (internals: DeclaredInternals, operation: DocumentOperation) =>
+      responsesOf(operationCodes(internals, operation, options.codes)),
+    codes: responsesOf,
     objects: () =>
       Object.entries(errorObjectSchemas(ban, inCatalogOrder(referenced))).map(
         ([code, schema]) => [errorKey(code), schema] as const,
@@ -227,6 +243,23 @@ export function openapi(
       paths[path] = item;
     }
   }
+  const lids = servesOperations(listed) ? lidTypes(listed) : undefined;
+  if (lids !== undefined) {
+    const path = operationsPath(located.map(({ paths: of }) => of.collection));
+    // Only a collection can: every other path of a resource holds its id.
+    const taken = located.find(({ paths: of }) => of.collection === path);
+    if (taken !== undefined) {
+      throw new TypeError(
+        `openapi: the operations endpoint's path, ${path}, is the collection path of ${taken.internals.resource.names.type}`,
+      );
+    }
+    paths[path] = {
+      post: atomicOperation(
+        listed,
+        errors.codes(atomicCodes(listed, options.codes)),
+      ),
+    };
+  }
   return {
     openapi: OPENAPI_VERSION,
     info: options.info,
@@ -234,7 +267,7 @@ export function openapi(
     paths,
     components: {
       schemas: Object.fromEntries([
-        ...listed.flatMap((internals) => componentSchemas(internals)),
+        ...listed.flatMap((internals) => componentSchemas(internals, lids)),
         ...errors.objects(),
       ]),
       responses: Object.fromEntries(errors.loneResponses()),

@@ -503,10 +503,10 @@ operation's failure.
 
 ## Modules
 
-| Subpath                        | What it holds                                                                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-core`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants |
-| `@netvark/jsonapi-core/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, and the operations document parser                                       |
+| Subpath                        | What it holds                                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-core`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants                    |
+| `@netvark/jsonapi-core/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, the operations document parser, and `DEFAULT_MAX_OPERATIONS`, the processor's default limit |
 
 ## Documentation
 

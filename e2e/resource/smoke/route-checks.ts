@@ -210,18 +210,22 @@ export const routeChecks: Checks = {
       text,
     );
   },
-  'hono-resource serves the OpenAPI document without an actor': async () => {
-    const response = await host().request('/api/openapi.json');
-    check(response.status === 200, `status ${String(response.status)}`);
-    const type = response.headers.get('Content-Type');
-    check(type === 'application/json', `Content-Type ${String(type)}`);
-    const text = await response.text();
-    check(
-      text.includes('"openapi":"3.1.2"') &&
-        text.includes('"/api/contacts/{id}/organization"'),
-      text.slice(0, 200),
-    );
-  },
+  'hono-resource serves the OpenAPI document without an actor, the operations endpoint listed':
+    async () => {
+      const response = await host().request('/api/openapi.json');
+      check(response.status === 200, `status ${String(response.status)}`);
+      const type = response.headers.get('Content-Type');
+      check(type === 'application/json', `Content-Type ${String(type)}`);
+      const text = await response.text();
+      check(
+        text.includes('"openapi":"3.1.2"') &&
+          text.includes('"/api/contacts/{id}/organization"') &&
+          text.includes(
+            '"/api/operations":{"post":{"operationId":"atomic:operations"',
+          ),
+        text.slice(0, 200),
+      );
+    },
   'hono-resource tells the error handler the type a route serves': async () => {
     const response = await host().request('/api/contacts/9/organization', {
       headers: { 'X-Actor': 'smoke' },

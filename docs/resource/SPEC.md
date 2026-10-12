@@ -2220,6 +2220,31 @@ resources, after the checks of every list of resources (4.2). The options:
   `.`, and its tag is the type. `resourcePaths(definition)` reads them and is exported, so a host
   mounts its routes at the paths the document lists (19.2); its `TypeError`s start with
   `resourcePaths:`, and the same ones start with `openapi:` when `openapi` reads the paths.
+- **The Atomic Operations endpoint**, `POST <base>/operations`, is listed when a listed resource
+  declares `create`, `update`, or `remove`, as a host serves it (19.4), `<base>` being the path the
+  collections share. Collections under different bases throw `TypeError`
+  (`openapi: the resources' links have different bases (/api, /v2); the operations endpoint sits under one`),
+  and so does a collection at the endpoint's path, listed or not, since a host routes every
+  collection (19.2):
+  `openapi: the operations endpoint's path, /api/operations, is the collection path of operations`.
+  Its operation id and tag are `atomic:operations`, which no other operation takes: a type is a
+  member name, which holds no `:`. Its request and its 200 use the extension's media type,
+  `application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"` (jsonapi SPEC 11.1). The request
+  is an operations document of 1 to `DEFAULT_MAX_OPERATIONS` (10) operations, the processor's
+  default limit, with top-level `jsonapi`, `links`, `meta`, and `@`-members. Each operation is one
+  of the closed variants the processor runs (jsonapi SPEC 11.2, 11.4): an `add` of
+  `<type>.atomic-add`, without a target or by `href`; an `update` of `<type>.atomic-update` by
+  `ref`, by `href`, or by its data alone; a `remove` by `ref` or by `href`; and, for each
+  `readWrite` relationship of a resource that declares `update`, an `update` by a `ref` that names
+  the relationship or by `href`, with the target's linkage. A `ref` names a resource by `id`, or by
+  `lid` when an `add` can create its type; a variant two resources share, such as a `remove` by
+  `href`, is listed once. The 200 answers `atomic:results`, each result empty or carrying the
+  `<type>.resource` of a resource that declares `create` or `update`, and is listed only when one
+  does; the 204 is listed when a result can be empty, for a `remove` or a relationship's `update`.
+  The error responses list the processor's codes, the document's, `FORBIDDEN` for an operation its
+  resource does not declare, and `NOT_FOUND` for a target that does not exist, with every code of
+  each declared write and `options.codes`. What an `href` names, and whether an earlier `add`
+  defined a `lid`, are the server's to judge.
 - **Bodies** use `application/vnd.api+json` without parameters, which matches the media type with
   the Cursor Pagination profile a page carries (RFC 9110 media ranges). Documents are those
   `@netvark/jsonapi-core` builds and parses (11.1): a resource document with the includable targets'
@@ -2229,24 +2254,29 @@ resources, after the checks of every list of resources (4.2). The options:
   and a relationship's update 200, and a remove 204 without a body.
 - **Schemas**: `components.schemas` holds, per resource, `<type>.resource`, the resource object a
   response carries, `<type>.identifier`, and `<type>.create` and `<type>.update` for the declared
-  operations. A response object is open, since `schema.read` strips the keys it does not know, and
-  requires no attribute, since a sparse fieldset may leave any out; a request object is closed, as
-  the parser is, but for `@`-members, which the parser skips. A value's schema is read from its
-  metadata (8): the wire form's type and format (5.1), the folded limits as keywords, a digit
-  pattern for integer and decimal text, each catalog pattern as a `pattern` (several under `allOf`;
-  a `.` outside a class becomes `[\s\S]`, since the catalog reads patterns with `su`), the options
-  as `enum`, an array's `items`, `null` where the value may be null, `readOnly` and `writeOnly` by
-  access, and the declared `description` and `example`, as `examples`. A codec's value is
-  `z.toJSONSchema(codec.schema)`, its input in a request and its output in a response (7.1).
-  Validators add no keyword: their codes appear in the error responses. `int16`, `decimal`, and
-  `date-time-local` come from the OpenAPI Format Registry, which a validator that does not know a
-  format ignores.
+  operations. With the operations endpoint come the objects its operations send: `<type>.local`, a
+  local identifier `{ type, lid }`, and `<type>.atomic-add`, an `add`'s resource object with its own
+  `lid`, for a resource that declares `create`; and `<type>.atomic-update` for one that declares
+  `update`, identified by `id` or by `lid`, since the processor resolves an update's `lid` only
+  without a target and reads past one beside an `id` (jsonapi SPEC 11.4). Their linkage takes the
+  target's `local` when an `add` can create the target. A response object is open, since
+  `schema.read` strips the keys it does not know, and requires no attribute, since a sparse fieldset
+  may leave any out; a request object is closed, as the parser is, but for `@`-members, which the
+  parser skips. A value's schema is read from its metadata (8): the wire form's type and format
+  (5.1), the folded limits as keywords, a digit pattern for integer and decimal text, each catalog
+  pattern as a `pattern` (several under `allOf`; a `.` outside a class becomes `[\s\S]`, since the
+  catalog reads patterns with `su`), the options as `enum`, an array's `items`, `null` where the
+  value may be null, `readOnly` and `writeOnly` by access, and the declared `description` and
+  `example`, as `examples`. A codec's value is `z.toJSONSchema(codec.schema)`, its input in a
+  request and its output in a response (7.1). Validators add no keyword: their codes appear in the
+  error responses. `int16`, `decimal`, and `date-time-local` come from the OpenAPI Format Registry,
+  which a validator that does not know a format ignores.
 - **Component keys** hold only `A-Za-z0-9.-_`: a type, which may hold a space or characters outside
   ASCII, and a code, which may be any string, are spelled with each UTF-16 code unit outside
-  `A-Za-z0-9_-` as `.` and four uppercase hexadecimal digits, which is injective. A suffix is a
-  lowercase word after the last `.`, and an error key starts with `_`, which no type's spelling
-  does. An error key names a code's error object in `components.schemas` and its lone response in
-  `components.responses`, two maps with keys of their own.
+  `A-Za-z0-9_-` as `.` and four uppercase hexadecimal digits, which is injective. A suffix is
+  lowercase words joined by `-` after the last `.` (`atomic-add`), and an error key starts with `_`,
+  which no type's spelling does. An error key names a code's error object in `components.schemas`
+  and its lone response in `components.responses`, two maps with keys of their own.
 - **Parameters** come from the JSON:API definition's capabilities, which `parseQuery` holds a
   request to: `filter[<member>][<operator>]` per declared operator, whose value is the text
   `@netvark/keyset-core` accepts for the member's keyset type, a list for `in`, `nin`, `between`,
@@ -2271,9 +2301,10 @@ resources, after the checks of every list of resources (4.2). The options:
   document codes, `CONFLICT` for a type or an id that differs, `CLIENT_GENERATED_ID_NOT_SUPPORTED`
   for a create's id without client ids, `FORBIDDEN` for a member the operation does not accept (9.4)
   and a denied create, and the derived codes the operation can raise (9.1, 9.5); a remove's
-  `NOT_FOUND` and `CONFLICT` for a row still referenced; and `options.codes`. A code `codes` names
-  outside the catalog throws `TypeError`
-  (`openapi: codes: TEAPOT is not a code of the catalog; give it in appErrors`).
+  `NOT_FOUND` and `CONFLICT` for a row still referenced; the operations endpoint's own and every
+  code of each declared write, a relationship's `update` adding none, since it writes what its
+  resource's update can; and `options.codes`. A code `codes` names outside the catalog throws
+  `TypeError` (`openapi: codes: TEAPOT is not a code of the catalog; give it in appErrors`).
 - **Examples**: `options.examples` adds named Example Objects (`summary`, `description`, `value`) to
   a create's and an update's request body and to a get's 200 response. Each MUST pass what the
   server holds that body to: the id's schema where the body carries one (3.4), `write.create` or
@@ -2289,9 +2320,10 @@ JSON Schema cannot state compactly stays with the server, whose refusals the err
 document. The document is looser for U+0000 and unpaired surrogates in text; a `real`'s range; an
 `int8` or `numeric` bound finer than its digit count, since a digit pattern bounds a value only by
 the power of ten above its bounds, sign included (a pattern for `> 0` still admits `0`); a negative
-zero; a date-time's range and leap second; a validator; a codec's refinements; and an update whose
-`data.id` differs from the path's id, which answers 409 `CONFLICT`. Patterns keep to the regular
-expression tokens JSON Schema recommends for interoperability, so no lookahead refuses `-0`.
+zero; a date-time's range and leap second; a validator; a codec's refinements; an update whose
+`data.id` differs from the path's id, which answers 409 `CONFLICT`; and an operation's `href` and a
+`lid` no earlier `add` defined. Patterns keep to the regular expression tokens JSON Schema
+recommends for interoperability, so no lookahead refuses `-0`.
 
 @ref https://spec.openapis.org/oas/v3.1.2.html @ref
 https://spec.openapis.org/oas/v3.1.2.html#components-object @ref
@@ -2338,6 +2370,10 @@ master of October 2026, the same declarations over 36 unchanged tables gave 34 c
 column widened to `bigint` broke its wire form (`integer` to a `string` of `int64`), a new CHECK
 raised a minimum, renamed CHECKs removed their codes, and widened text limits and a new column
 default broke nobody (15.5).
+
+The Atomic Operations endpoint has no entry of its own: `openapi` lists it exactly when a resource
+declares a write, and its operations follow from each resource's, which the surface holds, so a
+write added or removed is the change a client reads.
 
 `parseSurface(value)` reads a surface back from JSON, such as the committed snapshot: it returns the
 value as a `Surface` when it is one, and otherwise throws `TypeError` at the first member that is
@@ -3877,8 +3913,8 @@ throws there rather than on a request. It is served as `application/json`, witho
 client reads it before it has a session. Like every route, the path answers another method 405 with
 `Allow: GET, HEAD` (19.2), and a resource whose route has the path, which a definition's own
 `links.self` can give it, is refused when the routes are made. The routes and the document read the
-same links, so the document names the paths the routes serve. @ref
-https://spec.openapis.org/oas/v3.1.2.html
+same links, so the document names the paths the routes serve, the operations endpoint of 19.4 among
+them when a resource declares a write. @ref https://spec.openapis.org/oas/v3.1.2.html
 
 ### 19.6 Errors and localization
 
