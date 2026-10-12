@@ -1,11 +1,11 @@
 /**
- * `query(search)` (resource SPEC 20.7): a route's search read back against
- * the definition, as JSON and as the API's own parameters. What
- * `parseQuery` refuses is dropped parameter by parameter, so a stale or
- * edited link opens the list with the rest; `include`, `fields`, and
- * custom parameters are never read; JSON of another shape is dropped
- * member by member; and the state reads back to the parameters it came
- * from.
+ * `lenientQuery`, which `query(search)` reads with (resource SPEC 20.7): a
+ * route's search read back against the definition, as JSON and as the
+ * API's own parameters. What `parseQuery` refuses is dropped parameter by
+ * parameter, so a stale or edited link opens the list with the rest;
+ * `include`, `fields`, and custom parameters are never read; JSON of
+ * another shape is dropped member by member; and the state reads back to
+ * the parameters it came from.
  */
 import type { AnyResource } from '@netvark/jsonapi-core';
 
@@ -19,6 +19,10 @@ import { lenientQuery } from './lenient-query';
 import { resourceList } from './resource-list';
 
 const contacts = resourceList(Contacts, messages);
+
+const read = (search: unknown) => lenientQuery(Contacts.resource, search);
+const organizations = (search: unknown) =>
+  lenientQuery(Organizations.resource, search);
 
 /** The state the JSON and parameter forms below both hold. */
 const STATE = {
@@ -58,28 +62,26 @@ describe('query: a valid search in either form (resource SPEC 20.7)', () => {
       page: { size: 5, after: 'c2' },
       search: 'ada',
     };
-    expect(contacts.query(json)).toStrictEqual(json);
-    expect(contacts.query(JSON.parse(JSON.stringify(json)))).toStrictEqual(
-      json,
-    );
-    expect(contacts.query(STATE)).toStrictEqual(STATE);
+    expect(read(json)).toStrictEqual(json);
+    expect(read(JSON.parse(JSON.stringify(json)))).toStrictEqual(json);
+    expect(read(STATE)).toStrictEqual(STATE);
   });
 
   it('reads the API parameters as URLSearchParams and as a string, with or without ?', () => {
-    expect(contacts.query(new URLSearchParams(PARAMS))).toStrictEqual(STATE);
-    expect(contacts.query(PARAMS)).toStrictEqual(STATE);
-    expect(contacts.query(`?${PARAMS}`)).toStrictEqual(STATE);
+    expect(read(new URLSearchParams(PARAMS))).toStrictEqual(STATE);
+    expect(read(PARAMS)).toStrictEqual(STATE);
+    expect(read(`?${PARAMS}`)).toStrictEqual(STATE);
   });
 
   it('gives back the parameters it read, and reads back the state they make', () => {
-    expect(contacts.params(contacts.query(PARAMS)).toString()).toBe(PARAMS);
-    expect(contacts.query(contacts.params(STATE))).toStrictEqual(STATE);
-    expect(contacts.query(contacts.query(STATE))).toStrictEqual(STATE);
+    expect(contacts.params(read(PARAMS)).toString()).toBe(PARAMS);
+    expect(read(contacts.params(STATE))).toStrictEqual(STATE);
+    expect(read(read(STATE))).toStrictEqual(STATE);
   });
 
   it('reads a bare value as eq, a repeated parameter as a list, and an empty search as it is', () => {
     expect(
-      contacts.query(
+      read(
         'filter[email]=ada@example.com&filter[kind][in]=person&filter[kind][in]=organization&filter[q]=',
       ),
     ).toStrictEqual({
@@ -92,10 +94,10 @@ describe('query: a valid search in either form (resource SPEC 20.7)', () => {
   });
 
   it('keeps page.size only when the search held it', () => {
-    expect(contacts.query('page[after]=c2')).toStrictEqual({
+    expect(read('page[after]=c2')).toStrictEqual({
       page: { after: 'c2' },
     });
-    expect(contacts.query('sort=')).toStrictEqual({});
+    expect(read('sort=')).toStrictEqual({});
   });
 });
 
@@ -144,17 +146,17 @@ describe('query: what the definition refuses is dropped, parameter by parameter 
       { filter: { vip: { eq: 'false' } } },
     ],
   ])('drops %s and keeps the rest', (_case, search, state) => {
-    expect(contacts.query(search)).toStrictEqual(state);
+    expect(read(search)).toStrictEqual(state);
   });
 
   it("never reads include, fields, or custom parameters: they are the screen's", () => {
     expect(
-      contacts.query(
+      read(
         'include=organization&fields[contacts]=name&sorting=name&q=ada&sort=name',
       ),
     ).toStrictEqual({ sort: ['name'] });
     expect(
-      contacts.query({
+      read({
         include: ['organization'],
         fields: { contacts: ['name'] },
         custom: { q: 'ada' },
@@ -164,22 +166,19 @@ describe('query: what the definition refuses is dropped, parameter by parameter 
   });
 
   it('drops an empty JSON cursor, which the definition refuses', () => {
-    expect(contacts.query({ page: { size: 5, after: '' } })).toStrictEqual({
+    expect(read({ page: { size: 5, after: '' } })).toStrictEqual({
       page: { size: 5 },
     });
   });
 
   it('drops search on a definition without one, and what it refuses beside it', () => {
-    const organizations = resourceList(Organizations, messages);
-    expect(
-      organizations.query({ sort: ['verified'], search: 'acme' }),
-    ).toStrictEqual({});
-    expect(
-      organizations.query({ search: 'acme', sort: ['name'] }),
-    ).toStrictEqual({
+    expect(organizations({ sort: ['verified'], search: 'acme' })).toStrictEqual(
+      {},
+    );
+    expect(organizations({ search: 'acme', sort: ['name'] })).toStrictEqual({
       sort: ['name'],
     });
-    expect(organizations.query('filter[q]=acme&sort=name')).toStrictEqual({
+    expect(organizations('filter[q]=acme&sort=name')).toStrictEqual({
       sort: ['name'],
     });
   });
@@ -216,11 +215,11 @@ describe('query: JSON of another shape is dropped member by member (resource SPE
     ['a cursor that is no string', { page: { after: 3 } }],
     ['search not a string', { search: 5 }],
   ])('drops %s', (_case, search) => {
-    expect(contacts.query(search)).toStrictEqual({});
+    expect(read(search)).toStrictEqual({});
   });
 
   it('keeps a JSON page at either cursor', () => {
-    expect(contacts.query({ page: { size: 5, before: 'c9' } })).toStrictEqual({
+    expect(read({ page: { size: 5, before: 'c9' } })).toStrictEqual({
       page: { size: 5, before: 'c9' },
     });
   });
@@ -244,7 +243,7 @@ describe('query: JSON of another shape is dropped member by member (resource SPE
 
   it('keeps the members of the right shape beside one of another', () => {
     expect(
-      contacts.query({
+      read({
         sort: ['name'],
         filter: {
           name: { startsWithi: 'Ad', eq: null },
@@ -268,7 +267,7 @@ describe('query: JSON of another shape is dropped member by member (resource SPE
 
   it('drops each JSON member whose parameter the definition refuses, and keeps the rest in its own form', () => {
     expect(
-      contacts.query({
+      read({
         sort: ['nickname', 'name'],
         filter: {
           name: { startsWithi: 'Ad', containsi: 'd' },
@@ -294,7 +293,7 @@ describe('query: JSON of another shape is dropped member by member (resource SPE
   it.each([null, undefined, 5, true, [], [['sort', 'name']], () => ({})])(
     'is the empty state for a search that is not an object: %s',
     (search) => {
-      expect(contacts.query(search)).toStrictEqual({});
+      expect(read(search)).toStrictEqual({});
     },
   );
 });

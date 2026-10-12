@@ -600,6 +600,10 @@ function ContactsScreen() {
   no longer filters or a page size over `page.max`. JSON keeps its own forms, so a router that
   validates the search after every navigation reads back the state it wrote; parameters read one
   value as text and a repeated one as a list, as the API does.
+- `query` names every member of the list query, `undefined` where the state holds none. TanStack
+  Router hands a route the URL's search with the validated one spread over it, so a member left out
+  would pass through as the URL holds it; with the router registered, `Route.useSearch()` is the
+  `ListState` that `query` returns, and an `undefined` member never reaches the URL.
 - Every change but paging starts at the first page: sorting, filtering, searching, and resizing drop
   `page.after` and `page.before` and keep `page.size`, since a cursor belongs to the order and the
   conditions it was issued under. Each function returns a new state and keeps every member it does

@@ -83,6 +83,37 @@ describe('resourceList: the columns, page sizes, and search of a definition (res
   });
 });
 
+describe('resourceList.query: a state naming every member of a list query (resource SPEC 20.7)', () => {
+  it("keeps nothing of the URL's search a router spreads the state over that the state does not hold", () => {
+    const url = {
+      sort: ['nickname'],
+      include: ['organization'],
+      fields: { contacts: ['name'] },
+      filter: { status: { in: ['archived'] }, vip: { gte: 1 } },
+      tab: 'details',
+    };
+    const state = contacts.query(url);
+    expect(Object.keys(state)).toEqual([
+      'include',
+      'fields',
+      'sort',
+      'filter',
+      'page',
+      'search',
+      'custom',
+    ]);
+    // TanStack Router hands the route the URL's search with the validated one spread over it.
+    const routed = { ...url, ...state };
+    expect(contacts.params(routed).toString()).toBe(
+      'filter%5Bstatus%5D%5Bin%5D=archived',
+    );
+    expect(JSON.parse(JSON.stringify(routed))).toStrictEqual({
+      filter: { status: { in: ['archived'] } },
+      tab: 'details',
+    });
+  });
+});
+
 describe('resourceList: changes and paging (resource SPEC 20.7)', () => {
   const paged = {
     sort: ['name'],
