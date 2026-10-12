@@ -1,8 +1,9 @@
 # keyset family: instructions for coding agents
 
 Read with the root [`AGENTS.md`](../../AGENTS.md), which holds the rules every family shares; this
-file adds what is specific to `@netvark/keyset-core` (the database-free core) and
-`@netvark/kysely-keyset` (the Kysely binding). Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+file adds what is specific to `@netvark/keyset-core` (the database-free core),
+`@netvark/kysely-keyset` (the Kysely binding), and `@netvark/drizzle-keyset` (the Drizzle binding).
+Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Ground rules
 
@@ -12,11 +13,12 @@ file adds what is specific to `@netvark/keyset-core` (the database-free core) an
   a decision it records; add a new ADR instead of silently reversing one.
 - Spec-driven, not memory-driven. Every behavior comes from the Cursor Pagination profile
   (https://jsonapi.org/profiles/ethanresnick/cursor-pagination/), the PostgreSQL documentation
-  (ordering, pattern matching, arrays, text search, data types), Kysely's documentation, the Web
-  Crypto specification, or an RFC (2104 for HMAC, 4648 for base64url, 8785 for canonical JSON).
-  Fetch the clause, cite it in the code with an `@ref <url>` comment next to the decision it
-  justifies, and name it in the test. Where the profile leaves a choice to the server, the choice is
-  written down in `docs/keyset/SPEC.md` and an ADR.
+  (ordering, pattern matching, arrays, text search, data types), Kysely's or Drizzle's
+  documentation, the Web Crypto specification, or an RFC (2104 for HMAC, 4648 for base64url, 8785
+  for canonical JSON). A Drizzle behavior its documentation does not state is measured, on the floor
+  and the current version, before code relies on it. Fetch the clause, cite it in the code with an
+  `@ref <url>` comment next to the decision it justifies, and name it in the test. Where the profile
+  leaves a choice to the server, the choice is written down in `docs/keyset/SPEC.md` and an ADR.
 - Every identifier in SQL comes from the definition, validated once in `defineKeyset`; every value
   from a request is a bound parameter. The one literal (the text search configuration) is validated
   against `regconfig`'s name syntax at definition time. Never interpolate request data.
@@ -24,16 +26,21 @@ file adds what is specific to `@netvark/keyset-core` (the database-free core) an
   `message`.
 - Client input never becomes an object key without a check (`PROTO_KEYS`, `Object.hasOwn`), and
   every lookup into client-shaped data goes through `internal/object.ts` or a `ReadonlyMap`.
-- Database code stays in the adapter. Nothing under `packages/keyset-core/` imports `kysely` or a
-  driver; what needs a query builder lives in `packages/kysely-keyset/` and renders the plan (ADR
-  0004).
+- Database code stays in the adapters. Nothing under `packages/keyset-core/` imports `kysely`,
+  `drizzle-orm`, or a driver; what needs a query builder lives in an adapter and renders the plan
+  (ADR 0004, ADR 0017).
+- In `packages/drizzle-keyset/`, every column reference is its own nested `sql` chunk (Drizzle drops
+  the table of a column directly inside a selected expression), every value is `sql.param`, and
+  `sql.raw` takes only the constant fragments of a lookup table and a configuration `isSearchConfig`
+  accepted (ADR 0017).
 
 ## Repository map
 
 A pnpm workspace: `packages/keyset-core` (the database-free core, published as
 `@netvark/keyset-core`), `packages/kysely-keyset` (the Kysely adapter, published as
-`@netvark/kysely-keyset`, depends on the core and re-exports it), and `e2e/keyset/` (private). Root
-configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.jsonc`,
+`@netvark/kysely-keyset`, depends on the core and re-exports it), `packages/drizzle-keyset` (the
+Drizzle adapter, published as `@netvark/drizzle-keyset`, the same), and `e2e/keyset/` (private).
+Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.jsonc`,
 `.oxlintrc.json`, `.oxfmtrc.json`) apply to all of them.
 
 `packages/keyset-core/src/`:
@@ -65,12 +72,28 @@ configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.js
 - `test-support/` a compile-only Kysely, a canned-rows driver, and the rows it answers, for the unit
   tests; not published
 
-`e2e/keyset/`: end-to-end suite, a private workspace package that consumes the built
-`@netvark/keyset-core` and `@netvark/kysely-keyset` through `workspace:*`; never imports from
-`src/`. `e2e/keyset/support/` holds the schema and seed (`schema.ts`, `seed.ts`), the harnesses
+`packages/drizzle-keyset/src/`:
+
+- `index.ts` re-exports `@netvark/keyset-core` and adds the adapter
+- `define-keyset.ts` and `typed-init.ts` `createDefineKeyset(schema)`: a `defineKeyset` whose names
+  are checked against the Drizzle schema's type and whose keysets carry `paginate`
+- `check-names.ts` every name of a validated definition resolved in the schema object at definition
+  time, and the nullability of each column field's column
+- `schema.ts` `tableOf` and `columnOf`: prototype-safe lookups of tables and columns
+- `paginate.ts` the select the binding builds: the caller's selection and condition, the filter, the
+  total, the seek, the key selections, the ordering, the limit; rows split from the private aliases
+- `render/` `renderTarget` (columns, correlated aggregates, `concat_ws`) and `renderPredicate`
+  (every predicate kind as Drizzle `sql`)
+- `test-support/` a Drizzle schema, a `pg-proxy` database that records statements and answers canned
+  rows, and the rows; not published
+
+`e2e/keyset/`: end-to-end suite, a private workspace package that consumes the three built packages
+through `workspace:*`; never imports from `src/`. `e2e/keyset/support/` holds the schema and seed
+(`schema.ts`, `seed.ts`), the Drizzle schema of the same tables (`drizzle-schema.ts`), the harnesses
 (`db.ts`: PGlite, node-postgres over pglite-socket, a PostgreSQL server), the keysets under test
-(`keysets.ts`), and the invariants every harness must satisfy (`invariants.ts`). `e2e/keyset/smoke/`
-is the runtime smoke test (Bun, Deno, workerd).
+(`keysets.ts`, each through both adapters), a pager per adapter (`bindings.ts`), and the invariants
+every harness and adapter must satisfy (`invariants.ts`). `e2e/keyset/smoke/` is the runtime smoke
+test (Bun, Deno, workerd).
 
 - `docs/keyset/DESIGN.md` what we are building and why; `docs/keyset/SPEC.md` the normative
   contract; `docs/keyset/adr/` decisions

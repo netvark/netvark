@@ -1,7 +1,7 @@
 # @netvark/keyset-core: design
 
-This document describes what @netvark/keyset-core and @netvark/kysely-keyset are, the API they
-expose, and how they are built.
+This document describes what @netvark/keyset-core and its two adapters, @netvark/kysely-keyset and
+@netvark/drizzle-keyset, are, the API they expose, and how they are built.
 
 Architecture decisions referenced as ADR-NNNN live in `docs/keyset/adr/`. The normative,
 clause-by-clause specification that implementers work from is `docs/keyset/SPEC.md`; this document
@@ -10,8 +10,9 @@ explains the intent behind it. When the two disagree, fix one in the same PR.
 ## 1. Purpose
 
 @netvark/keyset-core is the pagination layer between an API and a PostgreSQL database: a
-database-free core (`@netvark/keyset-core`) and a Kysely adapter (`@netvark/kysely-keyset`) that
-re-exports it and adds the SQL (ADR-0004). They give an application:
+database-free core (`@netvark/keyset-core`) and two adapters that re-export it and add the SQL,
+`@netvark/kysely-keyset` for Kysely (ADR-0004) and `@netvark/drizzle-keyset` for Drizzle (ADR-0017).
+They give an application:
 
 1. one definition per collection, from which the request type, the validation, the seek predicate,
    the cursors, and the SQL all derive, so a client cannot sort, filter, or search on anything the
@@ -33,6 +34,8 @@ It is a library for teams who paginate large tables and want the hard cases hand
 ### Who it is for
 
 - Teams on Kysely and PostgreSQL who want `paginate(query, request)` to be the whole story.
+- Teams on Drizzle and PostgreSQL who want the same from the schema they already declared:
+  `paginate(db, request)`.
 - Teams on another query builder, a raw driver, or a client who want the planning, the cursors, and
   the page semantics without the SQL: the core hands them a plan to render.
 - Teams serving JSON:API who want the one published cursor profile, end to end:
@@ -89,7 +92,7 @@ It is a library for teams who paginate large tables and want the hard cases hand
 
 The examples use `@netvark/kysely-keyset`. `createDefineKeyset`, `paginate`, and the render
 functions are the adapter's; everything else is `@netvark/keyset-core`'s, and the core README shows
-the same flow without Kysely.
+the same flow without Kysely. 3.7 shows the Drizzle adapter.
 
 ### 3.1 Minimal
 
@@ -223,7 +226,7 @@ const page = await contacts.page(plan, rows, (row) => [row.keyset0, row.keyset1]
 `finishPage` takes the fetched rows (one more than the page size, to know whether a next page
 exists), reverses a backward page back into request order, signs a cursor per row, and decides
 `prev` and `next`. An empty page still links back to the cursors it came from, as the profile
-requires. `@netvark/kysely-keyset`'s `paginate` does 3.4 and 3.5 in one call.
+requires. Each adapter's `paginate` does 3.4 and 3.5 in one call.
 
 ### 3.6 Errors to HTTP
 
@@ -252,6 +255,40 @@ Every request-time error is a `KeysetError` with a stable `code` and the detail 
 the same with its own catalog. The fields hold the request's text, which `unsupportedSortError`
 quotes only when it is a plain token (jsonapi ADR 0016); a layer of its own does the same.
 
+### 3.7 With Drizzle
+
+```ts
+import { createDefineKeyset } from '@netvark/drizzle-keyset';
+
+import * as schema from './schema'; // your Drizzle tables
+
+export const defineKeyset = createDefineKeyset(schema, { cursor: { secret: env.CURSOR_SECRET } });
+
+export const contacts = defineKeyset({
+  table: 'contacts',
+  key: ['id'],
+  fields: {
+    id: { column: 'id', type: 'uuid' },
+    name: { column: 'name', type: 'text' },
+    createdAt: { column: 'createdAt', type: 'timestamptz' },
+  },
+});
+
+const page = await contacts.paginate(db, request, {
+  select: { id: schema.contacts.id, name: schema.contacts.name },
+  where: eq(schema.contacts.organizationId, org.id),
+  context: { organization: org.id },
+});
+```
+
+The definer takes the schema object, so a definition names tables and columns as the application's
+code does, by table key and column property, and Drizzle maps them to SQL, `casing` and `pgSchema`
+tables included. Every name is checked against the schema in the types and again at startup, where a
+nullable column declared otherwise is refused. A Drizzle select cannot be extended once built, so
+`paginate` builds it: the caller hands over a selection and a condition, and the binding adds the
+filter, the seek, the key selections, the order, and the limit (ADR-0017). The cursors are those of
+the Kysely adapter, so a definition with the same field names accepts the cursors of either.
+
 ## 4. Architecture
 
 ### 4.1 Modules
@@ -270,11 +307,17 @@ quotes only when it is a plain token (jsonapi ADR 0016); a layer of its own does
   define-keyset   createDefineKeyset<DB>(): names checked against DB, keysets with paginate
   paginate        the plan onto a select query: filter, total, seek, keys, order, limit
   render          targets and predicates as Kysely expressions
+@netvark/drizzle-keyset (packages/drizzle-keyset/src)
+  define-keyset   createDefineKeyset(schema): names checked against the schema, keysets with paginate
+  check-names     every name of a definition resolved in the schema at startup
+  paginate        the select it builds: selection, where, filter, total, seek, keys, order, limit
+  render          targets and predicates as Drizzle sql
 ```
 
 Imports form a DAG from `internal` outward. Nothing in `@netvark/keyset-core` imports a database
 library; it has no dependencies. `@netvark/kysely-keyset` imports `@netvark/keyset-core` and
-`kysely` and re-exports the core so applications see one package (ADR-0004). `import/no-cycle` is
+`kysely` and re-exports the core so applications see one package (ADR-0004);
+`@netvark/drizzle-keyset` does the same with `drizzle-orm` (ADR-0017). `import/no-cycle` is
 enforced.
 
 ### 4.2 Data flow for a page
@@ -322,7 +365,9 @@ names, filterable field names and relation paths, and the relation filters. The 
 database: `createDefineKeyset<DB>(defaults?)` returns a definer whose `TypedKeysetInit` checks
 `table`, every `column`, every relation `table` and `on` pair, aggregate columns, and search columns
 against `DB`, and makes `cursor` optional when the defaults carry one; `paginate` is generic over
-the caller's query, so `Page<TRow>` is the selection's row type.
+the caller's query, so `Page<TRow>` is the selection's row type. The Drizzle adapter reads the same
+checks from the schema object's type, `createDefineKeyset(schema, defaults?)`, and types
+`Page<TRow>` from the `select` it is handed, or the table's `$inferSelect` without one.
 
 ## 5. Decisions
 
@@ -344,3 +389,4 @@ the caller's query, so `Page<TRow>` is the selection's row type.
 | 0014 | Definer defaults are merged member by member                                                                |
 | 0015 | Cursors can be bound to a caller-supplied context                                                           |
 | 0016 | The seek leads with a range on the first key; declared nullability shapes seek and order                    |
+| 0017 | The Drizzle binding takes names from the schema object and builds the select itself                         |

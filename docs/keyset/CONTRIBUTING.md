@@ -1,33 +1,41 @@
 # Contributing to the keyset family
 
-`@netvark/keyset-core` (the database-free core) and `@netvark/kysely-keyset` (the Kysely binding).
-The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md) covers setup, the quality gates, the shared
-conventions, commits, changesets, and releases; this guide adds what is specific to the family.
-Design intent lives in [`DESIGN.md`](DESIGN.md), the normative contract in [`SPEC.md`](SPEC.md), and
-decisions in [`adr/`](adr); read those before proposing API changes.
+`@netvark/keyset-core` (the database-free core), `@netvark/kysely-keyset` (the Kysely binding), and
+`@netvark/drizzle-keyset` (the Drizzle binding). The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+covers setup, the quality gates, the shared conventions, commits, changesets, and releases; this
+guide adds what is specific to the family. Design intent lives in [`DESIGN.md`](DESIGN.md), the
+normative contract in [`SPEC.md`](SPEC.md), and decisions in [`adr/`](adr); read those before
+proposing API changes.
 
 ## Conventions
 
 - **Every behavior traces to a source.** The Cursor Pagination profile, the PostgreSQL documentation
-  (ordering, pattern matching, arrays, text search, data types), Kysely's documentation, the Web
-  Crypto specification, and RFCs 2104, 4648, and 8785 are the sources. Add an `@ref <url>` comment
-  next to the decision it justifies, and name the rule in the test. Where the profile leaves a
-  choice to the server (page size bounds, the cursor format, null ordering, the operator table), the
-  choice is recorded in `docs/keyset/SPEC.md` and an ADR, never only in code.
+  (ordering, pattern matching, arrays, text search, data types), Kysely's and Drizzle's
+  documentation, the Web Crypto specification, and RFCs 2104, 4648, and 8785 are the sources. A
+  Drizzle behavior its documentation does not state is measured on the floor and the current
+  version, and the measurement is cited. Add an `@ref <url>` comment next to the decision it
+  justifies, and name the rule in the test. Where the profile leaves a choice to the server (page
+  size bounds, the cursor format, null ordering, the operator table), the choice is recorded in
+  `docs/keyset/SPEC.md` and an ADR, never only in code.
 - **The core knows no database.** Everything under `packages/keyset-core/` is functions over plain
   values; the plan it produces is data (`QueryPlan`, `Predicate`, `Target`). What needs a query
-  builder or a driver goes in `packages/kysely-keyset/` and renders the plan (ADR 0004).
+  builder or a driver goes in an adapter, `packages/kysely-keyset/` or `packages/drizzle-keyset/`,
+  and renders the plan (ADR 0004, ADR 0017).
 - **Identifiers from the definition, values as parameters.** Table, column, relation, and
   configuration names reach SQL only after `defineKeyset` validated them; request values are always
-  bound parameters; the adapter's unit tests assert the compiled SQL and parameters exactly.
+  bound parameters; each adapter's unit tests assert the compiled SQL and parameters exactly. In
+  `packages/drizzle-keyset/`, every column reference is its own nested `sql` chunk, every value is
+  `sql.param`, and `sql.raw` takes only constant fragments and a configuration `isSearchConfig`
+  accepted (ADR 0017).
 - **End-to-end tests live in `e2e/keyset/`.** That directory is a private pnpm workspace package
-  that depends on `@netvark/keyset-core` and `@netvark/kysely-keyset` through `workspace:*`, so its
-  imports resolve through the published `exports` maps into `dist/` and its `tsc` run checks the
-  emitted declarations. Each `*.e2e.test.ts` file opens a database harness from
-  `e2e/keyset/support/db.ts` (PGlite in-process, node-postgres over a PGlite socket server, or a
-  PostgreSQL server) and asserts over real rows; expectations are computed in JavaScript from the
-  seed, never read back from the SQL under test. Never import from `src/` there. Run one file with
-  `pnpm --filter @netvark/keyset-e2e exec vitest run <name>` after `pnpm build`.
+  that depends on the three packages through `workspace:*`, so its imports resolve through the
+  published `exports` maps into `dist/` and its `tsc` run checks the emitted declarations. Each
+  `*.e2e.test.ts` file opens a database harness from `e2e/keyset/support/db.ts` (PGlite in-process,
+  node-postgres over a PGlite socket server, or a PostgreSQL server) and asserts over real rows;
+  expectations are computed in JavaScript from the seed, never read back from the SQL under test. A
+  file that runs plans against rows runs once per adapter (`support/bindings.ts`). Never import from
+  `src/` there. Run one file with `pnpm --filter @netvark/keyset-e2e exec vitest run <name>` after
+  `pnpm build`.
 - **Client input is hostile.** Names from a request become object keys only through
   `internal/object.ts` or after a `PROTO_KEYS` check; reads of client-shaped objects use
   `Object.hasOwn`; error messages are constant. See `SECURITY.md` for what counts as a
@@ -38,32 +46,33 @@ decisions in [`adr/`](adr); read those before proposing API changes.
 New library surface falls into one of these:
 
 - **A filter operator.** A row in the operator table (`filter/operators.ts`), its mapping in
-  `filter/condition.ts`, a predicate kind in `plan/types.ts` if none fits, the adapter's render
+  `filter/condition.ts`, a predicate kind in `plan/types.ts` if none fits, each adapter's render
   case, the SPEC 4.2 row, an amendment to ADR 0005, tests at every layer, an e2e case, and a `minor`
-  changeset for both packages.
+  changeset for the three packages.
 - **A field type.** The vocabulary in `definition/field-types.ts`, a value checker in
   `filter/values.ts`, its operators in the table, SPEC 3.1 and 4.3, tests, and a `minor` changeset.
 - **A search mode or a sort feature.** A SPEC section and an ADR first (these change the SQL shape
   and the cursor context), then code.
 - **An adapter for another query builder or driver.** A new package `packages/<name>-keyset/`
-  following `packages/kysely-keyset/` as the precedent: depends on `@netvark/keyset-core`
-  (`workspace:^`), re-exports it in full, renders every `Predicate` and `Target` kind (or rejects
-  the ones its target cannot express, documented), and exposes a `paginate` that calls `plan` and
-  `page`. Its own e2e coverage joins `e2e/keyset/`.
+  following `packages/kysely-keyset/` and `packages/drizzle-keyset/` as the precedents: depends on
+  `@netvark/keyset-core` (`workspace:^`), re-exports it in full, renders every `Predicate` and
+  `Target` kind (or rejects the ones its target cannot express, documented), and exposes a
+  `paginate` that calls `plan` and `page`. Its own e2e coverage joins `e2e/keyset/`.
 
 **Constraints every contribution inherits.**
 
 - `@netvark/keyset-core` has no dependencies and imports no runtime API beyond web standards (ADR
-  0002). `kysely` is `@netvark/kysely-keyset`'s only peer dependency, at `>= 0.28.0`; CI tests the
-  floor, so a Kysely API used by the adapter must exist in 0.28.
+  0002). `kysely` is `@netvark/kysely-keyset`'s only peer dependency, at `>= 0.28.0`, and
+  `drizzle-orm` is `@netvark/drizzle-keyset`'s, at `>=0.45.2 <1.0.0`. CI tests both floors, so an
+  API an adapter uses must exist at its floor: Kysely 0.28, drizzle-orm 0.45.2.
 - A definition is validated once, in `defineKeyset`, with a `TypeError` naming the option. A
   request-time check that a definition mistake could trigger belongs there, not in the planner.
 - A request-time error is one of the `KeysetError` classes in `errors.ts`, with a constant message
   and structured fields; a new one is a class, a `code`, a SPEC 9 row, and a `minor` changeset.
 - The cursor format is versioned (`CURSOR_VERSION`). A change to the payload bumps the version and
   gets an ADR; old cursors are then rejected with reason `version`, never misread.
-- `e2e/keyset/package-surface.e2e.test.ts` lists every value export of both packages; a new export
-  goes there, and into an e2e file that runs it against a database.
+- `e2e/keyset/package-surface.e2e.test.ts` lists every value export of the three packages; a new
+  export goes there, and into an e2e file that runs it against a database.
 
 **Checklist.** Every item below is checked by CI or by a reviewer.
 
