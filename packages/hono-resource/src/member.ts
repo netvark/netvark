@@ -25,6 +25,7 @@ import {
 
 import { idOf, includedOf, notRun, operationsOf } from './context';
 import { allow } from './methods';
+import { servesType } from './resource-type';
 
 const HTTP_NO_CONTENT = 204;
 
@@ -39,9 +40,11 @@ export function memberRoutes<TEnv extends Env, TDomain extends DomainShape>(
   const operations: ReadonlySet<string> = new Set(
     declared.declaration.operations,
   );
+  const serves = servesType(declared.names.type);
   if (operations.has('get')) {
     app.get(
       paths.resource,
+      serves,
       actors.resolve,
       queryValidator(resource),
       async (c) => {
@@ -66,6 +69,7 @@ export function memberRoutes<TEnv extends Env, TDomain extends DomainShape>(
   if (operations.has('update')) {
     app.patch(
       paths.resource,
+      serves,
       actors.resolve,
       bodyValidator(resource, { operation: 'update' }),
       async (c) => {
@@ -80,7 +84,7 @@ export function memberRoutes<TEnv extends Env, TDomain extends DomainShape>(
     allow(methods, paths.resource, 'PATCH');
   }
   if (operations.has('remove')) {
-    app.delete(paths.resource, actors.resolve, async (c) => {
+    app.delete(paths.resource, serves, actors.resolve, async (c) => {
       const domain = operationsOf(context, c, declared);
       if (domain.remove === undefined) {
         throw notRun(declared, 'remove');

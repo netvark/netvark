@@ -10,6 +10,7 @@
 import type { Context, ErrorHandler } from 'hono';
 
 import type { JsonApiVariables } from '@netvark/hono-jsonapi';
+import type { OpenApiOptions } from '@netvark/resource-core/openapi';
 import type { ResourceRuntime } from '@netvark/resource-core/server';
 
 import type { Member, TestDomain } from './memory-runtime';
@@ -54,12 +55,18 @@ export function memberOf(c: Context<TestEnv>): Member {
   return found;
 }
 
-/** What a test overrides: the actor, and a hook that sees each error before the handler renders it. */
+/**
+ * What a test overrides: the actor, a hook that sees each error before the
+ * handler renders it, the handler, `errorHandler()` by default, and the
+ * routes' `openapi` option.
+ */
 export interface TestAppOptions {
   readonly actor?:
     | ((c: Context<TestEnv>) => Member | Promise<Member>)
     | undefined;
-  readonly onError?: ((error: Error) => void) | undefined;
+  readonly onError?: ((error: Error, c: Context<TestEnv>) => void) | undefined;
+  readonly handler?: ErrorHandler<TestEnv> | undefined;
+  readonly openapi?: OpenApiOptions | undefined;
 }
 
 /** The host over `runtime`. */
@@ -68,7 +75,7 @@ export function testApp(
   options: TestAppOptions = {},
 ): Hono<TestEnv> {
   const app = new Hono<TestEnv>();
-  const handle: ErrorHandler<TestEnv> = errorHandler();
+  const handle = options.handler ?? errorHandler<TestEnv>();
   app.use(
     jsonApi({
       profiles: [CURSOR_PAGINATION_PROFILE],
@@ -76,10 +83,17 @@ export function testApp(
     }),
   );
   app.onError(async (error, c) => {
-    options.onError?.(error);
+    options.onError?.(error, c);
     return handle(error, c);
   });
   app.notFound(notFoundHandler());
-  app.route('/', jsonApiRoutes({ runtime, actor: options.actor ?? memberOf }));
+  app.route(
+    '/',
+    jsonApiRoutes({
+      runtime,
+      actor: options.actor ?? memberOf,
+      openapi: options.openapi,
+    }),
+  );
   return app;
 }

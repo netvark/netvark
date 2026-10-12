@@ -35,6 +35,8 @@ import { notRun, resourceOperations } from './context';
 import { hrefTargets } from './hrefs';
 import { allow } from './methods';
 import { OperationCalls } from './operation-calls';
+import { notingFailedType } from './operation-type';
+import { claimRoute } from './paths';
 import { linkagePath, nowhere, objectPath } from './pointers';
 
 /** What the operations of one request share: the transaction's domain, and their calls. */
@@ -178,29 +180,30 @@ export function operationsRoute<TEnv extends Env, TDomain extends DomainShape>(
     return;
   }
   const path = `${plan.base}/operations`;
-  if (plan.routes.has(path)) {
-    throw new TypeError(`jsonApiRoutes: two routes have the path ${path}`);
-  }
+  claimRoute(plan, path);
   const { app, actors, methods, runtime } = context;
+  const resolveHref = hrefTargets(plan, path);
+  const handler = atomicOperations<OperationsTransaction, TEnv>({
+    resources: plan.resources.map(({ declared }) => handlersOf<TEnv>(declared)),
+    resolveHref,
+    transaction: async (c, run) => {
+      const calls = new OperationCalls();
+      try {
+        return await runtime.transaction(actors.of(c), async (domain) =>
+          run({ domain, calls }),
+        );
+      } catch (error) {
+        throw calls.settled(error);
+      }
+    },
+  });
+  const served: ReadonlySet<string> = new Set(
+    plan.resources.map(({ declared }) => declared.names.type),
+  );
   app.post(
     path,
     actors.resolve,
-    atomicOperations<OperationsTransaction, TEnv>({
-      resources: plan.resources.map(({ declared }) =>
-        handlersOf<TEnv>(declared),
-      ),
-      resolveHref: hrefTargets(plan, path),
-      transaction: async (c, run) => {
-        const calls = new OperationCalls();
-        try {
-          return await runtime.transaction(actors.of(c), async (domain) =>
-            run({ domain, calls }),
-          );
-        } catch (error) {
-          throw calls.settled(error);
-        }
-      },
-    }),
+    notingFailedType(handler, resolveHref, served),
   );
   allow(methods, path, 'POST');
 }

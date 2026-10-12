@@ -5,9 +5,11 @@
  * method with 405 and `Allow`, a request without an actor with what the
  * actor threw, a relationship link with its linkage, an update the
  * relationship does not support with 403, a related link with the
- * target's document, and an operations request with its results, through
- * Hono's `fetch` as every runtime calls it. No Node.js API, so the module
- * runs on Bun, Deno, and workerd.
+ * target's document, an operations request with its results, and the
+ * OpenAPI document without an actor, and the error handler reads the type
+ * a route serves through `resourceTypeOf`, through Hono's `fetch` as every
+ * runtime calls it. No Node.js API, so the module runs on Bun, Deno, and
+ * workerd.
  */
 import type {
   PublicRow,
@@ -27,7 +29,7 @@ import {
   jsonApiError,
   notFoundHandler,
 } from '@netvark/hono-jsonapi';
-import { jsonApiRoutes } from '@netvark/hono-resource';
+import { jsonApiRoutes, resourceTypeOf } from '@netvark/hono-resource';
 
 import { Contacts } from '../resources/contacts.ts';
 import { Organizations } from '../resources/organizations.ts';
@@ -83,7 +85,15 @@ const runtime: ResourceRuntime = {
   transaction: async (_actor, work) => work(domain),
 };
 
-/** The host: negotiation, the error handlers, and the routes at `/`. */
+/** The error handler, which adds the type `resourceTypeOf` names to each error document's `meta`. */
+const handle = errorHandler({
+  transform: (body, _error, c) =>
+    typeof body === 'object' && body !== null
+      ? { ...body, meta: { type: resourceTypeOf(c) ?? null } }
+      : body,
+});
+
+/** The host: negotiation, the error handlers, and the routes at `/`, with the document. */
 function host(): Hono {
   const app = new Hono();
   app.use(
@@ -92,7 +102,7 @@ function host(): Hono {
       extensions: [ATOMIC_OPERATIONS_EXTENSION],
     }),
   );
-  app.onError(errorHandler());
+  app.onError(handle);
   app.notFound(notFoundHandler());
   app.route(
     '/',
@@ -106,6 +116,7 @@ function host(): Hono {
         }
         return { id: 'smoke', can: () => false };
       },
+      openapi: { info: { title: 'Contacts', version: '1.0.0' } },
     }),
   );
   return app;
@@ -198,5 +209,25 @@ export const routeChecks: Checks = {
       ) && text.includes('"seats":6'),
       text,
     );
+  },
+  'hono-resource serves the OpenAPI document without an actor': async () => {
+    const response = await host().request('/api/openapi.json');
+    check(response.status === 200, `status ${String(response.status)}`);
+    const type = response.headers.get('Content-Type');
+    check(type === 'application/json', `Content-Type ${String(type)}`);
+    const text = await response.text();
+    check(
+      text.includes('"openapi":"3.1.2"') &&
+        text.includes('"/api/contacts/{id}/organization"'),
+      text.slice(0, 200),
+    );
+  },
+  'hono-resource tells the error handler the type a route serves': async () => {
+    const response = await host().request('/api/contacts/9/organization', {
+      headers: { 'X-Actor': 'smoke' },
+    });
+    check(response.status === 404, `status ${String(response.status)}`);
+    const text = await response.text();
+    check(text.includes('"meta":{"type":"organizations"}'), text);
   },
 };

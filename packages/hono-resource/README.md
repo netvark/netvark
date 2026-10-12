@@ -12,8 +12,9 @@ section 19, and the decisions behind it in
 [ADR 0013](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0013-hosts-take-the-runtime-contract-and-mount-where-the-links-point.md).
 
 Status: in development and unreleased. The collection, resource, relationship, and related routes,
-includes, the Atomic Operations endpoint, and the 405 of every other method are served. The OpenAPI
-document's route and `resourceTypeOf` for localized errors follow in the 0.x line.
+includes, the Atomic Operations endpoint, the OpenAPI document, and the 405 of every other method
+are served, and `resourceTypeOf` tells your error handler which resource a request addressed, for
+localized errors.
 
 ## Install
 
@@ -188,6 +189,88 @@ Accept: application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"
 - **An operation the resource does not declare answers 403**, a type the runtime does not run 404,
   and a request of more than 10 operations 400.
 
+## The OpenAPI document
+
+Pass `openapi`, the options of
+[`openapi`](https://github.com/netvark/netvark/tree/main/packages/resource-core#openapi-and-the-api-diff)
+without the resources, which are the runtime's, and the routes serve the document at
+`GET /api/openapi.json`, the base of your links followed by `/openapi.json`:
+
+```ts
+app.route(
+  '/',
+  jsonApiRoutes({
+    runtime,
+    actor: sessionActor,
+    openapi: {
+      info: { title: 'Contacts API', version: '1.0.0' },
+      appErrors: APP_ERRORS,
+      codes: { all: ['UNAUTHORIZED'] },
+    },
+  }),
+);
+```
+
+- **Built once, when `jsonApiRoutes` runs.** A document that cannot be built, such as one with an
+  example its schema refuses, throws at boot instead of answering 500 on a request.
+- **Served without an actor**, as `application/json`: a client reads it before it has a session.
+- **The same paths as the routes**, since both come from the links, so the document cannot drift
+  from what the server answers.
+
+## Errors and localization
+
+The routes throw and your ban renders. Build it with the JSON:API catalog, the codes of the
+runtime's resources, and your own, and localize with
+[`localizeErrors`](https://github.com/netvark/netvark/tree/main/packages/resource-core#messages-and-localization),
+which labels each member an error points at in the words of the resource the request addressed.
+`resourceTypeOf(c)` names that resource:
+
+```ts
+// src/server/errors.ts
+import { createBan } from '@netvark/hono-ban';
+import { jsonApi } from '@netvark/hono-ban/formats/json-api';
+import { resourceTypeOf } from '@netvark/hono-resource';
+import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import { errorCatalog, localizeErrors } from '@netvark/resource-core';
+
+import { messages } from '../i18n/messages'; // defineMessages over your Paraglide messages
+
+const ban = createBan({
+  errors: { ...ERROR_CATALOG, ...errorCatalog(runtime.resources, APP_ERRORS) },
+  format: jsonApi({ mixedEntries: true }),
+});
+
+export const handle = ban.onError<AppEnv>({
+  transform: localizeErrors(messages, { resource: resourceTypeOf }),
+});
+```
+
+```ts
+// src/server/app.ts
+app.use('*', async (c, next) =>
+  paraglideMiddleware(c.req.raw, async () => {
+    await next();
+    return c.res;
+  }),
+);
+app.use(
+  jsonApi({ profiles: [CURSOR_PAGINATION_PROFILE], extensions: [ATOMIC_OPERATIONS_EXTENSION] }),
+);
+app.onError(handle);
+```
+
+| The request                                            | `resourceTypeOf(c)`                                             |
+| ------------------------------------------------------ | --------------------------------------------------------------- |
+| a collection, resource, or relationship route          | the route's resource, from before the actor resolves            |
+| a related link, such as `/api/contacts/7/organization` | the target, `organizations`                                     |
+| `POST /api/operations`                                 | the type of the operation that failed, when the runtime runs it |
+| anything else, such as a 405                           | `undefined`                                                     |
+
+With German messages that label a contact's `email` as `E-Mail`, a client that sends
+`{ "email": 5 }` to `POST /api/contacts`, or in the second operation of an operations request, reads
+`E-Mail muss vom Typ string sein.` at `/data/attributes/email` or
+`/atomic:operations/1/data/attributes/email`.
+
 ## Best practices
 
 **Mount at `/` and keep the prefix in `links.base`.** `app.route('/api', routes)` would serve the
@@ -223,6 +306,14 @@ use `ref`.
 **Put `jsonApi()` first, and CORS before it.** `jsonApi()` negotiates every request (415 and 406)
 before a route runs. A browser's preflight `OPTIONS` would otherwise reach the 405, so mount
 `hono/cors` before both when browsers call the API from another origin.
+
+**Localize with `resourceTypeOf`, not with the path.** A type guessed from the URL is `api` under a
+base and `operations` on the operations endpoint, so every member loses its label; the routes know
+the resource, the related link's target, and the operation that failed.
+
+**Run `paraglideMiddleware` before everything else.** The error handler runs inside the request's
+middleware chain, so the messages read the locale the middleware resolved only when it wraps the
+whole chain, `jsonApi()`'s 415 and 406 included.
 
 **Serve one runtime with one set of routes.** Its resources must share the links' origin and base;
 mounting a second `jsonApiRoutes` of the same runtime would register every route twice.

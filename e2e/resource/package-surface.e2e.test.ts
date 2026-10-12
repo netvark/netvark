@@ -73,7 +73,10 @@ describe('package surface (SPEC 1, 18.1, 19.1)', () => {
   });
 
   it('@netvark/hono-resource exports the documented values', () => {
-    expect(Object.keys(routes).toSorted()).toEqual(['jsonApiRoutes']);
+    expect(Object.keys(routes).toSorted()).toEqual([
+      'jsonApiRoutes',
+      'resourceTypeOf',
+    ]);
   });
 
   it('@netvark/kysely-resource exports the documented values', () => {

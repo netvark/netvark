@@ -28,6 +28,7 @@ import { keysetRequest } from '@netvark/resource-core/server';
 
 import { includedOf, notRun, operationsOf } from './context';
 import { allow } from './methods';
+import { servesType } from './resource-type';
 
 const HTTP_CREATED = 201;
 
@@ -42,9 +43,11 @@ export function collectionRoutes<TEnv extends Env, TDomain extends DomainShape>(
   const operations: ReadonlySet<string> = new Set(
     declared.declaration.operations,
   );
+  const serves = servesType(declared.names.type);
   if (operations.has('list')) {
     app.get(
       paths.collection,
+      serves,
       actors.resolve,
       queryValidator(resource),
       async (c) => {
@@ -76,6 +79,7 @@ export function collectionRoutes<TEnv extends Env, TDomain extends DomainShape>(
   if (operations.has('create')) {
     app.post(
       paths.collection,
+      serves,
       actors.resolve,
       bodyValidator(resource, { operation: 'create' }),
       async (c) => {

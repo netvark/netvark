@@ -1091,6 +1091,10 @@ export const document = openapi([Organizations, Contacts, Meetings], {
 app.get('/openapi.json', (c) => c.json(document));
 ```
 
+A host on [`@netvark/hono-resource`](../hono-resource#the-openapi-document) passes the same options
+as `jsonApiRoutes({ runtime, actor, openapi })`, and the routes serve the document of the runtime's
+resources at `<base>/openapi.json`.
+
 Every operation the declarations serve has its path, parameters, request and response documents, and
 an error response for each status it can answer with, listing its codes; each code's error object is
 a component, written once and referenced, and so is the response of a status that carries one code,
