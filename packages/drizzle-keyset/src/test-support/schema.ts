@@ -11,7 +11,7 @@
  * @ref https://orm.drizzle.team/docs/custom-types
  */
 import type { SQL } from 'drizzle-orm';
-import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { relations } from 'drizzle-orm';
 import {
@@ -98,6 +98,12 @@ export const schema: TestSchema = {
   people,
   contactsRelations,
 };
+
+/** The caller's selection of the paginate tests: two columns of contacts. */
+export const selection: {
+  readonly id: PgColumn;
+  readonly firstName: PgColumn;
+} = { id: contacts.id, firstName: contacts.firstName };
 
 /** The statement Drizzle's PostgreSQL dialect prints for a fragment. */
 export function compile(

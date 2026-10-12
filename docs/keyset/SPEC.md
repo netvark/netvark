@@ -763,7 +763,7 @@ answers canned rows while recording the compiled queries, the Drizzle adapter's 
 | Sort, plan, page, cursor            | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks                   |
 | Errors                              | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                                        |
 | Adapter (`@netvark/kysely-keyset`)  | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                      | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                                            |
-| Adapter (`@netvark/drizzle-keyset`) | `schema.test.ts`, `target.test.ts`, `predicate.test.ts`, `check-names.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                             | exact SQL and parameters for every target and predicate kind and every page shape; name checks against the schema, in the types and at definition time |
+| Adapter (`@netvark/drizzle-keyset`) | `schema.test.ts`, `target.test.ts`, `predicate.test.ts`, `check-names.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `paginate.test-d.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                       | exact SQL and parameters for every target and predicate kind and every page shape; name checks against the schema, in the types and at definition time |
 
 ### 11.1 End-to-end suite and invariants (`e2e/keyset/`)
 
@@ -914,8 +914,7 @@ a `DrizzleKeyset`: the core's `Keyset` plus `paginate(db, request, options?)` (1
 Tests: `define-keyset.test.ts` (the core's merge and validation running first, the defaults, a
 missing secret), `check-names.test.ts` (every row of the table, a prototype key, a member that is
 not a table, the runtime nullability check), `define-keyset.test-d.ts` (name checks,
-`nullable: true` for a nullable column, `cursor` optional only with a cursor default, the row types
-of `paginate`).
+`nullable: true` for a nullable column, `cursor` optional only with a cursor default).
 
 ### 14.2 Rendering (`schema.ts`, `render/target.ts`, `render/predicate.ts`)
 
@@ -958,12 +957,13 @@ is `{ select?, where?, total?, onQuery?, context? }`. `select` is the caller's s
 is the caller's condition, an `SQL` such as `eq(contacts.orgId, org.id)`; `total`, `onQuery`, and
 `context` are those of 10.3.
 
-1. `plan = await keyset.plan(request, { context: options.context })`.
-2. A member of `select` named like one of the plan's aliases is a `TypeError`, raised before any
-   statement runs.
+1. A member of `select` named like a key alias (`keyset` followed by digits, the names `keyAlias`
+   gives) is a `TypeError`, raised before the request is planned: the names are reserved as in 10.3,
+   whatever the request's sort, so a selection either always works or never does.
+2. `plan = await keyset.plan(request, { context: options.context })`.
 3. The total, when `options.total` is `true`: `select count(*) from <table>` with the caller's
-   `where` and the filter joined as in step 4, run first; the result is `Number(total)`, `0` without
-   a row.
+   `where` and the filter joined as in step 4, run first. It selects Drizzle's `count()`, which
+   reads the count as a number; `0` without a row.
 4. The page: `db.select({ ...select, <alias>: cast(<target> as text), ... }).from(<table>)`, with
    those of the caller's `where`, the filter, and the seek that are present, each in parentheses and
    joined with `and`; `order by <target> <direction>` per key, with `nulls <first|last>` when the
@@ -995,8 +995,10 @@ secret, and the reverse.
 Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, scoped, and `casing` pages; the
 default selection and a caller's; the reserved aliases; row splitting; the context rejecting a
 foreign cursor before querying), `paginate-order.test.ts` (the seek after the filter, the inverted
-backward page, nulls placed on nullable keys only). Both run over Drizzle's `pg-proxy` driver, whose
-callback records each statement and answers canned rows.
+backward page, nulls placed on nullable keys only, a correlated aggregate key, a `pgSchema` table).
+Both run over Drizzle's `pg-proxy` driver, whose callback records each statement and answers canned
+rows. `paginate.test-d.ts` pins the row types of the default selection and of a caller's, the
+request types, and a database, a transaction, and a `withReplicas` database as `KeysetDatabase`.
 
 ### 14.4 End-to-end and smoke tests
 
