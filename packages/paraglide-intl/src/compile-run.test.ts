@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +15,22 @@ import {
 } from './test-support/fixture-project';
 
 const BY_HAND = '// changed by hand\n';
+
+/** Rewrites the catalogs in `dir` as `MESSAGES` with `shared_by` edited and `welcome` removed. */
+async function editCatalogs(dir: string): Promise<void> {
+  for (const [locale, entries] of Object.entries(MESSAGES)) {
+    const edited = Object.entries(entries)
+      .filter(([key]) => key !== 'welcome')
+      .map(([key, value]) => [
+        key,
+        key === 'shared_by' && typeof value === 'string' ? `${value}!` : value,
+      ]);
+    await writeFile(
+      join(dir, 'messages', `${locale}.json`),
+      JSON.stringify(Object.fromEntries(edited)),
+    );
+  }
+}
 
 describe('compile runs (SPEC 6.1)', () => {
   it('rewrites nothing unchanged when given the previous compilation', async () => {
@@ -31,6 +47,36 @@ describe('compile runs (SPEC 6.1)', () => {
     expect(await readFile(runtime, 'utf8')).toBe(BY_HAND);
     await compile({ project, outdir });
     expect(await readFile(runtime, 'utf8')).not.toBe(BY_HAND);
+  });
+
+  it('writes only what changed over the previous compilation, keeping the rest (#170)', async () => {
+    const { dir, project, outdir } = await fixtureProject(MESSAGES);
+    const first = await compile({ project, outdir });
+    const before = await filesUnder(outdir);
+    await editCatalogs(dir);
+    const written: Array<string> = [];
+    const promises = {
+      ...fs.promises,
+      writeFile: async (path: any, data: any) => {
+        written.push(relative(outdir, String(path)));
+        return fs.promises.writeFile(path, data);
+      },
+    };
+    await compile({
+      project,
+      outdir,
+      previousCompilation: first,
+      fs: { ...fs, promises },
+    });
+    const after = await filesUnder(outdir);
+    const fresh = join(dir, 'fresh');
+    await compile({ project, outdir: fresh });
+    expect(after).toEqual(await filesUnder(fresh));
+    const changed = Object.keys(after).filter(
+      (file) => after[file] !== before[file],
+    );
+    expect(written.toSorted()).toEqual(changed.toSorted());
+    expect(changed.length).toBeGreaterThan(0);
   });
 
   it('cleans the output directory first unless cleanOutdir is false', async () => {
