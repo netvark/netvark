@@ -33,11 +33,16 @@
       "source": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./form": {
+      "source": "./src/tanstack-form/index.ts",
+      "default": "./dist/form.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js",
+      "./form": "./dist/form.js",
       "./package.json": "./package.json"
     },
     "access": "public",
@@ -54,11 +59,20 @@
   "devDependencies": {
     "@netvark/jsonapi-client": "workspace:^",
     "@netvark/resource-core": "workspace:^",
+    "@tanstack/react-form": "1.33.5",
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
     "zod": "catalog:"
   },
   "peerDependencies": {
     "@netvark/jsonapi-client": "^0.1.0",
-    "@netvark/resource-core": "^0.1.0"
+    "@netvark/resource-core": "^0.1.0",
+    "@tanstack/react-form": "^1.17.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-form": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.12.0"
