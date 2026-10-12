@@ -5,7 +5,8 @@
  * organizations, modeled on the contacts application of e2e/resource, and
  * the plans an organization is on, a lookup table keyed by an enum. Between
  * them every filter kind, every wire type, and a relationship whose id has
- * options. What this module exports is typed wide, as a JavaScript caller
+ * options, a write-only member, and a CHECK across a field and a
+ * relationship. What this module exports is typed wide, as a JavaScript caller
  * hands it; a type test declares its own typed resources over the same
  * catalog. Not published with the package.
  * @packageDocumentation
@@ -15,8 +16,12 @@ import type { DeclaredResource } from '@netvark/resource-core';
 import { createDeclareResource } from '@netvark/resource-core';
 
 import { publicCatalog } from './public-catalog';
+import { FIXTURE_REGISTRIES } from './registries';
 
-const declareResource = createDeclareResource({ catalog: publicCatalog });
+const declareResource = createDeclareResource({
+  catalog: publicCatalog,
+  ...FIXTURE_REGISTRIES,
+});
 
 export const Plans: DeclaredResource = declareResource('plans', {
   operations: ['list', 'get'],
@@ -30,7 +35,10 @@ export const Organizations: DeclaredResource = declareResource(
     fields: {
       name: { access: 'readWrite', filter: ['eq', 'containsi'], sort: true },
       verified: { access: 'readWrite', filter: ['eq'] },
+      marketing_opt_in: { access: 'readWrite' },
+      open_days: { access: 'readWrite' },
       founded_on: { access: 'readWrite', filter: ['gte', 'lte'], sort: true },
+      invite_code: { access: 'write' },
       created_at: { access: 'read', sort: true },
     },
     relationships: {
@@ -41,6 +49,9 @@ export const Organizations: DeclaredResource = declareResource(
       },
     },
     sort: { default: ['-created_at'] },
+    rules: {
+      organizations_enterprise_verified: { validator: 'enterpriseVerified' },
+    },
   },
 );
 
@@ -57,6 +68,7 @@ export const Contacts: DeclaredResource = declareResource('contacts', {
     lifetime_value: { access: 'readWrite', filter: ['gte'], sort: true },
     score: { access: 'readWrite', filter: ['gte', 'lte'], sort: true },
     tags: { access: 'readWrite', filter: ['contains', 'overlaps'] },
+    ratings: { access: 'readWrite' },
     channels: { access: 'readWrite' },
     vip: { access: 'readWrite', filter: ['eq'] },
     birthday: { access: 'readWrite', filter: ['gte', 'lt'] },
@@ -71,6 +83,7 @@ export const Contacts: DeclaredResource = declareResource('contacts', {
       filter: ['eq', 'in'],
       include: true,
     },
+    referred_by_id: { target: () => Contacts, access: 'readWrite' },
   },
   search: { column: 'search', mode: 'websearch' },
   sort: { default: ['name', { field: 'created_at', direction: 'desc' }] },

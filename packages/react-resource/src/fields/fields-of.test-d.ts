@@ -8,9 +8,13 @@ import { createDeclareResource } from '@netvark/resource-core';
 
 import { messages } from '../test-support/messages';
 import { publicCatalog } from '../test-support/public-catalog';
+import { FIXTURE_REGISTRIES } from '../test-support/registries';
 import { fieldsOf } from './fields-of';
 
-const declareResource = createDeclareResource({ catalog: publicCatalog });
+const declareResource = createDeclareResource({
+  catalog: publicCatalog,
+  ...FIXTURE_REGISTRIES,
+});
 
 const Plans = declareResource('plans', {
   operations: ['get'],
@@ -24,6 +28,9 @@ const Organizations = declareResource('organizations', {
     created_at: { access: 'read' },
   },
   relationships: { plan_id: { target: () => Plans, access: 'readWrite' } },
+  rules: {
+    organizations_enterprise_verified: { validator: 'enterpriseVerified' },
+  },
 });
 
 describe('fieldsOf (resource SPEC 20.2)', () => {

@@ -93,6 +93,23 @@ function descriptorOf(labels: TypeLabels, meta: FieldMeta): FieldDescriptor {
 }
 
 /**
+ * The descriptor of each of `resource`'s public fields and relationships,
+ * in `fields` order, labeled by `messages`; `caller` names the function in
+ * each `TypeError`, as `fieldsOf` documents them.
+ */
+export function descriptorsOf(
+  caller: string,
+  resource: DeclaredShape,
+  messages: Messages,
+): ReadonlyArray<FieldDescriptor> {
+  checkDeclared(caller, resource);
+  const labels = typeLabels(caller, messages, resource.names.type);
+  return Object.values(resource.fields).map((meta) =>
+    descriptorOf(labels, meta),
+  );
+}
+
+/**
  * The descriptors of `resource`'s public fields and relationships, keyed by
  * public name in `fields` order, labeled by `messages`; frozen. Throws
  * `TypeError` for a resource no `declareResource` returned, for messages no
@@ -103,12 +120,10 @@ export function fieldsOf<TResource extends DeclaredShape>(
   resource: TResource,
   messages: Messages,
 ): FieldDescriptors<TResource> {
-  checkDeclared(CALLER, resource);
-  const labels = typeLabels(CALLER, messages, resource.names.type);
   const descriptors = Object.fromEntries(
-    Object.values(resource.fields).map((meta) => [
-      meta.name,
-      descriptorOf(labels, meta),
+    descriptorsOf(CALLER, resource, messages).map((descriptor) => [
+      descriptor.name,
+      descriptor,
     ]),
   );
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: one descriptor per member of `fields`, keyed by its public name, which `FieldDescriptors` maps

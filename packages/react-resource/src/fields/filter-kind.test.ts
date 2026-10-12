@@ -22,6 +22,7 @@ describe('filterKind (resource SPEC 20.2)', () => {
       'attribute lifetimeValue': 'number',
       'attribute score': 'number',
       'attribute tags': 'values',
+      'attribute ratings': 'values',
       'attribute channels': 'options',
       'attribute vip': 'boolean',
       'attribute birthday': 'date',
@@ -29,8 +30,12 @@ describe('filterKind (resource SPEC 20.2)', () => {
       'attribute details': 'text',
       'attribute createdAt': 'date',
       'relationship organization': 'reference',
+      'relationship referredBy': 'reference',
       'attribute verified': 'boolean',
+      'attribute marketingOptIn': 'boolean',
+      'attribute openDays': 'values',
       'attribute foundedOn': 'date',
+      'attribute inviteCode': 'text',
       'relationship plan': 'reference',
     });
   });

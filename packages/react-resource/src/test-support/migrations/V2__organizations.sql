@@ -8,6 +8,10 @@ create table organizations (
   name varchar(120) not null check (char_length(name) >= 1),
   plan_id plan_tier not null default 'free' references plans (id),
   verified boolean not null default false,
+  marketing_opt_in boolean not null,
+  open_days boolean[] not null default '{t,t,t,t,t,f,f}',
   founded_on date,
-  created_at timestamptz not null default now()
+  invite_code text check (char_length(invite_code) between 6 and 32),
+  created_at timestamptz not null default now(),
+  constraint organizations_enterprise_verified check (plan_id <> 'enterprise' or verified)
 );

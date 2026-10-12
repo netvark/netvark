@@ -329,7 +329,7 @@ read back leniently from a URL. `./form` turns the form model into TanStack Form
 refusal onto the fields; `./query` keys TanStack Query by the request and invalidates a type after a
 write; TanStack Table v9 reads and writes the list's sorting and filters as state, with paging by
 cursor outside it. An application keeps its field components, its table markup, and its router. ADRs
-0014 and 0015 record why.
+0014, 0015, and 0016 record why.
 
 ## 5. Decisions
 
@@ -350,6 +350,7 @@ cursor outside it. An application keeps its field components, its table markup, 
 | 0013 | Hosts take the runtime contract, mount where the links point, and run an operations request in one transaction |
 | 0014 | The React bindings render the application's one messages object                                                |
 | 0015 | The React bindings are a framework-free model under TanStack Query, Form, and Table                            |
+| 0016 | A form sends a cleared input as `null`, nullable or not                                                        |
 
 ## 6. Later
 

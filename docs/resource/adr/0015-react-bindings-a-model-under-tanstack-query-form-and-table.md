@@ -1,6 +1,7 @@
 # ADR 0015: The React bindings are a framework-free model under TanStack Query, Form, and Table
 
-- Status: accepted
+- Status: accepted; superseded in part by ADR-0016 (a form sends a cleared input as `null`, nullable
+  or not)
 - Date: 2026-10-12
 
 ## Context
@@ -55,12 +56,12 @@ https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
   Table v9 reads it, so no Table import is needed and the application keeps its own table, columns,
   and markup.
 - **Forms edit strings and send what changed.** A form value is what its input edits: a string for
-  every text, number, date, and id, a relationship's included, a boolean or `null` until it is set
-  for a boolean, a list for an array. A write carries the members whose value differs from the value
-  the form started from: the declaration's display default or blank on create, the record's value on
-  update, so a database default applies to every member the person left alone (ADR 0004). Values are
-  turned into their wire forms by the field's metadata, and a blank becomes `null` where the member
-  is nullable and is left out where it is not.
+  every text, number, date, and id, a relationship's whether its linkage or its included record
+  holds it, a boolean or `null` until it is set for a boolean, a list for an array. A write carries
+  the members whose value differs from the value the form started from: the declaration's display
+  default or blank on create, the record's value on update, so a database default applies to every
+  member the person left alone (ADR 0004). Values are turned into their wire forms by the field's
+  metadata, and a blank becomes `null` where the member is nullable and is left out where it is not.
 - **Validation is the declaration's.** The form's Standard Schema converts the values and runs
   `write.create` or `write.update`, places each issue on its member, keeps one per member, the
   first, and renders it with `localizeIssues` (ADR 0014); an issue on a blank value reads as

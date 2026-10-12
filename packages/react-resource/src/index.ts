@@ -7,6 +7,18 @@
  */
 export type { FilterKind } from './fields/filter-kind';
 export type {
+  FormErrors,
+  FormMemberName,
+  FormModel,
+  FormModelOptions,
+  FormOperation,
+  FormRecord,
+  FormValue,
+  FormValues,
+  FormWriteOf,
+} from './form/form-types';
+export type { FormResource } from './form/resource-form';
+export type {
   ColumnFilterDescriptor,
   FieldDescriptor,
   FieldDescriptors,
@@ -14,3 +26,4 @@ export type {
 } from './fields/fields-of';
 
 export { fieldsOf } from './fields/fields-of';
+export { resourceForm } from './form/resource-form';

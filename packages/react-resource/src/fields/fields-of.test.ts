@@ -39,6 +39,7 @@ describe('fieldsOf (resource SPEC 20.2)', () => {
       'lifetimeValue',
       'score',
       'tags',
+      'ratings',
       'channels',
       'vip',
       'birthday',
@@ -46,6 +47,7 @@ describe('fieldsOf (resource SPEC 20.2)', () => {
       'details',
       'createdAt',
       'organization',
+      'referredBy',
     ]);
     for (const [name, descriptor] of Object.entries(contacts)) {
       expect(descriptor.name).toBe(name);
@@ -148,6 +150,7 @@ describe('fieldsOf (resource SPEC 20.2)', () => {
       lifetimeValue: ['number', ['gte']],
       score: ['number', ['gte', 'lte']],
       tags: ['values', ['contains', 'overlaps']],
+      ratings: null,
       channels: null,
       vip: ['boolean', ['eq']],
       birthday: ['date', ['gte', 'lt']],
@@ -155,11 +158,15 @@ describe('fieldsOf (resource SPEC 20.2)', () => {
       details: null,
       createdAt: ['date', ['gte', 'lt']],
       organization: ['reference', ['eq', 'in']],
+      referredBy: null,
     });
     expect(filtersOf(organizations)).toEqual({
       name: ['text', ['eq', 'containsi']],
       verified: ['boolean', ['eq']],
+      marketingOptIn: null,
+      openDays: null,
       foundedOn: ['date', ['gte', 'lte']],
+      inviteCode: null,
       createdAt: null,
       plan: ['reference', ['eq', 'in']],
     });
