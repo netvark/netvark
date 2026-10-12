@@ -209,7 +209,7 @@ const page = await clients.articles.list({
   sort: ['-createdAt'],
   page: { size: 20 },
 });
-page.data[0].author?.name; // string | undefined: resolved, since the query includes author
+page.data[0]?.author?.name; // string | undefined: resolved, since the query includes author
 ```
 
 `@netvark/jsonapi-client` takes the definitions the server is built from. The paths come from their

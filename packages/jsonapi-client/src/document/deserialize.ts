@@ -234,7 +234,7 @@ function objectMember(
 }
 
 /** The document's `links`, `meta`, and `jsonapi`, each `undefined` when it is not an object. */
-function documentMembers(
+export function documentMembers(
   document: JsonRecord,
 ): Pick<Deserialized, 'links' | 'meta' | 'jsonapi'> {
   const links = objectMember(document, 'links');

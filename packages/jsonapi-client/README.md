@@ -1,12 +1,13 @@
 # @netvark/jsonapi-client
 
 A typed client for [JSON:API 1.1](https://jsonapi.org/format/1.1/) servers built with
-[`@netvark/jsonapi-core`](../jsonapi-core#readme). The queries it sends and the records it reads are
-typed by the definitions the server is built from, so an include path, sort, filter, or fieldset the
-server would refuse with a 400 fails `tsc` first, and a record holds exactly what the query asked
-for. Error documents become a `ResponseError` that keeps each error's code. Nothing is generated:
-the client imports the definitions. It uses web standards only (`URL`, `URLSearchParams`), so one
-build runs in browsers, workers, Node, Bun, and Deno. The contract is section 15 of
+[`@netvark/jsonapi-core`](../jsonapi-core#readme). Its calls, the queries they send, the documents
+they write, and the records they read are typed by the definitions the server is built from, so an
+include path, sort, filter, fieldset, or attribute the server would refuse fails `tsc` first, and a
+record holds exactly what the query asked for. Error documents become a `ResponseError` that keeps
+each error's code. Nothing is generated: the client imports the definitions. It uses web standards
+only (`fetch`, `Request`, `Headers`, `URL`, `URLSearchParams`), so one build runs in browsers,
+workers, Node, Bun, and Deno. The contract is section 15 of
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
 ## Install
@@ -18,10 +19,81 @@ pnpm add @netvark/jsonapi-client
 `@netvark/jsonapi-core` is the one dependency. The definitions are the server's: see
 [What a client sees](../jsonapi-core#what-a-client-sees) for what they carry and how to share them.
 
+## Calls
+
+`createTransport` says where the server is and what every request carries; `createClients` gives a
+client per definition:
+
+```ts
+import { Articles, People, Tags } from '@acme/api/definitions';
+
+import { createClients, createTransport } from '@netvark/jsonapi-client';
+
+import { getLocale } from './paraglide/runtime.js';
+
+const transport = createTransport({
+  origin: 'https://api.example.com',
+  headers: async () => ({ Authorization: `Bearer ${await session.token()}` }),
+  language: getLocale,
+});
+export const api = createClients({ articles: Articles, people: People, tags: Tags }, transport);
+
+const { data: articles } = await api.articles.list({
+  include: ['author'],
+  sort: ['-createdAt'],
+  page: { size: 20 },
+});
+articles[0]?.author?.name; // string: the author was included
+
+const { data: created } = await api.articles.create({
+  attributes: { title: 'JSON:API', body: 'A specification for building APIs' },
+  relationships: { author: '9', tags: ['t1', 't2'] },
+});
+```
+
+| Call                                                         | Request                                      | `data`                                          |
+| ------------------------------------------------------------ | -------------------------------------------- | ----------------------------------------------- |
+| `list(query?)`                                               | `GET` the collection                         | the records                                     |
+| `get(id, query?)`                                            | `GET` the resource, with `include`, `fields` | the record                                      |
+| `create(input)`                                              | `POST` the collection                        | the stored record; `undefined` for a 202 or 204 |
+| `update(id, input)`                                          | `PATCH` the resource                         | the record as updated, or `undefined`           |
+| `remove(id)`                                                 | `DELETE` the resource                        | `undefined`                                     |
+| `relationship(id, name)`                                     | `GET` the relationship link                  | the linkage, each identifier with its `meta`    |
+| `related(id, name, query?)`                                  | `GET` the related link, `include`, `fields`  | the related record or `null`, or the records    |
+| `setRelationship(id, name, linkage)`                         | `PATCH` the relationship link                | the linkage, or `undefined`                     |
+| `addToRelationship(id, name, ids)`, `removeFromRelationship` | `POST`, `DELETE` the link of a to-many       | the linkage, or `undefined`                     |
+| `next(page)`, `prev(page)`                                   | `GET` the page's `links.next`, `links.prev`  | the records; `undefined` without the link       |
+
+Each call takes `{ signal, headers }` last and resolves to `{ status, data, links, meta, jsonapi }`.
+The paths come from the definitions' links; a definition's own origin, from an absolute
+`links.base`, is ignored, so one set of definitions serves development, staging, and production.
+
+The transport:
+
+- `origin`: an absolute `http:` or `https:` URL with nothing after the host but `/`.
+- `headers`: sent first on every request; a function is called on each, so a rotated token is
+  current. A call's own `headers` come after it, and the client's `Accept` and `Content-Type` last.
+- `language`: called on every request; a non-empty result is `Accept-Language`, so the server's
+  error titles come back in the user's language.
+- `fetch`: by default the global `fetch`, looked up per request. Anything that answers a `Request`
+  with an object holding `status`, `headers`, and `text()` will do.
+
+A write's `attributes` are the server's validator input, required when it has a required member; its
+`relationships` are the ones the definition's writable lists name, each an id, an identifier object,
+or a record (only its `type` and `id` are sent), `null` to empty a to-one, and a list for a to-many.
+`id` is accepted where the definition takes client ids. A create or an update the definition does
+not serve takes no input at all.
+
+The client checks what the types cannot: an id that is empty, `.`, or `..` throws `TypeError` before
+sending, since the URL parser would drop it from the path; a 2xx that is not a JSON:API document, or
+whose `data` is not what the call reads, throws `TypeError`; any other status rejects with
+`ResponseError`; and a rejected `fetch`, a network failure or an abort, reaches the caller as it is.
+
 ## Queries
 
-`serializeQuery(definition, query)` writes the query string `parseQuery` reads on the server.
-`ListQuery` and `GetQuery` type the query from the definitions:
+`list` takes a `ListQuery` and `get` and `related` a `GetQuery`, typed from the definitions.
+`serializeQuery(definition, query)` writes the query string `parseQuery` reads on the server, for
+code that sends its own requests:
 
 ```ts
 import { Articles, People, Tags } from '@acme/api/definitions';
@@ -94,11 +166,12 @@ to judge: a date it cannot read or a page size above its maximum is a 400 that n
 
 ## Records
 
-`deserialize(document, { include })` turns a document into records: plain objects holding `type`,
-`id`, each attribute, and each relationship, with the resource object's `links`, `meta`, and
-relationship objects as `$links`, `$meta`, and `$relationships` (`$` is a character no member name
-may contain, so nothing collides with them). A relationship on a path the request included is the
-included record, or records in linkage order; every other one is its linkage, `{ type, id }`.
+The calls read every document into records; `deserialize(document, { include })` does the same for
+code that sends its own requests. A record is a plain object holding `type`, `id`, each attribute,
+and each relationship, with the resource object's `links`, `meta`, and relationship objects as
+`$links`, `$meta`, and `$relationships` (`$` is a character no member name may contain, so nothing
+collides with them). A relationship on a path the request included is the included record, or
+records in linkage order; every other one is its linkage, `{ type, id }`.
 
 ```ts
 import { deserialize, type RecordOf } from '@netvark/jsonapi-client';
@@ -154,17 +227,32 @@ It recognizes an error from another copy of the package, where `instanceof` woul
 
 ## Pagination
 
-`pageCursors(document)` reads the cursors of a page's links: `next` is `page[after]` of `links.next`
-and `prev` is `page[before]` of `links.prev`, each `undefined` when the link is `null` or absent,
-which ends the list in that direction. A link may be a string or a link object.
+`next(page)` and `prev(page)` fetch the page a list's `links.next` or `links.prev` names, as the
+server wrote the link, and resolve its records along the `include` the link carries; each resolves
+to `undefined` when the link is `null` or absent, which ends the list in that direction. A link is
+followed only when it is absolute or starts with `/` and is on the transport's origin, so a response
+cannot send the transport's headers to another host.
 
 ```ts
-import { pageCursors, serializeQuery } from '@netvark/jsonapi-client';
+let page = await api.articles.list({ include: ['author'], page: { size: 20 } });
+for (;;) {
+  render(page.data);
+  const following = await api.articles.next(page);
+  if (following === undefined) break;
+  page = following;
+}
+```
 
-const page = await response.json();
+`pageCursors(page)` reads the cursors of a page's links: `next` is `page[after]` of `links.next` and
+`prev` is `page[before]` of `links.prev`, each `undefined` when the link has none. An infinite list
+keys each page by its cursor and lists with `page: { after }`:
+
+```ts
+import { pageCursors } from '@netvark/jsonapi-client';
+
 const { next } = pageCursors(page);
 if (next !== undefined) {
-  const following = serializeQuery(Articles, { ...query, page: { size: 20, after: next } });
+  await api.articles.list({ include: ['author'], page: { size: 20, after: next } });
 }
 ```
 
@@ -175,6 +263,17 @@ carries as `$meta.page.cursor`; list with `page: { after }` set to it to start a
 
 - **Import the server's definitions; generate nothing.** A renamed attribute or a dropped sort then
   fails the client's `tsc`, not a request in production.
+- **Create one transport per server, once,** and the clients beside it at module scope; give the
+  transport the origin from configuration, never from a document.
+- **Give `headers` a function for credentials,** so every request carries the current token.
+- **Pass Paraglide's `getLocale` as `language`,** so titles and details come back in the user's
+  language; branch on codes all the same.
+- **Time a call out with its own signal,** `{ signal: AbortSignal.timeout(10_000) }`: a signal
+  shared by every request would abort them all once it fires.
+- **Pass literal queries to the calls.** A literal `include` or fieldset types the records exactly;
+  a query held in a variable typed `ListQuery` makes every field optional.
+- **Treat a write's `data === undefined` as the server's 202 or 204,** and read the resource again
+  when you need what the server stored.
 - **Pass every definition a response can hold.** The fields of an included type are typed by its
   definition; a type the client was not given takes any name.
 - **Name each sort field once.** The server refuses a field sorted twice in one `sort`.

@@ -13,20 +13,12 @@
 import type { TypesOf } from '@netvark/jsonapi-core';
 
 import type { AnyRecord, Identifier, RecordMembers } from '../document/types';
-
-type Simplify<TValue> = { readonly [K in keyof TValue]: TValue[K] };
-
-type TypeOf<TDefinition> = TDefinition extends {
-  readonly type: infer TType extends string;
-}
-  ? TType
-  : never;
-
-type KnownDefinition<TKnown, TType> = Extract<TKnown, { readonly type: TType }>;
-
-type FieldNameOf<TDefinition> =
-  | (keyof TypesOf<TDefinition>['attributes'] & string)
-  | (keyof TypesOf<TDefinition>['relationships'] & string);
+import type {
+  FieldNameOf,
+  KnownDefinition,
+  Simplify,
+  TypeOf,
+} from '../internal/definition-types';
 
 /** Whether a list type is a tuple, whose elements are all there. */
 type IsTuple<TList> =
