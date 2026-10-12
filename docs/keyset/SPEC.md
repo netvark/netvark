@@ -834,7 +834,8 @@ get the typed errors. `drizzle-checks.ts` adds the Drizzle binding's (14.4): pag
 keyset over Drizzle's `pg-proxy` driver, whose callback records each statement and answers it as a
 server would, and resume the page from its cursor. `run.ts` drives it in-process on Bun and Deno;
 `worker.ts` is the Workers module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`)
-and runs it in Miniflare's workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
+and runs it in Miniflare's workerd. `pnpm test:runtimes` runs all three; CI runs them on every pull
+request and every push to `main`.
 
 ---
 
