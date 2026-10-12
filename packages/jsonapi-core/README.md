@@ -297,7 +297,8 @@ silently.
 ```ts
 const query = parseQuery(Articles, url.search.slice(1));
 // query.sort:    Array<{ field: 'title' | 'createdAt'; direction: 'asc' | 'desc' }>
-// query.filter:  { conditions: [{ field: 'title', operator: 'like', value: 'rails' }], anyOf: [] }
+// query.filter:  { conditions: [{ field: 'title', operator: 'like', value: 'rails',
+//                                 parameter: 'filter[title][like]' }], anyOf: [] }
 // query.include: [['author'], ['tags']] | undefined
 // query.fields:  { articles: ['title'] } | undefined
 // query.page:    { size: 20, after: 'abc', before: undefined, sizeRequested: false, range: false }
@@ -305,7 +306,10 @@ const query = parseQuery(Articles, url.search.slice(1));
 
 The filter grammar is the package's choice, since JSON:API leaves it open: `filter[field]=v` is
 `eq`, `filter[field][op]=v` a declared operator, and `filter[or][0][field][op]=v` a condition in a
-disjunction group. Undeclared fields and operators are 400s.
+disjunction group. Undeclared fields and operators are 400s. Each condition keeps the `parameter` it
+came in, as the request spelled it: when your application refuses a value later, name that parameter
+in `source.parameter`, as `parseQuery` names its own refusals, so a client can match the error to
+the input it sent.
 
 ### Build documents
 

@@ -40,6 +40,8 @@ export interface ArticleQuery {
   readonly filter: ParsedFilter<ArticleFilter>;
   readonly search: string | undefined;
   readonly page: PageRequest;
+  /** A related collection's owner, from its path: only the articles that person wrote. */
+  readonly author?: string | undefined;
 }
 
 export interface Snapshot {
@@ -149,6 +151,7 @@ function select(
   const search = query.search?.toLowerCase();
   return rows.filter(
     (row) =>
+      (query.author === undefined || row.authorId === query.author) &&
       (search === undefined ||
         `${row.title} ${row.body}`.toLowerCase().includes(search)) &&
       query.filter.conditions.every((condition) => matches(row, condition)) &&

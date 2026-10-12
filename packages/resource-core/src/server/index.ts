@@ -43,6 +43,7 @@ export type {
 } from './resource-types';
 export type {
   Domain,
+  FilterParameter,
   ListOptions,
   ResourceInput,
   ResourceOperations,
@@ -64,7 +65,7 @@ export { constraintError } from './constraint-error';
 export { isResourceBehavior } from './define-resource';
 export { createDomainDefiners } from './domain';
 export { defineEvent } from './event';
-export { keysetRequest } from './keyset-request';
+export { filterParameters, keysetRequest } from './keyset-request';
 export { PARTITION_ROOT_SQL, partitionViolation } from './partition';
 export { denyAll } from './policy';
 export { defineQuota, quotaExceeded } from './quota';

@@ -29,6 +29,7 @@ import type {
   SortableFieldOf,
 } from '@netvark/keyset-core';
 
+import type { FilterParameter } from './runtime';
 import type { StorageListRequest } from './storage';
 
 import { isOperator, UnsupportedFilterError } from '@netvark/keyset-core';
@@ -81,28 +82,54 @@ function condition(fields: FieldsInit, parsed: ParsedCondition): KeysetFilter {
   };
 }
 
+/** A part of the filter, with the parameter of each condition in it by its path within the part. */
+interface Term {
+  readonly filter: KeysetFilter;
+  readonly parameters: ReadonlyArray<FilterParameter>;
+}
+
+function conditionTerm(fields: FieldsInit, parsed: ParsedCondition): Term {
+  return {
+    filter: condition(fields, parsed),
+    parameters: [{ path: [], parameter: parsed.parameter }],
+  };
+}
+
 /**
- * One term as itself. keyset-core binds a cursor to the request's filter
- * as given (keyset SPEC 6.1), so `filter[name]=a` binds it as the
+ * The terms under `combinator`, each condition's path below it, or a
+ * single term as itself. keyset-core binds a cursor to the request's
+ * filter as given (keyset SPEC 6.1), so `filter[name]=a` binds it as the
  * hand-written `{ field, op, value }` does.
  */
-function only(terms: ReadonlyArray<KeysetFilter>): KeysetFilter | undefined {
-  return terms.length === 1 ? terms[0] : undefined;
+function joined(combinator: 'and' | 'or', terms: ReadonlyArray<Term>): Term {
+  const [only] = terms;
+  if (only !== undefined && terms.length === 1) {
+    return only;
+  }
+  const filters = terms.map((term) => term.filter);
+  return {
+    filter: combinator === 'and' ? { and: filters } : { or: filters },
+    parameters: terms.flatMap((term, index) =>
+      term.parameters.map(({ path, parameter }) => ({
+        path: [combinator, index, ...path],
+        parameter,
+      })),
+    ),
+  };
 }
 
 /** Every condition and every `filter[or][n]` group must hold; within a group, any condition (jsonapi SPEC 6.8). */
-function filterOf(
-  fields: FieldsInit,
-  filter: ParsedFilter,
-): KeysetFilter | undefined {
+function filterOf(fields: FieldsInit, filter: ParsedFilter): Term | undefined {
   const terms = [
-    ...filter.conditions.map((parsed) => condition(fields, parsed)),
-    ...filter.anyOf.map((group) => {
-      const conditions = group.map((parsed) => condition(fields, parsed));
-      return only(conditions) ?? { or: conditions };
-    }),
+    ...filter.conditions.map((parsed) => conditionTerm(fields, parsed)),
+    ...filter.anyOf.map((group) =>
+      joined(
+        'or',
+        group.map((parsed) => conditionTerm(fields, parsed)),
+      ),
+    ),
   ];
-  return terms.length === 0 ? undefined : (only(terms) ?? { and: terms });
+  return terms.length === 0 ? undefined : joined('and', terms);
 }
 
 /**
@@ -125,11 +152,27 @@ export function keysetRequest(
   const { sort, filter, search, page } = query;
   return {
     sort: sort.length === 0 ? undefined : sort,
-    filter: filterOf(resource.keyset.fields, filter),
+    filter: filterOf(resource.keyset.fields, filter)?.filter,
     search,
     page:
       page === undefined
         ? undefined
         : { size: page.size, after: page.after, before: page.before },
   };
+}
+
+/**
+ * The query parameter of each condition of the filter `keysetRequest`
+ * builds from `query`, by the condition's path in that filter: the list's
+ * `parameters` option, so the error of a value keyset-core refuses names
+ * the parameter the client sent, such as `filter[status]` or
+ * `filter[or][0][status][eq]`, rather than `filter[status][eq]` (SPEC
+ * 18.5). Throws as `keysetRequest` does.
+ * @ref https://jsonapi.org/format/1.1/#error-objects ("which URI query parameter caused the error")
+ */
+export function filterParameters(
+  resource: { readonly keyset: { readonly fields: FieldsInit } },
+  query: ParsedQuery,
+): ReadonlyArray<FilterParameter> {
+  return filterOf(resource.keyset.fields, query.filter)?.parameters ?? [];
 }

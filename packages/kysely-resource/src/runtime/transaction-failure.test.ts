@@ -121,6 +121,32 @@ describe('transaction: the first failure (resource SPEC 12.10, 18.5)', () => {
     ]);
   });
 
+  it("maps a list's refused filter value once it ended, at the parameter it came in", async () => {
+    const thrown: Array<unknown> = [];
+    const { objects } = await refusal(
+      harness.transaction(member('1'), async (domain) =>
+        domain.tasks
+          .list(
+            {
+              filter: { field: 'title', op: 'eq', value: ['a', 'b'] } as never,
+            },
+            { parameters: [{ path: [], parameter: 'filter[title]' }] },
+          )
+          .catch((error: unknown) => {
+            thrown.push(error);
+            throw error;
+          }),
+      ),
+    );
+    expect(isBanError(thrown[0])).toBe(false);
+    expect(objects).toMatchObject([
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[title]' },
+      },
+    ]);
+  });
+
   it('rolls back when a call still pending as work resolves fails', async () => {
     const { objects } = await refusal(
       harness.transaction(member('1'), async (domain) => {

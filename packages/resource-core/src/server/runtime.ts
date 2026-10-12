@@ -39,9 +39,23 @@ export interface ResourceInput {
 }
 
 /** What `list` does besides the page. */
+/** A condition's place in a list request's filter (keyset SPEC 4.1), and the query parameter it came in. */
+export interface FilterParameter {
+  /** Member names and array indexes from the filter's root, as keyset-core's errors give them. */
+  readonly path: ReadonlyArray<string | number>;
+  /** The parameter as the request spelled it, such as `filter[status]` or `filter[or][0][status][eq]`. */
+  readonly parameter: string;
+}
+
 export interface ListOptions {
   /** Also count the rows of the scope the filter selects, as the page's `total`. */
   readonly total?: boolean | undefined;
+  /**
+   * The query parameter of each condition of the request's filter, as
+   * `filterParameters` lists them, so the error of a refused value names
+   * the parameter the client sent (SPEC 18.5).
+   */
+  readonly parameters?: ReadonlyArray<FilterParameter> | undefined;
 }
 
 /** What `defineResource` returned for each resource (SPEC 12.3), keyed by type. */

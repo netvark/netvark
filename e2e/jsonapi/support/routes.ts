@@ -5,11 +5,7 @@
  */
 import type { Context, Hono } from 'hono';
 
-import type {
-  FilterCondition,
-  JsonApiEnv,
-  ParsedQuery,
-} from '@netvark/hono-jsonapi';
+import type { JsonApiEnv, ParsedQuery } from '@netvark/hono-jsonapi';
 
 import type { PersonView } from './resources.ts';
 import type {
@@ -54,18 +50,12 @@ export function registerRoutes(app: Hono<JsonApiEnv>, store: Store): void {
     if (query.page === undefined) {
       throw new TypeError('articles always paginate');
     }
-    const conditions: ReadonlyArray<FilterCondition<ArticleFilter>> =
-      author === undefined
-        ? query.filter.conditions
-        : [
-            ...query.filter.conditions,
-            { field: 'author', operator: 'eq', value: author },
-          ];
     const page = store.page({
       sort: query.sort,
-      filter: { ...query.filter, conditions },
+      filter: query.filter,
       search: query.search,
       page: query.page,
+      author,
     });
     return respond(
       c,

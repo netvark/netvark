@@ -13,7 +13,10 @@
  */
 import type { Catalog } from '@netvark/ban-core';
 import type { AnyDeclaredResource, Operation } from '@netvark/resource-core';
-import type { StorageAdapter } from '@netvark/resource-core/server';
+import type {
+  FilterParameter,
+  StorageAdapter,
+} from '@netvark/resource-core/server';
 
 import {
   constraintError,
@@ -35,6 +38,8 @@ export interface FailureContext {
   readonly errors: Catalog;
   /** The RFC 6901 pointer of the operation's resource object; default `/data`. */
   readonly pointer?: string | undefined;
+  /** A list's filter parameters (`ListOptions`), which name a refused value's parameter as the request spelled it. */
+  readonly parameters?: ReadonlyArray<FilterParameter> | undefined;
 }
 
 /**
@@ -47,11 +52,11 @@ export async function operationFailure(
   thrown: unknown,
   context: FailureContext,
 ): Promise<unknown> {
-  const { storage, resource, operation, errors, pointer } = context;
+  const { storage, resource, operation, errors, pointer, parameters } = context;
   if (thrown instanceof Rejection) {
     return rejectionError(thrown, { resource, errors, pointer });
   }
-  const refusal = keysetRefusal(thrown);
+  const refusal = keysetRefusal(thrown, parameters);
   if (refusal !== undefined) {
     return refusal;
   }

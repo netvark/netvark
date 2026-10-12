@@ -18,6 +18,13 @@ export interface FilterCondition<TFilter extends string = string> {
   /** An operator the definition lists for the field; `eq` for `filter[field]`. */
   readonly operator: string;
   readonly value: ParameterValue;
+  /**
+   * The query parameter the condition came in, as the request spelled it
+   * (`filter[status]`, `filter[or][0][status][eq]`), for an error about
+   * its value to name in `source.parameter`.
+   * @ref https://jsonapi.org/format/1.1/#error-objects ("which URI query parameter caused the error")
+   */
+  readonly parameter: string;
 }
 
 export interface ParsedFilter<TFilter extends string = string> {

@@ -13,7 +13,10 @@
  * @packageDocumentation
  */
 import type { AnyDeclaredResource, Operation } from '@netvark/resource-core';
-import type { DomainEvent } from '@netvark/resource-core/server';
+import type {
+  DomainEvent,
+  FilterParameter,
+} from '@netvark/resource-core/server';
 
 import type { KyselyTransaction } from '../storage/transaction';
 
@@ -28,6 +31,8 @@ interface Raised {
   readonly thrown: unknown;
   readonly resource: AnyDeclaredResource;
   readonly operation: Operation;
+  /** A list's filter parameters, which name a refused value's parameter. */
+  readonly parameters?: ReadonlyArray<FilterParameter> | undefined;
 }
 
 /** The first operation's failure: what it threw, and where its lifecycle raised it, when it did. */
@@ -97,7 +102,11 @@ export class Session {
         thrown,
         raised:
           raised !== undefined && raised.thrown === thrown
-            ? { resource: raised.resource, operation: raised.operation }
+            ? {
+                resource: raised.resource,
+                operation: raised.operation,
+                parameters: raised.parameters,
+              }
             : undefined,
       };
       this.#fail();
@@ -112,11 +121,12 @@ export class Session {
     resource: AnyDeclaredResource,
     operation: Operation,
     work: Work<TResult>,
+    parameters?: ReadonlyArray<FilterParameter>,
   ): Promise<TResult> {
     try {
       return await work(this.tx, this.recorded);
     } catch (thrown) {
-      this.#raised ??= { thrown, resource, operation };
+      this.#raised ??= { thrown, resource, operation, parameters };
       throw thrown;
     }
   }

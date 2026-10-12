@@ -202,7 +202,14 @@ describe('keysetRequest: filters (SPEC 11.2)', () => {
     const query = {
       ...parseQuery(Kinds.resource, ''),
       filter: {
-        conditions: [{ field: 'label', operator: 'like', value: 'a%' }],
+        conditions: [
+          {
+            field: 'label',
+            operator: 'like',
+            value: 'a%',
+            parameter: 'filter[label][like]',
+          },
+        ],
         anyOf: [],
       },
     };

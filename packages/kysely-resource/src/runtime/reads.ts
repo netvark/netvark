@@ -36,10 +36,16 @@ export async function listRows<TDomain extends DomainShape>(
   options: ListOptions = {},
 ): Promise<StoragePage> {
   const { storage, services } = run.options;
-  return transact(run, behavior, 'list', async (tx) => {
-    await behavior.policy.authorize('list', { actor: run.actor, services });
-    return storage.list(tx, behavior.resource, request, options);
-  });
+  return transact(
+    run,
+    behavior,
+    'list',
+    async (tx) => {
+      await behavior.policy.authorize('list', { actor: run.actor, services });
+      return storage.list(tx, behavior.resource, request, options);
+    },
+    options.parameters,
+  );
 }
 
 /** The row whose id is `id`, when the actor may see it; `NOT_FOUND` otherwise. */

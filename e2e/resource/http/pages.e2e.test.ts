@@ -174,7 +174,7 @@ describe.each(runtimeDatabases())(
       ]);
     });
 
-    it('answers every filter value its field refuses, each at its parameter', async () => {
+    it('answers every filter value its field refuses, each at the parameter it came in', async () => {
       const url =
         '/api/contacts?filter[priority][gte]=high&filter[createdAt][lt]=yesterday&filter[status]=gone';
       const sent = await server.exchange('get', CONTACTS, url, {
@@ -185,7 +185,19 @@ describe.each(runtimeDatabases())(
         400,
         refused('filter[priority][gte]'),
         refused('filter[createdAt][lt]'),
+        refused('filter[status]'),
+      ]);
+      const grouped = await server.exchange(
+        'get',
+        CONTACTS,
+        '/api/contacts?filter[status][eq]=gone&filter[or][0][status]=lost&filter[or][0][name]=x&filter[or][1][priority][gte]=high',
+        { actor: 'editor', language: 'en' },
+      );
+      expect(problemsOf(grouped)).toEqual([
+        400,
         refused('filter[status][eq]'),
+        refused('filter[or][0][status]'),
+        refused('filter[or][1][priority][gte]'),
       ]);
     });
 

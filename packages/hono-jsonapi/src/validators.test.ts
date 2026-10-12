@@ -46,7 +46,14 @@ describe('queryValidator', () => {
     expect(await response.json()).toEqual({
       sort: [{ field: 'title', direction: 'desc' }],
       filter: {
-        conditions: [{ field: 'title', operator: 'like', value: 'a%' }],
+        conditions: [
+          {
+            field: 'title',
+            operator: 'like',
+            value: 'a%',
+            parameter: 'filter[title][like]',
+          },
+        ],
         anyOf: [],
       },
     });
@@ -63,7 +70,14 @@ describe('queryValidator', () => {
     expect(await response.json()).toEqual({
       sort: [],
       filter: {
-        conditions: [{ field: 'title', operator: 'like', value: 'a' }],
+        conditions: [
+          {
+            field: 'title',
+            operator: 'like',
+            value: 'a',
+            parameter: 'filter[title][like]',
+          },
+        ],
         anyOf: [],
       },
     });

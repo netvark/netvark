@@ -86,6 +86,36 @@ describe('list (resource SPEC 18.4)', () => {
     ]);
   });
 
+  it('names a refused filter value at the parameter it came in, when the list is told', async () => {
+    const tasks = domain(member('1')).tasks;
+    const filter = {
+      or: [
+        { field: 'title', op: 'eq', value: ['a', 'b'] },
+        { field: 'title', op: 'eq', value: 'c' },
+      ],
+    } as never;
+    const parameters = [
+      { path: ['or', 0], parameter: 'filter[or][0][title]' },
+      { path: ['or', 1], parameter: 'filter[or][0][title][eq]' },
+    ];
+    const [named, unnamed] = await Promise.all([
+      refusal(tasks.list({ filter }, { parameters })),
+      refusal(tasks.list({ filter })),
+    ]);
+    expect(named.objects).toMatchObject([
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[or][0][title]' },
+      },
+    ]);
+    expect(unnamed.objects).toMatchObject([
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[title][eq]' },
+      },
+    ]);
+  });
+
   it('refuses a cursor issued in another workspace', async () => {
     for (const title of ['a', 'b', 'c']) {
       await storedTask(storage, title, { workspace: '2' });

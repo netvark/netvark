@@ -7,7 +7,7 @@ import { parseQuery } from './parse-query';
 import { Articles, People, errorsOf } from './test-fixtures';
 
 describe('filter', () => {
-  it('parses conditions, operators, repeated values, or-groups, and search', () => {
+  it('parses conditions, operators, repeated values, or-groups, and search, each condition with the parameter it came in', () => {
     const query = parseQuery(
       Articles,
       'filter[title]=a&filter[title][like]=b%25&filter[created][gt]=1&filter[created][gt]=2' +
@@ -15,15 +15,47 @@ describe('filter', () => {
     );
     expect(query.filter).toEqual({
       conditions: [
-        { field: 'title', operator: 'eq', value: 'a' },
-        { field: 'title', operator: 'like', value: 'b%' },
-        { field: 'created', operator: 'gt', value: ['1', '2'] },
+        {
+          field: 'title',
+          operator: 'eq',
+          value: 'a',
+          parameter: 'filter[title]',
+        },
+        {
+          field: 'title',
+          operator: 'like',
+          value: 'b%',
+          parameter: 'filter[title][like]',
+        },
+        {
+          field: 'created',
+          operator: 'gt',
+          value: ['1', '2'],
+          parameter: 'filter[created][gt]',
+        },
       ],
       anyOf: [
-        [{ field: 'author.name', operator: 'eq', value: 'y' }],
         [
-          { field: 'title', operator: 'eq', value: 'x' },
-          { field: 'created', operator: 'lt', value: 'z' },
+          {
+            field: 'author.name',
+            operator: 'eq',
+            value: 'y',
+            parameter: 'filter[or][0][author.name][eq]',
+          },
+        ],
+        [
+          {
+            field: 'title',
+            operator: 'eq',
+            value: 'x',
+            parameter: 'filter[or][1][title]',
+          },
+          {
+            field: 'created',
+            operator: 'lt',
+            value: 'z',
+            parameter: 'filter[or][1][created][lt]',
+          },
         ],
       ],
     });
