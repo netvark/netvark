@@ -92,10 +92,11 @@ Without `--config`, the CLI loads the first of `netvark.config.ts`, `netvark.con
 against its own directory, so `pg-catalog extract --config db/netvark.config.ts` works from
 anywhere. Its default export must be a configuration. `defineExtraction` types it and checks it as
 the file loads: an unknown option (`postgres:` where `database:` was meant), an empty path, a
-`database` with both or neither of `pglite` and `url`, a system or duplicate schema, an interface
-name that does not start with an uppercase letter or that both modules share, or a drift environment
-name outside `^[A-Za-z0-9][A-Za-z0-9_-]*$` fails with a message naming the option. URL functions run
-only in the command that needs them, so `extract` never reads the variable behind a drift URL.
+`database` with both or neither of `pglite` and `url`, a system or duplicate schema, a
+`types.driver` other than `'node-postgres'` and `'pglite'`, an interface name that does not start
+with an uppercase letter or that both modules share, or a drift environment name outside
+`^[A-Za-z0-9][A-Za-z0-9_-]*$` fails with a message naming the option. URL functions run only in the
+command that needs them, so `extract` never reads the variable behind a drift URL.
 
 A TypeScript configuration needs a runtime that strips types: Node.js 22.18 or later, Bun, or Deno.
 On Node.js 22.12 to 22.17, set `NODE_OPTIONS=--experimental-strip-types`, or write
@@ -171,9 +172,10 @@ A name is an ASCII identifier that starts with an uppercase letter, and the two 
 
 ## Kysely types
 
-A column's select type is what node-postgres returns for it, and its insert and update types are the
-values node-postgres can send, so the types match the rows of a `PostgresDialect` application. From
-the repository's contacts application:
+A column's select type is what your driver returns for it, and its insert and update types are the
+values the driver can send, so the types match the rows you get back. The default driver is
+node-postgres, behind Kysely's `PostgresDialect`; [PGlite](#pglite) behind `PGliteDialect` has a
+table of its own. From the repository's contacts application:
 
 ```ts
 export type ContactKind = 'person' | 'company';
@@ -206,6 +208,8 @@ const contact = await db
 // { id: string; kind: ContactKind; tags: Array<string>; created_at: Date }
 ```
 
+With node-postgres:
+
 | PostgreSQL                                       | Select             | Insert and update            |
 | ------------------------------------------------ | ------------------ | ---------------------------- |
 | `int2`, `int4`, `float4`, `float8`, `oid`        | `number`           | `number`                     |
@@ -228,11 +232,63 @@ const contact = await db
   their select type is `string`. Every array column accepts a JavaScript array or array text.
 - **Domains** map as the type they are declared over. A domain from a schema outside `schemas` maps
   to `unknown`, and an enum from one to `string`.
-- **Helpers.** `JsonValue`, `PostgresInterval`, `Point`, and `Circle` are declared in the file when
-  a column uses them.
+- **Helpers.** `JsonValue`, `JsonParameter`, `PostgresInterval`, `Point`, and `Circle` are declared
+  in the file when a column uses them.
 
-SPEC section 9.2 lists every type. A test holds the whole table against node-postgres on PostgreSQL
-14 and 18: a value of every insert type goes in, and what comes back has the select type.
+SPEC section 9.2 lists every type of both tables. Tests hold each table against its driver,
+node-postgres on PostgreSQL 14 and 18 and PGlite on 0.5.0 and the current release: a value of every
+insert type goes in, and what comes back has the select type.
+
+### PGlite
+
+An application on Kysely's `PGliteDialect` reads rows through PGlite's own parsers, which return
+other types than node-postgres's. Name the driver:
+
+```ts
+types: { file: 'src/generated/db.ts', driver: 'pglite' },
+```
+
+```ts
+import type { DB } from './generated/db';
+
+import { PGlite } from '@electric-sql/pglite';
+import { Kysely, PGliteDialect } from 'kysely';
+
+const pglite = await PGlite.create('idb://app');
+await migrate(pglite);
+// PGlite learns array types when it starts: an enum[] the migrations just created parses after this.
+await pglite.refreshArrayTypes();
+
+const db = new Kysely<DB>({ dialect: new PGliteDialect({ pglite }) });
+```
+
+Where PGlite differs from node-postgres:
+
+| PostgreSQL                                          | Select             | Insert and update                      |
+| --------------------------------------------------- | ------------------ | -------------------------------------- |
+| `int8`                                              | `number \| bigint` | `string \| number \| bigint`           |
+| `bytea`                                             | `Uint8Array`       | `Uint8Array`                           |
+| `json`, `jsonb`                                     | `JsonValue`        | `JsonParameter`: a value, or JSON text |
+| `interval`, `point`, `circle`                       | `string`           | `string`                               |
+| `numeric[]`, `interval[]`, and other unparsed types | `Array<string>`    | `Array<element insert type> \| string` |
+| an enum's array                                     | `Array<labels>`    | `Array<labels> \| string`              |
+| a domain's array                                    | `Array<string>`    | `Array<element insert type> \| string` |
+
+- **`int8`** is a number up to 2^53 − 1 and a `bigint` beyond, as PGlite's parser returns it.
+- **JSON** goes in as a value, which PGlite sends with `JSON.stringify`; a string is sent as JSON
+  text, so write `'"plain"'` for the JSON string `plain`.
+- **Arrays.** PGlite parses every array, each element with its type's parser; a domain has none, so
+  its elements stay text. It learns the array types when it starts and on `refreshArrayTypes()`:
+  call it after migrations that create a type an array column uses. A database opened later needs
+  nothing.
+- **Domains.** PGlite sends a domain column's value with `toString()`, so a domain over a date or
+  time type, `bytea`, `json`, `jsonb`, or an array takes PostgreSQL's text:
+  `'2026-01-02 03:04:05+00'`, `'\x0102'`, `'{"a":1}'`, `'{1,2}'`. A `Uint8Array` would be stored as
+  the text of its bytes, without an error.
+- **Time zones.** PGlite writes a `Date` in UTC but reads a `timestamp` (without time zone) in the
+  process's local zone: use `timestamptz`, or run in UTC.
+- **pglite-socket.** PGlite served over a socket to node-postgres returns node-postgres's types;
+  keep the default driver there.
 
 ### Overrides
 
@@ -264,9 +320,9 @@ arrays. The override of a column's own type wins over those of the domains under
 `insert` or `update` takes the `select` type, as in Kysely's `ColumnType`, and `imports` are written
 verbatim after Kysely's.
 
-The mapping follows node-postgres, the driver of Kysely's `PostgresDialect`. Another driver needs an
-override for every type it returns differently: PGlite's own parsers, behind `PGliteDialect`, return
-`int8` as `bigint` and `bytea` as `Uint8Array`, for example.
+The table follows `types.driver`. Any other driver needs an override for every type it returns
+differently from the table you pick. With PGlite, which parses an array's elements with the element
+type's parser, the application's included, the override of `int8` also types `int8[]`.
 
 ### camelCase
 
@@ -651,21 +707,26 @@ and exits 2. `defineExtraction` throws a `TypeError` instead, since its mistakes
 - **Review the public catalog's diff.** Adding a table to `public.tables` shows its structure to
   every browser; the diff of `public-catalog.ts` is where reviewers see it.
 - **Mirror the parsers you register.** Every parser your application registers needs the same
-  override, and an array type has a parser of its own: registering one for `int8` leaves `int8[]` as
-  strings.
-- **Write JSON as text.** Pass `JSON.stringify(value)` for `json` and `jsonb`. node-postgres sends
-  an object as JSON, but an array as a PostgreSQL array and a string as raw text, so the types take
-  only text.
+  override. With node-postgres an array type has a parser of its own: registering one for `int8`
+  leaves `int8[]` as strings.
+- **Write JSON as text with node-postgres.** Pass `JSON.stringify(value)` for `json` and `jsonb`.
+  node-postgres sends an object as JSON, but an array as a PostgreSQL array and a string as raw
+  text, so the types take only text. PGlite sends any value with `JSON.stringify`, so its types take
+  values too.
+- **Refresh PGlite's array types after migrating.** Call `refreshArrayTypes()` once the migrations
+  that create enums, domains, or composite types used in arrays have run; until then PGlite returns
+  those arrays as text and refuses JavaScript arrays for them.
 - **Name JSON shapes with domains.** `create domain settings as jsonb` with the override
   `settings: 'Settings'` types those columns and leaves every other `jsonb` column alone. Since
   node-postgres sends an object as JSON, a `Settings` object can be written as it is.
 - **Mind `numeric[]`.** node-postgres returns `numeric` as a string but `numeric[]` as floats, which
   round. When the digits matter, register a parser for its OID (1231) and override `numeric[]`.
+  PGlite returns both as strings.
 - **Keep nulls and nesting out of arrays.** The types say `Array<string>`, but any `text[]` stores
   `{a,NULL}` and `{{a},{b}}`; `check (array_position(tags, null) is null)` refuses both.
 - **Keep infinite dates out.** node-postgres returns `infinity` dates and timestamps as the number
-  `Infinity`. Refuse them with `check (isfinite(starts_at))`, or override the type to admit
-  `number`.
+  `Infinity`, and PGlite as a `Date` whose time is `NaN`. Refuse them with
+  `check (isfinite(starts_at))`, or override the type to admit `number`.
 - **Put NOT NULL on the column, not the domain.** It is PostgreSQL's own advice: a nullable column
   of a NOT NULL domain can still read as null, so its select type keeps `| null`.
 - **Read every schema your tables use.** A domain from a schema outside `schemas` types its columns

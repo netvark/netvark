@@ -2,7 +2,7 @@
  * Extraction checks for runtimes with a file system and WebAssembly (Bun
  * and Deno): replay the contacts migrations into PGlite through the built
  * `@netvark/pg-catalog` and compare with the reviewed catalog module and
- * Kysely types, byte for byte.
+ * Kysely types of both drivers, byte for byte.
  */
 import type { Checks } from './report.ts';
 
@@ -17,6 +17,7 @@ import {
 import { catalog } from '../fixtures/contacts/expected/catalog.ts';
 import {
   EXPECTED_CATALOG,
+  EXPECTED_PGLITE_TYPES,
   EXPECTED_TYPES,
   MIGRATIONS_DIR,
   PGLITE_EXTENSIONS,
@@ -41,6 +42,11 @@ export const extractChecks: Checks = {
         renderKyselyTypes(extracted) ===
           (await readFile(EXPECTED_TYPES, 'utf8')),
         'Kysely types',
+      );
+      check(
+        renderKyselyTypes(extracted, { driver: 'pglite' }) ===
+          (await readFile(EXPECTED_PGLITE_TYPES, 'utf8')),
+        'Kysely types for PGlite',
       );
     },
 };

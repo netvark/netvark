@@ -29,6 +29,7 @@ describe('defineExtraction (SPEC 11.1)', () => {
         public: { file: 'src/db/public-catalog.ts', tables: ['contacts'] },
         types: {
           file: 'src/db/db.ts',
+          driver: 'pglite',
           overrides: {
             'public.contacts.meta': 'ContactMeta',
             'public.money': { select: 'string', insert: 'string | number' },

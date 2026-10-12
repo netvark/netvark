@@ -35,9 +35,18 @@ export interface TypeOverride {
   readonly update?: string;
 }
 
+/**
+ * The driver whose values the Kysely types describe (SPEC 9.2, ADR 0013):
+ * node-postgres, behind Kysely's `PostgresDialect`, or PGlite's own
+ * `query()`, behind `PGliteDialect`.
+ */
+export type KyselyDriver = 'node-postgres' | 'pglite';
+
 /** The Kysely types file and how it maps types (SPEC 9.2). */
 export interface TypesConfig {
   readonly file: string;
+  /** Default `'node-postgres'`. */
+  readonly driver?: KyselyDriver;
   /**
    * Types keyed by a column's `type` (or `<type>[]` for its arrays), for
    * applications that register their own parsers or use another driver: a

@@ -19,6 +19,7 @@ export type {
   DatabaseConfig,
   DriftEnvironment,
   ExtractionConfig,
+  KyselyDriver,
   OutputConfig,
   PublicFileConfig,
   ResourcesConfig,

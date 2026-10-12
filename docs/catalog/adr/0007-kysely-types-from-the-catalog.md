@@ -1,6 +1,7 @@
 # ADR 0007: Kysely types are generated from the catalog
 
-- Status: accepted
+- Status: accepted; amended by ADR-0013 (`types.driver` selects the table, and PGlite's own parsers
+  have one: its `int8` is `number | bigint`, not `bigint`)
 - Date: 2026-10-10
 
 ## Context

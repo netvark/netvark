@@ -46,6 +46,10 @@ describe('renderKyselyTypes: name_collision', () => {
     expect(collision(catalogOf({ enums: { json_value: [] } }))).toBe(
       'enum json_value and the helper JsonValue map to the same TypeScript name JsonValue',
     );
+    // Reserved under either driver, so switching drivers cannot introduce a collision.
+    expect(collision(catalogOf({ enums: { json_parameter: [] } }))).toBe(
+      'enum json_parameter and the helper JsonParameter map to the same TypeScript name JsonParameter',
+    );
     expect(collision(catalogOf({ enums: { generated: [] } }))).toBe(
       "enum generated and Kysely's Generated map to the same TypeScript name Generated",
     );

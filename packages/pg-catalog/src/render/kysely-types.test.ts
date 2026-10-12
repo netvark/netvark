@@ -96,6 +96,10 @@ describe('renderKyselyTypes: columns of a real schema (SPEC 9.2)', () => {
       'moments',
       'ColumnType<string | null, Array<Date | string> | string | null, Array<Date | string> | string | null>',
     ],
+    ['instant', NULLABLE_DATE],
+    ['chunk', 'Buffer | null'],
+    ['payload', 'ColumnType<JsonValue | null, string | null, string | null>'],
+    ['switched', 'boolean | null'],
     [
       'bigs',
       'ColumnType<Array<string> | null, Array<string | number | bigint> | string | null, Array<string | number | bigint> | string | null>',
@@ -136,7 +140,7 @@ describe('renderKyselyTypes: columns of a real schema (SPEC 9.2)', () => {
     const order = [...members(text, 'KindsTable').keys()];
     expect(order.slice(0, 4)).toEqual(['id', 'small', 'regular', 'big']);
     expect(order.at(-1)).toBe("'my column'");
-    expect(order).toHaveLength(80);
+    expect(order).toHaveLength(85);
     expect(text).toContain(
       "export type EmptyMood = never;\nexport type Mood = 'happy' | 'it\\'s fine';\n",
     );

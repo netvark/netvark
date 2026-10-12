@@ -88,6 +88,14 @@ describe('configuration types (SPEC 11.1)', () => {
       catalog: 'c.ts';
       types: { file: 'db.ts'; camelCase: 'yes' };
     }>().not.toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { file: 'db.ts'; driver: 'pglite' };
+    }>().toExtend<OutputConfig>();
+    expectTypeOf<{
+      catalog: 'c.ts';
+      types: { file: 'db.ts'; driver: 'postgres.js' };
+    }>().not.toExtend<OutputConfig>();
     expectTypeOf<{ insert: 'string' }>().not.toExtend<TypeOverride>();
     expectTypeOf<{
       catalog: 'c.ts';

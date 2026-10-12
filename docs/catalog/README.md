@@ -72,10 +72,11 @@ catalog.tables.contacts.constraints.contacts_name_length.rule;
 - **A public slice you choose.** The public catalog holds only the tables you list and only what a
   form needs: types, nullability, defaults, rules, and every uniqueness rule, a unique index's
   included. No expressions, policies, or comments.
-- **Kysely types from the same extraction.** Select types follow node-postgres's parsers (`int8` and
-  `numeric` are strings, timestamps are `Date`), and insert types take what it can send (JSON as
-  text), so the types match the rows you get back, and they can never disagree with the catalog.
-  With `camelCase`, the keys are the ones Kysely's `CamelCasePlugin` uses.
+- **Kysely types from the same extraction.** Select types follow your driver's parsers,
+  node-postgres's (`int8` and `numeric` are strings, timestamps are `Date`) or PGlite's own behind
+  `PGliteDialect` (`int8` is `number | bigint`), and insert types take what the driver can send, so
+  the types match the rows you get back, and they can never disagree with the catalog. With
+  `camelCase`, the keys are the ones Kysely's `CamelCasePlugin` uses.
 - **Deterministic files.** Same migrations, same bytes, on every machine and on PostgreSQL 14 to 18;
   CI proves the committed files current.
 - **Drift detection.** A scheduled job compares a live database with the committed catalog through a
@@ -181,13 +182,18 @@ object kind, or as JSON with `--json`), and 2 when it could not run.
   grant usage on schema public to catalog_drift;
   ```
 
+- **Name your driver.** Set `types.driver: 'pglite'` when the application queries PGlite through
+  Kysely's `PGliteDialect`, and call `refreshArrayTypes()` after migrations that create types used
+  in arrays; keep the default `'node-postgres'` for `PostgresDialect`, PGlite over a socket
+  included.
 - **Mirror custom type parsers in the Kysely types.** If your application registers parsers (for
   example `int8` as `bigint`), declare the same in `types.overrides` so the types keep matching the
-  rows. An array type has a parser of its own, so `int8[]` stays strings, and `numeric` is a string
-  but `numeric[]` is parsed as floats.
-- **Write JSON as text, and name JSON shapes with domains.** node-postgres sends a JavaScript array
-  as a PostgreSQL array, so `jsonb` columns take `JSON.stringify(value)`; a domain such as
-  `create domain settings as jsonb` can be overridden with its own TypeScript type.
+  rows. With node-postgres an array type has a parser of its own, so `int8[]` stays strings, and
+  `numeric` is a string but `numeric[]` is parsed as floats.
+- **Write JSON as text with node-postgres, and name JSON shapes with domains.** node-postgres sends
+  a JavaScript array as a PostgreSQL array, so `jsonb` columns take `JSON.stringify(value)`; PGlite
+  takes the value itself. A domain such as `create domain settings as jsonb` can be overridden with
+  its own TypeScript type.
 - **Put NOT NULL on the column, not the domain.** A nullable column of a NOT NULL domain can still
   read as null, as PostgreSQL's documentation warns, so its select type keeps `| null`.
 - **Give `types.camelCase` the options CamelCasePlugin gets.** A name the plugin cannot turn back

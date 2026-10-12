@@ -1,8 +1,8 @@
 /**
- * The driver oracle for the Kysely type table (SPEC 9.2): values of every
+ * The driver oracle for the Kysely type tables (SPEC 9.2): values of every
  * alternative of an insert type, built from the type's text, and a check
- * that a value node-postgres returned has a select type. Sending the values
- * through node-postgres holds the table against the driver itself, and a
+ * that a value a driver returned has a select type. Sending the values
+ * through the driver holds its table against the driver itself, and a
  * change to the table changes what is sent.
  */
 import type { CatalogColumn } from '@netvark/catalog-core';
@@ -11,7 +11,8 @@ import type { CatalogColumn } from '@netvark/catalog-core';
 const TEXT: ReadonlyMap<string, string> = new Map([
   ['int2', '7'],
   ['int4', '7'],
-  ['int8', '9007199254740993'],
+  // Within ±(2^53 - 1), where PGlite returns a number; `tally` holds one beyond, a bigint.
+  ['int8', '7'],
   ['float4', '1.5'],
   ['float8', '1.5'],
   ['numeric', '12.34'],
@@ -51,6 +52,10 @@ const TEXT: ReadonlyMap<string, string> = new Map([
   ['required_text', 'r'],
   ['defaulted_text', 'd'],
   ['moment', '2026-01-02 03:04:05+00'],
+  ['blob', '\\x0102'],
+  ['document', '{"a":[1,2]}'],
+  ['tally', '9007199254740993'],
+  ['toggle', 't'],
 ]);
 /** One element of each array domain, as PostgreSQL text. */
 const ELEMENT_TEXT: ReadonlyMap<string, string> = new Map([['int_list', '7']]);
@@ -62,7 +67,7 @@ const INTERVAL_METHODS = ['toPostgres', 'toISO', 'toISOString'];
 export interface OracleContext {
   /** Each enum's labels, by its TypeScript name. */
   readonly labels: ReadonlyMap<string, ReadonlyArray<string>>;
-  /** An interval node-postgres parsed, which it can send back. */
+  /** An interval node-postgres parsed, which it can send back; PGlite returns text. */
   readonly interval: unknown;
 }
 
@@ -129,7 +134,9 @@ const CHECKS: ReadonlyMap<string, (value: unknown) => boolean> = new Map([
     'Date',
     (value: unknown) => value instanceof Date && !Number.isNaN(value.getTime()),
   ],
+  ['bigint', (value: unknown) => typeof value === 'bigint'],
   ['Buffer', (value: unknown) => Buffer.isBuffer(value)],
+  ['Uint8Array', (value: unknown) => value instanceof Uint8Array],
   ['JsonValue', isJson],
   ['PostgresInterval', isInterval],
   ['Point', (value: unknown) => numbersAt(value, ['x', 'y'])],
@@ -137,7 +144,7 @@ const CHECKS: ReadonlyMap<string, (value: unknown) => boolean> = new Map([
   ['unknown', () => true],
 ]);
 
-/** Whether a value node-postgres returned has the TypeScript type `type`. */
+/** Whether a value a driver returned has the TypeScript type `type`. */
 export function satisfies(
   value: unknown,
   type: string,
@@ -195,9 +202,12 @@ function valuesOf(
     boolean: () => [true],
     Date: () => [new Date('2026-01-02T03:04:05Z')],
     Buffer: () => [Buffer.from([1, 2])],
+    Uint8Array: () => [Uint8Array.from([1, 2])],
     PostgresInterval: () => [context.interval],
     // The members node-postgres cannot send as what they are.
     JsonValue: () => [{ a: [1, 2] }, [1, 2], 'plain'],
+    // A member of each kind PGlite sends with JSON.stringify, and JSON text.
+    JsonParameter: () => [{ a: [1, 2] }, [1, 2], 1.5, true, text()],
     Point: () => [{ x: 1, y: 2 }],
     Circle: () => [{ x: 1, y: 2, radius: 3 }],
     unknown: () => [],
