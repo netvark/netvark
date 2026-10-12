@@ -25,7 +25,10 @@ const DEFINITIONS = {
   meetings: Meetings.resource,
 };
 
-export type ContactClients = Clients<typeof DEFINITIONS>;
+/** The definitions the application's clients are made from. */
+export type ContactDefinitions = typeof DEFINITIONS;
+
+export type ContactClients = Clients<ContactDefinitions>;
 
 /** A request as the transport sent it. */
 export interface Departure {

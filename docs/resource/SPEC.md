@@ -4657,29 +4657,38 @@ operators, and search, `withSearch` as `never` without one, and Table v9's `Sort
   pages both ways by the server's links and drops the cursor on a sort change, searches on submit,
   opens a stale link through TanStack Router's search with what the definition accepts (20.7, step
   5), and refetches after a create on the same screen.
-- End to end (`e2e/resource/react/`): the built package in jsdom against the contacts application
-  over HTTP (`support/contacts-server.ts`), on PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL
-  server, with the application's Paraglide messages and nothing mocked: the German create form, its
-  client refusal and the server's 422 and its `CONTACT_EMAIL_TAKEN` 409 each on their field in the
-  server's words, an update sending the changed members only, the list's sort, filter, search, and
-  cursors over real pages, a stale link read back leniently, and the list refetched after a create;
-  and over the table of `support/defaults-table.ts`, a create form starting where an update of the
-  row PostgreSQL stores for it starts (`form-defaults.e2e.test.ts`). A TanStack Form made with
-  `resourceFormOptions`, whose handler writes through the client and binds the refusal, over a
-  runtime that serves meetings too (`runtime/meetings.ts`): a taken email held on its field until
-  the email changes, a submit of the same values that sends nothing, and the 409 of a room booked
-  twice for one period on the room and the period, cleared when the person changes either
-  (`form-binding.e2e.test.ts`). TanStack Query's observers over `resourceQueries`, as its hooks read
-  and write: an infinite list paging both ways by the server's links from the query's own cursors, a
-  create and an update settling once the list and the record shown have refetched, a contact's
-  removal that removes their record's entries and refetches the meetings the database set to no
-  contact, and a refused write that leaves the cache as it was (`query-cache.e2e.test.ts`). The list
-  model over the contacts client, each request checked to carry the state's own parameters
-  (`list-model.e2e.test.ts`): its columns labeled in German and in English by a model built once,
-  the default sort the order the server applies, a sort, a filter, and a search, an emptied choice
-  removing its filter, cursors over real pages to the end and back, a stale or edited link read back
-  as parameters, as JSON, and through a router's JSON round trip, and the recovery from the 400 of
-  an expired cursor and of a filter value the server refuses.
+- End to end (`e2e/resource/react/`): the built package against the contacts application over HTTP
+  (`support/contacts-server.ts`), on PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server, with
+  the application's Paraglide messages and nothing mocked. The screens of `react/screens/` render in
+  jsdom, for a person whose browser prefers German, beside the server and its database in one
+  process, under `support/screen-environment.ts`: jsdom with the modules processed as a server's.
+  `contact-forms.e2e.test.tsx`: the create form's client refusals in the server's words before
+  anything is sent; the server's `CONTACT_EMAIL_TAKEN` and `CONTACT_NAME_TAKEN` 409s on their fields
+  in the German the request asked for, each cleared by the change that answers it; the plan's quota,
+  which no field holds, in the banner; an update sending the changed members only, measured against
+  the record as it refetched. The form runs every rule of the contacts table, so the server's 422
+  answers only a write no form validated, which `form-create.e2e.test.ts` maps onto the fields.
+  `contacts-screen.e2e.test.tsx`, the README's list screen with its router registered: a header's
+  sort, a status filter, and a search, each request the state's own parameters; cursors over real
+  pages to the end and back; a stale link read back leniently, none of what the state does not hold
+  left in the URL; and the list refetched after a create on the same screen. Over the table of
+  `support/defaults-table.ts`, a create form starts where an update of the row PostgreSQL stores for
+  it starts (`form-defaults.e2e.test.ts`). A TanStack Form made with `resourceFormOptions`, whose
+  handler writes through the client and binds the refusal, over a runtime that serves meetings too
+  (`runtime/meetings.ts`): a taken email held on its field until the email changes, a submit of the
+  same values that sends nothing, and the 409 of a room booked twice for one period on the room and
+  the period, cleared when the person changes either (`form-binding.e2e.test.ts`). TanStack Query's
+  observers over `resourceQueries`, as its hooks read and write: an infinite list paging both ways
+  by the server's links from the query's own cursors, a create and an update settling once the list
+  and the record shown have refetched, a contact's removal that removes their record's entries and
+  refetches the meetings the database set to no contact, and a refused write that leaves the cache
+  as it was (`query-cache.e2e.test.ts`). The list model over the contacts client, each request
+  checked to carry the state's own parameters (`list-model.e2e.test.ts`): its columns labeled in
+  German and in English by a model built once, the default sort the order the server applies, a
+  sort, a filter, and a search, an emptied choice removing its filter, cursors over real pages to
+  the end and back, a stale or edited link read back as parameters, as JSON, and through a router's
+  JSON round trip, and the recovery from the 400 of an expired cursor and of a filter value the
+  server refuses.
 - Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
   and write and a list model's `query`, `withPageSize`, and `next` on Bun, Deno, and workerd, where
   server rendering runs.

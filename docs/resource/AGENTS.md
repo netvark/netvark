@@ -95,7 +95,10 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   drives the screen as a person does, through `userEvent`, reading an error from its control's
   `aria-describedby`. Vitest resolves a jsdom file through Vite's client environment, so the
   package's config gives `source` to `resolve.conditions` as well as to `ssr.resolve.conditions`:
-  CI's test job builds nothing. The real server over HTTP runs in `e2e/resource/react/`.
+  CI's test job builds nothing. The real server over HTTP runs in `e2e/resource/react/`, whose
+  screens (`react/screens/`) render in jsdom beside it under `support/screen-environment.ts`, which
+  processes the modules as a server's: Vite's client environment would process the server's for a
+  browser, without `import.meta.url` as a file URL.
 
 ## Repository map
 
@@ -151,7 +154,8 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
 catalogs, declarations over them, `fails/` declarations that must not compile, the oracle, the
-reference storage adapter that proves the contract suite, and the runtime smoke test.
+reference storage adapter that proves the contract suite, the runtime smoke test, and the React
+screens (`react/screens/`) that run against the contacts server.
 
 - `docs/resource/DESIGN.md` what we are building and why; `docs/resource/SPEC.md` the normative
   contract; `docs/resource/adr/` decisions
