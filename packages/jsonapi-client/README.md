@@ -65,8 +65,11 @@ const { data: created } = await api.articles.create({
 | `next(page)`, `prev(page)`                                   | `GET` the page's `links.next`, `links.prev`  | the records; `undefined` without the link       |
 
 Each call takes `{ signal, headers }` last and resolves to `{ status, data, links, meta, jsonapi }`.
-The paths come from the definitions' links; a definition's own origin, from an absolute
-`links.base`, is ignored, so one set of definitions serves development, staging, and production.
+`api.articles.definition` is the definition the client was made from, so a cache that keys a read by
+its request serializes the query with it (`serializeQuery(api.articles.definition, query)`), as
+`@netvark/react-resource` does for TanStack Query. The paths come from the definitions' links; a
+definition's own origin, from an absolute `links.base`, is ignored, so one set of definitions serves
+development, staging, and production.
 
 The transport:
 

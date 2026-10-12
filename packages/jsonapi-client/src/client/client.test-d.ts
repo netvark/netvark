@@ -127,6 +127,13 @@ interface ArticleRecord {
 type Data<TResult> =
   Awaited<TResult> extends { readonly data: infer TData } ? TData : never;
 
+describe('the definition (SPEC 15.4)', () => {
+  it('is typed as the definition passed', () => {
+    expectTypeOf(articles.definition).toEqualTypeOf<typeof Articles>();
+    expectTypeOf(tags.definition).toEqualTypeOf<typeof Tags>();
+  });
+});
+
 describe('reads (SPEC 15.4, 15.6)', () => {
   it('types a list without a query: every field, each relationship its linkage', () => {
     const listed = articles.list();

@@ -31,6 +31,13 @@ describe('createClients (SPEC 15.4)', () => {
     expect(typeof clients.posts.list).toBe('function');
   });
 
+  it('gives each client the definition it was made from, as passed', () => {
+    const clients = createClients({ posts: Articles, labels: Tags }, transport);
+
+    expect(clients.posts.definition).toBe(Articles);
+    expect(clients.labels.definition).toBe(Tags);
+  });
+
   it('keeps a name such as __proto__ a plain key', async () => {
     const double = fetchDouble(jsonApi({ data: [] }));
     const definitions: Record<string, AnyResource> = {};

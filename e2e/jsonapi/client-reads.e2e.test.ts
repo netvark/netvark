@@ -9,7 +9,7 @@ import type { AnyRecord, Identifier } from '@netvark/jsonapi-client';
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { cursorOf, pageCursors } from '@netvark/jsonapi-client';
+import { cursorOf, pageCursors, serializeQuery } from '@netvark/jsonapi-client';
 import { CURSOR_PAGINATION_PROFILE } from '@netvark/jsonapi-core';
 
 import { useClientBlog } from './support/clients.ts';
@@ -179,6 +179,23 @@ describe('client reads', () => {
 
     expectTypeOf(data).toHaveProperty('title');
     expectTypeOf(data).not.toHaveProperty('body');
+  });
+
+  it('holds the definition it was made from, whose serialization of a query is what the server receives', async () => {
+    const { articles } = blog.clients();
+    const query = {
+      include: ['author'],
+      sort: ['-title'],
+      filter: { title: 'Rails is Omakase' },
+      page: { size: 1 },
+    } as const;
+
+    await articles.list(query);
+
+    expect(blog.arrivals().at(-1)?.target).toBe(
+      `/articles?${serializeQuery(articles.definition, query).toString()}`,
+    );
+    expectTypeOf(articles.definition.type).toEqualTypeOf<'articles'>();
   });
 
   it('reads a person with the linkage of their articles', async () => {

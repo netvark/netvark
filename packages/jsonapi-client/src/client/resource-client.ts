@@ -194,6 +194,7 @@ export function resourceClient(
   const context: CallContext = { definition, paths, state };
   const { type } = definition;
   return {
+    definition,
     list: async (query = {}, options) =>
       readRecords(
         context,

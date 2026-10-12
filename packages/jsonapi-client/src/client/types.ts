@@ -193,6 +193,11 @@ type NoQuery = Readonly<Record<never, never>>;
  * fieldsets type the records exactly.
  */
 export interface ResourceClient<TDefinitions, TDefinition> {
+  /**
+   * The definition the client was made from, as it was passed: a binding
+   * that keys a cache by the request serializes with it (SPEC 15.4).
+   */
+  readonly definition: TDefinition;
   /** `GET <collection>?<query>`: a page of records. */
   list<const TQuery extends ListQuery<TDefinitions, TDefinition> = NoQuery>(
     query?: TQuery,
