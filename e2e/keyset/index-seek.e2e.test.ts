@@ -1,15 +1,18 @@
 /**
- * The seek starts an index scan at the cursor (keyset SPEC 6.2, ADR 0016).
- * On a PostgreSQL server with 10 000 rows and an index on the sort and the
- * key, the page after or before a cursor halfway down the list is an index
- * scan whose index condition bounds the first sort key, so it reads about
- * one page of entries instead of the 5 000 before the cursor. Runs only
- * when `KEYSET_PG_URL` names a server: only a server's planner shows the
- * plan production runs.
+ * The seek starts an index scan at the cursor (keyset SPEC 6.2, ADRs 0016
+ * and 0020). On a PostgreSQL server with 10 000 rows and an index on the
+ * sort and the key, the page after or before a cursor halfway down the
+ * list runs a select per seek branch, each an index scan whose index
+ * condition bounds the first sort key at the cursor, so the page reads
+ * about one page of entries instead of the 5 000 before the cursor. Runs
+ * only when `KEYSET_PG_URL` names a server: only a server's planner shows
+ * the plan production runs.
  * @ref https://www.postgresql.org/docs/current/using-explain.html
  * @ref https://use-the-index-luke.com/sql/partial-results/fetch-next-page
  */
 import type { QueryEvent } from '@netvark/kysely-keyset';
+
+import type { PlanNode } from './support/explain.ts';
 
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
@@ -17,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDefineKeyset } from '@netvark/kysely-keyset';
 
+import { explainPage, nodesOf, scansOf } from './support/explain.ts';
 import { SECRET } from './support/keysets.ts';
 
 // oxlint-disable-next-line import/no-named-as-default-member -- reason: node-postgres is CommonJS and documents `import pg from 'pg'; const { Pool } = pg` for ESM
@@ -29,23 +33,12 @@ const SIZE = 100;
 /** The pages walked to reach the middle of the list. */
 const STRIDE = 1000;
 const DEPTH = 5;
-/** A page, the row that tells whether another follows, and the cursor's own row. */
-const ONE_PAGE = SIZE + 2;
+/** A page and the row that tells whether another follows: what a seek branch reads at most. */
+const LIMIT = SIZE + 1;
+const INDEX_SCAN = /^Index (?:Only )?Scan$/u;
 
 interface IndexDB {
   people: { id: string; name: string; nickname: string | null };
-}
-
-/** One node of `EXPLAIN (FORMAT JSON)`. */
-interface PlanNode {
-  readonly 'Node Type': string;
-  readonly 'Scan Direction'?: string;
-  readonly 'Index Name'?: string;
-  readonly 'Index Cond'?: string;
-  readonly 'Presorted Key'?: ReadonlyArray<string>;
-  readonly 'Actual Rows': number;
-  readonly 'Rows Removed by Filter'?: number;
-  readonly Plans?: ReadonlyArray<PlanNode>;
 }
 
 const defineKeyset = createDefineKeyset<IndexDB>({
@@ -63,20 +56,14 @@ const people = defineKeyset({
 });
 type Request = Parameters<typeof people.paginate>[1];
 
-function nodesOf(node: PlanNode): Array<PlanNode> {
-  return [node, ...(node.Plans ?? []).flatMap((child) => nodesOf(child))];
-}
-
-/** The scan node, and how many index entries it read. */
-function scanOf(plan: PlanNode): { scan: PlanNode; read: number } {
-  const scan = nodesOf(plan).find((node) => node['Node Type'].endsWith('Scan'));
-  if (scan === undefined) {
-    throw new Error('the plan has no scan');
-  }
-  return {
-    scan,
-    read: scan['Actual Rows'] + (scan['Rows Removed by Filter'] ?? 0),
-  };
+/** A scan of `people_name_id` in `direction` whose index condition matches `condition`. */
+function nameScan(direction: string, condition: RegExp): unknown {
+  return expect.objectContaining({
+    'Node Type': expect.stringMatching(INDEX_SCAN),
+    'Index Name': 'people_name_id',
+    'Scan Direction': direction,
+    'Index Cond': expect.stringMatching(condition),
+  });
 }
 
 describe.skipIf(URL === undefined)(
@@ -121,18 +108,7 @@ describe.skipIf(URL === undefined)(
           events.push(event);
         },
       });
-      const page = events.find((event) => event.kind === 'page');
-      if (page === undefined) {
-        throw new Error('no page query ran');
-      }
-      const { rows } = await pool.query<{ 'QUERY PLAN': unknown }>(
-        `explain (analyze, costs off, timing off, summary off, format json) ${page.sql}`,
-        [...page.parameters],
-      );
-      const output = rows[0]?.['QUERY PLAN'];
-      const parsed: unknown =
-        typeof output === 'string' ? JSON.parse(output) : output;
-      return (parsed as ReadonlyArray<{ Plan: PlanNode }>)[0]!.Plan;
+      return explainPage(pool, events);
     }
 
     /** The cursor halfway down `sort`. */
@@ -154,49 +130,45 @@ describe.skipIf(URL === undefined)(
       return after;
     }
 
-    it('after a cursor: a forward index scan that starts at the cursor', async () => {
+    it('after a cursor: forward index scans that start at the cursor', async () => {
       const after = await middle(['name']);
-      const { scan, read } = scanOf(
+      const { scans, read } = scansOf(
         await planOf({ sort: ['name'], page: { size: SIZE, after } }),
       );
-      expect(scan).toMatchObject({
-        'Node Type': expect.stringMatching(/^Index (?:Only )?Scan$/u),
-        'Index Name': 'people_name_id',
-        'Scan Direction': 'Forward',
-        'Index Cond': expect.stringMatching(/^\(name >= '/u),
-      });
-      expect(read).toBeLessThanOrEqual(ONE_PAGE);
+      expect(scans).toEqual([
+        nameScan('Forward', /^\(name > '/u),
+        nameScan('Forward', /^\(\(name = '.+\) AND \(id > '/u),
+      ]);
+      expect(read).toBeLessThanOrEqual(LIMIT);
     });
 
-    it('before a cursor: a backward index scan that starts at the cursor', async () => {
+    it('before a cursor: backward index scans that start at the cursor', async () => {
       const before = await middle(['name']);
-      const { scan, read } = scanOf(
+      const { scans, read } = scansOf(
         await planOf({ sort: ['name'], page: { size: SIZE, before } }),
       );
-      expect(scan).toMatchObject({
-        'Index Name': 'people_name_id',
-        'Scan Direction': 'Backward',
-        'Index Cond': expect.stringMatching(/^\(name <= '/u),
-      });
-      expect(read).toBeLessThanOrEqual(ONE_PAGE);
+      expect(scans).toEqual([
+        nameScan('Backward', /^\(name < '/u),
+        nameScan('Backward', /^\(\(name = '.+\) AND \(id < '/u),
+      ]);
+      expect(read).toBeLessThanOrEqual(LIMIT);
     });
 
     it('descending over the ascending index: a backward scan from the cursor, ties sorted as they come', async () => {
       const after = await middle(['-name']);
-      const plan = await planOf({
+      const plan: PlanNode = await planOf({
         sort: ['-name'],
         page: { size: SIZE, after },
       });
-      const { scan, read } = scanOf(plan);
-      expect(scan).toMatchObject({
-        'Index Name': 'people_name_id',
-        'Scan Direction': 'Backward',
-        'Index Cond': expect.stringMatching(/^\(name <= '/u),
-      });
+      const { scans, read } = scansOf(plan);
+      expect(scans).toEqual([
+        nameScan('Backward', /^\(name < '/u),
+        nameScan('Forward', /^\(\(name = '.+\) AND \(id > '/u),
+      ]);
       expect(nodesOf(plan)).toContainEqual(
         expect.objectContaining({
           'Node Type': 'Incremental Sort',
-          'Presorted Key': ['name'],
+          'Presorted Key': [expect.stringMatching(/(?:^|\.)name$/u)],
         }),
       );
       expect(read).toBeLessThan(2 * SIZE);

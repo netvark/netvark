@@ -7,7 +7,9 @@
  * selects from (resource SPEC 11.2). Every value is a parameter cast from
  * text to its column's type, a cursor's values included, since they are
  * the text each key was selected as; the scope's predicate joins the
- * filter and the seek; each sort key is selected as text under its alias
+ * filter and the seek, whose branches join with `or` in this one
+ * statement, an independent reading of what kysely-resource runs as a
+ * union (keyset ADR 0020); each sort key is selected as text under its alias
  * and ordered with its direction and null placement; the limit is the
  * plan's, one row past the page. A declared resource's definition has no
  * relations and searches a `tsvector` column (resource SPEC 11.2), so the
@@ -188,9 +190,11 @@ export async function keysetPage(
   });
   const statement = new Statement(context, resource, tx);
   const render = new PlanSql(context, statement);
+  const seek: Predicate | null =
+    plan.seek.length === 0 ? null : { kind: 'or', items: plan.seek };
   const where = [
     statement.scoped(),
-    ...[plan.filter, plan.seek].flatMap((node) =>
+    ...[plan.filter, seek].flatMap((node) =>
       node === null ? [] : [`(${render.predicate(node)})`],
     ),
   ].join(' and ');

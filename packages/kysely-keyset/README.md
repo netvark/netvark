@@ -105,7 +105,8 @@ validation, the same `TypeError` naming the option at startup, the same definiti
 Column names are the interface's. Under a `CamelCasePlugin` the interface says `createdAt`, so the
 definition says `column: 'createdAt'`, and the plugin maps the `"contacts"."created_at"` reference
 the adapter emits exactly as it maps your own. The adapter's private aliases (`keyset0`, `keyset1`,
-...) contain no underscore or capital, so the plugin leaves them alone.
+..., and `keyset0v`, `keyset1v`, ...) contain no underscore or capital, so the plugin leaves them
+alone.
 
 The core README covers what a definition can hold: field types and their operators, aggregates,
 relations, search modes, the key, page bounds, and cursor options.
@@ -219,12 +220,13 @@ to every sort, so the order is total. A nullable key gets an explicit `nulls las
 not nullable gets no placement, so the order is the one a plain index has (see Best practices).
 
 The next page, through the cursor of the last row (the quick start's request with its filter and
-search):
+search), captured on Kysely 0.29.6 over PGlite. Each select of the union repeats the selection and
+the filter, shortened here to `...`:
 
 ```sql
 select "id", "name", "created_at",
-  cast("contacts"."created_at" as text) as "keyset0",
-  cast("contacts"."id" as text) as "keyset1"
+  cast("contacts"."created_at" as text) as "keyset0", "contacts"."created_at" as "keyset0v",
+  cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v"
 from "contacts"
 where (("contacts"."status" = $1
     and exists (select 1 as "one" from "contact_emails"
@@ -232,19 +234,26 @@ where (("contacts"."status" = $1
                   and "contact_emails"."email" like $2))
     and to_tsvector('simple', concat_ws(' ', "contacts"."name", "contacts"."bio"))
         @@ websearch_to_tsquery('simple', $3))
-  and ("contacts"."created_at" <= $4
-    and ("contacts"."created_at" < $5
-      or ("contacts"."created_at" = $6 and "contacts"."id" > $7)))
-order by "contacts"."created_at" desc, "contacts"."id" asc
-limit $8
--- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
+  and false
+union all (select ... where ((...)) and "contacts"."created_at" < $7
+  order by "contacts"."created_at" desc, "contacts"."id" asc limit $8)
+union all (select ... where ((...)) and ("contacts"."created_at" = $12 and "contacts"."id" > $13)
+  order by "contacts"."created_at" desc, "contacts"."id" asc limit $14)
+order by "keyset0v" desc, "keyset1v" asc
+limit $15
+-- ["customer", "%@example.com", "ada", "customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", 26,
+--  "customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2a1b…", 26, 26]
 ```
 
-The seek leads with a range on the first key, `created_at <= $4`, that every row of the disjunction
-after it lies in: PostgreSQL starts an index scan there, at the cursor, instead of filtering every
-entry before it, which it would do with the disjunction alone. The range is there only where it is
-exact: after a value on a nullable first key the rows after the cursor include its nulls, so that
-seek has none.
+The seek has a branch per key: the rows past the cursor's `created_at`, and the rows at its
+`created_at` past its `id`. Each branch runs as its own select, a conjunction from which PostgreSQL
+starts an index scan at the cursor, even inside a tie of `created_at`; a disjunction of the two
+would only be filtered. After a value of a nullable first key, its nulls are a branch of their own.
+The union keeps no order, so it is ordered again by each key's value, selected uncast under
+`keyset0v`, `keyset1v`, ..., and limited again: a page reads at most one page and a row per branch.
+Kysely does not parenthesize the query a union starts from, so the union starts from your query
+where `false` holds, which reads no row. A seek of one branch, such as the page after a null of a
+nullable first key, is added to your query's `where` without a union.
 
 The cursor's values are bound as text parameters that PostgreSQL casts back to the columns' types,
 so a `timestamptz` keeps its microseconds and a `numeric` its digits. Every request value is a
@@ -376,14 +385,14 @@ Keep both definitions' page bounds equal, since each applies its own default and
   `(created_at, id)` serves it too, read backward with an incremental sort of each tie (PostgreSQL
   13 and later), and serves `createdAt` forward. A nullable column sorted descending needs the
   query's placement in the index: `(age desc nulls last, id)`. In a multi-tenant table the scope
-  column leads: `(organization_id, created_at desc, id)`. The range bounds the first key only: a
-  first key with many equal values (a status, a bulk-loaded timestamp) still reads the entries of
-  its tie before the cursor, and a nullable first key has no range after a value, so sort large
-  tables by `NOT NULL` columns with few ties. An insensitive field sorts and compares through
-  `lower()`, so index the expression: `create index on contacts (lower(name), id)`. An aggregate
-  sort computes a correlated subquery per candidate row; keep it for small relations, or maintain
-  the value in a column (a trigger or a generated column where PostgreSQL allows it) and declare
-  that column as a plain field.
+  column leads: `(organization_id, created_at desc, id)`. Each branch of the seek is a range of that
+  index, so a first key with many equal values (a status, a bulk-loaded timestamp) or a nullable
+  first key costs a page per branch, not the entries before the cursor; a sort has at most a branch
+  per key and one more per nullable key, so short sorts over `NOT NULL` columns read least. An
+  insensitive field sorts and compares through `lower()`, so index the expression:
+  `create index on contacts (lower(name), id)`. An aggregate sort computes a correlated subquery per
+  candidate row; keep it for small relations, or maintain the value in a column (a trigger or a
+  generated column where PostgreSQL allows it) and declare that column as a plain field.
 - **Prefer a stored `tsvector` for search.** `search: { columns }` computes `to_tsvector` per row at
   query time; a generated column with a GIN index answers the same query from the index:
 

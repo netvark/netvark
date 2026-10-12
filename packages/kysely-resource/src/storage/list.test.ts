@@ -49,7 +49,7 @@ afterAll(async () => {
   await database.close();
 });
 
-describe('the order of list (SPEC 18.2, keyset ADR 0016)', () => {
+describe('the order of list (SPEC 18.2, keyset ADR 0016, ADR 0020)', () => {
   it('places nulls on a nullable key only, so a plain index matches the order', async () => {
     statements.length = 0;
     await storage.transaction(inWorkspace('1'), async (tx) => {
@@ -69,7 +69,7 @@ describe('the order of list (SPEC 18.2, keyset ADR 0016)', () => {
     ]);
   });
 
-  it('leads the seek with a range on a first key that is not nullable', async () => {
+  it("runs the seek's branches as one select each under union all, ordered by the keys' values", async () => {
     const after = await storage.transaction(inWorkspace('1'), async (tx) => {
       const page = await storage.list(tx, tasks, {
         sort: ['title'],
@@ -86,10 +86,18 @@ describe('the order of list (SPEC 18.2, keyset ADR 0016)', () => {
       return page.rows;
     });
     expect(titles(rows)).toEqual(['c', 'd']);
+    const order = 'order by "tasks"\\."title" asc, "tasks"\\."id" asc';
     expect(
       statements.find((statement) => statement.includes(' limit ')),
     ).toMatch(
-      /\("tasks"\."title" >= \$\d+ and \("tasks"\."title" > \$\d+ or /u,
+      new RegExp(
+        [
+          `^\\(select .+, cast\\("tasks"\\."title" as text\\) as "\\.keyset0", "tasks"\\."title" as "\\.keyset0v", cast\\("tasks"\\."id" as text\\) as "\\.keyset1", "tasks"\\."id" as "\\.keyset1v" from .+ and \\("tasks"\\."title" > \\$2\\) ${order} limit \\$3\\)`,
+          `union all \\(select .+ and \\(\\("tasks"\\."title" = \\$5 and "tasks"\\."id" > \\$6\\)\\) ${order} limit \\$7\\)`,
+          'order by "\\.keyset0v" asc, "\\.keyset1v" asc limit \\$8$',
+        ].join(' '),
+        'u',
+      ),
     );
   });
 });

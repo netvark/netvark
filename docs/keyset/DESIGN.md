@@ -76,7 +76,9 @@ It is a library for teams who paginate large tables and want the hard cases hand
    order (ADR-0008). The e2e suite proves it over sorts with ties and nulls on three databases.
 6. **A page costs one page.** The seek leads with a range on the first key and the order matches a
    plain index, so an index on the sort starts its scan at the cursor whatever the page's depth
-   (ADR-0016). A server-only e2e test reads the plans to prove it.
+   (ADR-0016). Inside a tie of the first key, or after a value of a nullable one, the seek runs as
+   one select per branch under `union all`, each bounded by the index, so those pages cost a page
+   per branch (ADR-0020). Server-only e2e tests read the plans to prove it.
 7. **Report, never drop.** An unknown sort field, an operator the field does not accept, a bad
    value, a malformed filter node, a cursor from another request: each is a typed error with the
    detail in a field. Nothing is ignored.
@@ -202,16 +204,18 @@ operator, and what was expected (ADR-0019), so a client fixes them all in one ro
 
 ```ts
 const plan = await contacts.plan(request);
-// plan.keys    [{ alias: 'keyset0', field: 'emailCount', target: {...}, direction: 'desc', nulls: 'last' }, ...]
+// plan.keys    [{ alias: 'keyset0', valueAlias: 'keyset0v', field: 'emailCount', target: {...}, direction: 'desc', nulls: 'last' }, ...]
 // plan.filter  the filter and the search as one predicate tree
-// plan.seek    the cursor's predicate tree, or null on a first page
+// plan.seek    the cursor's branches, each a predicate tree; none on a first page
 // plan.limit   51: one more than the page size
 // plan.context the hash cursors are bound to
 ```
 
 An adapter renders `plan.filter` and `plan.seek` (thirteen predicate kinds over three target kinds,
 SPEC 6), selects each key cast to text under its alias, orders by the keys with the stated null
-placement, and limits. The planner validated everything: an adapter renders without re-checking.
+placement, and limits. A seek of one branch joins the `where`; two or more run as one select each,
+joined with `union all` and ordered again by each key's value under its `valueAlias` (ADR-0020). The
+planner validated everything: an adapter renders without re-checking.
 
 What scopes the rows outside the request, such as the tenant in the query's `where`, scopes the
 cursors through the second argument: `plan(request, { context: { tenant: org.id } })`, or the same
@@ -313,18 +317,20 @@ the Kysely adapter, so a definition with the same field names accepts the cursor
   definition   defineKeyset: vocabularies, field and relation validation, the definition
   filter       the tree, the operator table, value checks, condition and tree normalization
   sort         sort resolution with the key appended; the sort signature
-  plan         the plan types, the planner, the seek predicate
+  plan         the plan types, the planner, the seek predicate and its branches
   page         page request resolution, page assembly
   cursor       the codec: sign, verify, rotate, expire, bind to context
   errors       the request-time error classes
 @netvark/kysely-keyset (packages/kysely-keyset/src)
   define-keyset   createDefineKeyset<DB>(): names checked against DB, keysets with paginate
   paginate        the plan onto a select query: filter, total, seek, keys, order, limit
+  page-query      the page statement: one select, or a union of the seek's branches
   render          targets and predicates as Kysely expressions
 @netvark/drizzle-keyset (packages/drizzle-keyset/src)
   define-keyset   createDefineKeyset(schema): names checked against the schema, keysets with paginate
   check-names     every name of a definition resolved in the schema at startup
   paginate        the select it builds: selection, where, filter, total, seek, keys, order, limit
+  page-query      the page statement: one select, or a union of the seek's branches
   render          targets and predicates as Drizzle sql
 ```
 
@@ -338,10 +344,12 @@ enforced.
 
 ```
 request ──plan()──▶ resolveSort ▶ normalizeFilter ▶ search ▶ resolvePage ▶ context
-                    decode cursors (verify, version, expiry, context) ▶ seekPredicate ▶ keys
-        ──paginate()──▶ where(filter) ▶ [count(*) as total] ▶ where(seek)
-                        ▶ select cast(key as text) as keysetN ▶ order by keys [nulls last|first]
-                        ▶ limit size + 1 ▶ execute ▶ split aliases from rows
+                    decode cursors (verify, version, expiry, context) ▶ pageSeek ▶ keys
+        ──paginate()──▶ where(filter) ▶ [count(*) as total] ▶ where(branch), per seek branch
+                        ▶ select cast(key as text) as keysetN [, key as keysetNv]
+                        ▶ order by keys [nulls last|first] ▶ limit size + 1
+                        ▶ [union all the branches ▶ order by keysetNv ▶ limit size + 1]
+                        ▶ execute ▶ split aliases from rows
         ──page()──▶ reverse a backward page ▶ sign a cursor per row ▶ prev, next, total, rangeTruncated
 ```
 
@@ -356,10 +364,12 @@ an index declared in the sort's directions, which an explicit placement would no
 The seek predicate is a disjunction of prefix-equality conjunctions whose last term knows what lies
 beyond a value or a null in each direction; over several keys it leads with a range on the first key
 that every row of the disjunction lies in, which PostgreSQL uses as the index condition that starts
-the scan at the cursor (SPEC 6.2). The definition's `nullable` decides both, so `finishPage` refuses
-a null sort value on a key declared not nullable. The e2e invariants walk eight sorts, with ties and
-nulls, forward and backward on PGlite, node-postgres, and a PostgreSQL server, and check that each
-walk visits every row once in the expected order.
+the scan at the cursor (SPEC 6.2). The range bounds the first key only, so a page runs the disjuncts
+as branches, each a conjunction an index bounds, the nulls after a value of a nullable key a branch
+of their own (ADR-0020). The definition's `nullable` decides both, so `finishPage` refuses a null
+sort value on a key declared not nullable. The e2e invariants walk eight sorts, with ties and nulls,
+forward and backward on PGlite, node-postgres, and a PostgreSQL server, and check that each walk
+visits every row once in the expected order.
 
 ### 4.4 Cursor values
 
@@ -406,3 +416,4 @@ checks from the schema object's type, `createDefineKeyset(schema, defaults?)`, a
 | 0017 | The Drizzle binding takes names from the schema object and builds the select itself                         |
 | 0018 | The `kysely` peer range starts past Kysely's published advisories                                           |
 | 0019 | The planner reports every refused filter value at once                                                      |
+| 0020 | A seek of two or more branches runs as one select per branch, joined with `union all`                       |

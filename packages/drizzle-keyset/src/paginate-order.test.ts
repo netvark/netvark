@@ -18,7 +18,7 @@ async function cursorAt(
   return page.cursors[0]!;
 }
 
-describe('paginate: the seek and the order (SPEC 14.3, ADR 0008, ADR 0016)', () => {
+describe('paginate: the seek and the order (SPEC 14.3, ADR 0008, ADR 0016, ADR 0020)', () => {
   it('adds the seek after the filter and inverts a backward page', async () => {
     const { db, recorded } = canned([[row(3), row(2), row(1)]]);
     const request = {
@@ -52,13 +52,49 @@ describe('paginate: the seek and the order (SPEC 14.3, ADR 0008, ADR 0016)', () 
     await paginate(contacts, schema, db, { sort: ['-score'] }, options);
     expect(
       recorded.statements.map(({ sql }) =>
-        sql.slice(sql.indexOf(' order by ')),
+        sql.slice(sql.lastIndexOf(' order by ')),
       ),
     ).toEqual([
-      // After a value of a nullable key no range leads (SPEC 6.2): one parameter fewer.
-      ' order by "contacts"."age" asc nulls last, "contacts"."id" asc limit $4',
-      ' order by "contacts"."age" desc nulls first, "contacts"."id" desc limit $5',
+      ' order by "keyset0v" asc nulls last, "keyset1v" asc  limit $7',
+      ' order by "keyset0v" desc nulls first, "keyset1v" desc  limit $6',
       ' order by "contacts"."score" desc, "contacts"."id" asc limit $1',
+    ]);
+  });
+
+  it('runs a seek of several branches as one select each under union all, ordered by the values', async () => {
+    const select =
+      'select "id", "first_name", cast("contacts"."age" as text) as "keyset0", "contacts"."age" as "keyset0v", cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v" from "contacts"';
+    const order =
+      'order by "contacts"."age" asc nulls last, "contacts"."id" asc';
+    const { db, recorded } = canned([
+      [
+        [`${ID}5`, 'name5', '31', 31, `${ID}5`, `${ID}5`],
+        [`${ID}6`, 'name6', null, null, `${ID}6`, `${ID}6`],
+      ],
+    ]);
+    const after = await cursorAt({ sort: ['age'] }, ['30', `${ID}4`]);
+    const page = await paginate(
+      contacts,
+      schema,
+      db,
+      { sort: ['age'], page: { size: 2, after } },
+      options,
+    );
+    // Drizzle nests every operand after the second in parentheses of its own.
+    expect(recorded.statements).toEqual([
+      {
+        sql: [
+          `((${select} where ("contacts"."age" > $1) ${order} limit $2)`,
+          `union all (${select} where ("contacts"."age" is null) ${order} limit $3))`,
+          `union all (${select} where (("contacts"."age" = $4 and "contacts"."id" > $5)) ${order} limit $6)`,
+          'order by "keyset0v" asc nulls last, "keyset1v" asc  limit $7',
+        ].join(' '),
+        params: ['30', 3, 3, '30', `${ID}4`, 3, 3],
+      },
+    ]);
+    expect(page.rows).toEqual([
+      { id: `${ID}5`, firstName: 'name5' },
+      { id: `${ID}6`, firstName: 'name6' },
     ]);
   });
 

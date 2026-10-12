@@ -952,8 +952,9 @@ async function list(tx, resource, request: StorageListRequest): Promise<StorageP
   if (keyset === undefined) keysets.set(resource, (keyset = defineKeyset(resource.keyset)));
   const plan = await keyset.plan(request);
   // One statement on the schema-qualified table: where the scope's predicate, plan.filter, and
-  // plan.seek; each of plan.keys selected as text under its alias, ordered by its direction and
-  // nulls; limit plan.limit.
+  // plan.seek's branch; each of plan.keys selected as text under its alias, ordered by its
+  // direction and nulls; limit plan.limit. Two or more branches: one such select each, also
+  // selecting each key's value under its valueAlias, under union all, ordered by those values.
   const { rows, keyValues } = await select(tx, resource, plan);
   return keyset.page(plan, rows, (row) => keyValues.get(row) ?? []);
 }

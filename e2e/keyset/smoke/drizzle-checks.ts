@@ -44,17 +44,28 @@ const keyset = createDefineKeyset(
 const ID = '00000000-0000-4000-8000-00000000000';
 const CREATED_AT = '2026-01-01T00:00:00.000Z';
 
+/** Three people answer a page of two and tell that another follows. */
+const PEOPLE = [
+  [`${ID}1`, 'Ada', 40],
+  [`${ID}2`, 'Adam', 30],
+  [`${ID}3`, 'Adele', null],
+] as const;
+const TOTAL = 3;
+
 /**
  * The selected rows the proxy answers, positional in the selection's
  * order: the table's columns, then the sort key and the tie-breaker as
- * text. Three rows answer a page of two and tell that another follows.
+ * text, and in a union of the seek's branches each also as its value
+ * (ADR 0020).
  */
-const ROWS = [
-  [`${ID}1`, 'Ada', CREATED_AT, 40, '40', `${ID}1`],
-  [`${ID}2`, 'Adam', CREATED_AT, 30, '30', `${ID}2`],
-  [`${ID}3`, 'Adele', CREATED_AT, null, null, `${ID}3`],
-];
-const TOTAL = 3;
+function rowsOf(union: boolean): Array<Array<unknown>> {
+  return PEOPLE.map(([id, name, age]) => {
+    const ageText = age === null ? null : String(age);
+    return union
+      ? [id, name, CREATED_AT, age, ageText, age, id, id]
+      : [id, name, CREATED_AT, age, ageText, id];
+  });
+}
 
 interface Recorded {
   readonly db: PgRemoteDatabase;
@@ -68,7 +79,11 @@ function recorded(): Recorded {
     statements.push({ sql, params });
     // A network driver answers on a later turn.
     await Promise.resolve();
-    return { rows: sql.startsWith('select count(*)') ? [[TOTAL]] : ROWS };
+    return {
+      rows: sql.startsWith('select count(*)')
+        ? [[TOTAL]]
+        : rowsOf(sql.startsWith('(')),
+    };
   });
   return { db, statements };
 }
@@ -120,22 +135,34 @@ export const DRIZZLE_CHECKS: Readonly<Record<string, Check>> = {
     const page = await keyset.paginate(first.db, REQUEST);
     check(typeof page.next === 'string', 'next cursor');
     const { db, statements } = recorded();
-    await keyset.paginate(db, {
+    const resumed = await keyset.paginate(db, {
       ...REQUEST,
       page: { size: 2, after: page.next },
     });
     const statement = statements[0];
     check(statement !== undefined, 'one statement');
-    check(
-      statement.sql.includes(
-        '((("contacts"."age" < $2 or "contacts"."age" is null) or ("contacts"."age" = $3 and "contacts"."id" > $4)))',
-      ),
-      `seek past the cursor, its nulls last: ${statement.sql}`,
-    );
+    // After 30 on the nullable -age: the smaller ages, the nulls, and the
+    // rest of the tie, one select each under union all (ADR 0020).
+    for (const branch of [
+      'and ("contacts"."age" < $2) order by',
+      'and ("contacts"."age" is null) order by',
+      'and (("contacts"."age" = $7 and "contacts"."id" > $8)) order by',
+      ') order by "keyset0v" desc nulls last, "keyset1v" asc',
+    ]) {
+      check(
+        statement.sql.includes(branch),
+        `seek past the cursor, its nulls last: ${statement.sql}`,
+      );
+    }
     equal(
-      JSON.stringify(statement.params.slice(1, -1)),
+      JSON.stringify([2, 7, 8].map((index) => statement.params[index - 1])),
       JSON.stringify(['30', '30', `${ID}2`]),
       "the cursor's values",
+    );
+    equal(
+      resumed.rows.map((row) => `${row.name}:${String(row.age)}`).join(','),
+      'Ada:40,Adam:30',
+      "rows split from the union's aliases",
     );
   },
 };

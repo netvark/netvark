@@ -115,6 +115,11 @@ export type Predicate =
 export interface PlanKey {
   /** The selection alias the adapter reads the value back from. */
   readonly alias: string;
+  /**
+   * The alias a union of the seek's branches selects the key's value
+   * under, uncast, and orders by (ADR 0020).
+   */
+  readonly valueAlias: string;
   readonly field: string;
   readonly target: ColumnTarget | AggregateTarget;
   /** The effective direction of the query (inverted on a backward page). */
@@ -137,8 +142,13 @@ export interface QueryPlan {
   readonly reversed: boolean;
   /** The request's filter and search; what `total` counts. */
   readonly filter: Predicate | null;
-  /** The cursor predicates; never counted. */
-  readonly seek: Predicate | null;
+  /**
+   * The seek as branches (ADR 0020): disjoint conjunctions that together
+   * select the rows past the cursors; none on a first page. One branch is
+   * added to the page with `where`; two or more run as one select each,
+   * joined with `union all`. Never counted.
+   */
+  readonly seek: ReadonlyArray<Predicate>;
   /** `size + 1`, to detect a further page. */
   readonly limit: number;
   /** The used page size. */

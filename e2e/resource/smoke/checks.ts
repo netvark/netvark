@@ -254,7 +254,7 @@ export const neutralChecks: Checks = {
       ...request,
       page: { size: 1, after: page.next },
     });
-    check(next.seek !== null, 'the cursor gave no seek predicate');
+    check(next.seek.length > 0, 'the cursor gave no seek');
   },
   'refuses a list without a relationship target': () => {
     const message = messageOf(errorCatalog, [[Contacts]]);

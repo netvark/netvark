@@ -38,7 +38,7 @@ describe('paginate', () => {
     const plan = await contacts.plan({ page: { size: 2 } });
     const next = await contacts.plan({ page: { size: 2, after: page.next! } });
     expect(next.context).toBe(plan.context);
-    expect(next.seek).toMatchObject({ kind: 'compare', operator: '>' });
+    expect(next.seek).toMatchObject([{ kind: 'compare', operator: '>' }]);
   });
 
   it('puts the filter into where, counts it for the total, and reports both queries', async () => {

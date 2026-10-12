@@ -1,6 +1,7 @@
 # ADR 0007: Sort-key values travel as text under private aliases
 
-- Status: accepted
+- Status: accepted; amended by ADR-0020 (the value aliases `keyset0v`, `keyset1v`, ..., which a
+  union of the seek's branches selects each key's value under, are reserved too)
 - Date: 2026-10-08
 
 ## Context

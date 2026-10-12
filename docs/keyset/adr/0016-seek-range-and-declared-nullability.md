@@ -1,7 +1,9 @@
 # ADR 0016: The seek leads with a range on the first key; declared nullability shapes seek and order
 
 - Status: accepted; supersedes the clause of ADR 0008 that the seek does not consult nullability,
-  and its `NULLS LAST` on every key
+  and its `NULLS LAST` on every key; amended by ADR-0020 (a seek of two or more branches runs as one
+  select per branch under `union all`, so an index bounds the scan inside a tie of the first key and
+  after a value of a nullable one too)
 - Date: 2026-10-11
 
 ## Context

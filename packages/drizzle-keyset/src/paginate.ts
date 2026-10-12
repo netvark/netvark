@@ -4,14 +4,12 @@ import type { SelectResultFields } from 'drizzle-orm/query-builders/select.types
 
 /**
  * `keyset.paginate` (SPEC 14.3, ADR 0017): the plan rendered as Drizzle
- * `sql` into a select this module builds over the definition's table. The
- * caller's selection gets the text-cast keys under private aliases; the
- * caller's `where`, the filter, and the seek are each parenthesized and
- * joined with `and`, since Drizzle's `and()` does not parenthesize its
- * operands; the total (when asked for) counts the first two. The aliases
- * are stripped before the rows reach the caller.
+ * `sql` into the page select `page-query.ts` builds over the definition's
+ * table, where the caller's `where`, the filter, and the seek hold; the
+ * total (when asked for) counts the first two. The caller's selection
+ * gets the keys under private aliases, which are stripped before the rows
+ * reach the caller.
  * @ref https://orm.drizzle.team/docs/select#aggregations-helpers (count)
- * @ref https://www.postgresql.org/docs/current/queries-order.html (NULLS FIRST / LAST)
  * @ref https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-TYPE-CASTS
  * @packageDocumentation
  */
@@ -21,11 +19,11 @@ import type {
   Keyset,
   KeysetRequestOf,
   Page,
-  PlanKey,
   QueryPlan,
   RelationsInit,
 } from '@netvark/keyset-core';
 
+import type { Statement } from './page-query';
 import type {
   KeysetDatabase,
   KeysetSchema,
@@ -34,31 +32,16 @@ import type {
   RenderContext,
 } from './types';
 
-import { count, getTableColumns, sql } from 'drizzle-orm';
+import { count, getTableColumns } from 'drizzle-orm';
 
+import { conjunction, pageQuery } from './page-query';
 import { renderPredicate } from './render/predicate';
-import { renderTarget, table } from './render/target';
+import { table } from './render/target';
 
-/** The names `keyAlias` gives the sort keys: reserved in a caller's selection. */
-const KEY_ALIAS = /^keyset\d+$/u;
-
-const DIRECTIONS: Readonly<Record<PlanKey['direction'], SQL>> = {
-  asc: sql.raw('asc'),
-  desc: sql.raw('desc'),
-};
-
-const NULLS: Readonly<Record<'first' | 'last', SQL>> = {
-  first: sql.raw('nulls first'),
-  last: sql.raw('nulls last'),
-};
+/** The names the plan gives the sort keys and their values: reserved in a caller's selection. */
+const KEY_ALIAS = /^keyset\d+v?$/u;
 
 type Reporter = (event: QueryEvent) => void;
-
-/** What `run` needs of a Drizzle select: its statement, and its rows. */
-interface Statement<TRow> {
-  toSQL(): { readonly sql: string; readonly params: ReadonlyArray<unknown> };
-  execute(): Promise<Array<TRow>>;
-}
 
 async function run<TRow>(
   query: Statement<TRow>,
@@ -85,22 +68,10 @@ function checkSelection(selection: SelectedFields | undefined): void {
   for (const name of Object.keys(selection ?? {})) {
     if (KEY_ALIAS.test(name)) {
       throw new TypeError(
-        `select has a member named ${name}: paginate reserves the names keyset0, keyset1, ... for the sort keys`,
+        `select has a member named ${name}: paginate reserves the names keyset0, keyset0v, keyset1, keyset1v, ... for the sort keys`,
       );
     }
   }
-}
-
-/** The present parts, each in parentheses, joined with `and`. */
-function conjunction(parts: ReadonlyArray<SQL | undefined>): SQL | undefined {
-  const present = parts.filter((part) => part !== undefined);
-  if (present.length === 0) {
-    return undefined;
-  }
-  return sql.join(
-    present.map((part) => sql`(${part})`),
-    sql` and `,
-  );
 }
 
 async function countTotal(
@@ -114,25 +85,6 @@ async function countTotal(
   return row === undefined ? 0 : row.total;
 }
 
-function keySelection(
-  plan: QueryPlan,
-  context: RenderContext,
-): Record<string, SQL.Aliased<string | null>> {
-  return Object.fromEntries(
-    plan.keys.map((key) => [
-      key.alias,
-      sql<string | null>`cast(${renderTarget(key.target, context)} as text)`.as(
-        key.alias,
-      ),
-    ]),
-  );
-}
-
-function orderOf(key: PlanKey, context: RenderContext): SQL {
-  const ordered = sql`${renderTarget(key.target, context)} ${DIRECTIONS[key.direction]}`;
-  return key.nulls === null ? ordered : sql`${ordered} ${NULLS[key.nulls]}`;
-}
-
 /** Reads the key values of a fetched row and returns the row without the private aliases. */
 function splitRow(
   fetched: Record<string, unknown>,
@@ -141,7 +93,9 @@ function splitRow(
   readonly row: Record<string, unknown>;
   readonly values: ReadonlyArray<CursorValue>;
 } {
-  const aliases = new Set(plan.keys.map((key) => key.alias));
+  const aliases = new Set(
+    plan.keys.flatMap((key) => [key.alias, key.valueAlias]),
+  );
   const values = plan.keys.map((key) => {
     const value = fetched[key.alias];
     return typeof value === 'string' ? value : null;
@@ -173,29 +127,20 @@ export async function paginate<
   const from = table(context, plan.table);
   const filter =
     plan.filter === null ? undefined : renderPredicate(plan.filter, context);
-  const seek =
-    plan.seek === null ? undefined : renderPredicate(plan.seek, context);
+  const parts = [options.where, filter];
   const total =
     options.total === true
-      ? await countTotal(
-          db,
-          from,
-          conjunction([options.where, filter]),
-          options.onQuery,
-        )
+      ? await countTotal(db, from, conjunction(parts), options.onQuery)
       : undefined;
-  const selection: SelectedFields = {
-    ...(options.select ?? getTableColumns(from)),
-    ...keySelection(plan, context),
-  };
-  const query = db
-    .select(selection)
-    .from(from)
-    .where(conjunction([options.where, filter, seek]))
-    .orderBy(...plan.keys.map((key) => orderOf(key, context)))
-    .limit(plan.limit);
-  const fetched: Array<Record<string, unknown>> = await run(
-    query,
+  const fetched = await run(
+    pageQuery(
+      db,
+      from,
+      options.select ?? getTableColumns(from),
+      parts,
+      plan,
+      context,
+    ),
     'page',
     options.onQuery,
   );

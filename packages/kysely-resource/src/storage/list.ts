@@ -1,4 +1,4 @@
-import type { RawBuilder, SqlBool } from 'kysely';
+import type { Expression, RawBuilder, SqlBool } from 'kysely';
 
 /**
  * `list` (SPEC 18.2, obligations 5 and 12 of resource SPEC 12.8): the
@@ -12,10 +12,15 @@ import type { RawBuilder, SqlBool } from 'kysely';
  * public name holds (resource SPEC 4.2), so no member's alias meets it,
  * and ordered with its direction and, on a nullable key, its null
  * placement (keyset ADR 0016); the plan's limit is one row past the page.
+ * A seek of two or more branches runs as one such statement per branch,
+ * each in parentheses and also selecting the keys' values under their
+ * value aliases, joined with `union all` and ordered by those values and
+ * limited again, since a union keeps no order (keyset ADR 0020).
  * With `total`, a second statement counts the rows of the scope the filter
  * selects. `list` never counts rows to find a page.
  * @ref https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md (section 6, the query plan)
  * @ref https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST / LAST)
+ * @ref https://www.postgresql.org/docs/18/queries-union.html (no order; LIMIT on an operand needs parentheses)
  * @packageDocumentation
  */
 import type {
@@ -23,6 +28,7 @@ import type {
   CursorValue,
   Keyset,
   PlanKey,
+  Predicate,
 } from '@netvark/keyset-core';
 import type { AnyDatabase, RenderContext } from '@netvark/kysely-keyset';
 import type { DeclaredResource } from '@netvark/resource-core';
@@ -61,9 +67,23 @@ function cursorContext(tx: KyselyTransaction): CursorContext {
   );
 }
 
-/** The alias a sort key is selected under. */
+/** The alias a sort key is selected under as text. */
 function keyAlias(key: PlanKey): string {
   return `.${key.alias}`;
+}
+
+/** The alias a sort key's value is selected under in a union of the seek's branches. */
+function valueAlias(key: PlanKey): string {
+  return `.${key.valueAlias}`;
+}
+
+/** `ordered` in the key's direction, with its null placement on a nullable key. */
+function directed(
+  ordered: Expression<unknown>,
+  key: PlanKey,
+): RawBuilder<unknown> {
+  const placed = sql`${ordered} ${DIRECTIONS[key.direction]}`;
+  return key.nulls === null ? placed : sql`${placed} ${NULLS[key.nulls]}`;
 }
 
 /**
@@ -105,23 +125,35 @@ export async function listRows(
     scopePredicate(context.catalog, table, resource, tx),
     ...(plan.filter === null ? [] : [renderPredicate(eb, plan.filter, render)]),
   ];
-  const sought =
-    plan.seek === null
-      ? filtered
-      : [...filtered, renderPredicate(eb, plan.seek, render)];
-  const keys = plan.keys.map(
-    (key) =>
-      sql`cast(${renderTarget(eb, key.target, render)} as text) as ${sql.id(keyAlias(key))}`,
-  );
-  const order = plan.keys.map((key) => {
-    const directed = sql`${renderTarget(eb, key.target, render)} ${DIRECTIONS[key.direction]}`;
-    return key.nulls === null ? directed : sql`${directed} ${NULLS[key.nulls]}`;
-  });
-  const fetched = await tx.execute((db) =>
-    sql<Row>`select ${selectList(context, table, resource)}, ${sql.join(keys)} from ${from} where ${conjunction(sought)} order by ${sql.join(order)} limit ${plan.limit}`.compile(
-      db,
-    ),
-  );
+  const select = (branch: Predicate | undefined, values: boolean) => {
+    const keys = plan.keys.flatMap((key) => {
+      const target = renderTarget(eb, key.target, render);
+      const text = sql`cast(${target} as text) as ${sql.id(keyAlias(key))}`;
+      return values
+        ? [text, sql`${target} as ${sql.id(valueAlias(key))}`]
+        : [text];
+    });
+    const where = conjunction(
+      branch === undefined
+        ? filtered
+        : [...filtered, renderPredicate(eb, branch, render)],
+    );
+    const order = plan.keys.map((key) =>
+      directed(renderTarget(eb, key.target, render), key),
+    );
+    return sql<Row>`select ${selectList(context, table, resource)}, ${sql.join(keys)} from ${from} where ${where} order by ${sql.join(order)} limit ${plan.limit}`;
+  };
+  const [only, ...more] = plan.seek;
+  const statement =
+    more.length === 0
+      ? select(only, false)
+      : sql<Row>`${sql.join(
+          plan.seek.map((branch) => sql`(${select(branch, true)})`),
+          sql` union all `,
+        )} order by ${sql.join(
+          plan.keys.map((key) => directed(sql.id(valueAlias(key)), key)),
+        )} limit ${plan.limit}`;
+  const fetched = await tx.execute((db) => statement.compile(db));
   const values = new Map<PublicRow, ReadonlyArray<CursorValue>>();
   const rows = fetched.map((row) => {
     const publicRow = readRow(context, table, resource, row);

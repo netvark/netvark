@@ -101,7 +101,12 @@ const CHECKS: Readonly<Record<string, Check>> = {
       sort: ['-age'],
       page: { size: 2, after: page.next },
     });
-    equal(next.seek?.kind, 'and', 'seek from the cursor');
+    // After b's null age, only the rest of the nulls follow: one branch.
+    equal(
+      next.seek.map((branch) => branch.kind).join(),
+      'and',
+      'seek from the cursor',
+    );
   },
   'renders SQL through Kysely without a database': async () => {
     const events: Array<QueryEvent> = [];
@@ -155,7 +160,11 @@ const CHECKS: Readonly<Record<string, Check>> = {
     );
     check(typeof page.next === 'string', 'next cursor');
     const resumed = await contacts.plan({ page: { after: page.next } }, acme);
-    equal(resumed.seek?.kind, 'compare', 'resumes under the same context');
+    equal(
+      resumed.seek.map((branch) => branch.kind).join(),
+      'compare',
+      'resumes under the same context',
+    );
     try {
       await contacts.plan(
         { page: { after: page.next } },

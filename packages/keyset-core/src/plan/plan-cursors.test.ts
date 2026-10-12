@@ -17,7 +17,7 @@ function compare(target: unknown, operator: string, value: string) {
 }
 
 describe('createPlanner (cursors)', () => {
-  it('decodes an after cursor into a seek in the request direction', async () => {
+  it('decodes an after cursor into a seek in the request direction, one branch per key', async () => {
     const first = await plan({ sort: ['-createdAt'], page: { size: 2 } });
     const after = await codec.encode(['2024-01-02', 'k2'], first.context);
     const next = await plan({ sort: ['-createdAt'], page: { size: 2, after } });
@@ -32,25 +32,13 @@ describe('createPlanner (cursors)', () => {
       ['asc', null],
     ]);
     const [createdAt, id] = next.keys.map((key) => key.target);
-    expect(next.seek).toEqual({
-      kind: 'and',
-      items: [
-        compare(createdAt, '<=', '2024-01-02'),
-        {
-          kind: 'or',
-          items: [
-            compare(createdAt, '<', '2024-01-02'),
-            {
-              kind: 'and',
-              items: [
-                compare(createdAt, '=', '2024-01-02'),
-                compare(id, '>', 'k2'),
-              ],
-            },
-          ],
-        },
-      ],
-    });
+    expect(next.seek).toEqual([
+      compare(createdAt, '<', '2024-01-02'),
+      {
+        kind: 'and',
+        items: [compare(createdAt, '=', '2024-01-02'), compare(id, '>', 'k2')],
+      },
+    ]);
   });
 
   it('plans a before-only page inverted, with nulls first, and marks it reversed', async () => {
@@ -66,24 +54,21 @@ describe('createPlanner (cursors)', () => {
       { field: 'birthday', direction: 'desc' },
       { field: 'id', direction: 'asc' },
     ]);
-    expect(previous.seek).toEqual({
-      kind: 'or',
-      items: [
-        { kind: 'null', target: previous.keys[0]?.target, negate: true },
-        {
-          kind: 'and',
-          items: [
-            { kind: 'null', target: previous.keys[0]?.target, negate: false },
-            {
-              kind: 'compare',
-              target: previous.keys[1]?.target,
-              operator: '<',
-              value: 'k9',
-            },
-          ],
-        },
-      ],
-    });
+    expect(previous.seek).toEqual([
+      { kind: 'null', target: previous.keys[0]?.target, negate: true },
+      {
+        kind: 'and',
+        items: [
+          { kind: 'null', target: previous.keys[0]?.target, negate: false },
+          {
+            kind: 'compare',
+            target: previous.keys[1]?.target,
+            operator: '<',
+            value: 'k9',
+          },
+        ],
+      },
+    ]);
   });
 
   it('plans a range as a forward page bounded on both sides', async () => {
@@ -98,23 +83,25 @@ describe('createPlanner (cursors)', () => {
       limit: 101,
     });
     expect(range.keys[0]).toMatchObject({ direction: 'asc', nulls: null });
-    expect(range.seek).toEqual({
-      kind: 'and',
-      items: [
-        {
-          kind: 'compare',
-          target: range.keys[0]?.target,
-          operator: '>',
-          value: 'a',
-        },
-        {
-          kind: 'compare',
-          target: range.keys[0]?.target,
-          operator: '<',
-          value: 'z',
-        },
-      ],
-    });
+    expect(range.seek).toEqual([
+      {
+        kind: 'and',
+        items: [
+          {
+            kind: 'compare',
+            target: range.keys[0]?.target,
+            operator: '>',
+            value: 'a',
+          },
+          {
+            kind: 'compare',
+            target: range.keys[0]?.target,
+            operator: '<',
+            value: 'z',
+          },
+        ],
+      },
+    ]);
   });
 
   it('rejects cursors from another context, with the parameter that carried them', async () => {
