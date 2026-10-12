@@ -1,3 +1,5 @@
+import type { Reply } from './support/http.ts';
+
 /**
  * Fetching resources over HTTP (SPEC 7, 6): primary data, compound
  * documents through `include`, sparse fieldsets, sorting, filtering, the
@@ -19,6 +21,14 @@ interface Doc {
   readonly errors?: Array<Record<string, unknown>>;
   readonly links?: Record<string, unknown>;
   readonly meta?: Record<string, unknown>;
+}
+
+/** The titles of a collection reply's articles, in order. */
+function titlesOf(reply: Reply): Array<unknown> {
+  expect(reply.status).toBe(200);
+  return ((reply.body as Doc).data as Array<Record<string, unknown>>).map(
+    (row) => (row['attributes'] as Record<string, unknown>)['title'],
+  );
 }
 
 describe('fetching', () => {
@@ -133,6 +143,19 @@ describe('fetching', () => {
         'filter[or][0][title]=Compilers&filter[or][0][title][like]=rails',
       ),
     ).toEqual(['Rails is Omakase', 'Compilers']);
+  });
+
+  it('reads the query only up to a literal fragment in the request target', async () => {
+    // A cache in front of the API keys these requests on their URLs without
+    // the fragment, so the API must answer what those URLs name.
+    const filtered = await blog.requestTarget(
+      '/articles?filter[title][like]=omakase#&filter[author]=3',
+    );
+    expect(titlesOf(filtered)).toEqual(
+      await titles('filter[title][like]=omakase'),
+    );
+    const hidden = await blog.requestTarget('/articles#?filter[author]=3');
+    expect(titlesOf(hidden)).toEqual(await titles(''));
   });
 
   it('answers 400 with every offending parameter and 404 for a missing resource', async () => {

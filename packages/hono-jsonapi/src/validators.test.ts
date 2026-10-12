@@ -52,6 +52,32 @@ describe('queryValidator', () => {
     });
   });
 
+  // A literal `#` can reach the request URL (Node's HTTP server keeps it);
+  // a cache or a filter in front of the application never sees what
+  // follows it, so neither may the application (Hono GHSA-crvj-82cr-hjcx).
+  it('reads the query up to the fragment, as a URL does', async () => {
+    const response = await app.request(
+      '/articles?filter[title][like]=a#&filter[title][eq]=b&sort=title',
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      sort: [],
+      filter: {
+        conditions: [{ field: 'title', operator: 'like', value: 'a' }],
+        anyOf: [],
+      },
+    });
+  });
+
+  it('reads no query from a fragment', async () => {
+    const response = await app.request('/articles#?filter[title][eq]=b');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      sort: [],
+      filter: { conditions: [], anyOf: [] },
+    });
+  });
+
   it('throws an invalid query as a JSON:API error that renders without an error handler', async () => {
     const response = await app.request('/articles?sort=nope&foo=1');
     expect(response.status).toBe(400);
