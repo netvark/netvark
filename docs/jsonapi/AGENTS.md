@@ -1,8 +1,9 @@
 # jsonapi family: instructions for coding agents
 
 Read with the root [`AGENTS.md`](../../AGENTS.md), which holds the rules every family shares; this
-file adds what is specific to `@netvark/jsonapi-core` (the framework-free core) and
-`@netvark/hono-jsonapi` (the Hono binding). Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+file adds what is specific to `@netvark/jsonapi-core` (the framework-free core),
+`@netvark/hono-jsonapi` (the Hono binding), and `@netvark/jsonapi-client` (the typed client).
+Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Ground rules
 
@@ -25,14 +26,18 @@ file adds what is specific to `@netvark/jsonapi-core` (the framework-free core) 
   another framework; what needs a request, a response, or a framework context lives in
   `packages/hono-jsonapi/` and calls the core (ADR 0013). The host context handlers receive is the
   `TContext` type parameter, never a concrete framework type, in the core.
+- The client runs wherever `fetch` does. Nothing under `packages/jsonapi-client/` imports a
+  framework, a Node built-in, or `process`; it reads a definition's `type`, `relationships`,
+  `links`, and `query`, and never calls its `serialize` or a validator (SPEC 15).
 
 ## Repository map
 
 A pnpm workspace: `packages/jsonapi-core` (the framework-free core, published as
 `@netvark/jsonapi-core`), `packages/hono-jsonapi` (the Hono adapter, published as
-`@netvark/hono-jsonapi`, depends on the core and re-exports it), and `e2e/jsonapi/` (private). Root
-configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.jsonc`,
-`.oxlintrc.json`, `.oxfmtrc.json`) apply to all of them.
+`@netvark/hono-jsonapi`, depends on the core and re-exports it), `packages/jsonapi-client` (the
+typed client, published as `@netvark/jsonapi-client`, depends on the core alone), and `e2e/jsonapi/`
+(private). Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`,
+`knip.jsonc`, `.oxlintrc.json`, `.oxfmtrc.json`) apply to all of them.
 
 `packages/jsonapi-core/src/`:
 
@@ -62,6 +67,14 @@ configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.js
   (`validators.ts`), `errorHandler` and `notFoundHandler` (`handlers.ts`)
 - `atomic/` re-exports `@netvark/jsonapi-core/atomic` and adds `atomicOperations()`, the operations
   endpoint as a Hono handler
+
+`packages/jsonapi-client/src/` (SPEC 15.1):
+
+- `query/` the query types (`types.ts`) and `serializeQuery` (`serialize-query.ts`,
+  `serialize-filter.ts`)
+- `pagination/cursors.ts` `pageCursors` and `cursorOf`
+- `internal/object.ts` prototype-safe reads of response JSON; never exported
+- `test-support/blog.ts` the blog's definitions for the package's own tests; not published
 
 `e2e/jsonapi/`: end-to-end suite, a private workspace package that consumes the built
 `@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*` and drives a blog API over

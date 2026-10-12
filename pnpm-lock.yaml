@@ -582,6 +582,12 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
 
+  packages/jsonapi-client:
+    dependencies:
+      '@netvark/jsonapi-core':
+        specifier: workspace:^
+        version: link:../jsonapi-core
+
   packages/jsonapi-core:
     dependencies:
       '@netvark/ban-core':

@@ -14,6 +14,7 @@ body:
           '@netvark/pg-catalog',
           '@netvark/jsonapi-core',
           '@netvark/hono-jsonapi',
+          '@netvark/jsonapi-client',
           '@netvark/keyset-core',
           '@netvark/kysely-keyset',
           '@netvark/resource-core',

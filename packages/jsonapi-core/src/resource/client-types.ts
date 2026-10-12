@@ -32,6 +32,8 @@ export interface ResourceTypes {
   readonly filter: Readonly<Record<string, string>>;
   /** The union of the declared include paths. */
   readonly include: string;
+  /** Whether the definition accepts `fields[type]`. */
+  readonly fields: boolean;
   /** Whether the definition has a search parameter. */
   readonly search: boolean;
   /** Whether the definition paginates. */
@@ -191,6 +193,7 @@ export interface InferredTypes<
   };
   readonly filter: FilterTypes<TQuery>;
   readonly include: ListedNames<MemberOf<TQuery, 'include', never>>;
+  readonly fields: TQuery extends { readonly fields: false } ? false : true;
   readonly search: TQuery extends { readonly search: string } ? true : false;
   readonly page: TQuery extends { readonly page: object } ? true : false;
   readonly custom: ListedNames<MemberOf<TQuery, 'custom', never>>;

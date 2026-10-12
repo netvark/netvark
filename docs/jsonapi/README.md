@@ -1,11 +1,12 @@
 # jsonapi: JSON:API 1.1 for JavaScript
 
-[JSON:API 1.1](https://jsonapi.org/format/1.1/) for JavaScript, as two packages:
+[JSON:API 1.1](https://jsonapi.org/format/1.1/) for JavaScript, as three packages:
 
-| Package                                                | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@netvark/jsonapi-core`](../../packages/jsonapi-core) | The framework-free core: resource definitions, document building, typed query parsing, request document validation, content negotiation, the [Cursor Pagination](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/) profile, and the [Atomic Operations](https://jsonapi.org/ext/atomic/) extension. Functions over plain values; runs on Node, Bun, Deno, and Cloudflare Workers; errors are [@netvark/ban-core](https://github.com/netvark/netvark) errors, its one dependency. |
-| [`@netvark/hono-jsonapi`](../../packages/hono-jsonapi) | The [Hono](https://hono.dev) adapter: content negotiation middleware, validators typed for `c.req.valid()`, response helpers, error handlers on [@netvark/hono-ban](https://github.com/netvark/netvark), and the operations endpoint as a handler. Re-exports the core in full, so a Hono application imports from one package.                                                                                                                                                              |
+| Package                                                    | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@netvark/jsonapi-core`](../../packages/jsonapi-core)     | The framework-free core: resource definitions, document building, typed query parsing, request document validation, content negotiation, the [Cursor Pagination](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/) profile, and the [Atomic Operations](https://jsonapi.org/ext/atomic/) extension. Functions over plain values; runs on Node, Bun, Deno, and Cloudflare Workers; errors are [@netvark/ban-core](https://github.com/netvark/netvark) errors, its one dependency. |
+| [`@netvark/hono-jsonapi`](../../packages/hono-jsonapi)     | The [Hono](https://hono.dev) adapter: content negotiation middleware, validators typed for `c.req.valid()`, response helpers, error handlers on [@netvark/hono-ban](https://github.com/netvark/netvark), and the operations endpoint as a handler. Re-exports the core in full, so a Hono application imports from one package.                                                                                                                                                              |
+| [`@netvark/jsonapi-client`](../../packages/jsonapi-client) | A typed client of a server built on the core: queries typed by the definitions the server is built from and serialized as `parseQuery` reads them, with nothing generated. Web standards only, so it runs in browsers, workers, Node, Bun, and Deno; `@netvark/jsonapi-core` is its one dependency.                                                                                                                                                                                          |
 
 Declare a resource once; everything else reads from the definition. Every rule is a cited clause of
 the specification; where the specification leaves a choice to the server, the choice is written down
@@ -15,7 +16,8 @@ in [`docs/jsonapi/SPEC.md`](SPEC.md).
 
 ```bash
 pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban   # Hono applications (pulls in @netvark/jsonapi-core and @netvark/ban-core)
-pnpm add @netvark/jsonapi-core                  # anything else: a fetch handler, another framework, a client
+pnpm add @netvark/jsonapi-core                  # anything else: a fetch handler, another framework
+pnpm add @netvark/jsonapi-client                # a client of a server built on either
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
@@ -160,7 +162,8 @@ listing every parameter the endpoint does not support, because the definition de
 The package READMEs walk through each area:
 [`@netvark/jsonapi-core`](../../packages/jsonapi-core/README.md) for the core API,
 [`@netvark/hono-jsonapi`](../../packages/hono-jsonapi/README.md) for the Hono routes, validators,
-handlers, and the operations endpoint.
+handlers, and the operations endpoint, and
+[`@netvark/jsonapi-client`](../../packages/jsonapi-client/README.md) for the typed client.
 
 ## Documentation
 

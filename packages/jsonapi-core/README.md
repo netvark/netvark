@@ -194,10 +194,10 @@ relationship names it may return are the declared ones: a typo is a type error.
 Every definition also carries, in types only, what a client reads and writes:
 `TypesOf<typeof Articles>` holds the attributes as the JSON `serialize` produces (a `Date` arrives
 as a string, an attribute that may be `undefined` is optional), each relationship's type and
-cardinality, the filter operators, the include paths, whether the resource paginates and has a
-search parameter, the validators' inputs for a create and an update, and the fields each write
-takes. [`@netvark/jsonapi-client`](../jsonapi-client#readme) types its calls and records from it.
-The member, `'~types'`, is never present at runtime.
+cardinality, the filter operators, the include paths, whether the resource takes sparse fieldsets,
+paginates, and has a search parameter, the validators' inputs for a create and an update, and the
+fields each write takes. [`@netvark/jsonapi-client`](../jsonapi-client#readme) types its calls and
+records from it. The member, `'~types'`, is never present at runtime.
 
 ```ts
 type Article = TypesOf<typeof Articles>['attributes'];

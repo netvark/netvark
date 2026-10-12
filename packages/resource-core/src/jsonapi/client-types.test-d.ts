@@ -88,6 +88,7 @@ describe("a declared resource's client types (SPEC 11.1)", () => {
       readonly organization: 'eq';
     }>();
     expectTypeOf<Types['include']>().toEqualTypeOf<'organization'>();
+    expectTypeOf<Types['fields']>().toEqualTypeOf<true>();
     expectTypeOf<Types['search']>().toEqualTypeOf<true>();
     expectTypeOf<Types['page']>().toEqualTypeOf<true>();
     expectTypeOf<Types['custom']>().toEqualTypeOf<never>();

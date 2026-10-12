@@ -111,6 +111,7 @@ export interface ClientTypesOf<
   readonly relationships: ClientRelationships<TDecl>;
   readonly filter: FilterOperators<TDecl>;
   readonly include: IncludeOf<TDecl>;
+  readonly fields: true;
   readonly search: HasSearch<TDecl>;
   readonly page: true;
   readonly custom: never;

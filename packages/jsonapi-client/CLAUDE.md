@@ -1,0 +1,1 @@
+@../../docs/jsonapi/AGENTS.md
