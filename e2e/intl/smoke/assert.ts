@@ -11,7 +11,7 @@ class CheckFailure extends Error {
 }
 
 /** Fails the check with `message` unless `condition` holds. */
-function check(condition: boolean, message: string): asserts condition {
+export function check(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new CheckFailure(message);
   }

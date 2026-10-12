@@ -1,21 +1,42 @@
 /**
- * Runtime-neutral checks (SPEC 7.3) over the built core. No file system and
- * no environment: the same module runs on Bun, Deno, and workerd.
+ * Runtime-neutral checks (SPEC 7.3) over the built core: the isolates, and
+ * the formatters on the runtime's own `Intl`, with the calendar and digits
+ * a formatting tag names. No file system and no environment: the same
+ * module runs on Bun, Deno, and workerd.
  */
 import type { Check } from './assert.ts';
 
 import {
+  createIntl,
   FIRST_STRONG_ISOLATE,
   isolate,
   POP_DIRECTIONAL_ISOLATE,
 } from '@netvark/intl-core';
 
-import { equal } from './assert.ts';
+import { check, equal } from './assert.ts';
 
 export interface SmokeResult {
   readonly runtime: string;
   readonly passed: number;
   readonly failures: ReadonlyArray<string>;
+}
+
+const AR_TAG = 'ar-SA-u-ca-gregory-nu-latn';
+/** 2026-10-12 21:30 UTC: already 13 October in Riyadh (UTC+3). */
+const INSTANT = Date.UTC(2026, 9, 12, 21, 30);
+
+let locale = 'ar';
+const intl = createIntl({
+  locale: () => locale,
+  timeZone: () => 'Asia/Riyadh',
+  formattingLocales: { ar: AR_TAG },
+});
+
+/** Every decimal digit in `text` is an ASCII digit. */
+function latinDigits(text: string): boolean {
+  return (text.match(/\p{Nd}/gu) ?? []).every(
+    (digit) => digit >= '0' && digit <= '9',
+  );
 }
 
 const CHECKS: Readonly<Record<string, Check>> = {
@@ -27,6 +48,32 @@ const CHECKS: Readonly<Record<string, Check>> = {
       'pop directional isolate',
     );
     equal(isolate('محمد'), '\u2068محمد\u2069', 'isolated value');
+  },
+  'formats a date with the calendar, digits, and zone the reader has': () => {
+    locale = 'ar';
+    const text = intl.date(INSTANT, { dateStyle: 'long' });
+    check(text.includes('2026'), `Gregorian year: ${text}`);
+    check(text.includes('13'), `the day in Riyadh: ${text}`);
+    check(latinDigits(text), `Latin digits: ${text}`);
+  },
+  'keeps every digit of numeric text': () => {
+    locale = 'en';
+    equal(
+      intl.number('12345678901234567890.5', {
+        maximumFractionDigits: 1,
+        useGrouping: false,
+      }),
+      '12345678901234567890.5',
+      'numeric text',
+    );
+  },
+  'selects the plural categories of the formatting tag': () => {
+    locale = 'ar';
+    equal(
+      [3, 11, 100].map((count) => intl.plural(count)).join(),
+      'few,many,other',
+      'Arabic plural categories',
+    );
   },
 };
 
