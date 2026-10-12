@@ -31,9 +31,10 @@ a validity test.
   offset (`toTimeZone()`).
 - `createTimeZone({ cookieName, fallback, scope })` answers, in order: the zone of the request whose
   scope is active (read from its `cookie` header when `run()` entered the scope); in a browser, the
-  zone of `document.cookie`, read on first use and kept for the document's life; otherwise the
-  fallback, `UTC` by default. The device's own zone is never an answer during a render; it only
-  seeds the cookie for the next load (`detectTimeZone()`, `timeZoneCookie()`).
+  zone of `document.cookie`, read when the resolver is created, before any script can write the
+  cookie, and kept for the document's life; otherwise the fallback, `UTC` by default. The device's
+  own zone is never an answer during a render; it only seeds the cookie for the next load
+  (`detectTimeZone()`, `timeZoneCookie()`).
 - `timeZoneCookie()` writes Paraglide's attributes by default (`Path=/`, `Max-Age=34560000`), so the
   language and zone cookies live and expire together.
 

@@ -76,9 +76,10 @@ for (const warning of warnings) console.warn(warning);
 - **Name the calendar and the digits** in every formatting tag whose defaults differ between
   engines: `ar-SA-u-ca-gregory-nu-latn`, not `ar-SA`. Engines disagree on both (ADR 0004).
 - **Store the reader's zone in a cookie** beside Paraglide's locale cookie: seed it in the browser
-  with `document.cookie = timeZoneCookie(detectTimeZone() ?? 'UTC', { name: 'TIME_ZONE' })` when it
-  is missing, and set it from the profile on sign-in. Never format a render in the device's zone
-  (ADR 0005).
+  after hydration with
+  `document.cookie = timeZoneCookie(detectTimeZone() ?? 'UTC', { name: 'TIME_ZONE' })` when it is
+  missing, and set it from the profile on sign-in. Never format a render in the device's zone (ADR
+  0005).
 - **Create the formatters once, at module scope.** They read the locale and the zone on every call
   (ADR 0003); the cache makes repeated formats cheap.
 - **Format outside the message, interpolate the string.** `compile()` refuses `{x: number}` and

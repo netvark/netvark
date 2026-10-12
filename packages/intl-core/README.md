@@ -26,13 +26,14 @@ uses web standards only and never reads the environment.
 
 ```ts
 // src/lib/intl.ts: created once, at module scope, shared by the server and the browser
-import { createIntl } from '@netvark/intl-core';
+import { createIntl, createTimeZone } from '@netvark/intl-core';
 
 import { getLocale } from './paraglide/runtime.js';
 
+export const timeZone = createTimeZone({ cookieName: 'TIME_ZONE' }); // below
 export const intl = createIntl({
   locale: getLocale,
-  timeZone: readerTimeZone, // () => the reader's IANA time zone
+  timeZone: timeZone.get,
   formattingLocales: { ar: 'ar-SA-u-ca-gregory-nu-latn', en: 'en-US' },
 });
 ```
@@ -89,6 +90,73 @@ itself.
   anything else builds a new `Intl` object on every call.
 - **Wrap a formatter you pass to `map`**: `values.map(intl.number)` would hand each index over as
   the options; TypeScript refuses it, so write `values.map((value) => intl.number(value))`.
+
+## The reader's time zone
+
+During SSR the server sees the request, not the device, so the reader's zone comes from a cookie
+that both sides read before they render
+([ADR 0005](https://github.com/netvark/netvark/blob/main/docs/intl/adr/0005-the-readers-time-zone-comes-from-a-cookie.md)).
+
+```ts
+// the server entry: each request formats in the zone of its cookie
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+import { timeZone } from './lib/intl';
+
+timeZone.useScope(new AsyncLocalStorage());
+export default {
+  fetch: (request: Request) => timeZone.run(request, () => handler.fetch(request)),
+};
+```
+
+```ts
+// the browser, after hydration: store the device's zone for the requests that follow
+import { detectTimeZone, timeZoneCookie, timeZoneFromCookie } from '@netvark/intl-core';
+
+if (timeZoneFromCookie(document.cookie, 'TIME_ZONE') === undefined) {
+  document.cookie = timeZoneCookie(detectTimeZone() ?? 'UTC', { name: 'TIME_ZONE' });
+}
+```
+
+On a server, `timeZone.run(request, callback)` makes the zone in the request's cookie the active one
+for everything `callback` runs and awaits, and `timeZone.get()` returns it.
+`timeZone.fromRequest(request)` returns it without a scope. In a browser, `timeZone.get()` returns
+the zone the document's cookie held when `createTimeZone()` ran and keeps it for the document's
+life, so a later write never changes text that is already rendered. Without the cookie, or with a
+value that is not a time zone, both sides use the fallback: `UTC`, unless `fallback` names another.
+A new reader's first document renders in the fallback, and every document loaded after the cookie is
+written in their zone.
+
+`timeZoneCookie(zone, { name })` returns the cookie as `document.cookie` and `Set-Cookie` take it:
+`TIME_ZONE=Asia/Riyadh; Path=/; Max-Age=34560000` by default, the attributes of Paraglide's locale
+cookie, so both cookies live and expire together. `path`, `maxAge`, `domain`, `sameSite`, and
+`secure` add to it, and a cookie that user agents would drop throws instead
+([RFC 6265bis-22, 5.7](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis-22#section-5.7)):
+`sameSite: 'None'` or a `__Secure-` or `__Host-` name without `secure`, or a `__Host-` name with a
+`domain` or another path. `toTimeZone(value)` returns the trimmed value when the runtime knows it as
+an IANA time zone, and `undefined` for anything else, offsets such as `+03:00` included: an offset
+ignores daylight saving time, and engines disagree on the ones they accept. `detectTimeZone()`
+returns the device's zone, or `undefined` when the engine reports an offset instead.
+
+### Best practices
+
+- **Write the cookie after hydration**, never from a script that runs before the module that calls
+  `createTimeZone()`: that document would render in the new zone, the server's HTML in the fallback,
+  and hydration would replace the server's text.
+- **Set the cookie from the profile on sign-in** for readers who choose their zone: append
+  `timeZoneCookie(user.timeZone, { name: 'TIME_ZONE' })` as a `Set-Cookie` header of the response.
+- **Reload after the reader changes their zone**, as Paraglide's `setLocale` reloads after a
+  language change: the open document keeps the zone it was created with.
+- **Format where the text renders.** A server function that a client navigation calls reads the
+  cookie as it is now, which can differ from the zone the open document keeps.
+- **Pass `secure: true` on an HTTPS origin**, and keep the cookie readable by scripts: the browser
+  reads it through `document.cookie`, so it is never `HttpOnly`. It holds a zone name, nothing
+  secret.
+- **Check a zone you accept** with `toTimeZone` before you store it.
+- **Enable `nodejs_als` on Cloudflare Workers** (or `nodejs_compat`) for `node:async_hooks`;
+  compatibility dates from 2026-08-04 enable Node.js compatibility by default
+  ([Workers docs](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/)).
+  Bun and Deno provide `node:async_hooks` as they are.
 
 ## Isolate an interpolated value
 
