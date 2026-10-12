@@ -28,7 +28,7 @@ serves the runtime over HTTP on Hono.
 pnpm add @netvark/kysely-resource @netvark/resource-core @netvark/keyset-core kysely zod
 ```
 
-`kysely >= 0.28`, `@netvark/resource-core`, and `@netvark/keyset-core` are peer dependencies: your
+`kysely >= 0.29`, `@netvark/resource-core`, and `@netvark/keyset-core` are peer dependencies: your
 application declares its resources and behaviors and makes the keyset definer with its own copies,
 and the runtime must work with those same copies, since it recognizes a behavior by the copy that
 made it and a keyset's refusal by its class
@@ -36,7 +36,9 @@ made it and a keyset's refusal by its class
 Install one copy of each: a second copy of `@netvark/resource-core`, such as one nested under a
 package that declares your resources, fails boot with a `TypeError`. The adapter runs on PostgreSQL
 14 or later and on PGlite, through any Kysely PostgreSQL dialect (`PostgresDialect` over `pg`,
-`PGliteDialect`, or your own), on Node 22.12+, Bun, Deno, and Cloudflare Workers.
+`PGliteDialect`, or your own), on Node 22.12+, Bun, Deno, and Cloudflare Workers. Kysely 0.29.0 is
+the floor: the tests run every query against PGlite through Kysely's `PGliteDialect`, which that
+release added, and CI runs them there.
 
 ## Quick start
 

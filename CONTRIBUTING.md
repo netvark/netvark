@@ -61,15 +61,15 @@ else, `e2e/*` included, resolves `dist/`.
 | `pnpm format` / `lint:fix` | Apply formatting / autofixable lint fixes                              |
 
 CI runs the same commands, plus these packages' tests on the floors of their peer ranges:
-`@netvark/kysely-keyset` on Kysely 0.28.17, `@netvark/drizzle-keyset` on drizzle-orm 0.45.2,
-`@netvark/resource-core` on Zod 4.5.0, `@netvark/react-resource` on TanStack Form 1.17.0 and Query
-5.89.0, `@netvark/hono-ban` and `@netvark/hono-jsonapi` on Hono 4.12.34, `@netvark/hono-resource` on
-Hono 4.13.0, and `@netvark/pg-catalog` on PGlite 0.5.0. It also runs the keyset e2e suite on a
-PostgreSQL server, and `@netvark/pg-catalog`'s tests and the catalog e2e suite on PostgreSQL
-servers. A pull request must be green on all of them: the last CI job, `CI passed`, needs every
-other job and is the one check `main` requires
-([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI job goes into its
-`needs` list. To work on one package or family, filter by name:
+`@netvark/kysely-keyset` on Kysely 0.28.17, `@netvark/kysely-resource` on Kysely 0.29.0,
+`@netvark/drizzle-keyset` on drizzle-orm 0.45.2, `@netvark/resource-core` on Zod 4.5.0,
+`@netvark/react-resource` on TanStack Form 1.17.0 and Query 5.89.0, `@netvark/hono-ban` and
+`@netvark/hono-jsonapi` on Hono 4.12.34, `@netvark/hono-resource` on Hono 4.13.0, and
+`@netvark/pg-catalog` on PGlite 0.5.0. It also runs the keyset e2e suite on a PostgreSQL server, and
+`@netvark/pg-catalog`'s tests and the catalog e2e suite on PostgreSQL servers. A pull request must
+be green on all of them: the last CI job, `CI passed`, needs every other job and is the one check
+`main` requires ([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI
+job goes into its `needs` list. To work on one package or family, filter by name:
 
 ```bash
 pnpm --filter @netvark/keyset-core test
@@ -119,6 +119,11 @@ CATALOG_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filte
   referenced as `"name": "catalog:"`. One that a single package uses stays pinned there, and peer
   ranges always stay in the package
   ([ADR 0005](docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md)).
+- **Every peer range's floor runs in CI.** A package that declares a peer range on a package outside
+  the workspace gets a job beside the other floor jobs in `.github/workflows/ci.yml`: it installs
+  the floor, the oldest release the package's typecheck and tests pass on unless a security fix sets
+  a later one, runs both, and is listed in `CI passed`'s `needs`. Workspace packages that share the
+  peer go on one version per step, as an application has one copy.
 - **No emojis** in code, docs, or commit messages.
 - **Lint disables carry a reason.** `// oxlint-disable-next-line rule -- reason: <why>`.
 

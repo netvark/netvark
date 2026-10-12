@@ -69,7 +69,7 @@ jobs:
           retention-days: 7
 
   test-kysely-floor:
-    name: Test (Kysely 0.28, the peer range floor)
+    name: Test (Kysely 0.28.17 and 0.29.0, the peer range floors)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,6 +88,13 @@ jobs:
       - run: pnpm --filter @netvark/kysely-keyset add --save-dev kysely@0.28.17
       - run: pnpm --filter @netvark/kysely-keyset run typecheck
       - run: pnpm --filter @netvark/kysely-keyset run test
+      # @netvark/kysely-resource declares `kysely >= 0.29.0`, the first
+      # release with the PGlite dialect its tests run every query through. It
+      # renders with kysely-keyset, so both go on 0.29.0: with two copies
+      # their expression builders' types disagree.
+      - run: pnpm --filter @netvark/kysely-keyset --filter @netvark/kysely-resource add --save-dev kysely@0.29.0
+      - run: pnpm --filter @netvark/kysely-resource run typecheck
+      - run: pnpm --filter @netvark/kysely-resource run test
 
   test-drizzle-floor:
     name: Test (drizzle-orm 0.45.2, the peer range floor)

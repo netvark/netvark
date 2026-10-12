@@ -40,7 +40,8 @@ and e2e directory imports; read the family's file before changing that family.
   reads no environment at module scope.
 - A dependency that two or more workspace packages declare takes its version from the default
   catalog in `pnpm-workspace.yaml` (`"zod": "catalog:"`); peer ranges stay in each package
-  (`docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md`).
+  (`docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md`), and each floor has a CI job
+  that runs the package's typecheck and tests on it (CONTRIBUTING).
 - One pull request per epic (or a few related issues) with one commit per issue; each commit passes
   the gates on its own and ends with `Closes #<issue>`, and the pull request merges with rebase.
 - Commit subjects use conventional commits with the package or family as the scope. Every
