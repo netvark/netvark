@@ -55,12 +55,24 @@ type RelationshipsOf<TDefinition> = TypesOf<TDefinition>['relationships'];
 type RelationshipName<TDefinition> = keyof RelationshipsOf<TDefinition> &
   string;
 
-/** The to-many relationships: what `addToRelationship` and `removeFromRelationship` take. */
+/**
+ * The relationships a relationship call may write: the ones `updatable`
+ * names, on a definition that serves updates. The server refuses any other
+ * with 403, so a call naming one does not compile.
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403
+ */
+type UpdatableName<TDefinition> = [TypesOf<TDefinition>['update']] extends [
+  never,
+]
+  ? never
+  : RelationshipName<TDefinition> & TypesOf<TDefinition>['updatable'];
+
+/** The updatable to-many relationships: what `addToRelationship` and `removeFromRelationship` take. */
 type ToManyName<TDefinition> = {
   readonly [
-    K in RelationshipName<TDefinition>
+    K in UpdatableName<TDefinition>
   ]: 'many' extends RelationshipsOf<TDefinition>[K]['cardinality'] ? K : never;
-}[RelationshipName<TDefinition>];
+}[UpdatableName<TDefinition>];
 
 /** `TOne` for a to-one, `TMany` for a to-many, either for a relationship typed wide. */
 type ByCardinality<TCardinality, TOne, TMany> = TCardinality extends 'one'
@@ -226,21 +238,21 @@ export interface ResourceClient<TDefinitions, TDefinition> {
     query?: TQuery,
     options?: CallOptions,
   ): Promise<ReadResult<RelatedData<TDefinitions, TDefinition, TName, TQuery>>>;
-  /** `PATCH <relationship link>`: replaces the linkage. */
-  setRelationship<TName extends RelationshipName<TDefinition>>(
+  /** `PATCH <relationship link>`: replaces the linkage of an updatable relationship. */
+  setRelationship<TName extends UpdatableName<TDefinition>>(
     id: string,
     name: TName,
     linkage: LinkageInput<RelationshipsOf<TDefinition>[TName]>,
     options?: CallOptions,
   ): Promise<WriteResult<LinkageOf<RelationshipsOf<TDefinition>[TName]>>>;
-  /** `POST <relationship link>`: adds to a to-many's linkage. */
+  /** `POST <relationship link>`: adds to an updatable to-many's linkage. */
   addToRelationship<TName extends ToManyName<TDefinition>>(
     id: string,
     name: TName,
     linkage: LinkageInput<RelationshipsOf<TDefinition>[TName]>,
     options?: CallOptions,
   ): Promise<WriteResult<LinkageOf<RelationshipsOf<TDefinition>[TName]>>>;
-  /** `DELETE <relationship link>`: removes from a to-many's linkage. */
+  /** `DELETE <relationship link>`: removes from an updatable to-many's linkage. */
   removeFromRelationship<TName extends ToManyName<TDefinition>>(
     id: string,
     name: TName,
