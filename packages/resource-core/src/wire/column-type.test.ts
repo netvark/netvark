@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { contactsCatalog } from '../../test-support/contacts';
+import { contactsCatalog } from '../test-support/contacts';
 import { columnType } from './column-type';
 
 describe('columnType', () => {

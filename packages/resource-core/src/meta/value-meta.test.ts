@@ -280,9 +280,9 @@ describe('folds, fraction digits, elements, and defaults (SPEC 6.1, 6.3, 8)', ()
   });
 
   it("gives the default PostgreSQL applies: the column's, else the nearest domain's above the first array", () => {
-    expect(meta('rank').default).toEqual({ literal: '2' });
-    expect(meta('plain').default).toEqual({ literal: '2' });
-    expect(meta('lowest').default).toEqual({ literal: '5' });
+    expect(meta('rank').default).toEqual({ literal: '2', value: 2 });
+    expect(meta('plain').default).toEqual({ literal: '2', value: 2 });
+    expect(meta('lowest').default).toEqual({ literal: '5', value: 5 });
     expect(meta('ranks').default).toBeNull();
     expect(meta('seats').default).toEqual({ literal: null });
     expect(meta('code').default).toBeNull();

@@ -21,6 +21,17 @@ export function ownValue<TValue>(
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+/** `value` with every object in it frozen, itself included; a JSON value or a fixture is shared once frozen. */
+export function deepFreeze<TValue>(value: TValue): TValue {
+  if (typeof value === 'object' && value !== null) {
+    for (const member of Object.values(value)) {
+      deepFreeze(member);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
 /** A value for an error message: JSON text, or its type when it has none. */
 export function describe(value: unknown): string {
   try {

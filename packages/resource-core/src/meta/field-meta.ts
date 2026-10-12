@@ -10,7 +10,6 @@
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-identification
  * @packageDocumentation
  */
-import type { PublicColumnDefault } from '@netvark/catalog-core';
 import type { Operator } from '@netvark/keyset-core';
 
 import type {
@@ -25,6 +24,7 @@ import type { ValueMeta } from './value-meta';
 
 import { ownValue } from '../internal/object';
 import { schemaHolds } from '../schema/object-schemas';
+import { fieldDefault } from './field-default';
 import { idMeta, valueMeta } from './value-meta';
 
 /** What an entry takes from the declaration and the target, beyond the member's spec. */
@@ -39,13 +39,6 @@ interface DeclaredFacts {
 }
 
 const NO_OPERATORS: ReadonlyArray<Operator> = Object.freeze([]);
-
-/** A copy, since the default is the catalog's own object. */
-function defaultOf(
-  applied: PublicColumnDefault | null,
-): PublicColumnDefault | null {
-  return applied === null ? null : Object.freeze({ literal: applied.literal });
-}
 
 function memberMeta(
   spec: MemberSpec,
@@ -62,7 +55,11 @@ function memberMeta(
     fractionDigits: value.fractionDigits,
     nullable: spec.nullable,
     required: schemaHolds('create', spec.access) && spec.required,
-    default: defaultOf(spec.default),
+    default: fieldDefault(
+      spec.default,
+      spec.value,
+      facts.kind === 'relationship',
+    ),
     limits: value.limits,
     options: value.options,
     items: value.items,

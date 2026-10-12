@@ -5,7 +5,7 @@
  * `bpchar` padded, `real` at single precision), but never change it.
  * @packageDocumentation
  */
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 
 import { sameJson } from './same-json';
 

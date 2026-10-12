@@ -1,7 +1,11 @@
+import type { FieldDefault } from '@netvark/resource-core';
+
 import { describe, expect, it } from 'vitest';
 
+import { descriptorsOf } from '../fields/fields-of';
 import { messages } from '../test-support/messages';
 import { Contacts, Organizations } from '../test-support/resources';
+import { heldMember } from './form-values';
 import { resourceForm } from './resource-form';
 
 /** A contact as the client reads it (jsonapi SPEC 15.6), its organization as linkage. */
@@ -46,6 +50,18 @@ function editContact(record: Record<string, unknown>) {
   return resourceForm(Contacts, 'update', { messages, record });
 }
 
+/** Where a create starts the contact member `name` when its column's default is `fieldDefault`. */
+function startWith(name: string, fieldDefault: FieldDefault) {
+  const descriptor = descriptorsOf('test', Contacts, messages).find(
+    (described) => described.name === name,
+  );
+  if (descriptor === undefined) {
+    throw new Error(`no ${name}`);
+  }
+  const meta = { ...descriptor.meta, default: fieldDefault };
+  return heldMember({ ...descriptor, meta }, 'create').start;
+}
+
 describe('start values on create (resource SPEC 20.3)', () => {
   const contacts = resourceForm(Contacts, 'create', { messages });
   const organizations = resourceForm(Organizations, 'create', { messages });
@@ -86,7 +102,7 @@ describe('start values on create (resource SPEC 20.3)', () => {
     ]);
   });
 
-  it('starts each scalar from its literal default, a boolean as true or false, and every other member blank', () => {
+  it("starts each member from its default as a read gives it, read as an update reads the record's value, and every other member blank", () => {
     expect(contacts.defaultValues).toEqual({
       kind: 'person',
       name: '',
@@ -112,11 +128,27 @@ describe('start values on create (resource SPEC 20.3)', () => {
       name: '',
       verified: false,
       marketingOptIn: null,
-      openDays: [],
+      openDays: ['true', 'true', 'true', 'true', 'true', 'false', 'false'],
       foundedOn: '',
       inviteCode: '',
       plan: 'free',
     });
+    expect(Object.isFrozen(organizations.defaultValues['openDays'])).toBe(true);
+  });
+
+  it("starts a JSON member from its default's value, the same object", () => {
+    const value = Object.freeze({ theme: 'light' });
+    expect(startWith('details', { literal: '{"theme": "light"}', value })).toBe(
+      value,
+    );
+  });
+
+  it('starts blank from a default with no read form, such as an expression', () => {
+    expect(startWith('tags', { literal: null, value: undefined })).toEqual([]);
+    expect(startWith('name', { literal: null, value: undefined })).toBe('');
+    expect(
+      startWith('details', { literal: 'null', value: undefined }),
+    ).toBeUndefined();
   });
 
   it('describes the members with the descriptors of fieldsOf, only required changed', () => {

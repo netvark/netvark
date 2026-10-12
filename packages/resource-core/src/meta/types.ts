@@ -5,7 +5,6 @@
  * follows the metadata sends what the schemas accept.
  * @packageDocumentation
  */
-import type { PublicColumnDefault } from '@netvark/catalog-core';
 import type { Operator } from '@netvark/keyset-core';
 
 import type { Access } from '../declare/types';
@@ -78,6 +77,22 @@ export interface FieldFacts {
   readonly codec: string | null;
 }
 
+/**
+ * A member's default (SPEC 8), for display: a client never sends it, and
+ * the database decides the value.
+ */
+export interface FieldDefault {
+  /** The constant's text as PostgreSQL prints it; `null` for an expression such as `now()`. */
+  readonly literal: string | null;
+  /**
+   * The constant's read form (SPEC 5.1), the value as a read gives it
+   * before the column's type modifier applies, and a relationship's as
+   * its id's text; `undefined` for an expression, a codec's field, and a
+   * constant outside the read form.
+   */
+  readonly value: unknown;
+}
+
 /** One public field or relationship of a declared resource (SPEC 8). */
 export interface FieldMeta<TFacts extends FieldFacts = FieldFacts> {
   /** The public name, the key of `fields`. */
@@ -95,11 +110,8 @@ export interface FieldMeta<TFacts extends FieldFacts = FieldFacts> {
   readonly nullable: TFacts['nullable'];
   /** Whether a create must carry the member: `schema.create` or `linkage.create` requires it (SPEC 6.2). */
   readonly required: TFacts['required'];
-  /**
-   * The default PostgreSQL applies when a create leaves the member out, with
-   * `literal` when it is a constant; for display, never sent by a client.
-   */
-  readonly default: PublicColumnDefault | null;
+  /** The default PostgreSQL applies when a create leaves the member out; `null` without one. */
+  readonly default: FieldDefault | null;
   readonly limits: FieldLimits;
   /** Enum labels or an `enum` rule's values, in order; `null` when any value of the type goes. */
   readonly options: TFacts['options'];

@@ -1,12 +1,12 @@
 /**
- * A column's type as the oracle writes and reads values of it (SPEC 7.3):
- * the base type its domains end in, whether that is an enum, and whether
- * the column, or a domain on the way, is an array.
+ * A column's type as PostgreSQL's text forms of its values depend on it
+ * (SPEC 5.4, 7.3): the base type its domains end in, whether that is an
+ * enum, and whether the column, or a domain on the way, is an array.
  * @packageDocumentation
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 
-import { ownValue } from '../../internal/object';
+import { ownValue } from '../internal/object';
 
 /** What a column holds, followed through its domains. */
 export interface ColumnType {

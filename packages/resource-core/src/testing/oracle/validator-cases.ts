@@ -21,7 +21,7 @@ import type {
 } from './types';
 
 import { isRecord, ownValue } from '../../internal/object';
-import { columnType } from './column-type';
+import { columnType } from '../../wire/column-type';
 import { memberText, storageOf, writeText } from './members';
 import { parameterText } from './pg-text';
 import { Unwritable, unwritableReason } from './unwritable';

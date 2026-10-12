@@ -1,18 +1,16 @@
 /**
- * Wire values as the text PostgreSQL reads them from, and one-dimensional
- * array literals back into their elements (SPEC 5.1, 7.3). A driver sends
+ * Wire values as the text PostgreSQL reads them from (SPEC 5.1, 7.3); an
+ * array literal read back into its elements is `wire/array-literal.ts`'s. A driver sends
  * text as UTF-8, so an unpaired surrogate reaches the server as U+FFFD
  * (SPEC 5.2). A value is written as itself or not at all: one with no
  * text form is `Unwritable`, never sent as another value.
  * @ref https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO
  * @packageDocumentation
  */
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 
 import { sameJson } from './same-json';
 import { Unwritable } from './unwritable';
-
-const NULL_ELEMENT = 'NULL';
 
 /**
  * The JSON text of `value`. JSON has no text for `undefined`, a function,
@@ -66,49 +64,4 @@ export function parameterText(value: unknown, type: ColumnType): string {
   return type.array && Array.isArray(value)
     ? `{${value.map((element: unknown) => elementText(element)).join(',')}}`
     : scalarText(value);
-}
-
-function quotedElement(body: string, start: number): readonly [string, number] {
-  let value = '';
-  let at = start + 1;
-  while (at < body.length && body[at] !== '"') {
-    if (body[at] === '\\') {
-      at += 1;
-    }
-    value += body[at] ?? '';
-    at += 1;
-  }
-  return [value, at + 1];
-}
-
-/** The elements of a one-dimensional array literal, `null` for `NULL`; `undefined` for any other text. */
-export function arrayElements(
-  text: string,
-): ReadonlyArray<string | null> | undefined {
-  if (!text.startsWith('{') || !text.endsWith('}')) {
-    return undefined;
-  }
-  const body = text.slice(1, -1);
-  if (body === '') {
-    return [];
-  }
-  const elements: Array<string | null> = [];
-  let at = 0;
-  while (at <= body.length) {
-    if (body[at] === '{') {
-      return undefined;
-    }
-    if (body[at] === '"') {
-      const [value, next] = quotedElement(body, at);
-      elements.push(value);
-      at = next;
-    } else {
-      const end = body.includes(',', at) ? body.indexOf(',', at) : body.length;
-      const raw = body.slice(at, end);
-      elements.push(raw === NULL_ELEMENT ? null : raw);
-      at = end;
-    }
-    at += 1;
-  }
-  return elements;
 }
