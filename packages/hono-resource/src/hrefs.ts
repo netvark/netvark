@@ -12,6 +12,7 @@
  * @ref https://jsonapi.org/ext/atomic/#creating-resources ("MAY target a resource collection through the operation's href member")
  * @ref https://www.rfc-editor.org/rfc/rfc3986#section-5.2 (resolving a reference against a base URI)
  * @ref https://github.com/honojs/hono/blob/v4.13.13/src/request.ts (a parameter is decoded by `tryDecodeURIComponent`)
+ * @ref https://github.com/honojs/hono/pull/5158 (`hono/utils/url` exports it from 4.13.0, the peer range's floor)
  * @packageDocumentation
  */
 import type { OperationTarget } from '@netvark/hono-jsonapi/atomic';
