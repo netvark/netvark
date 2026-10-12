@@ -3793,10 +3793,11 @@ what `report` itself throws; neither reaches the operation's caller, whose write
 - Peer dependencies: `kysely` `>=0.29.0`, `@netvark/resource-core`, and `@netvark/keyset-core`, the
   last two each a `workspace:^` development dependency too. 0.29.0 is the oldest Kysely the tests
   run on: they reach PGlite through its `PGliteDialect`, which that release added, and CI runs them
-  there (kysely-keyset's own floor stays 0.28.0). The application declares its resources, behaviors,
-  and scopes and makes the keyset definer with its own copies, and the runtime must work with those
-  same copies: a declaration and a behavior are recognized by the copy that made them, and a
-  keyset's refusal by `instanceof` (18.5, root ADR 0006).
+  there. It also ships the fixes for Kysely's published SQL injection advisories, which set
+  kysely-keyset's own floor at 0.28.17. The application declares its resources, behaviors, and
+  scopes and makes the keyset definer with its own copies, and the runtime must work with those same
+  copies: a declaration and a behavior are recognized by the copy that made them, and a keyset's
+  refusal by `instanceof` (18.5, root ADR 0006).
 - Development: `kysely`, `zod`, and `@electric-sql/pglite` from the workspace catalog, and
   `@netvark/pg-catalog`, whose extraction the boot tests read.
 - Runs wherever Kysely reaches PostgreSQL: Node.js 22.12 and later, Bun, Deno, and Cloudflare

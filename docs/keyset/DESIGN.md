@@ -390,3 +390,4 @@ checks from the schema object's type, `createDefineKeyset(schema, defaults?)`, a
 | 0015 | Cursors can be bound to a caller-supplied context                                                           |
 | 0016 | The seek leads with a range on the first key; declared nullability shapes seek and order                    |
 | 0017 | The Drizzle binding takes names from the schema object and builds the select itself                         |
+| 0018 | The `kysely` peer range starts past Kysely's published advisories                                           |

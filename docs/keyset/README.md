@@ -25,11 +25,12 @@ pnpm add @netvark/keyset-core                   # another query builder, a drive
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. `@netvark/kysely-keyset` has
-`kysely >= 0.28` as its peer dependency and `@netvark/drizzle-keyset` has
-`drizzle-orm >=0.45.2 <1.0.0`; both target PostgreSQL 14+ (and PGlite). CI runs the unit suites on
-Node 22 and 24, the adapters' tests on Kysely 0.28 and drizzle-orm 0.45.2, the end-to-end suite
-through both adapters on PGlite, on node-postgres, and on PostgreSQL 14 and 18 servers, and a smoke
-test of the three packages on Bun, Deno, and workerd.
+`kysely >= 0.28.17` as its peer dependency and `@netvark/drizzle-keyset` has
+`drizzle-orm >=0.45.2 <1.0.0`, each floor the first release past its builder's published SQL
+injection advisories; both target PostgreSQL 14+ (and PGlite). CI runs the unit suites on Node 22
+and 24, the adapters' tests on Kysely 0.28.17 and drizzle-orm 0.45.2, the end-to-end suite through
+both adapters on PGlite, on node-postgres, and on PostgreSQL 14 and 18 servers, and a smoke test of
+the three packages on Bun, Deno, and workerd.
 
 ## Quick start with Kysely
 

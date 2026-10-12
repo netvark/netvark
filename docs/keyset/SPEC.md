@@ -34,10 +34,11 @@ Three packages, one repository (ADR 0004, ADR 0017). `@netvark/keyset-core` is t
 core: every module is a function over plain values and none imports a query builder, a driver, or a
 runtime API beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter: it
 depends on `@netvark/keyset-core`, re-exports all of it (one import for a Kysely application), and
-adds the typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its
-only peer dependency. `@netvark/drizzle-keyset` is the Drizzle adapter, built the same way: the
-definer over the application's schema object, whose keysets carry `paginate`, and the render
-functions (section 14). `drizzle-orm >=0.45.2 <1.0.0` is its only peer dependency.
+adds the typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.17`, the
+first release past Kysely's published SQL injection advisories (ADR 0018), is its only peer
+dependency. `@netvark/drizzle-keyset` is the Drizzle adapter, built the same way: the definer over
+the application's schema object, whose keysets carry `paginate`, and the render functions (section
+14). `drizzle-orm >=0.45.2 <1.0.0` is its only peer dependency.
 
 | Package                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -851,9 +852,10 @@ request and every push to `main`.
   `pnpm pack` apply. CI fails when the build changes the committed maps.
 - `@netvark/keyset-core` has no dependencies. `@netvark/kysely-keyset` depends on
   `@netvark/keyset-core` (`workspace:^`, written as a caret range on publish) and has
-  `kysely >= 0.28.0` as its only peer dependency; CI runs its unit tests on 0.28.17.
-  `@netvark/drizzle-keyset` depends on the core the same way and has `drizzle-orm >=0.45.2 <1.0.0`
-  as its only peer dependency; CI runs its unit tests on 0.45.2 (ADR 0017).
+  `kysely >= 0.28.17` as its only peer dependency; CI runs its unit tests on 0.28.17, the first
+  release no published Kysely advisory affects (ADR 0018). `@netvark/drizzle-keyset` depends on the
+  core the same way and has `drizzle-orm >=0.45.2 <1.0.0` as its only peer dependency; CI runs its
+  unit tests on 0.45.2 (ADR 0017).
 - `files` is `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`. `sideEffects: false`.
 - Releases go through Changesets: a "Version Packages" PR, then `changeset publish` under npm
   trusted publishing with provenance, one GitHub release per package.
