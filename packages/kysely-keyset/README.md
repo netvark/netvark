@@ -23,7 +23,7 @@ pnpm add @netvark/kysely-keyset kysely
 
 `kysely >= 0.28.17` is the peer dependency, the first release past Kysely's published SQL injection
 advisories. None of them reaches the queries the adapter builds, but the adapter runs on your copy
-of Kysely, and the floor keeps an affected one out of your application. The adapter targets
+of Kysely: an affected one in your application is an unmet peer dependency. The adapter targets
 PostgreSQL 14+ and PGlite through any Kysely PostgreSQL dialect (`PostgresDialect` over `pg`,
 `PGliteDialect`, or your own). Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs
 the unit tests on Kysely 0.28.17 and 0.29, the end-to-end suite on PGlite, on node-postgres, and on

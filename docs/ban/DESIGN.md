@@ -632,10 +632,10 @@ several error statuses are heuristically cacheable.
   `@netvark/hono-ban` (the Hono adapter, depending on `@netvark/ban-core` with a caret range).
 - ESM only, `platform: 'neutral'`, `engines.node >= 22.12`, `sideEffects: false` (ADR-0006).
 - `@netvark/ban-core` has no dependencies and no peers. `@netvark/hono-ban` has one peer,
-  `hono >= 4.13.7` (upstream security floor: the first release no published Hono advisory affects).
-  No optional peers anywhere: the integrations are typed structurally, so `zod`, `valibot`,
-  `@hono/*` validators, `@standard-schema/spec`, `@opentelemetry/api`, and the Postgres drivers are
-  devDependencies of this repository only (ADR-0009).
+  `hono >= 4.13.7` (upstream security floor: the first release no published Hono advisory affects,
+  root ADR 0007). No optional peers anywhere: the integrations are typed structurally, so `zod`,
+  `valibot`, `@hono/*` validators, `@standard-schema/spec`, `@opentelemetry/api`, and the Postgres
+  drivers are devDependencies of this repository only (ADR-0009).
 - Ids come from `crypto.randomUUID()`.
 - Subpath exports, identical in both packages: `.`, `./formats/json-api`,
   `./formats/problem-details`, `./formats/plain`, `./formats/google-api`, `./formats/stripe`,
