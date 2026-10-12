@@ -7,7 +7,7 @@ import type { Keyset, Relation } from '@netvark/keyset-core';
 
 import { defineKeyset } from '@netvark/keyset-core';
 
-const CONTACTS = {
+export const CONTACTS = {
   table: 'contacts',
   key: ['id'],
   fields: {
@@ -64,8 +64,10 @@ const CONTACTS = {
   cursor: { secret: 'test-secret-with-at-least-32-bytes!!' },
 } as const;
 
-const contacts: Keyset<typeof CONTACTS.fields, typeof CONTACTS.relations> =
-  defineKeyset(CONTACTS);
+export const contacts: Keyset<
+  typeof CONTACTS.fields,
+  typeof CONTACTS.relations
+> = defineKeyset(CONTACTS);
 
 /** A declared relation of the test keyset, by name. */
 export function relation(name: keyof typeof CONTACTS.relations): Relation {

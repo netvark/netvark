@@ -12,7 +12,9 @@ is written down in
 Using [Kysely](https://kysely.dev)?
 [`@netvark/kysely-keyset`](https://www.npmjs.com/package/@netvark/kysely-keyset) renders the plan
 onto your select query and runs it, checks every name against your `DB` interface, and re-exports
-all of this package.
+all of this package. Using [Drizzle](https://orm.drizzle.team)?
+[`@netvark/drizzle-keyset`](https://www.npmjs.com/package/@netvark/drizzle-keyset) does the same
+over your Drizzle schema object, naming tables and columns as your code does.
 
 ## Install
 
@@ -232,7 +234,9 @@ subquery, a concatenation);
 [`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md) section 6
 lists each with its SQL, and
 [`@netvark/kysely-keyset`](https://github.com/netvark/netvark/tree/main/packages/kysely-keyset) is
-the reference rendering in under two hundred lines.
+the reference rendering in under two hundred lines, and
+[`@netvark/drizzle-keyset`](https://github.com/netvark/netvark/tree/main/packages/drizzle-keyset)
+the same plan as Drizzle `sql`.
 
 Why text? A cursor must round-trip a value exactly, and drivers parse values for convenience, not
 exactness (a `timestamptz` becomes a millisecond `Date`, a `numeric` a string or a number). The
