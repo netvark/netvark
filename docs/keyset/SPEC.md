@@ -948,8 +948,9 @@ configuration, which `isSearchConfig` must accept again first (a `TypeError` oth
 kind is a `TypeError`.
 
 Tests: `schema.test.ts`, `target.test.ts`, `predicate.test.ts` (exact SQL and parameters through
-`PgDialect` for every kind, a `pgSchema` table, `casing: 'snake_case'`, a correlated aggregate
-selected beside a table's columns, an unresolved name, a configuration `isSearchConfig` refuses).
+`PgDialect` for every kind, a `pgSchema` table, a quote inside a table and a column name (doubled
+from 0.45.2 on, CVE-2026-39356), `casing: 'snake_case'`, a correlated aggregate selected beside a
+table's columns, an unresolved name, a configuration `isSearchConfig` refuses).
 
 ### 14.3 `keyset.paginate(db, request, options?)` (`paginate.ts`, ADR 0007, ADR 0012, ADR 0017)
 
