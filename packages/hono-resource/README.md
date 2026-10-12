@@ -12,8 +12,8 @@ section 19, and the decisions behind it in
 [ADR 0013](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0013-hosts-take-the-runtime-contract-and-mount-where-the-links-point.md).
 
 Status: in development and unreleased. The collection, resource, relationship, and related routes,
-includes, and the 405 of every other method are served. The Atomic Operations endpoint, the OpenAPI
-document's route, and `resourceTypeOf` for localized errors follow in the 0.x line.
+includes, the Atomic Operations endpoint, and the 405 of every other method are served. The OpenAPI
+document's route and `resourceTypeOf` for localized errors follow in the 0.x line.
 
 ## Install
 
@@ -52,6 +52,7 @@ import type { JsonApiVariables } from '@netvark/hono-jsonapi';
 import { Hono } from 'hono';
 
 import {
+  ATOMIC_OPERATIONS_EXTENSION,
   CURSOR_PAGINATION_PROFILE,
   errorHandler,
   jsonApi,
@@ -67,7 +68,12 @@ export interface AppEnv {
 }
 
 export const app = new Hono<AppEnv>();
-app.use(jsonApi({ profiles: [CURSOR_PAGINATION_PROFILE] }));
+app.use(
+  jsonApi({
+    profiles: [CURSOR_PAGINATION_PROFILE],
+    extensions: [ATOMIC_OPERATIONS_EXTENSION],
+  }),
+);
 app.onError(errorHandler());
 app.notFound(notFoundHandler());
 app.route('/', jsonApiRoutes({ runtime, actor: sessionActor }));
@@ -124,10 +130,63 @@ Each route exists only when the declaration declares its operation:
   `/data/relationships/contact` becomes `/data`, so a client maps the error to what it sent.
 - **What the runtime throws is the response**, such as `NOT_FOUND` for a row the actor does not see.
 
-`jsonApiRoutes` throws `TypeError` before it serves anything when an option is wrong, when the
-runtime runs no resource, when a resource's links give no paths, when the links have different
-origins or bases, when two routes have one path, or when a relationship's target, includable or not,
-is not among the runtime's resources.
+`jsonApiRoutes` throws `TypeError` before it serves anything when an option is wrong, a runtime
+without `transaction` among them, when the runtime runs no resource, when a resource's links give no
+paths, when the links have different origins or bases, when two routes have one path, the operations
+endpoint's among them, or when a relationship's target, includable or not, is not among the
+runtime's resources.
+
+## Atomic Operations
+
+When a resource declares `create`, `update`, or `remove`, the routes also serve
+`POST /api/operations`, the base of your links followed by `/operations`: the endpoint of the
+[Atomic Operations extension](https://jsonapi.org/ext/atomic/). Every operation of a request runs in
+one `runtime.transaction` as the request's actor, so they commit together, the first failure rolls
+every one back, and the hook after commit runs once with all their events.
+
+```http
+POST /api/operations HTTP/1.1
+Content-Type: application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"
+Accept: application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"
+
+{
+  "atomic:operations": [
+    { "op": "add", "data": { "type": "contacts", "lid": "lin", "attributes": { "name": "Lin" } } },
+    {
+      "op": "add",
+      "data": {
+        "type": "notes",
+        "attributes": { "body": "Met at the fair" },
+        "relationships": { "contact": { "data": { "type": "contacts", "lid": "lin" } } }
+      }
+    },
+    { "op": "remove", "href": "/api/contacts/3b1d5c2e-8a7f-4e6d-9c0b-1a2b3c4d5e6f" }
+  ]
+}
+```
+
+| `op`     | Target                                               | Runs                                              |
+| -------- | ---------------------------------------------------- | ------------------------------------------------- |
+| `add`    | none, or a collection `href` such as `/api/contacts` | `create(data)`                                    |
+| `update` | a resource's `ref` or `href`, or `data`'s `id`       | `update(id, data)`                                |
+| `update` | a `ref` with `relationship`, or a relationship link  | `update(id, { relationships: { <name>: data } })` |
+| `remove` | a resource's `ref` or `href`                         | `remove(id)`                                      |
+
+- **A relationship operation follows the declaration**, as the relationship link's `PATCH` does: the
+  relationship must be `readWrite` and the resource must declare `update`.
+- **Results**: 200 with `atomic:results`, where each `add` and resource `update` carries its row as
+  `data`; 204 without a document when none does.
+- **A `lid` names what an earlier `add` created**, in a later operation's `ref`, `data`, or linkage.
+- **An `href` names what a route serves**: a collection path for an `add`, a resource path, or a
+  relationship link, resolved against the endpoint's URL, with the links' origin and no query or
+  fragment. Any other `href`, a related link among them, answers 400 at its pointer.
+- **Errors point at the operation that failed.** The runtime's `/data/attributes/email` becomes
+  `/atomic:operations/1/data/attributes/email`, a relationship operation's refused linkage
+  `/atomic:operations/1/data`, and an error without a pointer `/atomic:operations/1`. A constraint
+  violation, which the runtime maps once the transaction ended, points at the operation whose call
+  raised it all the same.
+- **An operation the resource does not declare answers 403**, a type the runtime does not run 404,
+  and a request of more than 10 operations 400.
 
 ## Best practices
 
@@ -148,6 +207,18 @@ Hono's default `Env`.
 
 **Leave authorization to the runtime.** The routes check no permission: the runtime's policies
 decide every operation and every include, for HTTP and for workers alike.
+
+**List the extension in `jsonApi()`.** The operations endpoint needs `ATOMIC_OPERATIONS_EXTENSION`
+among `jsonApi()`'s extensions, as the quick start mounts it; without it, `jsonApi()` answers every
+operations request 415 before the route runs.
+
+**Send a change that spans resources as one operations request.** A contact and the note about it
+then commit together or not at all, and the hook after commit wakes the relay once. Two requests can
+leave the contact without its note when the second fails.
+
+**Send `href`s as the links spell them.** The resolver sees the `href`, not the request, so with
+root-relative links an absolute `href` names nothing; echo `links.self` as the server sent it, or
+use `ref`.
 
 **Put `jsonApi()` first, and CORS before it.** `jsonApi()` negotiates every request (415 and 406)
 before a route runs. A browser's preflight `OPTIONS` would otherwise reach the 405, so mount

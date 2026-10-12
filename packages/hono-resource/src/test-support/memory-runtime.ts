@@ -9,10 +9,12 @@
  * target lookup answers (SPEC 12.3); an include of workspaces by an actor
  * without `workspaces:read` answers FORBIDDEN, as a policy would. A page
  * holds every row the actor sees, in insertion order, and has no other
- * page. `transaction` keeps the contract's rules: the first failure ends
- * it, every row returns to what it held when an operation failed or
- * `work` rejected, and it rejects with the failure unless `work` rejected
- * with another value. Not published with the package.
+ * page. A constraint's violation is the client's error once mapped: at
+ * once for an operation of `as(actor)`, and once the transaction ended
+ * inside one. `transaction` keeps the contract's rules: the first failure
+ * ends it, every row returns to what it held when an operation failed or
+ * `work` rejected, and it rejects with the failure, mapped, unless `work`
+ * rejected with another value. Not published with the package.
  */
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
@@ -26,7 +28,9 @@ import type {
 import { jsonApiError } from '@netvark/hono-jsonapi';
 
 import {
+  checkConstraints,
   checkTargets,
+  clientError,
   linkedRows,
   membersOf,
   newRow,
@@ -75,7 +79,13 @@ type Admit = <TResult>(operation: () => Promise<TResult>) => Promise<TResult>;
 /** The scope's member on a row of a scoped resource: the workspace it belongs to. */
 const SCOPE = 'workspace';
 
-const direct: Admit = async (operation) => operation();
+const direct: Admit = async (operation) => {
+  try {
+    return await operation();
+  } catch (thrown) {
+    throw clientError(thrown);
+  }
+};
 
 /** A member of `workspace` holding `permissions`. */
 export function member(
@@ -135,6 +145,7 @@ function operationsOf(
         record('create', [input]);
         checkTargets(state.rows, input);
         const id = input.id ?? crypto.randomUUID();
+        checkConstraints(id, input);
         const row = {
           ...newRow(declared, id, input),
           ...(scoped ? { [SCOPE]: actor.workspace } : {}),
@@ -150,6 +161,7 @@ function operationsOf(
         record('update', [id, input]);
         checkTargets(state.rows, input);
         const row = { ...find(id), ...membersOf(input), id };
+        checkConstraints(id, input);
         rows.set(id, row);
         return row;
       });
@@ -227,7 +239,7 @@ async function transactionOf<TResult>(
     throw failures[0];
   } catch (error) {
     restore(state.rows, snapshot);
-    throw error;
+    throw error === failures[0] ? clientError(error) : error;
   }
 }
 

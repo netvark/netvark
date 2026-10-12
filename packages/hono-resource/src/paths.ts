@@ -40,19 +40,30 @@ export interface MountedResource {
 
 /** What the routes mount: each resource, in the runtime's order, and the base they share. */
 export interface PathPlan {
+  /** The links' origin, when they are absolute. */
+  readonly origin: string | undefined;
   /** As Hono matches it: `''` for root-relative links. */
   readonly base: string;
   readonly resources: ReadonlyArray<MountedResource>;
+  /** Every route of the resources. */
+  readonly routes: ReadonlySet<string>;
 }
 
 const TEMPLATE = '{id}';
-const PARAMETER = ':id';
+/** The id of a resource route, as Hono reads a path parameter. */
+export const PARAMETER = ':id';
+const ROOT_RELATIVE = 'root-relative';
+
+/** `path` as Hono's router reads a request's: decoded by `decodeURI` but for `%25`. */
+export function requestPath(path: string): string {
+  return tryDecodeURI(path.replaceAll('%25', '%2525'));
+}
 
 /** `path`, which holds `{id}` at most once, as a Hono route. */
 export function routeOf(path: string): string {
   return path
     .split(TEMPLATE)
-    .map((part) => tryDecodeURI(part.replaceAll('%25', '%2525')))
+    .map((part) => requestPath(part))
     .join(PARAMETER);
 }
 
@@ -115,8 +126,8 @@ export function planPaths(
     declared,
     links: resourcePaths(declared.resource),
   }));
-  shared(
-    located.map(({ links }) => links.origin ?? 'root-relative'),
+  const origin = shared(
+    located.map(({ links }) => links.origin ?? ROOT_RELATIVE),
     'origins',
     'the routes serve one',
   );
@@ -138,5 +149,10 @@ export function planPaths(
     }
     return { declared, paths };
   });
-  return { base: routeOf(base), resources: mounted };
+  return {
+    origin: origin === ROOT_RELATIVE ? undefined : origin,
+    base: routeOf(base),
+    resources: mounted,
+    routes: seen,
+  };
 }

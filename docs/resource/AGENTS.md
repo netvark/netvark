@@ -97,6 +97,8 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 - `collection.ts` and `member.ts` the routes of each operation; `relationships.ts` each
   relationship's link and related link; `pointers.ts` moving a refusal's items to where the request
   held the input
+- `operations.ts` the Atomic Operations endpoint over `runtime.transaction`; `operation-calls.ts`
+  where each operation's failure points; `hrefs.ts` the targets an `href` names
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted

@@ -1,11 +1,12 @@
 /**
  * `jsonApiRoutes(options)` (resource SPEC 19.2): the routes of a runtime
  * of the contract (SPEC 12.10) on Hono, at the full paths each resource's
- * links name, for the host to mount at `/` behind `jsonApi()`, its error
- * handler, and `notFound`. A route maps a request to an operation's input
- * and its result to a document: `@netvark/hono-jsonapi` negotiates,
- * validates, and builds documents, the runtime authorizes and runs, and
- * the host's ban renders every error.
+ * links name, and the Atomic Operations endpoint beside them (SPEC 19.4),
+ * for the host to mount at `/` behind `jsonApi()`, its error handler, and
+ * `notFound`. A route maps a request to an operation's input and its
+ * result to a document: `@netvark/hono-jsonapi` negotiates, validates,
+ * and builds documents, the runtime authorizes and runs, and the host's
+ * ban renders every error.
  * @ref https://jsonapi.org/format/1.1/
  * @ref https://hono.dev/docs/api/routing#grouping
  * @packageDocumentation
@@ -27,6 +28,7 @@ import { collectionRoutes } from './collection';
 import { targetsOf } from './context';
 import { memberRoutes } from './member';
 import { refuseOtherMethods } from './methods';
+import { operationsRoute } from './operations';
 import { planPaths } from './paths';
 import { relationshipRoutes } from './relationships';
 
@@ -65,7 +67,8 @@ function checkOptions(options: unknown): void {
   if (
     !isRecord(runtime) ||
     !Array.isArray(runtime['resources']) ||
-    typeof runtime['as'] !== 'function'
+    typeof runtime['as'] !== 'function' ||
+    typeof runtime['transaction'] !== 'function'
   ) {
     throw new TypeError(
       'jsonApiRoutes: options.runtime must be a runtime of the contract, such as createResourceRuntime resolves to',
@@ -79,11 +82,12 @@ function checkOptions(options: unknown): void {
 }
 
 /**
- * The routes of `options.runtime`'s resources. Throws `TypeError` before
- * it serves anything when the runtime runs no resource, when a resource's
+ * The routes of `options.runtime`'s resources, and its operations
+ * endpoint when a resource declares a write. Throws `TypeError` before it
+ * serves anything when the runtime runs no resource, when a resource's
  * links give no paths, when the links have different origins or bases,
- * when two resources name one path, or when an includable relationship's
- * target is not among the runtime's resources.
+ * when two routes have one path, the endpoint's among them, or when a
+ * relationship's target is not among the runtime's resources.
  */
 export function jsonApiRoutes<TEnv extends Env, TDomain extends DomainShape>(
   options: JsonApiRoutesOptions<TEnv, TDomain>,
@@ -104,6 +108,7 @@ export function jsonApiRoutes<TEnv extends Env, TDomain extends DomainShape>(
     memberRoutes(context, mounted);
     relationshipRoutes(context, mounted);
   }
+  operationsRoute(context, plan);
   refuseOtherMethods(app, context.methods);
   return app;
 }

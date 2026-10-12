@@ -12,6 +12,7 @@ import type { Context, Env, Hono } from 'hono';
 import type { Included, ParsedQuery } from '@netvark/hono-jsonapi';
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
+  Domain,
   DomainShape,
   PublicRow,
   ResourceOperations,
@@ -40,21 +41,27 @@ export function notRun(declared: DeclaredResource, name: string): TypeError {
   );
 }
 
-/** `declared`'s operations as the actor of the request of `c` runs them. */
-export function operationsOf<TEnv extends Env, TDomain extends DomainShape>(
-  context: RouteContext<TEnv, TDomain>,
-  c: Context,
+/** `declared`'s operations in `domain`, which holds every resource the runtime lists. */
+export function resourceOperations(
+  domain: Domain,
   declared: DeclaredResource,
 ): ResourceOperations {
-  const operations = context.runtime.as(context.actors.of(c))[
-    declared.names.type
-  ];
+  const operations = domain[declared.names.type];
   if (operations === undefined) {
     throw new TypeError(
       `jsonApiRoutes: the runtime's domain has no ${declared.names.type}, which it lists in resources`,
     );
   }
   return operations;
+}
+
+/** `declared`'s operations as the actor of the request of `c` runs them. */
+export function operationsOf<TEnv extends Env, TDomain extends DomainShape>(
+  context: RouteContext<TEnv, TDomain>,
+  c: Context,
+  declared: DeclaredResource,
+): ResourceOperations {
+  return resourceOperations(context.runtime.as(context.actors.of(c)), declared);
 }
 
 /** The runtime's resource that `declared`'s relationship `name` targets, which `targetsOf` found for each. */

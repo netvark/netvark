@@ -1,9 +1,11 @@
 /**
  * The rows of the runtime held in memory (`memory-runtime.ts`): new rows,
  * the members an input writes, the target lookup a runtime runs (SPEC
- * 12.3), pages, and includes, each settling after a turn of the
- * microtask queue as a storage round trip does. Not published with the
- * package.
+ * 12.3), the constraints a table checks, pages, and includes, each
+ * settling after a turn of the microtask queue as a storage round trip
+ * does. A constraint throws a `Violation`, which is not the client's
+ * error until it is mapped, as a PostgreSQL violation is not (SPEC 18.5).
+ * Not published with the package.
  */
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
@@ -15,6 +17,49 @@ import type {
 import { jsonApiError } from '@netvark/hono-jsonapi';
 
 const PAGE_SIZE = 10;
+
+/** The title a unique constraint holds taken. */
+export const TAKEN_TITLE = 'Taken';
+
+/** What a constraint throws: the path of the member it refused, which its client's error points at. */
+class Violation extends Error {
+  public readonly path: ReadonlyArray<string>;
+
+  public constructor(path: ReadonlyArray<string>) {
+    super('memory runtime: a constraint refused the row');
+    this.path = path;
+  }
+}
+
+/** Throws a `Violation` when row `id` would hold the taken title, or be its own parent. */
+export function checkConstraints(id: string, input: ResourceInput): void {
+  if (input.attributes?.['title'] === TAKEN_TITLE) {
+    throw new Violation(['data', 'attributes', 'title']);
+  }
+  const parent = input.relationships?.['parent'];
+  if (
+    typeof parent === 'object' &&
+    parent !== null &&
+    'id' in parent &&
+    parent.id === id
+  ) {
+    throw new Violation(['data', 'relationships', 'parent']);
+  }
+}
+
+/** The client's error of `thrown`: a violation's 409 at its path, as a runtime maps one; anything else as thrown. */
+export function clientError(thrown: unknown): unknown {
+  return thrown instanceof Violation
+    ? jsonApiError([
+        {
+          code: 'CONFLICT',
+          status: 409,
+          detail: 'A constraint refused the row',
+          path: thrown.path,
+        },
+      ])
+    : thrown;
+}
 
 /** The error of a row the actor does not see, as a runtime answers it. */
 export function notFound(): Error {

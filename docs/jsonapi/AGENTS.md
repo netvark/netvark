@@ -51,7 +51,7 @@ configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `knip.js
 - `pagination/` the Cursor Pagination profile: links, meta, errors, `paginatedDocument`
 - `request/` request documents: identifiers, resource objects, relationship documents
 - `atomic/` the Atomic Operations extension (`@netvark/jsonapi-core/atomic`): `operationsProcessor`,
-  `assertOperationsContentType`, the document parser, lids, executors
+  `assertOperationsContentType`, `errorAtOperation`, the document parser, lids, executors
 - `test-support/` the vendored JSON:API 1.0 JSON Schema and the Ajv conformance helper for the
   repository's own tests; not published
 

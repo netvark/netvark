@@ -25,5 +25,6 @@ export type {
 } from './types';
 
 export { assertOperationsContentType } from './content-type';
+export { errorAtOperation } from './operation-error';
 export { parseOperationsDocument } from './parse-document';
 export { operationsProcessor } from './process';

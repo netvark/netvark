@@ -4,7 +4,9 @@
  * at `/data` (SPEC 12.10). A relationship document holds the linkage at
  * `/data` itself, so an item at the relationship, or under its linkage,
  * moves there, and an item at another member, which the document does not
- * hold, loses its pointer rather than point at nothing.
+ * hold, loses its pointer rather than point at nothing. An operations
+ * document holds an operation's resource object, or its linkage, at
+ * `/atomic:operations/<index>/data`.
  * @ref https://jsonapi.org/format/1.1/#error-objects ("pointer: a JSON Pointer [RFC6901] to the value in the request document that caused the error")
  * @ref https://www.rfc-editor.org/rfc/rfc6901
  * @packageDocumentation
@@ -14,10 +16,19 @@ import type { ErrorItem } from '@netvark/hono-jsonapi';
 import { BanError, isBanError } from '@netvark/hono-jsonapi';
 
 /** An item's path: RFC 6901 reference tokens. */
-type Path = NonNullable<ErrorItem['path']>;
+export type Path = NonNullable<ErrorItem['path']>;
 
 const DATA = 'data';
 const RELATIONSHIPS = 'relationships';
+
+/**
+ * Where `path` goes when the resource object sits at `base`: the object
+ * and its members under `base`, and anything else nowhere.
+ */
+export function objectPath(path: Path, base: Path): Path | undefined {
+  const [data, ...rest] = path;
+  return data === DATA ? [...base, ...rest] : undefined;
+}
 
 /**
  * Where `path` goes when the input of relationship `name` sits at `base`:
@@ -40,7 +51,12 @@ export function linkagePath(
 }
 
 /** Where a path into the body goes, or nowhere. */
-type Move = (path: Path) => Path | undefined;
+export type Move = (path: Path) => Path | undefined;
+
+/** Where a path into the body goes when the request holds no input there: nowhere. */
+export function nowhere(): undefined {
+  return undefined;
+}
 
 /** `item` moved by `move` when it points into the body, or without its pointer. */
 function movedItem(item: ErrorItem, move: Move): ErrorItem {
@@ -57,13 +73,18 @@ function movedItem(item: ErrorItem, move: Move): ErrorItem {
 
 /**
  * `error` with each item that points into the body moved by `move`, and
- * without its pointer where `move` gives no path. Anything but a
- * `BanError` with items is returned as it is.
+ * without its pointer where `move` gives no path. An error without items
+ * is returned as it is.
  */
-export function moveItems(error: unknown, move: Move): unknown {
-  if (!isBanError(error) || error.errors === undefined) {
+export function movedError(error: BanError, move: Move): BanError {
+  if (error.errors === undefined) {
     return error;
   }
   const errors = error.errors.map((item) => movedItem(item, move));
   return new BanError({ ...error.toInit(), errors });
+}
+
+/** `movedError` of a `BanError`; anything else as it is. */
+export function moveItems(error: unknown, move: Move): unknown {
+  return isBanError(error) ? movedError(error, move) : error;
 }

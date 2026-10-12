@@ -114,6 +114,10 @@ describe('jsonApiRoutes refusals (resource SPEC 19.2)', () => {
       'jsonApiRoutes: options.runtime must be a runtime of the contract, such as createResourceRuntime resolves to',
     ],
     [
+      { runtime: { resources: RESOURCES, as: runtime.as }, actor },
+      'jsonApiRoutes: options.runtime must be a runtime of the contract, such as createResourceRuntime resolves to',
+    ],
+    [
       { runtime, actor: 'ada' },
       'jsonApiRoutes: options.actor must be a function from the request to its actor',
     ],

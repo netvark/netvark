@@ -3711,18 +3711,20 @@ and builds documents, the runtime authorizes and runs, and the host's ban render
 └── resourceTypeOf(c)        actor.ts    the type a request's route serves, for localizeErrors (19.6)
 ```
 
-| Module             | Holds                                                                         |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `paths.ts`         | each resource's paths from its links, as Hono routes, and the base            |
-| `methods.ts`       | the methods each path answers, and the 405 of any other                       |
-| `actor.ts`         | the request's actor, resolved once, and `resourceTypeOf`                      |
-| `context.ts`       | what every route reads: the runtime, a request's operations, and its includes |
-| `collection.ts`    | `list` and `create`                                                           |
-| `member.ts`        | `get`, `update`, and `remove`                                                 |
-| `relationships.ts` | the relationship and related routes                                           |
-| `operations.ts`    | the Atomic Operations endpoint                                                |
-| `pointers.ts`      | moving an error's items to where the request held the input                   |
-| `openapi.ts`       | the document's route                                                          |
+| Module               | Holds                                                                         |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `paths.ts`           | each resource's paths from its links, as Hono routes, and the base            |
+| `methods.ts`         | the methods each path answers, and the 405 of any other                       |
+| `actor.ts`           | the request's actor, resolved once, and `resourceTypeOf`                      |
+| `context.ts`         | what every route reads: the runtime, a request's operations, and its includes |
+| `collection.ts`      | `list` and `create`                                                           |
+| `member.ts`          | `get`, `update`, and `remove`                                                 |
+| `relationships.ts`   | the relationship and related routes                                           |
+| `operations.ts`      | the Atomic Operations endpoint                                                |
+| `operation-calls.ts` | the domain calls of one operations request, and where their failures point    |
+| `hrefs.ts`           | the targets an operation's `href` names                                       |
+| `pointers.ts`        | moving an error's items to where the request held the input                   |
+| `openapi.ts`         | the document's route                                                          |
 
 Types exported: `JsonApiRoutesOptions`, `RoutesOpenApiOptions`.
 
@@ -3765,14 +3767,15 @@ outside ASCII routes at the percent-encoded path its links spell. @ref
 https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath)
 
 `jsonApiRoutes` throws `TypeError` before it serves anything for an option a JavaScript caller got
-wrong (one that is not an option, a runtime without `resources` and `as`, an actor that is not a
-function), when the runtime runs no resource, when a resource's links give no paths (13.1's
-messages, starting `resourcePaths:`), when two resources' links have different origins or bases,
-when two routes have one path, or when a relationship's target, includable or not, is not among the
-runtime's resources, since its related link serves the target and its linkage names it. A runtime
-that breaks the contract on a request, whose domain lacks a resource it lists or an operation a
-declaration declares, or whose row lacks a relationship its declaration declares, fails that request
-with a `TypeError` naming it, which the host's handler answers with 500.
+wrong (one that is not an option, a runtime without `resources`, `as`, and `transaction`, an actor
+that is not a function), when the runtime runs no resource, when a resource's links give no paths
+(13.1's messages, starting `resourcePaths:`), when two resources' links have different origins or
+bases, when two routes have one path, the operations endpoint's among them (19.4), or when a
+relationship's target, includable or not, is not among the runtime's resources, since its related
+link serves the target and its linkage names it. A runtime that breaks the contract on a request,
+whose domain lacks a resource it lists or an operation a declaration declares, or whose row lacks a
+relationship its declaration declares, fails that request with a `TypeError` naming it, which the
+host's handler answers with 500.
 
 A path answers the methods its operations take and any other with `METHOD_NOT_ALLOWED` (405), whose
 `Allow` header lists them, `HEAD` beside `GET` since Hono answers `HEAD` with a `GET` route. The 405
@@ -3823,28 +3826,45 @@ linkage the server holds. @ref https://jsonapi.org/format/1.1/#crud-updating-rel
 
 ### 19.4 Atomic Operations: `POST <base>/operations`
 
-Served when a resource of the runtime declares `create`, `update`, or `remove`, through
-`atomicOperations` (jsonapi SPEC 11.1) with:
+Served at `<base>/operations` when a resource of the runtime declares `create`, `update`, or
+`remove`, through `atomicOperations` (jsonapi SPEC 11.1) with:
 
 - `transaction`: `runtime.transaction(actor, run)`, the actor resolved once for the request, so the
   operations run in one transaction and the hook after commit runs once (12.10);
-- per resource, the handlers of its declared operations over the transaction's domain: `add` is
-  `create`, `update` is `update`, `remove` is `remove`, and an `update` whose target names a
-  relationship is `update(id, { relationships: { <name>: linkage } })`, when the relationship is
-  `readWrite` and the resource declares `update`;
-- `resolveHref`: an `href` whose path is a resource path of the routes (19.2), or a relationship
-  link of one, names that resource, or that relationship; any other is the processor's 400;
+- handlers for every resource of the runtime, over the transaction's domain: `add` is `create`,
+  `update` is `update`, and `remove` is `remove`, each where the resource declares it, and an
+  `update` whose target names a relationship is
+  `update(id, { relationships: { <name>: linkage } })`, when the relationship is `readWrite` and the
+  resource declares `update`. An operation the resource does not declare is the processor's 403, and
+  a type the runtime does not run its 404;
+- `resolveHref`: an `href`, resolved against the endpoint's URL, names what a route of 19.2 serves
+  when it has the links' origin, no query, no fragment, and a path the route matches as Hono matches
+  a request's: a collection path names its type, for an `add`; a resource path names that resource,
+  its id decoded as Hono decodes `:id`; a relationship link names that relationship. Any other, a
+  related link among them, is the processor's 400 at `.../href` (jsonapi SPEC 11.4). When the links
+  are root-relative, an absolute `href` names nothing, since the resolver does not see the request's
+  origin;
 - `maxOperations`: the processor's default.
 
 The runtime's refusals point at `/data...` (12.10), and the endpoint moves each item to the
 operation that failed: `/data...` becomes `/atomic:operations/<index>/data...`, and a relationship
 operation's `/data/relationships/<name>` and `/data/relationships/<name>/data...` become
 `/atomic:operations/<index>/data` and `/atomic:operations/<index>/data...`, its other members losing
-their pointer as on a relationship link (19.3). A refusal an operation throws inside the transaction
-moves before the processor sees it; a failure `transaction` maps once the transaction ended, such as
-a constraint violation, moves by the index of the operation whose call threw it. An item without a
-path gets the operation's pointer from the processor. @ref
-https://jsonapi.org/ext/atomic/#processing-errors
+their pointer as on a relationship link (19.3); a `remove` holds no resource object, so its items in
+the body lose their pointer. A refusal an operation throws inside the transaction, a `BanError`
+already, moves before the processor sees it. Anything else ends the transaction as thrown, and the
+failure `transaction` maps once the transaction ended, such as a constraint violation (18.5), moves
+by the index of the operation whose call threw it, through `errorAtOperation` (jsonapi SPEC 11.1).
+An item without a path gets the operation's pointer.
+
+Like every route, the endpoint answers another method 405 with `Allow: POST` before the actor
+(19.2); then the actor resolves, then the processor checks the extension's media type (415) and the
+document. `jsonApi()` must list `ATOMIC_OPERATIONS_EXTENSION`, or it answers an operations request
+415 itself. @ref https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed
+atomically") @ref https://jsonapi.org/ext/atomic/#creating-resources ("MAY target a resource
+collection through the operation's href member") @ref
+https://jsonapi.org/ext/atomic/#processing-errors @ref
+https://www.rfc-editor.org/rfc/rfc3986#section-5.2
 
 ### 19.5 The document: `GET <base>/openapi.json`
 
@@ -3880,7 +3900,13 @@ related route and the failing operation's on the operations endpoint, or `undefi
   route, `resourceTypeOf`, and each `TypeError` of 19.2.
 - Smoke (`e2e/resource/smoke/route-checks.ts`): the built package's routes over a runtime held in
   memory answer a resource, a 405 with `Allow`, the actor's refusal, a relationship link, the 403 of
-  an update it does not support, and a related link on Bun, Deno, and workerd.
+  an update it does not support, a related link, and an operations request on Bun, Deno, and
+  workerd.
+- The operations endpoint over the runtime (`e2e/resource/runtime-operations.e2e.test.ts`): the
+  contacts application on `createResourceRuntime` through `app.request`, against PGlite and, with
+  `RESOURCE_PG_URL`, a PostgreSQL server: a call linking a contact by `lid`, one batch of events
+  after the commit, a violation mapped once the transaction ended at its operation, a partition's
+  code, a refusal inside the transaction, row security, and `href` targets.
 - End to end (`e2e/resource/http/`): the contacts application on `createResourceRuntime` over
   `@hono/node-server`, against PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server: defaults on
   create, omission on update, a 400 with codes, pointers, and localized messages per problem, a 409

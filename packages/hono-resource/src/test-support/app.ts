@@ -1,6 +1,7 @@
 /**
  * A host of the routes, composed as an application composes one
- * (resource SPEC 19.2): `jsonApi()` with the Cursor Pagination profile,
+ * (resource SPEC 19.2): `jsonApi()` with the Cursor Pagination profile
+ * and the Atomic Operations extension,
  * the error and not-found handlers of `@netvark/hono-jsonapi`, and the
  * routes at `/`, each request acting as the member its `X-Member` header
  * names; a request that names none answers UNAUTHORIZED. Not published
@@ -16,6 +17,7 @@ import type { Member, TestDomain } from './memory-runtime';
 import { Hono } from 'hono';
 
 import {
+  ATOMIC_OPERATIONS_EXTENSION,
   CURSOR_PAGINATION_PROFILE,
   errorHandler,
   jsonApi,
@@ -67,7 +69,12 @@ export function testApp(
 ): Hono<TestEnv> {
   const app = new Hono<TestEnv>();
   const handle: ErrorHandler<TestEnv> = errorHandler();
-  app.use(jsonApi({ profiles: [CURSOR_PAGINATION_PROFILE] }));
+  app.use(
+    jsonApi({
+      profiles: [CURSOR_PAGINATION_PROFILE],
+      extensions: [ATOMIC_OPERATIONS_EXTENSION],
+    }),
+  );
   app.onError(async (error, c) => {
     options.onError?.(error);
     return handle(error, c);

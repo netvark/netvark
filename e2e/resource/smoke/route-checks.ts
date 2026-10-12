@@ -4,17 +4,23 @@
  * memory answer a declared resource at the path its links name, another
  * method with 405 and `Allow`, a request without an actor with what the
  * actor threw, a relationship link with its linkage, an update the
- * relationship does not support with 403, and a related link with the
- * target's document, through Hono's `fetch` as every runtime calls it. No
- * Node.js API, so the module runs on Bun, Deno, and workerd.
+ * relationship does not support with 403, a related link with the
+ * target's document, and an operations request with its results, through
+ * Hono's `fetch` as every runtime calls it. No Node.js API, so the module
+ * runs on Bun, Deno, and workerd.
  */
-import type { PublicRow, ResourceRuntime } from '@netvark/resource-core/server';
+import type {
+  PublicRow,
+  ResourceInput,
+  ResourceRuntime,
+} from '@netvark/resource-core/server';
 
 import type { Checks } from './report.ts';
 
 import { Hono } from 'hono';
 
 import {
+  ATOMIC_OPERATIONS_EXTENSION,
   CURSOR_PAGINATION_PROFILE,
   errorHandler,
   jsonApi,
@@ -53,9 +59,20 @@ async function rowOf(
   return row;
 }
 
-/** The domain of the smoke runtime, which only reads, so a transaction is its domain as it is. */
+const ATOMIC = `application/vnd.api+json; ext="${ATOMIC_OPERATIONS_EXTENSION}"`;
+
+/**
+ * The domain of the smoke runtime, which keeps no write, so a transaction
+ * is its domain as it is: an update answers the row it would write.
+ */
 const domain = {
-  organizations: { get: async (id: string) => rowOf([ACME], id) },
+  organizations: {
+    get: async (id: string) => rowOf([ACME], id),
+    update: async (id: string, input: ResourceInput) => ({
+      ...(await rowOf([ACME], id)),
+      ...input.attributes,
+    }),
+  },
   contacts: { get: async (id: string) => rowOf([ADA], id) },
 };
 
@@ -69,7 +86,12 @@ const runtime: ResourceRuntime = {
 /** The host: negotiation, the error handlers, and the routes at `/`. */
 function host(): Hono {
   const app = new Hono();
-  app.use(jsonApi({ profiles: [CURSOR_PAGINATION_PROFILE] }));
+  app.use(
+    jsonApi({
+      profiles: [CURSOR_PAGINATION_PROFILE],
+      extensions: [ATOMIC_OPERATIONS_EXTENSION],
+    }),
+  );
   app.onError(errorHandler());
   app.notFound(notFoundHandler());
   app.route(
@@ -154,4 +176,27 @@ export const routeChecks: Checks = {
         text,
       );
     },
+  'hono-resource answers an operations request with its results': async () => {
+    const response = await host().request('/api/operations', {
+      method: 'POST',
+      headers: { 'X-Actor': 'smoke', 'Content-Type': ATOMIC, Accept: ATOMIC },
+      body: JSON.stringify({
+        'atomic:operations': [
+          {
+            op: 'update',
+            href: '/api/organizations/1',
+            data: { type: 'organizations', id: '1', attributes: { seats: 6 } },
+          },
+        ],
+      }),
+    });
+    check(response.status === 200, `status ${String(response.status)}`);
+    const text = await response.text();
+    check(
+      text.includes(
+        '"atomic:results":[{"data":{"type":"organizations","id":"1"',
+      ) && text.includes('"seats":6'),
+      text,
+    );
+  },
 };
