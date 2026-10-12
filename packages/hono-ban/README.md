@@ -19,8 +19,10 @@ pnpm add @netvark/hono-ban hono
 
 `@netvark/ban-core` comes along as a dependency.
 
-Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
-on Node 22 and 24 and a smoke test of every subpath on Bun, Deno, and workerd.
+`hono >= 4.13.7` is the only peer dependency, the first release no published Hono advisory affects:
+an affected Hono in your application is an unmet peer dependency. Node 22.12+, Bun, Deno, and
+Cloudflare Workers are supported. CI runs the unit and end-to-end suites on Node 22 and 24, the unit
+suite on Hono 4.13.7, and a smoke test of every subpath on Bun, Deno, and workerd.
 
 ## Quick start
 

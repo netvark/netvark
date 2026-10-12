@@ -164,7 +164,7 @@ jobs:
       - run: pnpm --filter @netvark/react-resource run test
 
   test-hono-floor:
-    name: Test (Hono 4.12.34 and 4.13.0, the peer range floors)
+    name: Test (Hono 4.13.7, the peer range floor)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -177,19 +177,15 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # @netvark/hono-ban and @netvark/hono-jsonapi declare `hono >=4.12.34`,
-      # the release that fixes four advisories affecting every earlier one;
-      # @netvark/hono-resource declares `>=4.13.0`, the first whose
-      # `hono/utils/url` exports the `tryDecodeURIComponent` it decodes an
-      # href with (resource SPEC 19.8). Each step puts the packages it tests
-      # on one hono, as an application has one: two copies make their
-      # `Context` types disagree.
-      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi add --save-dev hono@4.12.34
-      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi run typecheck
-      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi run test
-      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi --filter @netvark/hono-resource add --save-dev hono@4.13.0
-      - run: pnpm --filter @netvark/hono-resource run typecheck
-      - run: pnpm --filter @netvark/hono-resource run test
+      # @netvark/hono-ban, @netvark/hono-jsonapi, and @netvark/hono-resource
+      # declare `hono >=4.13.7`, the first release no published Hono advisory
+      # affects; hono-resource also needs 4.13.0's `hono/utils/url` export of
+      # `tryDecodeURIComponent` (resource SPEC 19.8). The three go on one
+      # hono, as an application has one: two copies make their `Context`
+      # types disagree.
+      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi --filter @netvark/hono-resource add --save-dev hono@4.13.7
+      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi --filter @netvark/hono-resource run typecheck
+      - run: pnpm --filter @netvark/hono-ban --filter @netvark/hono-jsonapi --filter @netvark/hono-resource run test
 
   test-pglite-floor:
     name: Test (PGlite 0.5.0, the peer range floor)

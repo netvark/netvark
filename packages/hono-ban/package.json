@@ -137,7 +137,7 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "hono": ">=4.12.34"
+    "hono": ">=4.13.7"
   },
   "engines": {
     "node": ">=22.12.0"
