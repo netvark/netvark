@@ -1066,8 +1066,9 @@ of `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, an
 - `@netvark/jsonapi-core`: `dependencies.@netvark/ban-core` (`workspace:^`, a caret range when
   published), no `peerDependencies`. `@netvark/hono-jsonapi`: `dependencies.@netvark/jsonapi-core`
   (`workspace:^`, a caret range when published) and `peerDependencies.hono >= 4.12.34` and
-  `@netvark/hono-ban >= 2.0.0` (ADR 0014); one copy of `@netvark/ban-core` and of `hono` in the
-  graph is what keeps `instanceof` true across the packages.
+  `@netvark/hono-ban >= 2.0.0` (ADR 0014), and CI runs its tests on hono 4.12.34; one copy of
+  `@netvark/ban-core` and of `hono` in the graph is what keeps `instanceof` true across the
+  packages.
 - `@netvark/jsonapi-client`: `dependencies.@netvark/jsonapi-core` (`workspace:^`, a caret range when
   published), no `peerDependencies`; its `exports` map has `.` and `./package.json` (15.9).
 - Each of the other two `exports` maps has `.`, `./atomic`, and `./package.json`, with declarations
