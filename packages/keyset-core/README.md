@@ -349,12 +349,14 @@ one into a detail quotes it only when it is a plain token, as `@netvark/jsonapi-
 ([jsonapi ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)).
 
 `INVALID_FILTER_VALUE` reports every condition whose value its field refuses, in the order of the
-request's conditions: each entry of `values` is one condition's `field`, `operator`, and `expected`
-(`integer`, `date (YYYY-MM-DD)`, `one of "lead", "customer"`, ...), and a condition with several bad
-items is one entry. Give each entry its own invalid query parameter error, at
-`filter[<field>][<operator>]` in `@netvark/jsonapi-core`'s filter grammar, so a client fixes every
-value in one round trip. A malformed filter or an undeclared field or operator is reported alone,
-before any value
+request's conditions: each entry of `values` is one condition's `field`, `operator`, `expected`
+(`integer`, `date (YYYY-MM-DD)`, `one of "lead", "customer"`, ...), and `path`, its place in the
+tree (`['and', 2, 'or', 0]`), and a condition with several bad items is one entry. Give each entry
+its own invalid query parameter error, at the parameter its condition came in: an API layer that
+built the tree from its own grammar finds that parameter by the path, as `@netvark/resource-core`'s
+`filterParameters` does for `@netvark/jsonapi-core`'s, so a client fixes every value in one round
+trip and matches each error to the input it sent. A malformed filter or an undeclared field or
+operator is reported alone, before any value
 ([keyset ADR 0019](https://github.com/netvark/netvark/blob/main/docs/keyset/adr/0019-every-refused-filter-value-at-once.md)).
 
 ```ts

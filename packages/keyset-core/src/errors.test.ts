@@ -22,7 +22,7 @@ describe('request errors', () => {
     [new InvalidFilterError(['and', 0]), 'INVALID_FILTER'],
     [
       new InvalidFilterValueError([
-        { field: 'x', operator: 'eq', expected: 'text' },
+        { field: 'x', operator: 'eq', expected: 'text', path: [] },
       ]),
       'INVALID_FILTER_VALUE',
     ],
@@ -40,8 +40,13 @@ describe('request errors', () => {
 
   it('keeps request values out of the message', () => {
     const values = [
-      { field: 'secretField', operator: 'eq', expected: 'text' },
-      { field: 'otherField', operator: 'gte', expected: 'integer' },
+      { field: 'secretField', operator: 'eq', expected: 'text', path: [] },
+      {
+        field: 'otherField',
+        operator: 'gte',
+        expected: 'integer',
+        path: ['and', 1],
+      },
     ];
     const error = new InvalidFilterValueError(values);
     expect(error.message).not.toMatch(/secretField|otherField/u);

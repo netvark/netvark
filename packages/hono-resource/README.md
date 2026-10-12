@@ -104,16 +104,16 @@ export async function sessionActor(c: Context<AppEnv>): Promise<AppActor> {
 
 Each route exists only when the declaration declares its operation:
 
-| Route                                              | Runs                                                      | Answers                                                                     |
-| -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `GET /api/contacts`                                | `list(keysetRequest(Contacts, query))`, then each include | 200, the page with the Cursor Pagination links and meta                     |
-| `POST /api/contacts`                               | `create(document)`                                        | 201, the resource document, with `Location` from its links                  |
-| `GET /api/contacts/:id`                            | `get(id)`, then each include                              | 200, the resource document with `included`                                  |
-| `PATCH /api/contacts/:id`                          | `update(id, document)`                                    | 200, the resource document                                                  |
-| `DELETE /api/contacts/:id`                         | `remove(id)`                                              | 204                                                                         |
-| `GET /api/contacts/:id/relationships/organization` | `get(id)`                                                 | 200, the relationship document: the linkage and its links                   |
-| `PATCH /api/notes/:id/relationships/contact`       | `update(id, { relationships: { contact: linkage } })`     | 200, the updated relationship document                                      |
-| `GET /api/contacts/:id/organization`               | `get(id)`, then the target's `get` of the linked id       | 200, the target's resource document, or `data: null` when nothing is linked |
+| Route                                              | Runs                                                                      | Answers                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `GET /api/contacts`                                | `list(keysetRequest(Contacts, query), { parameters })`, then each include | 200, the page with the Cursor Pagination links and meta                     |
+| `POST /api/contacts`                               | `create(document)`                                                        | 201, the resource document, with `Location` from its links                  |
+| `GET /api/contacts/:id`                            | `get(id)`, then each include                                              | 200, the resource document with `included`                                  |
+| `PATCH /api/contacts/:id`                          | `update(id, document)`                                                    | 200, the resource document                                                  |
+| `DELETE /api/contacts/:id`                         | `remove(id)`                                                              | 204                                                                         |
+| `GET /api/contacts/:id/relationships/organization` | `get(id)`                                                                 | 200, the relationship document: the linkage and its links                   |
+| `PATCH /api/notes/:id/relationships/contact`       | `update(id, { relationships: { contact: linkage } })`                     | 200, the updated relationship document                                      |
+| `GET /api/contacts/:id/organization`               | `get(id)`, then the target's `get` of the linked id                       | 200, the target's resource document, or `data: null` when nothing is linked |
 
 - **The paths are the links'.** `resourcePaths` reads them from each resource's JSON:API links, the
   function the OpenAPI document reads and a client calls through, so the routes, the links, the
@@ -124,6 +124,9 @@ Each route exists only when the declaration declares its operation:
 - **The query and the document are validated before the runtime runs**: an undeclared sort is a 400,
   a member the operation does not write a 403 at its pointer, an update whose `id` is not the path's
   a 409.
+- **Every refused filter value is answered at once, at the parameter the client sent.** `list` gets
+  the query's `filterParameters`, so `filter[status]=gone` is refused at `filter[status]`, a value
+  in a group at `filter[or][0][status]`, and three bad values with three error objects.
 - **Includes run through the resource's `include`**, so its policy for the relationship decides, and
   the rows join `included` once each.
 - **Relationship routes follow the declaration.** They exist when the resource declares `get`: the

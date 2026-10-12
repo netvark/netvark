@@ -44,6 +44,7 @@ describe('package surface (SPEC 1, 18.1, 19.1, 20.1)', () => {
       'defineQuota',
       'defineScope',
       'denyAll',
+      'filterParameters',
       'isResourceBehavior',
       'keysetRequest',
       'partitionViolation',

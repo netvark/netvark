@@ -13,6 +13,7 @@ import type { Operation } from '@netvark/resource-core';
 import type {
   DomainEvent,
   DomainShape,
+  FilterParameter,
   ResourceBehavior,
 } from '@netvark/resource-core/server';
 
@@ -42,6 +43,7 @@ async function scoped<TDomain extends DomainShape, TResult>(
   behavior: ResourceBehavior<TDomain>,
   operation: Operation,
   work: (tx: KyselyTransaction) => Promise<TResult>,
+  parameters: ReadonlyArray<FilterParameter> | undefined,
 ): Promise<TResult> {
   const { storage, scopes, errors } = run.options;
   const values = scopeValues(scopes, run.actor);
@@ -53,6 +55,7 @@ async function scoped<TDomain extends DomainShape, TResult>(
       resource: behavior.resource,
       operation,
       errors,
+      parameters,
     });
   }
 }
@@ -60,20 +63,26 @@ async function scoped<TDomain extends DomainShape, TResult>(
 /**
  * Runs `work` as `operation` on `behavior`'s resource; once committed,
  * hands what it recorded to `afterCommit`. In a session, runs it in the
- * session's transaction.
+ * session's transaction. A list passes its filter `parameters`, which its
+ * failure is mapped with.
  */
 export async function transact<TDomain extends DomainShape, TResult>(
   run: Run<TDomain>,
   behavior: ResourceBehavior<TDomain>,
   operation: Operation,
   work: Work<TResult>,
+  parameters?: ReadonlyArray<FilterParameter>,
 ): Promise<TResult> {
   if (run.session !== undefined) {
-    return run.session.inside(behavior.resource, operation, work);
+    return run.session.inside(behavior.resource, operation, work, parameters);
   }
   const recorded: Array<DomainEvent> = [];
-  const result = await scoped(run, behavior, operation, async (tx) =>
-    work(tx, recorded),
+  const result = await scoped(
+    run,
+    behavior,
+    operation,
+    async (tx) => work(tx, recorded),
+    parameters,
   );
   await afterCommit(run.options, recorded);
   return result;

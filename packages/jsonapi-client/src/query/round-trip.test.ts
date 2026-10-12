@@ -2,7 +2,8 @@
  * The round trip (SPEC 15.5): every query generated from the blog's
  * definitions, serialized and parsed back by `parseQuery`, is the query
  * the client meant: the same include paths, fieldsets, sort, page,
- * conditions and groups in order, search, and custom parameters.
+ * conditions and groups in order, each condition at the parameter the
+ * client wrote it as, search, and custom parameters.
  */
 import type { AnyResource, ParsedQuery } from '@netvark/jsonapi-core';
 
@@ -49,7 +50,11 @@ function defined<TValue>(
   );
 }
 
-function conditionsOf(conditions: Readonly<Record<string, unknown>>) {
+/** The conditions `parseQuery` reads under `prefix`, each with the parameter the client wrote it as. */
+function conditionsOf(
+  conditions: Readonly<Record<string, unknown>>,
+  prefix: string,
+) {
   return Object.entries(conditions).flatMap(([field, condition]) => {
     if (field === 'or') {
       return [];
@@ -63,10 +68,16 @@ function conditionsOf(conditions: Readonly<Record<string, unknown>>) {
         field,
         operator,
         value: parsed(values as FilterValues),
+        parameter: `${prefix}[${field}][${operator}]`,
       }));
     }
     return [
-      { field, operator: 'eq', value: parsed(condition as FilterValues) },
+      {
+        field,
+        operator: 'eq',
+        value: parsed(condition as FilterValues),
+        parameter: `${prefix}[${field}]`,
+      },
     ];
   });
 }
@@ -86,8 +97,10 @@ function expected(definition: AnyResource, query: Query): Expected {
         : { field: name, direction: 'asc' },
     ),
     filter: {
-      conditions: conditionsOf(filter),
-      anyOf: groups.map((group) => conditionsOf(group)),
+      conditions: conditionsOf(filter, 'filter'),
+      anyOf: groups.map((group, index) =>
+        conditionsOf(group, `filter[or][${String(index)}]`),
+      ),
     },
     page:
       page === undefined

@@ -76,7 +76,7 @@ function condition(
     );
     return undefined;
   }
-  return { field, operator, value };
+  return { field, operator, value, parameter };
 }
 
 export function parseFilterMember(

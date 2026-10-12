@@ -3,14 +3,18 @@
  * design maps refusals onto `@netvark/jsonapi-core` (keyset DESIGN 3.6):
  * the Cursor Pagination profile's error where the profile defines one,
  * and `INVALID_QUERY_PARAMETER` at the parameter the refusal names
- * otherwise, one object per refused filter value (keyset ADR 0019). A
- * detail written here names the parameter, never its value, and a field
- * or operator only once the keyset has accepted it as declared.
+ * otherwise, one object per refused filter value (keyset ADR 0019): at
+ * the parameter its condition came in, when the list was given the
+ * request's `parameters`, else at `filter[<field>][<operator>]`. A detail
+ * written here names the parameter, never its value, and a field or
+ * operator only once the keyset or the query parser has accepted it as
+ * declared.
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
  * @ref https://jsonapi.org/format/1.1/#query-parameters ("the server MUST respond with 400 Bad Request")
  * @packageDocumentation
  */
 import type { BanError } from '@netvark/ban-core';
+import type { FilterParameter } from '@netvark/resource-core/server';
 
 import {
   errorItem,
@@ -57,11 +61,27 @@ interface Refused {
   readonly detail: string;
 }
 
+/** The parameter the condition at `path` came in, among the list's `parameters`. */
+function sentAs(
+  parameters: ReadonlyArray<FilterParameter>,
+  path: ReadonlyArray<string | number>,
+): string | undefined {
+  return parameters.find(
+    (entry) =>
+      entry.path.length === path.length &&
+      entry.path.every((member, index) => member === path[index]),
+  )?.parameter;
+}
+
 /** The parameters a refusal names, for the refusals the profile leaves to the server. */
-function refusedParameters(error: unknown): ReadonlyArray<Refused> | undefined {
+function refusedParameters(
+  error: unknown,
+  parameters: ReadonlyArray<FilterParameter>,
+): ReadonlyArray<Refused> | undefined {
   if (error instanceof InvalidFilterValueError) {
-    return error.values.map(({ field, operator }) => {
-      const parameter = `filter[${field}][${operator}]`;
+    return error.values.map(({ field, operator, path }) => {
+      const parameter =
+        sentAs(parameters, path) ?? `filter[${field}][${operator}]`;
       return {
         parameter,
         detail: `${parameter} has a value its field does not accept.`,
@@ -106,14 +126,19 @@ function refusedParameters(error: unknown): ReadonlyArray<Refused> | undefined {
 
 /**
  * The client's error for a keyset refusal, or `undefined` for anything
- * that is not one.
+ * that is not one. `parameters` are a list's (resource-core's
+ * `filterParameters`), which name each refused filter value's parameter
+ * as the request spelled it.
  */
-export function keysetRefusal(error: unknown): BanError | undefined {
+export function keysetRefusal(
+  error: unknown,
+  parameters: ReadonlyArray<FilterParameter> = [],
+): BanError | undefined {
   const profile = profileError(error);
   if (profile !== undefined) {
     return profile;
   }
-  const refused = refusedParameters(error);
+  const refused = refusedParameters(error, parameters);
   return refused === undefined
     ? undefined
     : jsonApiError(

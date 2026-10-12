@@ -86,6 +86,7 @@ export function filterRequest(
       field: name,
       operator: op,
       value: values.length === 1 && only !== undefined ? only : values,
+      parameter,
     },
   };
 }

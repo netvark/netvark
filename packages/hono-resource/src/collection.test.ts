@@ -46,7 +46,7 @@ function as(
 }
 
 describe('GET <collection> (resource SPEC 19.3)', () => {
-  it('lists the rows the actor sees, handing list the keyset request of the query', async () => {
+  it('lists the rows the actor sees, handing list the keyset request of the query and its filter parameters', async () => {
     const runtime = seeded();
     const response = await testApp(runtime).request(
       '/api/tasks?filter[title][eq]=Boot&sort=-title',
@@ -83,7 +83,7 @@ describe('GET <collection> (resource SPEC 19.3)', () => {
         filter: { field: 'title', op: 'eq', value: 'Boot' },
         page: { size: 20 },
       },
-      undefined,
+      { parameters: [{ path: [], parameter: 'filter[title][eq]' }] },
     ]);
   });
 

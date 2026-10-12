@@ -219,7 +219,8 @@ parameter the endpoint cannot process is a 400 that names every offending parame
 app.get('/articles', queryValidator(Articles), async (c) => {
   const query = c.req.valid('query');
   // query.sort:   Array<{ field: 'title' | 'createdAt'; direction: 'asc' | 'desc' }>
-  // query.filter: { conditions: [{ field: 'title', operator: 'like', value: 'rails' }], anyOf: [] }
+  // query.filter: { conditions: [{ field: 'title', operator: 'like', value: 'rails',
+  //                                parameter: 'filter[title][like]' }], anyOf: [] }
   // query.include: [['author'], ['tags']] | undefined
   const rows = await articles.list(query);
   return respond(

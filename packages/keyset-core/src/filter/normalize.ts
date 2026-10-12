@@ -92,7 +92,8 @@ function condition(
 
 /**
  * The condition's predicate, or `REFUSED` with its value's refusal added
- * to `refused`, so the walk goes on to the next condition.
+ * to `refused` at the condition's path, so the walk goes on to the next
+ * condition.
  */
 function gathered(
   scope: Scope,
@@ -106,7 +107,9 @@ function gathered(
     if (!(error instanceof InvalidFilterValueError)) {
       throw error;
     }
-    refused.push(...error.values);
+    for (const { field, operator, expected, path: within } of error.values) {
+      refused.push({ field, operator, expected, path: [...path, ...within] });
+    }
     return REFUSED;
   }
 }

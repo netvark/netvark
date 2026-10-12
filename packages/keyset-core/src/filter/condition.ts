@@ -21,13 +21,17 @@ import { checkScalar } from './values';
 
 const BETWEEN_ARITY = 2;
 
-/** The refusal of one condition's value; `normalizeFilter` gathers every condition's (SPEC 4.1). */
+/**
+ * The refusal of one condition's value, at the condition itself (an empty
+ * path); `normalizeFilter` gathers every condition's at its place in the
+ * tree (SPEC 4.1).
+ */
 function refusal(
   field: string,
   operator: Operator,
   expected: string,
 ): InvalidFilterValueError {
-  return new InvalidFilterValueError([{ field, operator, expected }]);
+  return new InvalidFilterValueError([{ field, operator, expected, path: [] }]);
 }
 
 export function targetOf(

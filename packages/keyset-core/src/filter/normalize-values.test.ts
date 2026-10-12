@@ -12,7 +12,7 @@ import { normalizeFilter } from './normalize';
 const OLD = { field: 'age', op: 'gte', value: 'old' } as const;
 
 describe('normalizeFilter: refused values (ADR 0019)', () => {
-  it('lists every refused condition in the order of the request, at any depth', () => {
+  it('lists every refused condition in the order of the request, at its path, at any depth', () => {
     expect(
       invalidValues(() =>
         normalizeFilter(definition, {
@@ -34,20 +34,40 @@ describe('normalizeFilter: refused values (ADR 0019)', () => {
         }),
       ),
     ).toEqual([
-      { field: 'age', operator: 'gte', expected: 'integer' },
+      {
+        field: 'age',
+        operator: 'gte',
+        expected: 'integer',
+        path: ['and', 0],
+      },
       {
         field: 'createdAt',
         operator: 'lt',
         expected: 'timestamptz (ISO 8601)',
+        path: ['and', 2, 'or', 0, 'not'],
       },
-      { field: 'emails.primary', operator: 'eq', expected: 'boolean' },
-      { field: 'email', operator: 'contains', expected: 'text' },
+      {
+        field: 'emails.primary',
+        operator: 'eq',
+        expected: 'boolean',
+        path: ['and', 2, 'or', 1],
+      },
+      {
+        field: 'email',
+        operator: 'contains',
+        expected: 'text',
+        path: ['and', 3, 'some'],
+      },
       {
         field: 'status',
         operator: 'eq',
         expected: 'one of "lead", "customer"',
+        path: ['and', 4],
       },
     ]);
+    expect(invalidValues(() => normalizeFilter(definition, OLD))).toMatchObject(
+      [{ field: 'age', path: [] }],
+    );
   });
 
   it('lists a condition once, however many of its items are refused', () => {
@@ -61,8 +81,13 @@ describe('normalizeFilter: refused values (ADR 0019)', () => {
         }),
       ),
     ).toEqual([
-      { field: 'age', operator: 'in', expected: 'integer' },
-      { field: 'age', operator: 'between', expected: '[low, high]' },
+      { field: 'age', operator: 'in', expected: 'integer', path: ['or', 0] },
+      {
+        field: 'age',
+        operator: 'between',
+        expected: '[low, high]',
+        path: ['or', 1],
+      },
     ]);
   });
 

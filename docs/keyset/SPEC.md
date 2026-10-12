@@ -348,7 +348,9 @@ The structure is checked before the values (ADR 0019). `InvalidFilterError` and
 `UnsupportedFilterError` are thrown where the walk meets them, whatever values were refused before.
 A condition's `InvalidFilterValueError` (4.2) is gathered instead, and once the whole tree is
 walked, `normalizeFilter` throws one `InvalidFilterValueError` whose `values` hold every refused
-condition in the order of the request's conditions (a depth-first walk), one entry per condition.
+condition in the order of the request's conditions (a depth-first walk), one entry per condition,
+each with the condition's `path` in the tree, as `InvalidFilterError`'s (`['and', 2, 'or', 0]`; `[]`
+for a filter that is one condition).
 
 Tests: `normalize.test.ts` (combinators at depth, paths of malformed nodes, relation paths, relation
 nodes and nesting), `normalize-values.test.ts` (every refused value at any depth and in relations,
@@ -383,10 +385,10 @@ MUST be in the field's set (`UnsupportedFilterError(name, op)`); the target is t
 (`targetOf`: `{ kind: 'column', table, column, type, lower }`) or its aggregate
 (`{ kind: 'aggregate', relation, fn, column, type }`); values are checked by the field's scalar
 type, the element type for arrays (4.3), with an `InvalidFilterValueError` whose one entry is
-`{ field: name, operator: op, expected }` on failure, which `normalizeFilter` gathers (4.1). On a
-field with the `insensitive` collation, scalar values of every operator but the patterns are
-lowercased and the target has `lower: true`; a pattern's target has `lower: false` and the pattern
-is `ILIKE` whether or not the operator has the `i` suffix.
+`{ field: name, operator: op, expected, path: [] }` on failure, which `normalizeFilter` gathers at
+the condition's path (4.1). On a field with the `insensitive` collation, scalar values of every
+operator but the patterns are lowercased and the target has `lower: true`; a pattern's target has
+`lower: false` and the pattern is `ILIKE` whether or not the operator has the `i` suffix.
 
 Tests: `operators.test.ts` (the table, classification), `operators.test-d.ts` (`OperatorsOf` per
 row), `condition.test.ts` (comparisons, insensitive fields, rejections, aggregates),
@@ -651,24 +653,25 @@ Every request-time error extends `KeysetError`, whose `code` is the stable discr
 `name` is the class name; `isKeysetError(value)` narrows. Messages are constant; the detail is in
 fields. Definition mistakes are `TypeError`s (3.5) and are not keyset errors.
 
-| Class                     | `code`                 | Fields                                                         | When                                                                     |
-| ------------------------- | ---------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `InvalidCursorError`      | `INVALID_CURSOR`       | `parameter` (`after` or `before`), `reason` (8)                | A cursor is missing a part, forged, foreign, outdated, expired, or empty |
-| `UnsupportedSortError`    | `UNSUPPORTED_SORT`     | `fields` (every offending item, request order)                 | A sort item is unknown, unsortable, repeated, or malformed (5)           |
-| `UnsupportedFilterError`  | `UNSUPPORTED_FILTER`   | `field`, `operator` (or `null`)                                | An unknown field or relation path, or an operator the field rejects (4)  |
-| `InvalidFilterError`      | `INVALID_FILTER`       | `path`                                                         | A node that is not one of the five shapes (4.1)                          |
-| `InvalidFilterValueError` | `INVALID_FILTER_VALUE` | `values` (each `field`, `operator`, `expected`; request order) | Values their fields' types reject (4.1, 4.3)                             |
-| `UnsupportedSearchError`  | `UNSUPPORTED_SEARCH`   |                                                                | A search term on a definition without `search`                           |
-| `InvalidPageSizeError`    | `INVALID_PAGE_SIZE`    | `requested`                                                    | `page.size` is not a positive integer (7.1)                              |
-| `PageSizeExceededError`   | `PAGE_SIZE_EXCEEDED`   | `requested`, `max`                                             | `page.size` above the definition's max (7.1)                             |
-| `RangeNotSupportedError`  | `RANGE_NOT_SUPPORTED`  |                                                                | Both cursors on a definition without `page.range` (7.1)                  |
+| Class                     | `code`                 | Fields                                                                 | When                                                                     |
+| ------------------------- | ---------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `InvalidCursorError`      | `INVALID_CURSOR`       | `parameter` (`after` or `before`), `reason` (8)                        | A cursor is missing a part, forged, foreign, outdated, expired, or empty |
+| `UnsupportedSortError`    | `UNSUPPORTED_SORT`     | `fields` (every offending item, request order)                         | A sort item is unknown, unsortable, repeated, or malformed (5)           |
+| `UnsupportedFilterError`  | `UNSUPPORTED_FILTER`   | `field`, `operator` (or `null`)                                        | An unknown field or relation path, or an operator the field rejects (4)  |
+| `InvalidFilterError`      | `INVALID_FILTER`       | `path`                                                                 | A node that is not one of the five shapes (4.1)                          |
+| `InvalidFilterValueError` | `INVALID_FILTER_VALUE` | `values` (each `field`, `operator`, `expected`, `path`; request order) | Values their fields' types reject (4.1, 4.3)                             |
+| `UnsupportedSearchError`  | `UNSUPPORTED_SEARCH`   |                                                                        | A search term on a definition without `search`                           |
+| `InvalidPageSizeError`    | `INVALID_PAGE_SIZE`    | `requested`                                                            | `page.size` is not a positive integer (7.1)                              |
+| `PageSizeExceededError`   | `PAGE_SIZE_EXCEEDED`   | `requested`, `max`                                                     | `page.size` above the definition's max (7.1)                             |
+| `RangeNotSupportedError`  | `RANGE_NOT_SUPPORTED`  |                                                                        | Both cursors on a definition without `page.range` (7.1)                  |
 
 The profile's three error objects map to `UNSUPPORTED_SORT` (`unsupported-sort`),
 `PAGE_SIZE_EXCEEDED` (`max-size-exceeded`, with `max` for `meta.page.maxSize`), and
 `RANGE_NOT_SUPPORTED` (`range-pagination-not-supported`); `INVALID_CURSOR` is its invalid query
 parameter error with `source.parameter` `page[after]` or `page[before]`; `INVALID_FILTER_VALUE` is
-one invalid query parameter error per entry of `values`, on `filter[<field>][<operator>]`; the rest
-are invalid query parameter errors on `sort`, `filter`, or `page[size]`.
+one invalid query parameter error per entry of `values`, on the parameter its `path` leads to in the
+API layer's grammar (`filter[<field>][<operator>]` in jsonapi-core's, unless the request spelled it
+otherwise); the rest are invalid query parameter errors on `sort`, `filter`, or `page[size]`.
 
 Tests: `errors.test.ts`.
 

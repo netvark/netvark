@@ -262,7 +262,10 @@ try {
 
 Every request-time error is a `KeysetError` with a stable `code` and the detail in fields
 (ADR-0010). The example maps them to `@netvark/jsonapi-core`'s profile errors, one error object per
-refused sort field and per refused filter value; any API layer does the same with its own catalog.
+refused sort field and per refused filter value; any API layer does the same with its own catalog. A
+refused value's `path` leads to its condition in the tree, so a layer that built the tree from query
+parameters names the parameter the client sent, as `@netvark/resource-core`'s `filterParameters`
+does (ADR-0019); the example's `filter[<field>][<operator>]` is that grammar's canonical spelling.
 The fields hold the request's text, which `unsupportedSortError` quotes only when it is a plain
 token (jsonapi ADR 0016); a layer of its own does the same.
 

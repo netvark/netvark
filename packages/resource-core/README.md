@@ -734,7 +734,11 @@ app.get('/contacts', async (c) => {
 
 Its result is typed by the declaration, so it is what `contacts.plan` takes. Every other value goes
 to keyset-core unchanged, which accepts each type's text form: `filter[createdAt][gte]=yesterday` is
-keyset-core's `InvalidFilterValueError`, a client error like the parser's.
+keyset-core's `InvalidFilterValueError`, a client error like the parser's. That error lists every
+refused value, each with its condition's `path`; `filterParameters(Contacts, query)` gives the
+parameter each path came in, as the request spelled it (`filter[createdAt][gte]`,
+`filter[or][0][email]`). A runtime's `list` takes them as its `parameters` option and names each
+refused value's parameter with them.
 
 ## Server
 
@@ -1248,9 +1252,11 @@ option, operator, or code, a loosened limit, and a new default page size break n
   response outside the document is a bug in one of them.
 - **Answer the planner's refusals as the parser's.** Map keyset-core's `InvalidCursorError` to
   `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and each of
-  `InvalidFilterValueError`'s `values` to its own `INVALID_QUERY_PARAMETER` at
-  `filter[<field>][<operator>]`, as the document's 400 lists them, so a client hears of every bad
-  value at once; left unmapped, they answer 500.
+  `InvalidFilterValueError`'s `values` to its own `INVALID_QUERY_PARAMETER` at the parameter its
+  `path` leads to among `filterParameters`, as the document's 400 lists them. A client then hears of
+  every bad value at once, at the parameter it sent, such as `filter[status]` rather than
+  `filter[status][eq]`. Left unmapped, they answer 500. A runtime's `list` does this when given
+  `{ parameters: filterParameters(resource, query) }`.
 - **Commit the surface and review its diff.** Write it with `pg-catalog surface` next to the
   catalog, run `pg-catalog surface --check` in CI, and record a breaking change only with the API
   major version that announces it. A migration that renames a column, tightens a CHECK, or widens an

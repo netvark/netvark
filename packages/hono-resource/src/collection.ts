@@ -1,10 +1,11 @@
 /**
  * A collection's routes (resource SPEC 19.3), each only when its operation
  * is declared: `GET` runs `list` with the query as `keysetRequest` hands
- * it to the keyset, then each include, and answers the page with the
- * Cursor Pagination profile's links and meta; `POST` runs `create` with
- * the parsed document and answers 201, whose `Location` is the row's
- * `links.self`.
+ * it to the keyset and with its `filterParameters`, so a refused filter
+ * value's error names the parameter it came in, then each include, and
+ * answers the page with the Cursor Pagination profile's links and meta;
+ * `POST` runs `create` with the parsed document and answers 201, whose
+ * `Location` is the row's `links.self`.
  * @ref https://jsonapi.org/format/1.1/#fetching-resources
  * @ref https://jsonapi.org/format/1.1/#crud-creating-responses-201
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
@@ -24,7 +25,7 @@ import {
   resourceDocument,
   respond,
 } from '@netvark/hono-jsonapi';
-import { keysetRequest } from '@netvark/resource-core/server';
+import { filterParameters, keysetRequest } from '@netvark/resource-core/server';
 
 import { includedOf, notRun, operationsOf } from './context';
 import { allow } from './methods';
@@ -56,7 +57,9 @@ export function collectionRoutes<TEnv extends Env, TDomain extends DomainShape>(
         if (domain.list === undefined) {
           throw notRun(declared, 'list');
         }
-        const page = await domain.list(keysetRequest(declared, query));
+        const page = await domain.list(keysetRequest(declared, query), {
+          parameters: filterParameters(declared, query),
+        });
         const included = await includedOf(
           context,
           domain,

@@ -94,6 +94,8 @@ export interface InvalidFilterValue {
   readonly operator: string;
   /** What a valid value looks like, in the vocabulary of SPEC 4.3 (`text`, `integer`, `[low, high]`, ...). */
   readonly expected: string;
+  /** The condition's position: member names and array indexes from the root, as `InvalidFilterError`'s. */
+  readonly path: ReadonlyArray<string | number>;
 }
 
 export class InvalidFilterValueError extends KeysetError {

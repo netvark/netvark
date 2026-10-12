@@ -618,7 +618,12 @@ The grammar is the package's choice; JSON:API reserves the family and leaves the
 `conditions` all hold; within a group any condition may hold; every group holds. Groups are returned
 in ascending index order. An undeclared field or operator is `INVALID_QUERY_PARAMETER` on the
 parameter; `filter`, `filter[]`, more than four members, or an `or` without a numeric index and a
-field is `UNKNOWN_QUERY_PARAMETER`. A repeated parameter yields an array `value`.
+field is `UNKNOWN_QUERY_PARAMETER`. A repeated parameter yields an array `value`. Each condition
+keeps the `parameter` it came in, as the request spelled it (`filter[status]`,
+`filter[or][0][status][eq]`), so an application that refuses its value later, as keyset-core refuses
+a value its field's type does not accept, names that parameter in `source.parameter`, as this parser
+names its own refusals. @ref https://jsonapi.org/format/1.1/#error-objects ("which URI query
+parameter caused the error")
 
 Tests: `parse-query.test.ts` (dispatch, aggregation, single-occurrence rule, custom and search
 parameters), `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`.
