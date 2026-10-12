@@ -69,9 +69,20 @@ interface ValidatedStore {
   addValidatedData(target: keyof ValidationTargets, data: unknown): void;
 }
 
+/**
+ * The query of a request URL: from the first `?` to the fragment, and none
+ * when a `#` comes first. A literal `#` can reach the request URL (Node's
+ * HTTP server keeps it), and what follows it is no parameter to a cache or
+ * a filter in front of the application, so it is none here either.
+ * @ref https://www.rfc-editor.org/rfc/rfc3986#section-3.4 (the query ends at "#")
+ * @ref https://url.spec.whatwg.org/#query-state (the parser leaves the query at "#")
+ * @ref https://github.com/honojs/hono/security/advisories/GHSA-crvj-82cr-hjcx (Hono's own helpers, fixed in 4.13.5)
+ */
 function queryString(url: string): string {
-  const index = url.indexOf('?');
-  return index === -1 ? '' : url.slice(index + 1);
+  const hash = url.indexOf('#');
+  const end = hash === -1 ? url.length : hash;
+  const start = url.indexOf('?');
+  return start === -1 || start > end ? '' : url.slice(start + 1, end);
 }
 
 /**
