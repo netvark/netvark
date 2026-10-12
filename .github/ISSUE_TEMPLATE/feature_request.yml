@@ -12,6 +12,8 @@ body:
           '@netvark/hono-ban',
           '@netvark/catalog-core',
           '@netvark/pg-catalog',
+          '@netvark/intl-core',
+          '@netvark/paraglide-intl',
           '@netvark/jsonapi-core',
           '@netvark/hono-jsonapi',
           '@netvark/jsonapi-client',

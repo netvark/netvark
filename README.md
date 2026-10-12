@@ -1,9 +1,9 @@
 # netvark
 
-TypeScript libraries for HTTP APIs, published under the `@netvark` scope. Each family is a
-framework-free core plus bindings for a host (Hono, Kysely), written from the specification or the
-manual it implements: every rule is cited where it is implemented and pinned by a test, and every
-choice the specification leaves open is written down.
+TypeScript libraries for HTTP APIs and the applications built on them, published under the
+`@netvark` scope. Each family is a framework-free core plus bindings for a host (Hono, Kysely),
+written from the specification or the manual it implements: every rule is cited where it is
+implemented and pinned by a test, and every choice the specification leaves open is written down.
 
 | Family                    | Package                                                       | What it is                                                                                                                                                                                                                                                                                                  |
 | ------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,6 +11,8 @@ choice the specification leaves open is written down.
 |                           | [`@netvark/hono-ban`](packages/hono-ban#readme)               | The [Hono](https://hono.dev) binding: `app.onError()` wiring and `HTTPException` adoption, every core subpath re-exported.                                                                                                                                                                                  |
 | [catalog](docs/catalog)   | [`@netvark/catalog-core`](packages/catalog-core#readme)       | The PostgreSQL catalog model as TypeScript types: tables, columns, constraints, indexes, row security, enums, and domains, with the browser-safe slice (`toPublicCatalog`) and a structural diff (`diffCatalogs`).                                                                                          |
 |                           | [`@netvark/pg-catalog`](packages/pg-catalog#readme)           | The extractor: replays your SQL migrations into PGlite or a throwaway database on a server, reads `pg_catalog`, and writes the catalog as a deterministic `as const` module, checked current in CI.                                                                                                         |
+| [intl](docs/intl)         | [`@netvark/intl-core`](packages/intl-core#readme)             | Formatters that read the locale and the reader's time zone on every call, through cached `Intl` objects built for formatting tags that name their calendar and digits, so a server render and its hydration agree; the reader's time zone from a cookie; Unicode bidi isolation. In development.            |
+|                           | [`@netvark/paraglide-intl`](packages/paraglide-intl#readme)   | The [Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs) compile step with every interpolated value isolated and every message that formats a value refused. In development.                                                                                                            |
 | [jsonapi](docs/jsonapi)   | [`@netvark/jsonapi-core`](packages/jsonapi-core#readme)       | [JSON:API 1.1](https://jsonapi.org/format/1.1/): resource definitions, documents, query parsing, request validation, content negotiation, the Cursor Pagination profile, the Atomic Operations extension.                                                                                                   |
 |                           | [`@netvark/hono-jsonapi`](packages/hono-jsonapi#readme)       | The Hono binding: negotiation middleware, validators typed for `c.req.valid()`, response helpers, error handlers on `@netvark/hono-ban`, the operations endpoint.                                                                                                                                           |
 |                           | [`@netvark/jsonapi-client`](packages/jsonapi-client#readme)   | A typed client for those servers: calls, queries, and records typed by the definitions the server is built from, with nothing generated; runs wherever `fetch` does.                                                                                                                                        |
@@ -23,20 +25,24 @@ choice the specification leaves open is written down.
 |                           | [`@netvark/react-resource`](packages/react-resource#readme)   | React forms, lists, and query caches from those declarations: labels and options from your messages, validation in the server's words, refusals on their fields, and list state as TanStack Table v9 holds it, bound to TanStack Form and Query. In development.                                            |
 
 Every package is ESM only and runs on Node 22.12+, Bun, and Deno. Every package but
-`@netvark/pg-catalog`, a build-time tool that reads files and drives PostgreSQL, also runs on
-Cloudflare Workers and reads nothing from the environment. The cores have no dependencies apart from
-each other (`@netvark/jsonapi-core` is built on `@netvark/ban-core`, and `@netvark/resource-core` on
-the catalog, jsonapi, and keyset cores). `@netvark/jsonapi-client` depends on
-`@netvark/jsonapi-core` alone and also runs in browsers. A binding takes its host as a peer
+`@netvark/pg-catalog`, a build-time tool that reads files and drives PostgreSQL, and
+`@netvark/paraglide-intl`, a build-time tool that compiles messages, also runs on Cloudflare Workers
+and reads nothing from the environment. The cores have no dependencies apart from each other
+(`@netvark/jsonapi-core` is built on `@netvark/ban-core`, and `@netvark/resource-core` on the
+catalog, jsonapi, and keyset cores). `@netvark/jsonapi-client` depends on `@netvark/jsonapi-core`
+alone and also runs in browsers, as does `@netvark/intl-core`. A binding takes its host as a peer
 dependency, and also each `@netvark` package whose values the application hands it
 ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)):
 `@netvark/hono-jsonapi` takes `@netvark/hono-ban`, `@netvark/kysely-resource` takes
 `@netvark/resource-core` and `@netvark/keyset-core`, `@netvark/hono-resource` takes
 `@netvark/hono-jsonapi` and `@netvark/resource-core`, and `@netvark/react-resource` takes
 `@netvark/resource-core`. `@netvark/pg-catalog` depends on `pg` and takes PGlite and
-`@netvark/resource-core` as optional peers. A peer range on a package outside the workspace starts
-past that package's published advisories, so an affected release in your application is an unmet
-peer dependency, and CI runs the binding's tests on the range's floor
+`@netvark/resource-core` as optional peers. `@netvark/paraglide-intl` takes `@inlang/paraglide-js`
+and `@inlang/sdk`, whose projects it hands to Paraglide's compiler
+([ADR 0009](docs/adr/0009-a-binding-takes-as-peers-the-packages-whose-values-it-hands-its-host.md)).
+A peer range on a package outside the workspace starts past that package's published advisories, so
+an affected release in your application is an unmet peer dependency, and CI runs the binding's tests
+on the range's floor
 ([ADR 0007](docs/adr/0007-a-peer-range-starts-past-published-advisories-and-ci-tests-its-floor.md)).
 
 ## Install
@@ -52,6 +58,8 @@ pnpm add @netvark/resource-core                                # resources decla
 pnpm add @netvark/kysely-resource @netvark/keyset-core kysely  # those resources run on PostgreSQL through Kysely
 pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono     # and served on Hono
 pnpm add @netvark/react-resource @netvark/resource-core        # and their forms and lists in React
+pnpm add @netvark/intl-core                                    # formatting and time zones for Paraglide apps
+pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js @inlang/sdk  # Paraglide's compile, values isolated
 pnpm add @netvark/ban-core                                     # a core on its own: a fetch handler, a worker, another framework
 ```
 
@@ -65,10 +73,10 @@ Package names are predictable, in the manner of `@tanstack/*`:
 | `@netvark/<host>-<thing>`  | the binding of a family to a host library          | `@netvark/hono-ban`, `@netvark/kysely-keyset`, `@netvark/pg-catalog` |
 | `@netvark/<thing>-<facet>` | a companion of a family that binds to no host      | `@netvark/jsonapi-client`                                            |
 
-`<thing>` is the family name (`ban`, `catalog`, `jsonapi`, `keyset`), `<host>` the npm name of the
-host library (`hono`, `kysely`, `pg`, `drizzle`, `react`). The directory under `packages/` is the
-package name without the scope. [ADR 0003](docs/adr/0003-package-naming.md) records the rule; new
-packages are tracked as epics in the
+`<thing>` is the family name (`ban`, `catalog`, `intl`, `jsonapi`, `keyset`), `<host>` the npm name
+of the host library (`hono`, `kysely`, `pg`, `drizzle`, `react`, `paraglide`). The directory under
+`packages/` is the package name without the scope. [ADR 0003](docs/adr/0003-package-naming.md)
+records the rule; new packages are tracked as epics in the
 [issues](https://github.com/netvark/netvark/issues?q=is%3Aissue+label%3Aepic).
 
 ## Repository
