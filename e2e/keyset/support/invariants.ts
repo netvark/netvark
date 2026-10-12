@@ -1,24 +1,24 @@
 /**
- * The invariants every harness must satisfy (SPEC 11): walking forward
- * visits every row once in the expected order, walking backward visits
- * the same rows in the same order, an item's cursor resumes right after
- * it, and `next` then `prev` returns to the page it came from. Run over
- * several sorts, including ones with equal values and nulls, and several
- * page sizes.
+ * The invariants every harness must satisfy through every binding (SPEC
+ * 11, 14.4): walking forward visits every row once in the expected order,
+ * walking backward visits the same rows in the same order, an item's
+ * cursor resumes right after it, and `next` then `prev` returns to the
+ * page it came from. Run over several sorts, including ones with equal
+ * values and nulls, and several page sizes.
  */
 import type { Page } from '@netvark/kysely-keyset';
 
+import type { Row } from './bindings.ts';
 import type { Harness } from './db.ts';
 import type { SortableField } from './schema.ts';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { contacts } from './keysets.ts';
+import { BINDINGS } from './bindings.ts';
 import { expectedIds } from './schema.ts';
 
 type SortName = SortableField | `-${SortableField}`;
 type Sort = ReadonlyArray<SortName>;
-type Row = { id: string };
 
 const SORTS: ReadonlyArray<Sort> = [
   ['id'],
@@ -50,106 +50,106 @@ export function runInvariants(
       await harness.close();
     });
 
-    const query = () =>
-      harness.db.selectFrom('contacts').select(['id', 'first_name']);
+    describe.each(
+      BINDINGS.flatMap((binding) =>
+        SORTS.map(
+          (sort) => [binding.name, sort.join(','), binding, sort] as const,
+        ),
+      ),
+    )('through %s, sort %s', (_name, _label, binding, sort) => {
+      async function fetch(
+        sortBy: Sort,
+        page: { size: number; after?: string; before?: string },
+      ): Promise<Page<Row>> {
+        return binding.contacts(harness, { sort: sortBy, page });
+      }
 
-    async function fetch(
-      sort: Sort,
-      page: { size: number; after?: string; before?: string },
-    ): Promise<Page<Row>> {
-      return contacts.paginate(query(), { sort, page });
-    }
+      const expected = expectedIds(sort);
 
-    describe.each(SORTS.map((sort) => [sort.join(','), sort] as const))(
-      'sort %s',
-      (_label, sort) => {
-        const expected = expectedIds(sort);
-
-        it.each(SIZES)(
-          'walks forward through every row once with size %i',
-          async (size) => {
-            const seen: Array<string> = [];
-            let page = await fetch(sort, { size });
-            expect(page.hasPrev).toBe(false);
-            expect(page.prev).toBeNull();
-            for (;;) {
-              seen.push(...ids(page));
-              expect(page.rows.length).toBeLessThanOrEqual(size);
-              if (page.next === null) {
-                expect(page.hasNext).toBe(false);
-                break;
-              }
-              expect(page.hasNext).toBe(true);
-              page = await fetch(sort, { size, after: page.next });
-              expect(page.hasPrev).toBe(true);
+      it.each(SIZES)(
+        'walks forward through every row once with size %i',
+        async (size) => {
+          const seen: Array<string> = [];
+          let page = await fetch(sort, { size });
+          expect(page.hasPrev).toBe(false);
+          expect(page.prev).toBeNull();
+          for (;;) {
+            seen.push(...ids(page));
+            expect(page.rows.length).toBeLessThanOrEqual(size);
+            if (page.next === null) {
+              expect(page.hasNext).toBe(false);
+              break;
             }
-            expect(seen).toEqual(expected);
-          },
-        );
-
-        it.each(SIZES)(
-          'walks backward from the end in the same order with size %i',
-          async (size) => {
-            let last = await fetch(sort, { size });
-            while (last.next !== null) {
-              last = await fetch(sort, { size, after: last.next });
-            }
-            const seen: Array<string> = ids(last);
-            let page = last;
-            while (page.prev !== null) {
-              page = await fetch(sort, { size, before: page.prev });
-              expect(page.hasNext).toBe(true);
-              seen.unshift(...ids(page));
-            }
-            expect(page.hasPrev).toBe(false);
-            expect(seen).toEqual(expected);
-          },
-        );
-
-        it('resumes right after any item from its own cursor', async () => {
-          const all = await fetch(sort, { size: 50 });
-          expect(ids(all)).toEqual(expected);
-          for (const [index, row] of all.rows.entries()) {
-            const after = await fetch(sort, {
-              size: 3,
-              after: all.cursor(row),
-            });
-            expect(ids(after)).toEqual(expected.slice(index + 1, index + 4));
-            const before = await fetch(sort, {
-              size: 3,
-              before: all.cursor(row),
-            });
-            expect(ids(before)).toEqual(
-              expected.slice(Math.max(0, index - 3), index),
-            );
+            expect(page.hasNext).toBe(true);
+            page = await fetch(sort, { size, after: page.next });
+            expect(page.hasPrev).toBe(true);
           }
-        });
+          expect(seen).toEqual(expected);
+        },
+      );
 
-        it('returns to the first page from the second through prev', async () => {
-          const first = await fetch(sort, { size: 4 });
-          const second = await fetch(sort, {
-            size: 4,
-            after: first.next ?? '',
+      it.each(SIZES)(
+        'walks backward from the end in the same order with size %i',
+        async (size) => {
+          let last = await fetch(sort, { size });
+          while (last.next !== null) {
+            last = await fetch(sort, { size, after: last.next });
+          }
+          const seen: Array<string> = ids(last);
+          let page = last;
+          while (page.prev !== null) {
+            page = await fetch(sort, { size, before: page.prev });
+            expect(page.hasNext).toBe(true);
+            seen.unshift(...ids(page));
+          }
+          expect(page.hasPrev).toBe(false);
+          expect(seen).toEqual(expected);
+        },
+      );
+
+      it('resumes right after any item from its own cursor', async () => {
+        const all = await fetch(sort, { size: 50 });
+        expect(ids(all)).toEqual(expected);
+        for (const [index, row] of all.rows.entries()) {
+          const after = await fetch(sort, {
+            size: 3,
+            after: all.cursor(row),
           });
-          expect(ids(second)).toEqual(expected.slice(4, 8));
-          const back = await fetch(sort, {
-            size: 4,
-            before: second.prev ?? '',
+          expect(ids(after)).toEqual(expected.slice(index + 1, index + 4));
+          const before = await fetch(sort, {
+            size: 3,
+            before: all.cursor(row),
           });
-          expect(ids(back)).toEqual(ids(first));
-          expect(back.hasPrev).toBe(false);
-          expect(back.hasNext).toBe(true);
-          // `back.next` and `first.next` mark the same position but carry
-          // their own issue time, so the strings differ when the clock
-          // ticks between the two requests. Equivalence is behavioral: both
-          // resume on the same second page.
-          const again = await fetch(sort, {
-            size: 4,
-            after: back.next ?? '',
-          });
-          expect(ids(again)).toEqual(ids(second));
+          expect(ids(before)).toEqual(
+            expected.slice(Math.max(0, index - 3), index),
+          );
+        }
+      });
+
+      it('returns to the first page from the second through prev', async () => {
+        const first = await fetch(sort, { size: 4 });
+        const second = await fetch(sort, {
+          size: 4,
+          after: first.next ?? '',
         });
-      },
-    );
+        expect(ids(second)).toEqual(expected.slice(4, 8));
+        const back = await fetch(sort, {
+          size: 4,
+          before: second.prev ?? '',
+        });
+        expect(ids(back)).toEqual(ids(first));
+        expect(back.hasPrev).toBe(false);
+        expect(back.hasNext).toBe(true);
+        // `back.next` and `first.next` mark the same position but carry
+        // their own issue time, so the strings differ when the clock
+        // ticks between the two requests. Equivalence is behavioral: both
+        // resume on the same second page.
+        const again = await fetch(sort, {
+          size: 4,
+          after: back.next ?? '',
+        });
+        expect(ids(again)).toEqual(ids(second));
+      });
+    });
   });
 }

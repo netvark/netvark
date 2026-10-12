@@ -785,22 +785,23 @@ first page; walking backward from the last page visits the same rows in the same
 own cursor resumes right after it (and right before it); and `next` then `prev` returns to the page
 it came from.
 
-| File                          | Covers                                                                                                                                                                                                                                                                                                   |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package-surface.e2e.test.ts` | the exact export lists of the three packages, and that each adapter re-exports the core's own bindings                                                                                                                                                                                                   |
-| `paginate.e2e.test.ts`        | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps                                                                                                                                                                                         |
-| `filters.e2e.test.ts`         | every operator of every type against real rows, combinators, rejections before querying, totals                                                                                                                                                                                                          |
-| `relations.e2e.test.ts`       | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging                                                                                                                                                                                     |
-| `search.e2e.test.ts`          | `like` search, websearch over the stored vector (words, negation, phrases), phrase search over columns, rejection                                                                                                                                                                                        |
-| `range.e2e.test.ts`           | the rows between two cursors, the max size default, `rangeTruncated`, empty ranges, rejection                                                                                                                                                                                                            |
-| `cursors.e2e.test.ts`         | foreign context, tampering, foreign secrets, malformed input, expiry, rotation, opacity and URL safety                                                                                                                                                                                                   |
-| `camel-case.e2e.test.ts`      | a `CamelCasePlugin` application end to end, and cursor interchange with the snake_case definition                                                                                                                                                                                                        |
-| `context.e2e.test.ts`         | an organization-scoped table: every row of one organization walked with cursors bound to it, a cursor rejected inside another organization before any query, failing closed without a context, and the cross-scope seek an unbound cursor allows; on PGlite and, when `KEYSET_PG_URL` is set, the server |
-| `defaults.e2e.test.ts`        | a configured definer: the default page size and max, every row walked with the default secret, the default text-search configuration (English stemming) against a definition's own; on PGlite and, when `KEYSET_PG_URL` is set, the server                                                               |
-| `pg-driver.e2e.test.ts`       | section 11.2                                                                                                                                                                                                                                                                                             |
-| `postgres.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
-| `index-seek.e2e.test.ts`      | section 11.3                                                                                                                                                                                                                                                                                             |
-| `drizzle.e2e.test.ts`         | section 14.4                                                                                                                                                                                                                                                                                             |
+| File                            | Covers                                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts`   | the exact export lists of the three packages, and that each adapter re-exports the core's own bindings                                                                                                                                                                                                   |
+| `paginate.e2e.test.ts`          | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps                                                                                                                                                                                         |
+| `filters.e2e.test.ts`           | every operator of every type against real rows, combinators, rejections before querying, totals                                                                                                                                                                                                          |
+| `relations.e2e.test.ts`         | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging                                                                                                                                                                                     |
+| `search.e2e.test.ts`            | `like` search, websearch over the stored vector (words, negation, phrases), phrase search over columns, rejection                                                                                                                                                                                        |
+| `range.e2e.test.ts`             | the rows between two cursors, the max size default, `rangeTruncated`, empty ranges, rejection                                                                                                                                                                                                            |
+| `cursors.e2e.test.ts`           | foreign context, tampering, foreign secrets, malformed input, expiry, rotation, opacity and URL safety                                                                                                                                                                                                   |
+| `camel-case.e2e.test.ts`        | a `CamelCasePlugin` application end to end, and cursor interchange with the snake_case definition                                                                                                                                                                                                        |
+| `context.e2e.test.ts`           | an organization-scoped table: every row of one organization walked with cursors bound to it, a cursor rejected inside another organization before any query, failing closed without a context, and the cross-scope seek an unbound cursor allows; on PGlite and, when `KEYSET_PG_URL` is set, the server |
+| `defaults.e2e.test.ts`          | a configured definer: the default page size and max, every row walked with the default secret, the default text-search configuration (English stemming) against a definition's own; on PGlite and, when `KEYSET_PG_URL` is set, the server                                                               |
+| `pg-driver.e2e.test.ts`         | section 11.2                                                                                                                                                                                                                                                                                             |
+| `postgres.e2e.test.ts`          | section 11.3                                                                                                                                                                                                                                                                                             |
+| `index-seek.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
+| `drizzle.e2e.test.ts`           | section 14.4                                                                                                                                                                                                                                                                                             |
+| `drizzle-pg-schema.e2e.test.ts` | section 14.4                                                                                                                                                                                                                                                                                             |
 
 ### 11.2 node-postgres (`pg-driver.e2e.test.ts`)
 
@@ -828,11 +829,12 @@ row with its nulls last. It runs only against a server.
 
 `checks.ts` holds runtime-neutral checks over the built packages: define a keyset through a
 configured definer, plan a request, bind cursors to a caller context, sign and verify cursors with
-the runtime's Web Crypto, render SQL through Kysely's PostgreSQL compiler over `DummyDriver`,
-paginate a Drizzle keyset over Drizzle's `pg-proxy` driver (14.4), and get the typed errors.
-`run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers module and `workerd.ts`
-bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's workerd.
-`pnpm test:runtimes` runs all three; CI runs them on every push.
+the runtime's Web Crypto, render SQL through Kysely's PostgreSQL compiler over `DummyDriver`, and
+get the typed errors. `drizzle-checks.ts` adds the Drizzle binding's (14.4): paginate a Drizzle
+keyset over Drizzle's `pg-proxy` driver, whose callback records each statement and answers it as a
+server would, and resume the page from its cursor. `run.ts` drives it in-process on Bun and Deno;
+`worker.ts` is the Workers module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`)
+and runs it in Miniflare's workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
 
 ---
 
@@ -1008,8 +1010,8 @@ keyset a second time through a Drizzle definer over a Drizzle schema of the same
 binding a pager over a harness. The files that run plans against rows (`paginate`, `filters`,
 `relations`, `search`, `range`, `context`, `defaults`, `pg-driver`, `postgres`) run once per
 binding, so every expectation of 11.1 to 11.3 holds for Drizzle's SQL on PGlite, node-postgres, and
-PostgreSQL 14 and 18. `drizzle.e2e.test.ts` adds what only the Drizzle binding has:
-`casing: 'snake_case'` over a schema without SQL names, a `pgSchema` table, a caller's `where`
-written as `sql` with an `or`, a caller's selection, a transaction, and cursors interchanged with
-the Kysely keysets in both directions. The smoke test (11.4) defines a Drizzle keyset and paginates
-it over `pg-proxy` on Bun, Deno, and workerd.
+PostgreSQL 14 and 18. `drizzle.e2e.test.ts` and `drizzle-pg-schema.e2e.test.ts` add what only the
+Drizzle binding has: `casing: 'snake_case'` over a schema without SQL names, a `pgSchema` table, a
+caller's `where` written as `sql` with an `or`, a caller's selection, a transaction, and cursors
+interchanged with the Kysely keysets in both directions. The smoke test (11.4) defines a Drizzle
+keyset and paginates it over `pg-proxy` on Bun, Deno, and workerd.
