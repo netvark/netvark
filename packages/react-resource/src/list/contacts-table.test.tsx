@@ -10,11 +10,12 @@
  * accepts, and a create elsewhere on the screen refetches the list.
  * @ref https://vitest.dev/guide/environment#environments-for-specific-files
  * @ref https://www.w3.org/WAI/ARIA/apg/patterns/table/examples/sortable-table/
+ * @ref https://github.com/jsdom/jsdom#unimplemented-parts-of-the-web-platform
  */
 import type { ContactsApi } from '../test-support/contacts-api';
 
 import { cleanup, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   contactId,
@@ -32,6 +33,13 @@ const ROWS = [
   contactRow(3, 'Cleo', { priority: 1 }),
 ];
 
+// TanStack Router scrolls the window to the top after each navigation,
+// which jsdom, laying nothing out, reports as not implemented; its own
+// tests replace `scrollTo` the same way.
+// @ref https://github.com/TanStack/router/blob/main/packages/react-router/tests/setupTests.tsx
+beforeAll(() => {
+  window.scrollTo = () => {};
+});
 afterEach(() => {
   cleanup();
 });
