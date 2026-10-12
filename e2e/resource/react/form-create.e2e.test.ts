@@ -151,6 +151,7 @@ describe.each(runtimeDatabases())(
         {
           method: 'POST',
           path: '/api/contacts',
+          query: '',
           body: {
             data: {
               type: 'contacts',

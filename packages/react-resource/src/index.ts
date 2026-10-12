@@ -19,6 +19,13 @@ export type {
 } from './form/form-types';
 export type { FormResource } from './form/resource-form';
 export type {
+  ListColumnFilters,
+  ListModel,
+  ListResource,
+  ListSorting,
+  ListState,
+} from './list/list-types';
+export type {
   ColumnFilterDescriptor,
   FieldDescriptor,
   FieldDescriptors,
@@ -27,3 +34,4 @@ export type {
 
 export { fieldsOf } from './fields/fields-of';
 export { resourceForm } from './form/resource-form';
+export { resourceList } from './list/resource-list';

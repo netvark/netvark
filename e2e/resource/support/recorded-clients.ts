@@ -2,7 +2,7 @@
  * The contacts application's clients, as the built
  * `@netvark/jsonapi-client` makes them, over a transport to a contacts
  * server that records each request as it leaves: the method, the path,
- * and the request document. Each request acts as the editor and sends
+ * the query, and the request document. Each request acts as the editor and sends
  * the language `language` returns when it leaves, as an application's
  * transport sends Paraglide's locale. Meetings answer where the server
  * serves them (`runtime/meetings.ts`).
@@ -31,6 +31,8 @@ export type ContactClients = Clients<typeof DEFINITIONS>;
 export interface Departure {
   readonly method: string;
   readonly path: string;
+  /** The query string as sent, without its `?`. */
+  readonly query: string;
   /** The request document, `undefined` without a body. */
   readonly body: unknown;
 }
@@ -47,9 +49,11 @@ export function recordedClients(
     language,
     fetch: async (request) => {
       const text = await request.clone().text();
+      const url = new URL(request.url);
       departures.push({
         method: request.method,
-        path: new URL(request.url).pathname,
+        path: url.pathname,
+        query: url.search.slice(1),
         body: text === '' ? undefined : JSON.parse(text),
       });
       return fetch(request);

@@ -15,8 +15,9 @@ and
 [ADR 0017](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0017-a-refusal-of-several-fields-binds-where-a-change-to-any-clears-it.md).
 
 Status: in development and unreleased. Field descriptors (`fieldsOf`), the form model
-(`resourceForm`), its TanStack Form binding (`@netvark/react-resource/form`), and the TanStack Query
-binding (`@netvark/react-resource/query`) have shipped; the list model follows.
+(`resourceForm`), its TanStack Form binding (`@netvark/react-resource/form`), the TanStack Query
+binding (`@netvark/react-resource/query`), and the list model for TanStack Table (`resourceList`)
+have shipped.
 
 ## Install
 
@@ -37,6 +38,10 @@ entry imports:
 ```bash
 pnpm add @tanstack/react-form @tanstack/react-query
 ```
+
+The list model, `resourceList`, is in the root entry and needs no peer: it reads and writes
+[TanStack Table](https://tanstack.com/table/v9) v9's sorting and column filters as plain values, so
+the screens that render a table bring Table themselves.
 
 ## Field descriptors
 
@@ -398,3 +403,231 @@ record's own entries first, so a screen still showing it does not ask the server
 - `resourceQueries` throws `TypeError` for a value `createClients` did not return, `pages` for a
   resource that does not paginate, and a write for `invalidates` that is not a list of keys:
   `[meetings.all]`, not `meetings.all`.
+
+## Lists
+
+`resourceList(resource, messages)` is a framework-free model of a list screen. Its state is the
+client's list query, the `sort`, `filter`, `page`, and `search` a list request sends; the model
+reads it as [TanStack Table v9](https://tanstack.com/table/v9/docs/framework/react/react-table)'s
+sorting and column filters, writes each change Table hands back as the next state, follows a
+result's links to the next and previous pages, and reads a route's search back leniently, so a stale
+or edited link opens the list with what the definition accepts. Build it once, at module scope,
+beside the descriptors:
+
+```ts
+// src/contacts/contacts-list.ts
+import { fieldsOf, resourceList } from '@netvark/react-resource';
+
+import { messages } from '../localization/messages';
+import { Contacts } from '../resources/contacts';
+
+export const contactsList = resourceList(Contacts, messages);
+export const contactFields = fieldsOf(Contacts, messages);
+```
+
+Keep the state in the route's search. With [TanStack Router](https://tanstack.com/router/v1),
+`validateSearch` reads it, the query key follows it, and every change is a navigation, so Back, a
+reload, and a shared link open the same page:
+
+```tsx
+// src/routes/contacts.tsx
+import type { RecordOf } from '@netvark/jsonapi-client';
+import type { ListState } from '@netvark/react-resource';
+
+import type { definitions } from '../api/clients';
+import type { Contacts } from '../resources/contacts';
+
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import {
+  columnFilteringFeature,
+  createColumnHelper,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
+} from '@tanstack/react-table';
+
+import { contacts } from '../api/queries';
+import { contactFields, contactsList } from '../contacts/contacts-list';
+
+type Contact = RecordOf<typeof definitions, typeof definitions.contacts>;
+
+export const Route = createFileRoute('/contacts')({
+  // A stale or edited link opens the list with what the definition accepts.
+  validateSearch: (search: Record<string, unknown>) => contactsList.query(search),
+  component: ContactsScreen,
+});
+
+// At module scope: Table rebuilds its rows when its features, columns, or data are new.
+const features = tableFeatures({ rowSortingFeature, columnFilteringFeature });
+const column = createColumnHelper<typeof features, Contact>();
+const member = (name: 'name' | 'email' | 'status' | 'priority') =>
+  column.accessor(name, {
+    header: () => contactFields[name].label(),
+    enableSorting: contactFields[name].sortable,
+  });
+const columns = column.columns([
+  member('name'),
+  member('email'),
+  member('status'),
+  member('priority'),
+]);
+const noContacts: ReadonlyArray<Contact> = [];
+const sortOrders = { asc: 'ascending', desc: 'descending' } as const;
+
+function ContactsScreen() {
+  const state = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const go = (next: ListState<typeof Contacts>) => void navigate({ search: next });
+  // The previous page stays on screen while the next one loads.
+  const result = useQuery({ ...contacts.list(state), placeholderData: keepPreviousData });
+  const table = useTable({
+    features,
+    columns,
+    data: result.data?.data ?? noContacts,
+    getRowId: (contact) => contact.id,
+    // The server sorts and filters; Table shows the model's state and hands each change back.
+    manualSorting: true,
+    manualFiltering: true,
+    state: {
+      sorting: contactsList.sorting(state),
+      columnFilters: contactsList.columnFilters(state),
+    },
+    onSortingChange: (updater) => go(contactsList.withSorting(state, updater)),
+    onColumnFiltersChange: (updater) => go(contactsList.withColumnFilters(state, updater)),
+  });
+  const status = table.getColumn('status');
+  const statusFilter = status?.getFilterValue() as { readonly eq?: string } | undefined;
+  const next = result.data && contactsList.next(state, result.data);
+  const previous = result.data && contactsList.previous(state, result.data);
+  return (
+    <>
+      <form
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const text = new FormData(event.currentTarget).get('search');
+          go(contactsList.withSearch(state, typeof text === 'string' ? text : ''));
+        }}
+      >
+        {/* The key resets the input when the route's search changes, as on Back. */}
+        <input
+          key={state.search}
+          name="search"
+          type="search"
+          aria-label="Search"
+          defaultValue={state.search}
+        />
+      </form>
+      <select
+        aria-label={contactFields.status.label()}
+        value={statusFilter?.eq ?? ''}
+        onChange={({ target }) =>
+          status?.setFilterValue(target.value === '' ? undefined : { eq: target.value })
+        }
+      >
+        <option value="">All</option>
+        {contactFields.status.options?.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label()}
+          </option>
+        ))}
+      </select>
+      <table>
+        <thead>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              {group.headers.map((header) => {
+                const sorted = header.column.getIsSorted();
+                return (
+                  <th key={header.id} aria-sort={sorted ? sortOrders[sorted] : undefined}>
+                    <button
+                      disabled={!header.column.getCanSort()}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      <table.FlexRender header={header} />
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr key={row.id}>
+              {row.getAllCells().map((cell) => (
+                <td key={cell.id}>
+                  <table.FlexRender cell={cell} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button disabled={previous === undefined} onClick={() => previous && go(previous)}>
+        Previous
+      </button>
+      <button disabled={next === undefined} onClick={() => next && go(next)}>
+        Next
+      </button>
+    </>
+  );
+}
+```
+
+| Member                                                      | Gives                                                                                              |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `query(search)`                                             | the state a route's search holds, as JSON or as parameters, refusals dropped                       |
+| `sorting(state)`, `withSorting(state, sorting)`             | Table's `sorting`, the declaration's default without `sort`, and back                              |
+| `columnFilters(state)`, `withColumnFilters(state, filters)` | Table's `columnFilters`, each condition an object of operators, and back                           |
+| `withSearch(state, text)`                                   | the state searching `text`; empty text removes `search`                                            |
+| `withPageSize(state, size)`                                 | the state at `size` records a page                                                                 |
+| `next(state, result)`, `previous(state, result)`            | the state at the page the result's links name; `undefined` at an end                               |
+| `first(state)`                                              | the state at the first page                                                                        |
+| `params(state)`                                             | the parameters a list request for `state` sends                                                    |
+| `columns`, `page`, `searchable`                             | the descriptors of the members a read returns, the page sizes, and whether the definition searches |
+
+## List rules
+
+- Build the model once, at module scope. `columns` holds descriptors, so its labels, like
+  `fieldsOf`'s, render in the locale of each render.
+- Keep in the state only what the person changes. `query` reads `sort`, `filter`, `page`, and
+  `search`, never `include` or `fields`; add what the screen always reads at the call:
+  `contacts.list({ ...state, include: ['organization'] })`.
+- `query` takes the JSON a router keeps and the API's own parameters, as a string or
+  `URLSearchParams`, and drops each member the definition refuses, such as a filter of a member that
+  no longer filters or a page size over `page.max`. JSON keeps its own forms, so a router that
+  validates the search after every navigation reads back the state it wrote; parameters read one
+  value as text and a repeated one as a list, as the API does.
+- Every change but paging starts at the first page: sorting, filtering, searching, and resizing drop
+  `page.after` and `page.before` and keep `page.size`, since a cursor belongs to the order and the
+  conditions it was issued under. Each function returns a new state and keeps every member it does
+  not set.
+- Give Table the model's `sorting` and `columnFilters` as its state on every render, with
+  `manualSorting` and `manualFiltering`: the server sorts and filters, and Table shows the page it
+  returned. The setters take Table's updaters as they are. Offer sorting where the descriptor is
+  `sortable`; without `sort`, Table shows the declaration's default order as its sorting.
+- A column filter's value is an object of its member's declared operators, `filter.operators`:
+  `{ eq: 'active' }`, `{ in: ['active', 'paused'] }`, `{ gte: 2, lte: 4 }`. An operator set to
+  `undefined` or to an empty list is left out, and a filter left without one is removed, so an
+  emptied input clears its filter. `columnFilters` reads a bare value, `filter[status]=active`, as
+  `{ eq: 'active' }`, and `withColumnFilters` keeps `filter.or`, which no column holds.
+- Page by `next` and `previous`, each `undefined` at an end, and start over with `first`. A cursor
+  counts no pages, so leave out Table's pagination feature, which pages by index.
+- Keep the previous page on screen while the next one loads with
+  `placeholderData: keepPreviousData`, and keep Table's features, columns, and the empty array of
+  the first load at module scope. Key rows by `getRowId`, so a row keeps its state across pages and
+  refetches.
+- Search when the person submits, or debounce typing: each state is a request and a history entry.
+- `query` checks names and shapes, while the server alone checks values, such as a date or an
+  expired cursor: it refuses one with a `400` whose error names its parameter in `source.parameter`.
+  Recover by the state: `first(state)` for `page[after]` or `page[before]`, and `withColumnFilters`
+  without the filter it names otherwise.
+- `resourceList` throws `TypeError` for a resource no `declareResource` returned and for messages as
+  `fieldsOf` does. Its functions throw for a state that is no list state; a sort of a member that
+  does not sort, or of one member twice; a filter of a member that does not filter, with an operator
+  its member does not declare, or whose value is no object of operators; a page size that is no
+  positive safe integer up to `page.max`; a result no `list` returned; and `withSearch` on a
+  definition without a search parameter, which TypeScript refuses too. A message names the function
+  and the type, never a value.

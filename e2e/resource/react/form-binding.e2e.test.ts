@@ -163,6 +163,7 @@ describe.each(runtimeDatabases())(
       expect(departures.at(-1)).toEqual({
         method: 'POST',
         path: '/api/contacts',
+        query: '',
         body: {
           data: {
             type: 'contacts',
