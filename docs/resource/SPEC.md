@@ -4640,15 +4640,23 @@ operators, and search, `withSearch` as `never` without one, and Table v9's `Sort
   across a field and a relationship occur; with messages from `defineMessages` whose texts are
   closures reading a locale variable, so a test switches the language as Paraglide does it, by
   changing what the functions read.
-- Component tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, and Table v9
-  as an application uses them) against a fetch double that answers with documents jsonapi-core
-  builds from the fixture's definitions: a create form that shows no error before its first submit,
+- Screen tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, Router, and
+  Table v9 as an application uses them) over the screens of `src/test-support/screens/`, against the
+  contacts API of `src/test-support/contacts-api.ts`: the fixture's contacts and organizations in
+  memory, each list request read by jsonapi-core's `parseQuery` against the definition, and each
+  answer a document jsonapi-core builds from it (`paginatedDocument`, `resourceDocument`,
+  `errorDocument`), routed by the paths `resourcePaths` reads.
+  `tanstack-form/contact-forms.test.tsx`: a create form that shows no error before its first submit,
   then a client `maxLength` refusal in German on its field and in English after the locale changes;
-  a 422 and a 409 landing on their fields with the server's detail, a field error cleared when its
-  value changes, a 500 without error objects leaving both empty; an update form sending only the
-  members the person changed; a table whose header sends `sort=-name`, whose filter sends
-  `filter[status][in]`, which pages by cursor and drops the cursor on a sort change; and a list
-  refetched after a create.
+  a create that sends the members the person set; a 422 and a 409 landing on their fields with the
+  server's detail, each cleared by the change that answers it; a 500 without error objects leaving
+  the fields empty and the banner to the screen's own text; an update form sending only the members
+  the person changed, measured against the record as it refetched, a cleared input as `null`.
+  `list/contacts-table.test.tsx`: a table whose header sends `sort=-name` and announces its order by
+  `aria-sort`, whose status choice sends `filter[status][in]` and no filter once emptied, which
+  pages both ways by the server's links and drops the cursor on a sort change, searches on submit,
+  opens a stale link through TanStack Router's search with what the definition accepts (20.7, step
+  5), and refetches after a create on the same screen.
 - End to end (`e2e/resource/react/`): the built package in jsdom against the contacts application
   over HTTP (`support/contacts-server.ts`), on PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL
   server, with the application's Paraglide messages and nothing mocked: the German create form, its
@@ -4693,6 +4701,8 @@ operators, and search, `withSearch` as `never` without one, and Table v9's `Sort
 - Dependencies: `@netvark/jsonapi-core`, for `parseQuery`.
 - TanStack Table is not a peer: the list model imports nothing of it and reads and writes its
   sorting and column filters as plain values. `@tanstack/react-table` 9 is a development dependency,
-  for the type tests that assign Table's state to and from the model's.
+  for the type tests that assign Table's state to and from the model's and for the screen tests,
+  with `@tanstack/react-router`, `react-dom`, `jsdom`, and Testing Library
+  (`@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`).
 - React is not a peer: the package has no component and no hook of its own; TanStack's React
   adapters bring it, and the root entry runs without it.

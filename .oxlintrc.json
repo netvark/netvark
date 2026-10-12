@@ -237,6 +237,21 @@
   },
   "overrides": [
     {
+      "files": ["**/*.tsx"],
+      "plugins": [
+        "eslint",
+        "typescript",
+        "oxc",
+        "unicorn",
+        "import",
+        "promise",
+        "node",
+        "jsdoc",
+        "react",
+        "jsx-a11y"
+      ]
+    },
+    {
       "files": ["e2e/smoke/checks.ts"],
       "rules": {
         "eslint/max-lines": "off"
@@ -247,6 +262,7 @@
         "**/*.spec.ts",
         "**/*.test-d.ts",
         "**/*.test.ts",
+        "**/*.test.tsx",
         "packages/*/src/test-support/**"
       ],
       "env": {

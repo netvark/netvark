@@ -180,6 +180,10 @@ async function submit(values: typeof createContact.defaultValues) {
 - Send what `write` returns, nothing more. It carries only the members the person changed, so a
   database default applies to every member left alone on create, and every stored value the person
   did not touch stays on update. Never spread the record into a write.
+- Build an update model from the record the screen shows, and again whenever that record changes:
+  `useMemo(() => resourceForm(Contacts, 'update', { messages, record }), [record])`. `write`
+  compares the values with the record its model was built from, so a model kept from an earlier read
+  sends again what the person already saved once the record refetches after a save.
 - A cleared input is sent as `null`, nullable or not: a member that is not nullable refuses it as
   required on its field, so a submit never reports success for a change the server did not make. To
   keep a stored value, leave the input as it is, or leave the member out of `members`.
