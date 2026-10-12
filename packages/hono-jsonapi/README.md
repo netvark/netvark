@@ -8,11 +8,12 @@ request document validation with JSON Pointers, content negotiation, the
 specification; where the specification leaves a choice to the server, the choice is written down in
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
-This is the Hono adapter of [`@netvark/jsonapi-core`](https://www.npmjs.com/package/jsonapi-kit),
-the framework-free core. Everything the core exports is re-exported here, so a Hono application
-imports from one package; what this package adds is the glue: the `jsonApi()` middleware, validators
-typed for `c.req.valid()`, `respond`, `readDocument`, `errorHandler` and `notFoundHandler`, and the
-operations endpoint as a handler.
+This is the Hono adapter of
+[`@netvark/jsonapi-core`](https://www.npmjs.com/package/@netvark/jsonapi-core), the framework-free
+core. Everything the core exports is re-exported here, so a Hono application imports from one
+package; what this package adds is the glue: the `jsonApi()` middleware, validators typed for
+`c.req.valid()`, `respond`, `readDocument`, `errorHandler` and `notFoundHandler`, and the operations
+endpoint as a handler.
 
 ## Install
 
@@ -504,7 +505,8 @@ Everything that is not a Hono hook comes from `@netvark/jsonapi-core` and is re-
 `parseQuery`, `parseCreateDocument`, `parseUpdateDocument`, the relationship document parsers,
 `negotiate`, `paginationLinks`, the document builders, and `operationsProcessor` are pure functions
 over plain values, usable from a non-Hono handler, a worker, or a client that wants the same checks
-before sending. See the [`@netvark/jsonapi-core` README](https://www.npmjs.com/package/jsonapi-kit).
+before sending. See the
+[`@netvark/jsonapi-core` README](https://www.npmjs.com/package/@netvark/jsonapi-core).
 
 ## Modules
 

@@ -9,10 +9,11 @@ rule is a cited clause of the profile or the PostgreSQL manual, and every choice
 open is written down in
 [`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md).
 
-This is the Kysely adapter of [`@netvark/keyset-core`](https://www.npmjs.com/package/keyset-kit),
-the database-free core. Everything the core exports is re-exported here, so an application imports
-from one package; what this package adds is `createDefineKeyset<DB>()`, `paginate`, and the two
-render functions that turn the core's plan into Kysely expressions.
+This is the Kysely adapter of
+[`@netvark/keyset-core`](https://www.npmjs.com/package/@netvark/keyset-core), the database-free
+core. Everything the core exports is re-exported here, so an application imports from one package;
+what this package adds is `createDefineKeyset<DB>()`, `paginate`, and the two render functions that
+turn the core's plan into Kysely expressions.
 
 ## Install
 
