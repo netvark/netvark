@@ -457,6 +457,9 @@ importers:
       '@netvark/pg-catalog':
         specifier: workspace:*
         version: link:../../packages/pg-catalog
+      '@netvark/react-resource':
+        specifier: workspace:*
+        version: link:../../packages/react-resource
       '@netvark/resource-core':
         specifier: workspace:*
         version: link:../../packages/resource-core
@@ -683,6 +686,12 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
+
+  packages/react-resource:
+    devDependencies:
+      '@netvark/resource-core':
+        specifier: workspace:^
+        version: link:../resource-core
 
   packages/resource-core:
     dependencies:

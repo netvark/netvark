@@ -6,11 +6,15 @@
  * catalogs type the declarations; the oracle's type the probes (SPEC 15.3);
  * the PostgreSQL 18 schema's type the NOT ENFORCED declarations. The
  * storage contract's catalog, which the testing entry ships next to its
- * migrations (SPEC 12.9), is what extraction gives for them.
+ * migrations (SPEC 12.9), and the catalog of `@netvark/react-resource`'s
+ * unit-test fixture (SPEC 20.8) are what extraction gives for theirs.
  */
 import { describe, expect, it } from 'vitest';
 
-import { extractContractCatalog } from './support/contract-catalog.ts';
+import {
+  COMMITTED_CATALOGS,
+  extractCommitted,
+} from './support/committed-catalogs.ts';
 import { CONTACTS_DIR, ORACLE_DIR, POSTGRES18_DIR } from './support/paths';
 import { binPath, runBin } from './support/run-bin';
 
@@ -32,10 +36,13 @@ describe('the extracted catalogs', () => {
     expect(run.code).toBe(0);
   });
 
-  it("of the storage contract's migrations is the one @netvark/resource-core/testing ships", async () => {
-    expect(
-      await extractContractCatalog(true),
-      'run `pnpm run contract:catalog` in e2e/resource',
-    ).toBe('unchanged');
-  });
+  it.each(Object.entries(COMMITTED_CATALOGS))(
+    'of the migrations of %s is the committed one',
+    async (_name, catalog) => {
+      expect(
+        await extractCommitted(catalog, true),
+        'run `pnpm run write:catalogs` in e2e/resource',
+      ).toBe('unchanged');
+    },
+  );
 });

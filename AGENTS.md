@@ -63,6 +63,7 @@ A pnpm workspace of five families:
 | keyset   | `packages/keyset-core`    | `packages/kysely-keyset`   | `docs/keyset`   | `e2e/keyset`   |
 | resource | `packages/resource-core`  | `packages/kysely-resource` | `docs/resource` | `e2e/resource` |
 |          |                           | `packages/hono-resource`   |                 |                |
+|          |                           | `packages/react-resource`  |                 |                |
 
 - `packages/<name>/`: one published package, `@netvark/<name>`. `src/` with colocated tests;
   `tsdown.config.ts`, whose entry map becomes the `exports` map in `package.json` on build;
