@@ -349,6 +349,9 @@ importers:
       '@netvark/hono-jsonapi':
         specifier: workspace:*
         version: link:../../packages/hono-jsonapi
+      '@netvark/jsonapi-client':
+        specifier: workspace:*
+        version: link:../../packages/jsonapi-client
       '@netvark/jsonapi-core':
         specifier: workspace:*
         version: link:../../packages/jsonapi-core

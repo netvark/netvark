@@ -40,13 +40,13 @@ class CheckFailure extends Error {
   override readonly name: string = 'CheckFailure';
 }
 
-function check(condition: boolean, message: string): asserts condition {
+export function check(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new CheckFailure(message);
   }
 }
 
-function equal(actual: unknown, expected: unknown, what: string): void {
+export function equal(actual: unknown, expected: unknown, what: string): void {
   check(
     actual === expected,
     `${what}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`,
@@ -238,19 +238,37 @@ export async function runChecks(dispatch: Dispatch): Promise<SmokeResult> {
   return { runtime, passed, failures };
 }
 
-/** Prints the outcome; throws on failure so the process exits non-zero everywhere. */
-export function report(result: SmokeResult): void {
+/**
+ * The client's checks, which the app runs inside the runtime under test
+ * and answers at `/client-checks` (`client-checks.ts`).
+ */
+export async function clientChecks(dispatch: Dispatch): Promise<SmokeResult> {
+  const res = await dispatch('/client-checks');
+  equal(res.status, 200, 'client checks status');
+  const body = await json(res);
+  const { runtime, passed } = body;
+  const failures = list(body['failures'], 'failures');
+  check(
+    typeof runtime === 'string' && typeof passed === 'number',
+    'client checks report a runtime and a count',
+  );
+  return { runtime, passed, failures: failures.map(String) };
+}
+
+/** Prints the outcome for `name`; throws on failure so the process exits non-zero everywhere. */
+export function report(
+  result: SmokeResult,
+  name = '@netvark/jsonapi-core',
+): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
-    console.log(
-      `@netvark/jsonapi-core smoke: ${total} checks passed on ${result.runtime}`,
-    );
+    console.log(`${name} smoke: ${total} checks passed on ${result.runtime}`);
     return;
   }
   for (const failure of result.failures) {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `@netvark/jsonapi-core smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `${name} smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

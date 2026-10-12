@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Package surface. Every subpath of both packages must resolve through the
- * published `exports` maps at runtime and export exactly what the SPEC
- * lists. Value imports on purpose: a missing dist file or a wrong `exports`
- * entry fails here before any feature test runs.
+ * Package surface. Every subpath of the three packages must resolve
+ * through the published `exports` maps at runtime and export exactly what
+ * the SPEC lists. Value imports on purpose: a missing dist file or a wrong
+ * `exports` entry fails here before any feature test runs.
  */
 import { BanError } from '@netvark/hono-ban';
 import * as hono from '@netvark/hono-jsonapi';
 import * as honoAtomic from '@netvark/hono-jsonapi/atomic';
+import * as client from '@netvark/jsonapi-client';
 import * as kit from '@netvark/jsonapi-core';
 import * as kitAtomic from '@netvark/jsonapi-core/atomic';
 
@@ -106,6 +107,18 @@ const HONO = [
   'varyAccept',
 ];
 
+/** SPEC section 15.1: the client's values. */
+const CLIENT = [
+  'ResponseError',
+  'createClients',
+  'createTransport',
+  'cursorOf',
+  'deserialize',
+  'isResponseError',
+  'pageCursors',
+  'serializeQuery',
+].toSorted();
+
 describe('@netvark/jsonapi-core surface', () => {
   it('the root exports the SPEC section 1 values', () => {
     expect(names(kit)).toEqual(CORE);
@@ -140,5 +153,11 @@ describe('@netvark/hono-jsonapi surface', () => {
       [...CORE_ATOMIC, 'atomicOperations'].toSorted(),
     );
     expect(honoAtomic.operationsProcessor).toBe(kitAtomic.operationsProcessor);
+  });
+});
+
+describe('@netvark/jsonapi-client surface', () => {
+  it('the root exports the SPEC section 15.1 values', () => {
+    expect(names(client)).toEqual(CLIENT);
   });
 });

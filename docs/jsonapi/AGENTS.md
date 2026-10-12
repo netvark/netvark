@@ -90,9 +90,10 @@ typed client, published as `@netvark/jsonapi-client`, depends on the core alone)
   fetch double (`fetch-double.ts`) for the package's own tests; not published
 
 `e2e/jsonapi/`: end-to-end suite, a private workspace package that consumes the built
-`@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*` and drives a blog API over
-real HTTP with `@hono/node-server`; never imports from `src/`. `e2e/jsonapi/smoke/` is the runtime
-smoke test (Bun, Deno, workerd).
+`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, and `@netvark/jsonapi-client` through
+`workspace:*` and drives a blog API over real HTTP with `@hono/node-server`, the `client-*` files
+through the client; never imports from `src/`. `e2e/jsonapi/smoke/` is the runtime smoke test (Bun,
+Deno, workerd), the client's checks running inside each runtime.
 
 - `docs/jsonapi/DESIGN.md` what we are building and why; `docs/jsonapi/SPEC.md` the normative
   contract; `docs/jsonapi/adr/` decisions

@@ -1143,29 +1143,38 @@ A private workspace package that depends on `@netvark/jsonapi-core`, `@netvark/h
 maps into each `dist/` (never the `source` condition) and `tsc` checks the emitted declarations.
 `e2e/jsonapi/support/` holds a blog API (people, articles, tags; a keyset pagination engine over an
 in-memory store; a snapshot transaction) built only from the packages: `store.ts` and `resources.ts`
-import `@netvark/jsonapi-core`, the routes and handlers `@netvark/hono-jsonapi`. Each file starts it
-on `@hono/node-server` and asserts over `fetch`.
+import `@netvark/jsonapi-core`, the routes and handlers `@netvark/hono-jsonapi`. It serves every
+link its documents name: each resource, relationship, and related link, a person's articles paged
+like the collection. Each file starts it on `@hono/node-server` and asserts over `fetch`;
+`clients.ts` builds the client's transport at the server's origin and records each request as the
+server received it.
 
-| File                          | Covers                                                                                                                                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package-surface.e2e.test.ts` | the exact export lists of all four subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings                                                                                       |
-| `fetch.e2e.test.ts`           | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500                                                                                                     |
-| `pagination.e2e.test.ts`      | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                                                                                                       |
-| `mutations.e2e.test.ts`       | create with 201 and `Location`, pointers for bad documents, 403 for a field a write does not accept, alone and beside a 400, update, relationship endpoints and a read-only relationship's 403, delete |
-| `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                   |
-| `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                           |
-| `custom-catalog.e2e.test.ts`  | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                       |
-| `client-types.e2e.test.ts`    | the client types the blog's definitions carry, read through the built declarations (5.3)                                                                                                               |
-| `declarations.e2e.test.ts`    | `tsc --declaration` over modules that export definitions: no diagnostics, and only package entry points named                                                                                          |
-| `client-*.e2e.test.ts`        | the built client over HTTP: pages, records, writes, relationship calls, errors, `Accept-Language` (15.9)                                                                                               |
+| File                               | Covers                                                                                                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package-surface.e2e.test.ts`      | the exact export lists of all five subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings                                                                                       |
+| `fetch.e2e.test.ts`                | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500                                                                                                     |
+| `pagination.e2e.test.ts`           | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                                                                                                       |
+| `mutations.e2e.test.ts`            | create with 201 and `Location`, pointers for bad documents, 403 for a field a write does not accept, alone and beside a 400, update, relationship endpoints and a read-only relationship's 403, delete |
+| `negotiation.e2e.test.ts`          | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                   |
+| `atomic.e2e.test.ts`               | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                           |
+| `custom-catalog.e2e.test.ts`       | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                       |
+| `client-types.e2e.test.ts`         | the client types the blog's definitions carry, read through the built declarations (5.3)                                                                                                               |
+| `declarations.e2e.test.ts`         | `tsc --declaration` over modules that export definitions: no diagnostics, and only package entry points named                                                                                          |
+| `client-reads.e2e.test.ts`         | the built client's pages of records, the walk along `next` and `prev`, cursors, compound documents resolved along the include paths sent, sparse fieldsets, and their types (15.4, 15.6, 15.8)         |
+| `client-writes.e2e.test.ts`        | the documents a create and an update send and the server stores, the records of a 201 and a 200, a remove's 204, and a member the types refuse, answered 403 (15.4)                                    |
+| `client-relationships.e2e.test.ts` | linkage by cardinality, related records with the target's fieldset and paged, linkage replaced, added to, and removed from, and a read-only relationship refused in the types and with 403 (15.4)      |
+| `client-errors.e2e.test.ts`        | each error status into a `ResponseError` with its message naming only the call, ids refused before sending, an aborted request passed on (15.3, 15.7)                                                  |
+| `client-transport.e2e.test.ts`     | the headers and `Accept-Language` the server receives, in order and per request, and a page link to another origin refused (15.2, 15.8)                                                                |
 
 ### 14.2 Runtime smoke test (`e2e/jsonapi/smoke/`)
 
-`app.ts` is the same blog API, so both packages load in each runtime; `checks.ts` holds
+`app.ts` is the same blog API, so every package loads in each runtime; `checks.ts` holds
 runtime-neutral assertions over every feature area; `run.ts` drives it in-process on Bun and Deno;
 `worker.ts` is the Workers module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`)
-and runs it in Miniflare's workerd. `client-checks.ts` drives the same app through the client in
-each runtime (15.9). `pnpm test:runtimes` runs all three; CI runs them on every push.
+and runs it in Miniflare's workerd. `client-checks.ts` calls a blog of its own through the client,
+in-process, inside the runtime that hosts the app, which answers `GET /client-checks` with the
+outcome; each harness reports it beside the app's checks (15.9). `pnpm test:runtimes` runs all
+three; CI runs them on every push.
 
 ---
 
@@ -1478,8 +1487,8 @@ request, the fetch called, each response), `request-documents.test.ts` (each wri
 back by jsonapi-core's own request parsers), `reads.test.ts`, `writes.test.ts`,
 `relationships.test.ts`, `follow.test.ts`, and `create-clients.test.ts`, through a fetch double;
 `record-types.test-d.ts`, `client.test-d.ts`, and `relationship-calls.test-d.ts` pin the inference.
-`e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client: list and
-walk pages, compound documents into records, sparse fieldsets, each write and relationship call,
-every error status into a `ResponseError`, and `Accept-Language` from `language`.
-`e2e/jsonapi/smoke/client-checks.ts` runs the client against the blog app in-process on Bun, Deno,
-and workerd.
+`e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client (14.1): list
+and walk pages, compound documents into records, sparse fieldsets, each write and relationship call,
+every error status the blog answers into a `ResponseError`, and the headers and `Accept-Language`
+the server receives. `e2e/jsonapi/smoke/client-checks.ts` runs the client against a blog in-process
+on Bun, Deno, and workerd (14.2).

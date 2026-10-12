@@ -74,7 +74,8 @@ The transport:
 - `headers`: sent first on every request; a function is called on each, so a rotated token is
   current. A call's own `headers` come after it, and the client's `Accept` and `Content-Type` last.
 - `language`: called on every request; a non-empty result is `Accept-Language`, so the server's
-  error titles come back in the user's language.
+  error titles come back in the user's language. Without one, the runtime's own applies: a browser
+  sends the user's languages, and Node's fetch sends `*`.
 - `fetch`: by default the global `fetch`, looked up per request. Anything that answers a `Request`
   with an object holding `status`, `headers`, and `text()` will do.
 
