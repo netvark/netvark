@@ -46,6 +46,8 @@ packages/intl-core/src/
     create-intl.ts            createIntl and the formatters (section 3)
     formatting-locales.ts     the formatting tag of a locale (3.2)
     intl-cache.ts             the bounded cache of Intl objects (3.4)
+  internal/
+    is-record.ts              the options-object check
   time-zone/
     to-time-zone.ts           toTimeZone, detectTimeZone (4.1, 4.2)
     cookie.ts                 timeZoneFromCookie, timeZoneCookie (4.3)
@@ -126,9 +128,10 @@ once; the date methods also call `timeZone()` exactly once, and only when their 
   strings: a string's meaning depends on its format, and the caller knows it.
 - `timeZone` in the table is `options.timeZone` when that is not `undefined`, and `timeZone()`
   otherwise.
-- `NumberInput` is `number | bigint | Intl.StringNumericLiteral`; a numeric string formats exactly
-  ([ToIntlMathematicalValue](https://tc39.es/ecma402/#sec-tointlmathematicalvalue)), so a PostgreSQL
-  `numeric` read as text keeps its digits.
+- `NumberInput` is `number | bigint | string`. A string is read as ECMA-402 reads it
+  ([ToIntlMathematicalValue](https://tc39.es/ecma402/#sec-tointlmathematicalvalue)): a
+  StringNumericLiteral formats exactly, so a PostgreSQL `numeric` read as text (which pg-catalog
+  types `string`) keeps its digits, and any other string formats as NaN.
 - Errors from `Intl` propagate unchanged: a `RangeError` for an invalid time value
   ([PartitionDateTimePattern](https://tc39.es/ecma402/#sec-partitiondatetimepattern), step 2), an
   unknown time zone, an option out of range, or a tag `Intl` refuses.
@@ -137,8 +140,9 @@ once; the date methods also call `timeZone()` exactly once, and only when their 
 
 - Each `createIntl()` result owns one cache. A formatter takes its `Intl` object from the cache
   under the key made of the constructor's name, the formatting tag, and the options: the own
-  enumerable entries whose value is not `undefined`, sorted by name. The zone a date method fills in
-  is part of its options.
+  enumerable entries whose value is not `undefined`, sorted by name, each value with its type. The
+  zone a date method fills in is part of its options. The constructor receives a copy of the own
+  enumerable entries, so it reads exactly what the key is made of, each getter once.
 - An options object with a value that is not a string, a finite or infinite number, or a boolean
   MUST NOT be cached: the object is built for that call only.
 - On a hit the entry becomes the most recently used; on a miss with a full cache the least recently
@@ -230,17 +234,17 @@ interface TimeZoneResolver {
 Every message is constant apart from the names of options and of configured locales, and names the
 function. No message contains a cookie, a header, a request URL, or a value read from a request.
 
-| Thrown by                     | Class                    | When                                                                                                                                 |
-| ----------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `createIntl()`                | `TypeError`              | `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string                 |
-| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                         |
-| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` holds a control character or `;`; `sameSite` is another value |
-| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a non-negative integer                                                                                               |
-| `createTimeZone()`            | `TypeError`              | the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                                     |
-| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                    |
-| `TimeZoneResolver.run()`      | `TypeError`              | the resolver was created without a scope                                                                                             |
-| `compile()`                   | `TypeError`              | `isolate` is not a boolean or an array of strings, or names a locale the project does not declare; `formatters` is another value     |
-| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                               |
+| Thrown by                     | Class                    | When                                                                                                                                                |
+| ----------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createIntl()`                | `TypeError`              | the options are not an object; `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string |
+| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                                        |
+| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` holds a control character or `;`; `sameSite` is another value                |
+| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a non-negative integer                                                                                                              |
+| `createTimeZone()`            | `TypeError`              | the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                                                    |
+| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                                   |
+| `TimeZoneResolver.run()`      | `TypeError`              | the resolver was created without a scope                                                                                                            |
+| `compile()`                   | `TypeError`              | `isolate` is not a boolean or an array of strings, or names a locale the project does not declare; `formatters` is another value                    |
+| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                              |
 
 ## 6. Paraglide binding (`@netvark/paraglide-intl`, `packages/paraglide-intl/src/`)
 

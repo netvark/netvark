@@ -18,8 +18,10 @@ function names(module: object): Array<string> {
 
 /** SPEC 1: the core's values. */
 const CORE = [
+  'DEFAULT_CACHE_SIZE',
   'FIRST_STRONG_ISOLATE',
   'POP_DIRECTIONAL_ISOLATE',
+  'createIntl',
   'isolate',
 ].toSorted();
 
