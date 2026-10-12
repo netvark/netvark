@@ -4115,14 +4115,18 @@ the model renders comes from the application's one messages object, computed whe
 | `tanstack-form/form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one            |
 | `tanstack-form/form-options.ts` | `resourceFormOptions`                                                               |
 | `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                                |
-| `tanstack-query/query-keys.ts`  | the keys of 20.6                                                                    |
-| `tanstack-query/queries.ts`     | `resourceQueries`                                                                   |
+| `tanstack-query/query-keys.ts`  | the keys of 20.6: the query string a call sends                                     |
+| `tanstack-query/pages.ts`       | an infinite list's page parameters, from the query's cursors and the pages' links   |
+| `tanstack-query/query-types.ts` | the options' types, as TanStack Query's own helpers return them                     |
+| `tanstack-query/queries.ts`     | `resourceQueries`, and the `TypeError`s of an argument that is not a client         |
 
 Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
 `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`, `FormResource`,
 `FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`, `FormErrors`, `ListModel`,
 `ListState`, `ListSorting`, `ListColumnFilters`. Types exported from `./form`: `BindableForm`,
-`ResourceFormOptions`.
+`ResourceFormOptions`. Types exported from `./query`: `ResourceQueries`, `ReadOptions`,
+`PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`, `PageParam`,
+`KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
@@ -4419,55 +4423,79 @@ submit handler receives, a field's errors, and the forms `bindResponseErrors` ta
 
 ```ts
 const contacts = resourceQueries(clients.contacts);
-const page = useQuery(contacts.list({ ...query, include: ['organization_id'] }));
+const meetings = resourceQueries(clients.meetings);
+const page = useQuery(contacts.list({ ...query, include: ['organization'] }));
 const feed = useInfiniteQuery(contacts.pages({ sort: ['-created_at'] }));
 const contact = useQuery(contacts.get(id));
 const create = useMutation(contacts.create());
+const remove = useMutation(contacts.remove({ invalidates: [meetings.all] }));
 ```
 
-| Member            | Made with              | Key                                       | Runs                                              |
-| ----------------- | ---------------------- | ----------------------------------------- | ------------------------------------------------- |
-| `all`             |                        | `[type]`                                  |                                                   |
-| `list(query?)`    | `queryOptions`         | `[type, 'list', <query>]`                 | `client.list(query, { signal })`                  |
-| `pages(query?)`   | `infiniteQueryOptions` | `[type, 'pages', <query>]`                | `client.list` of the query at the page's cursor   |
-| `get(id, query?)` | `queryOptions`         | `[type, 'get', id, <include and fields>]` | `client.get(id, query, { signal })`               |
-| `create()`        | `mutationOptions`      | `mutationKey: [type, 'create']`           | `client.create(input)`                            |
-| `update()`        | `mutationOptions`      | `mutationKey: [type, 'update']`           | `client.update(id, input)` for `{ id, ...input }` |
-| `remove()`        | `mutationOptions`      | `mutationKey: [type, 'remove']`           | `client.remove(id)`                               |
+| Member              | Made with              | Key                                       | Runs                                              |
+| ------------------- | ---------------------- | ----------------------------------------- | ------------------------------------------------- |
+| `all`               |                        | `[type]`                                  |                                                   |
+| `list(query?)`      | `queryOptions`         | `[type, 'list', <query>]`                 | `client.list(query, { signal })`                  |
+| `pages(query?)`     | `infiniteQueryOptions` | `[type, 'pages', <query>]`                | `client.list` of the query at the page's cursor   |
+| `get(id, query?)`   | `queryOptions`         | `[type, 'get', id, <include and fields>]` | `client.get(id, query, { signal })`               |
+| `create(settings?)` | `mutationOptions`      | `mutationKey: [type, 'create']`           | `client.create(input)`                            |
+| `update(settings?)` | `mutationOptions`      | `mutationKey: [type, 'update']`           | `client.update(id, input)` for `{ id, ...input }` |
+| `remove(settings?)` | `mutationOptions`      | `mutationKey: [type, 'remove']`           | `client.remove(id)`                               |
 
 - **A key is the request.** `<query>` is `serializeQuery(client.definition, query).toString()`
   (jsonapi SPEC 15.5), so two queries that make one request share one cache entry, a bigint filter
-  value keys as its text, and every key is JSON. `type` is the definition's, so invalidating
-  `[type]` reaches every list, page, and record of the type, and `[type, 'list']` every list.
-  `client.definition` is the definition the client was made from (jsonapi SPEC 15.4).
+  value keys as its text, and every key is JSON. The parameters come in `serializeQuery`'s order of
+  the families whatever order the query's members were written in; within a member the query's own
+  order stands, so a filter whose fields are written in another order is another request and another
+  entry. `type` is the definition's, so invalidating `[type]` reaches every list, page, and record
+  of the type, and `[type, 'list']` every list. `client.definition` is the definition the client was
+  made from (jsonapi SPEC 15.4).
 - **Reads** resolve to the client's `ReadResult` (15.4), the document's `links` and `meta` with the
   records, which paging reads (20.7). Each passes TanStack Query's `signal`, so a cancelled query
-  aborts its request.
+  aborts its request. A refused read settles the query with the client's `ResponseError`.
 - **Pages.** The page parameter is `{ after }` or `{ before }`, starting from the query's own
   cursors, which the key holds as the list's start; the next is `{ after: pageCursors(last).next }`
   and the previous `{ before: pageCursors(first).prev }` (jsonapi SPEC 15.8), none when the link is
   absent or the page holds no records, since the profile lets a link point at an empty page.
-  `page[size]` stays the query's.
-- **Writes** invalidate their type and return that promise from `onSuccess`, with the `QueryClient`
-  TanStack Query passes (`context.client`), so the mutation stays pending until the lists and
-  records it touched have refetched; `remove` first removes the record's `get` entries, so a screen
-  still showing it does not refetch a 404. A write whose server behavior changes other types
-  invalidates those in the application, through a per-call `onSuccess` passed to `mutate`, which
-  runs after these: spreading the options and overriding `onSuccess` would drop the invalidation.
+  `page[size]` stays the query's. `pages` is `never` on a definition whose list takes no `page`, and
+  throws `TypeError` on one typed wide.
+- **Writes** invalidate their type and the keys `settings.invalidates` names, the other types the
+  write changes on the server (removing a contact sets their meetings' contact to null,
+  `on delete set null`), and return that promise from `onSuccess`, with the `QueryClient` TanStack
+  Query passes (`context.client`), so the mutation stays pending until the lists and records it
+  touched have refetched; `remove` first removes the record's `get` entries, so a screen still
+  showing it does not refetch a 404. A refused write invalidates nothing. An invalidation belongs in
+  the options: TanStack Query runs a callback passed to `mutate` only while the component that
+  called it is mounted, and for the last of consecutive calls only, so `mutate`'s callbacks are for
+  what a screen does next, such as navigating; spreading the options and overriding `onSuccess`
+  would drop the invalidation.
 - **Types.** Every option is made with TanStack Query's own `queryOptions`, `infiniteQueryOptions`,
-  and `mutationOptions`, so `queryClient.getQueryData(contacts.get(id).queryKey)` is typed; records
-  are the client's `RecordOf` for the query passed (15.6), and `update`'s variables are
-  `{ id } & UpdateInput`.
+  and `mutationOptions`, and typed as they return it, so `useQuery` and its kin take it as it is and
+  `queryClient.getQueryData(contacts.get(id).queryKey)` is typed; records are the client's
+  `RecordOf` for the query passed (15.6), `create`'s variables its `CreateInput`, `update`'s
+  `{ id } & UpdateInput`, and `remove`'s the id. The options are made over the client's calls typed
+  wide, and typed by its definitions where `resourceQueries` returns them, as `createClients` types
+  the calls.
+- **Arguments.** `resourceQueries` throws `TypeError` for a value `createClients` did not return
+  (one without `definition` and the calls), and a write for `invalidates` that is not a list of
+  query keys, such as one key passed alone. Messages name the function and the definition's type,
+  never a value.
 
 @ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys @ref
 https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions @ref
-https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
+https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations @ref
+https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-side-effects
 
-Tests: `tanstack-query/query-keys.test.ts` (one key per request, the canonical order, bigints),
-`tanstack-query/queries.test.ts` (each member against a fetch double through a `QueryClient`: the
-signal, the pages in both directions and the empty page, invalidation and removal after each write),
-and `tanstack-query/queries.test-d.ts` (data and variables typed by the definitions, `getQueryData`
-through the tagged keys).
+Tests: `tanstack-query/query-keys.test.ts` (one key per request, the canonical order, bigints, what
+`[type]` and `[type, 'list']` reach), `tanstack-query/queries.test.ts` (each read against a fetch
+double through a `QueryClient`, the signal of each, a refused read, the `TypeError`s),
+`tanstack-query/pages.test.ts` (the pages in both directions from the query's cursors, an empty page
+that links on, a link absent or without its cursor), `tanstack-query/writes.test.ts` (each write
+pending until the reads a screen shows have refetched, an entry no screen shows left stale, removal
+before the refetch, `invalidates`, a refused write, `mutate`'s `onSuccess` after the refetch), and
+`tanstack-query/queries.test-d.ts` (data and variables typed by the definitions, `getQueryData`
+through the tagged keys, `pages` `never` without pagination). The tests read through TanStack
+Query's observers, which its hooks are made of: from 5.102 `fetchQuery` and its kin are deprecated
+for `queryClient.query`, which the 5.89 floor (20.9) does not have.
 
 ### 20.7 The list model: `resourceList(resource, messages)`
 
@@ -4601,7 +4629,11 @@ definition's sort names, operators, and search).
   runtime that serves meetings too (`runtime/meetings.ts`): a taken email held on its field until
   the email changes, a submit of the same values that sends nothing, and the 409 of a room booked
   twice for one period on the room and the period, cleared when the person changes either
-  (`form-binding.e2e.test.ts`).
+  (`form-binding.e2e.test.ts`). TanStack Query's observers over `resourceQueries`, as its hooks read
+  and write: an infinite list paging both ways by the server's links from the query's own cursors, a
+  create and an update settling once the list and the record shown have refetched, a contact's
+  removal that removes their record's entries and refetches the meetings the database set to no
+  contact, and a refused write that leaves the cache as it was (`query-cache.e2e.test.ts`).
 - Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
   and write and a list model's `query` on Bun, Deno, and workerd, where server rendering runs.
 - Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).

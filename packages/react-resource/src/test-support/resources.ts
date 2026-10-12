@@ -6,7 +6,8 @@
  * the plans an organization is on, a lookup table keyed by an enum. Between
  * them every filter kind, every wire type, and a relationship whose id has
  * options, a write-only member, and a CHECK across a field and a
- * relationship. What this module exports is typed wide, as a JavaScript caller
+ * relationship. Their links are under `/api`, so a client can be made of
+ * them. What this module exports is typed wide, as a JavaScript caller
  * hands it; a type test declares its own typed resources over the same
  * catalog. Not published with the package.
  * @packageDocumentation
@@ -21,6 +22,7 @@ import { FIXTURE_REGISTRIES } from './registries';
 const declareResource = createDeclareResource({
   catalog: publicCatalog,
   ...FIXTURE_REGISTRIES,
+  links: { base: '/api' },
 });
 
 export const Plans: DeclaredResource = declareResource('plans', {

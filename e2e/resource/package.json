@@ -33,6 +33,7 @@
     "@netvark/resource-core": "workspace:*",
     "@seriousme/openapi-schema-validator": "2.11.0",
     "@tanstack/react-form": "1.33.5",
+    "@tanstack/react-query": "5.104.1",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "19.3.0",
