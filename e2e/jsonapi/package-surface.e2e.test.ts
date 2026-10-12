@@ -84,6 +84,7 @@ const CORE = [
 /** SPEC section 11: the core extension's values. */
 const CORE_ATOMIC = [
   'assertOperationsContentType',
+  'errorAtOperation',
   'operationsProcessor',
   'parseOperationsDocument',
 ].toSorted();

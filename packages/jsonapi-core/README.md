@@ -495,6 +495,12 @@ A missing handler makes the operation a 403; an unknown type a 404; a structural
 with pointers like `/atomic:operations/1/data/relationships/author/data/lid`. The 405 for other
 methods is the host's: the processor never sees the request method.
 
+When your `transaction` turns a failure into the client's error only once the transaction ended,
+such as a constraint violation whose names are read on another connection, the processor no longer
+sees it. Point it at the operation whose call threw it with
+`errorAtOperation(error, '/atomic:operations/<index>')`, the function the processor applies to every
+operation's failure.
+
 ## Modules
 
 | Subpath                        | What it holds                                                                                                                      |

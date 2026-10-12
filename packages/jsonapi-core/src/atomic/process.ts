@@ -9,22 +9,20 @@
  * @ref https://jsonapi.org/ext/atomic/#processing-errors
  * @packageDocumentation
  */
-import type { ErrorItem } from '@netvark/ban-core';
-
 import type { ExtensionDocument, JsonApiObject } from '../document/types';
 import type { OperationResult } from './execute';
 import type { AnyResourceHandlers, AtomicOptions } from './types';
 
-import { BanError, isBanError } from '@netvark/ban-core';
+import { isBanError } from '@netvark/ban-core';
 
 import {
   ATOMIC_OPERATIONS_EXTENSION,
   DEFAULT_MAX_OPERATIONS,
   JSON_API_VERSION,
 } from '../internal/constants';
-import { pathFromPointer } from '../internal/pointer';
 import { executeOperation } from './execute';
 import { Lids } from './lids';
+import { errorAtOperation } from './operation-error';
 import { RESULTS_MEMBER, parseOperationsDocument } from './parse-document';
 
 /** The response document: results in operation order, extension applied. */
@@ -74,45 +72,6 @@ function indexHandlers<TTransaction, TContext>(
   return handlers;
 }
 
-/** The one item an error without a list renders as: its own identity and message. */
-function itemOf(error: BanError): ErrorItem {
-  return {
-    status: error.status,
-    code: error.code,
-    title: error.title,
-    ...(error.type === undefined ? {} : { type: error.type }),
-    detail: error.message,
-  };
-}
-
-/** The item, addressed at the operation. */
-function pointedAt(item: ErrorItem, path: ReadonlyArray<string>): ErrorItem {
-  return { ...item, path };
-}
-
-/**
- * Gives every error object of an operation's failure a pointer to the
- * operation when it has no source of its own, as the extension asks. The
- * error is rebuilt from its own fields (`toInit`), so its id, headers, and
- * rendering stay; an item with a `path` already points somewhere.
- */
-function atOperation(error: BanError, pointer: string): BanError {
-  const items =
-    error.errors === undefined || error.errors.length === 0
-      ? [itemOf(error)]
-      : error.errors;
-  if (items.every((item) => item.path !== undefined)) {
-    return error;
-  }
-  const path = pathFromPointer(pointer);
-  return new BanError({
-    ...error.toInit(),
-    errors: items.map((item) =>
-      item.path === undefined ? pointedAt(item, path) : item,
-    ),
-  });
-}
-
 function resultsDocument(
   results: ReadonlyArray<OperationResult>,
 ): OperationsResultDocument | undefined {
@@ -158,7 +117,7 @@ export function operationsProcessor<TTransaction, TContext = unknown>(
           out.push(await executeOperation(execution, operation));
         } catch (error) {
           throw isBanError(error)
-            ? atOperation(error, operation.pointer)
+            ? errorAtOperation(error, operation.pointer)
             : error;
         }
       }

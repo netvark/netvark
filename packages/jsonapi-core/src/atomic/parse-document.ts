@@ -43,7 +43,7 @@ const OPERATION_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** The member of an operation that holds its target. */
-export type TargetMember = 'ref' | 'href';
+type TargetMember = 'ref' | 'href';
 
 /** One operation as sent, with its position for pointers. */
 export interface RawOperation {
