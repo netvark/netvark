@@ -21,7 +21,7 @@ pnpm add @netvark/jsonapi-client                # a client of a server built on 
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
-on Node 22 and 24 and a smoke test of both packages on Bun, Deno, and workerd. Validators are
+on Node 22 and 24 and a smoke test of the three packages on Bun, Deno, and workerd. Validators are
 accepted through [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType, and others)
 without importing any of them.
 

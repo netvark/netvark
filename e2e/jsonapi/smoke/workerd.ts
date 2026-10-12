@@ -1,3 +1,5 @@
+import type { Dispatch } from './checks.ts';
+
 /**
  * Runs the smoke checks inside workerd, the Cloudflare Workers runtime, via
  * Miniflare. workerd executes the module graph it is handed and never reads
@@ -10,7 +12,7 @@
 import { Miniflare } from 'miniflare';
 import { build } from 'tsdown';
 
-import { report, runChecks } from './checks.ts';
+import { clientChecks, report, runChecks } from './checks.ts';
 
 const OUT_DIR = 'smoke/.workerd';
 /** Any date at or before the pinned workerd release; current behavior is what is tested. */
@@ -36,12 +38,11 @@ const mf = new Miniflare({
   compatibilityDate: COMPATIBILITY_DATE,
 });
 await mf.ready;
+const dispatch: Dispatch = async (path, init) =>
+  mf.dispatchFetch(new URL(path, ORIGIN), init);
 try {
-  report(
-    await runChecks(async (path, init) =>
-      mf.dispatchFetch(new URL(path, ORIGIN), init),
-    ),
-  );
+  report(await runChecks(dispatch));
+  report(await clientChecks(dispatch), '@netvark/jsonapi-client');
 } finally {
   await mf.dispose();
 }

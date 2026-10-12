@@ -32,8 +32,8 @@ export interface ArticleRow {
   readonly tagIds: ReadonlyArray<string>;
 }
 
-type ArticleSort = 'title' | 'createdAt';
-type ArticleFilter = 'title' | 'author';
+export type ArticleSort = 'title' | 'createdAt';
+export type ArticleFilter = 'title' | 'author';
 
 export interface ArticleQuery {
   readonly sort: ReadonlyArray<SortField<ArticleSort>>;
