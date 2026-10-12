@@ -1,21 +1,21 @@
 /**
  * The calls `createClients` types (SPEC 15.4): queries and records from
- * the definitions passed, writes from the validators' inputs and the
- * writable lists, relationship calls by cardinality. The blog is defined
- * here, since an exported definition needs an annotation under
- * `isolatedDeclarations` and the point is what `defineResource` infers.
+ * the definitions passed, and writes from the validators' inputs and the
+ * writable lists; `relationship-calls.test-d.ts` holds the relationship
+ * calls. The blog is defined here, since an exported definition needs an
+ * annotation under `isolatedDeclarations` and the point is what
+ * `defineResource` infers.
  */
 import type {
   AnyResource,
   Links,
   Meta,
   Relationships,
-  TypesOf,
 } from '@netvark/jsonapi-core';
 
 import type { AnyRecord, Identifier } from '../document/types';
 import type { ListQuery } from '../query/types';
-import type { IdentifierObject, ReadResult, WriteResult } from './types';
+import type { WriteResult } from './types';
 
 import { describe, expectTypeOf, it } from 'vitest';
 
@@ -103,36 +103,7 @@ const Articles = defineResource({
 
 const DEFINITIONS = { articles: Articles, people: People, tags: Tags };
 const transport = createTransport({ origin: 'https://api.example.test' });
-const { articles, people, tags } = createClients(DEFINITIONS, transport);
-
-/** Relationship writes: `owner` and `labels` updatable, `creator` and `watchers` set on create alone. */
-const Notes = defineResource({
-  type: 'notes',
-  attributes: ['text'],
-  relationships: {
-    owner: { type: 'people', cardinality: 'one' },
-    creator: { type: 'people', cardinality: 'one' },
-    labels: { type: 'tags', cardinality: 'many' },
-    watchers: { type: 'people', cardinality: 'many' },
-  },
-  serialize: (row: { readonly id: string; readonly text: string }) => ({
-    id: row.id,
-    attributes: { text: row.text },
-  }),
-  writable: { update: ['text', 'owner', 'labels'] },
-});
-
-/** A definition that serves no update, as `@netvark/resource-core` types a declaration without the operation. */
-declare const Archives: Omit<typeof Notes, '~types'> & {
-  readonly '~types'?: Omit<TypesOf<typeof Notes>, 'update'> & {
-    readonly update: never;
-  };
-};
-
-const { notes, archives } = createClients(
-  { notes: Notes, archives: Archives, people: People, tags: Tags },
-  transport,
-);
+const { articles, tags } = createClients(DEFINITIONS, transport);
 
 /** The members of a union that have `TKey`: a record, never the identifier beside it. */
 type WithKey<TUnion, TKey extends PropertyKey> = TUnion extends unknown
@@ -277,67 +248,5 @@ describe('writes (SPEC 15.4)', () => {
     expectTypeOf(articles.remove('a1')).toEqualTypeOf<
       Promise<WriteResult<undefined>>
     >();
-  });
-});
-
-describe('relationship calls (SPEC 15.4)', () => {
-  it('reads linkage by cardinality, each identifier with its meta', () => {
-    expectTypeOf(articles.relationship('a1', 'author')).toEqualTypeOf<
-      Promise<ReadResult<IdentifierObject<'people'> | null>>
-    >();
-    expectTypeOf(articles.relationship('a1', 'tags')).toEqualTypeOf<
-      Promise<ReadResult<ReadonlyArray<IdentifierObject<'tags'>>>>
-    >();
-  });
-
-  it('writes linkage by cardinality, to-many alone for add and remove', () => {
-    void notes.setRelationship('n1', 'owner', null);
-    void notes.setRelationship('n1', 'owner', { type: 'people', id: 'p1' });
-    void notes.setRelationship('n1', 'labels', ['t1']);
-    void notes.addToRelationship('n1', 'labels', ['t1']);
-    void notes.removeFromRelationship('n1', 'labels', [
-      { type: 'tags', id: 't1' },
-    ]);
-    // @ts-expect-error -- a to-many takes a list
-    void notes.setRelationship('n1', 'labels', 't1');
-    // @ts-expect-error -- owner is a to-one
-    void notes.addToRelationship('n1', 'owner', ['p1']);
-    // @ts-expect-error -- people declare no editor
-    void people.relationship('p1', 'editor');
-  });
-
-  it('writes only the relationships an update may carry, as the server answers 403 otherwise', () => {
-    // @ts-expect-error -- creator is set on create alone
-    void notes.setRelationship('n1', 'creator', 'p1');
-    // @ts-expect-error -- watchers are set on create alone
-    void notes.addToRelationship('n1', 'watchers', ['p1']);
-    // @ts-expect-error -- watchers are set on create alone
-    void notes.removeFromRelationship('n1', 'watchers', ['p1']);
-    // @ts-expect-error -- author is not in the articles' update list
-    void articles.setRelationship('a1', 'author', null);
-    void articles.addToRelationship('a1', 'tags', ['t1']);
-    // A definition without writable lists updates every relationship.
-    void people.setRelationship('p1', 'articles', ['a1']);
-  });
-
-  it('writes no relationship of a definition that serves no update, and reads each', () => {
-    // @ts-expect-error -- archives serve no update
-    void archives.setRelationship('x1', 'owner', null);
-    // @ts-expect-error -- archives serve no update
-    void archives.addToRelationship('x1', 'labels', ['t1']);
-    expectTypeOf(archives.relationship('x1', 'creator')).toEqualTypeOf<
-      Promise<ReadResult<IdentifierObject<'people'> | null>>
-    >();
-  });
-
-  it('follows the pages of records, not linkage', async () => {
-    const page = await articles.list();
-    const linkage = await articles.relationship('a1', 'tags');
-
-    expectTypeOf(articles.next(page)).toEqualTypeOf<
-      Promise<typeof page | undefined>
-    >();
-    // @ts-expect-error -- next and prev page records
-    void articles.next(linkage);
   });
 });

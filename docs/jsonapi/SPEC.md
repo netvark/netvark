@@ -1477,7 +1477,7 @@ Unit tests sit beside each module: `origin.test.ts`, `send.test.ts` and `respons
 request, the fetch called, each response), `request-documents.test.ts` (each write's document, read
 back by jsonapi-core's own request parsers), `reads.test.ts`, `writes.test.ts`,
 `relationships.test.ts`, `follow.test.ts`, and `create-clients.test.ts`, through a fetch double;
-`record-types.test-d.ts` and `client.test-d.ts` pin the inference.
+`record-types.test-d.ts`, `client.test-d.ts`, and `relationship-calls.test-d.ts` pin the inference.
 `e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client: list and
 walk pages, compound documents into records, sparse fieldsets, each write and relationship call,
 every error status into a `ResponseError`, and `Accept-Language` from `language`.
