@@ -22,7 +22,8 @@ pnpm add @netvark/hono-jsonapi hono @netvark/hono-ban
 ```
 
 Node 22.12+, Bun, Deno, and Cloudflare Workers are supported. CI runs the unit and end-to-end suites
-on Node 22 and 24 and a smoke test of both subpaths on Bun, Deno, and workerd. `hono` and
+on Node 22 and 24, the unit suite on Hono 4.13.7, and a smoke test of both subpaths on Bun, Deno,
+and workerd. `hono >= 4.13.7`, the first release no published Hono advisory affects, and
 [`@netvark/hono-ban`](https://github.com/netvark/netvark) are the peer dependencies: every error is
 a @netvark/ban-core error and `errorHandler()` is a @netvark/hono-ban handler (see Errors).
 Validators are accepted through [Standard Schema](https://standardschema.dev) (Zod 4, Valibot,

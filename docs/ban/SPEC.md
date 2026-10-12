@@ -1557,12 +1557,12 @@ zod, valibot, standard-schema, openapi, otel, postgresql, testing
 
 `@netvark/ban-core` has no `dependencies` and no `peerDependencies`. `@netvark/hono-ban` has
 `dependencies: { "@netvark/ban-core": "workspace:^" }` (a caret range on the published version) and
-`peerDependencies: { "hono": ">=4.12.34" }`, the upstream security floor, which CI runs its tests
-on. Validators, `@hono/*` packages, `@opentelemetry/api`, `postgres` (postgres.js, for one
-type-level test), Ajv, and `ajv-formats` are devDependencies used only by tests;
-`@electric-sql/pglite`, `@electric-sql/pglite-socket`, `drizzle-orm`, `pg`, and `postgres` are
-devDependencies of `e2e/ban/` only. Both packages set `sideEffects: false`. publint and attw run as
-part of each build.
+`peerDependencies: { "hono": ">=4.13.7" }`, the upstream security floor (the first release no
+published Hono advisory affects), which CI runs its tests on. Validators, `@hono/*` packages,
+`@opentelemetry/api`, `postgres` (postgres.js, for one type-level test), Ajv, and `ajv-formats` are
+devDependencies used only by tests; `@electric-sql/pglite`, `@electric-sql/pglite-socket`,
+`drizzle-orm`, `pg`, and `postgres` are devDependencies of `e2e/ban/` only. Both packages set
+`sideEffects: false`. publint and attw run as part of each build.
 
 The family's packages are `packages/ban-core`, `packages/hono-ban`, and `e2e/ban/` (private,
 `@netvark/ban-e2e`) in the netvark repository's pnpm workspace. `e2e/ban/` depends on both published
