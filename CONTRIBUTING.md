@@ -119,10 +119,13 @@ CATALOG_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filte
   referenced as `"name": "catalog:"`. One that a single package uses stays pinned there, and peer
   ranges always stay in the package
   ([ADR 0005](docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md)).
-- **Every peer range's floor runs in CI.** A package that declares a peer range on a package outside
-  the workspace gets a job beside the other floor jobs in `.github/workflows/ci.yml`: it installs
-  the floor, the oldest release the package's typecheck and tests pass on unless a security fix sets
-  a later one, runs both, and is listed in `CI passed`'s `needs`. Workspace packages that share the
+- **A peer range starts past its peer's published advisories, and its floor runs in CI**
+  ([ADR 0007](docs/adr/0007-a-peer-range-starts-past-published-advisories-and-ci-tests-its-floor.md)).
+  The floor of a peer range on a package outside the workspace is the later of the oldest release
+  the package's typecheck and tests pass on and the first release no advisory in GitHub's advisory
+  database affects. An advisory published later raises it, with a `minor` changeset. The package
+  gets a job beside the other floor jobs in `.github/workflows/ci.yml`: it installs the floor, runs
+  the typecheck and tests, and is listed in `CI passed`'s `needs`. Workspace packages that share the
   peer go on one version per step, as an application has one copy.
 - **No emojis** in code, docs, or commit messages.
 - **Lint disables carry a reason.** `// oxlint-disable-next-line rule -- reason: <why>`.

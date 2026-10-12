@@ -65,8 +65,8 @@ New library surface falls into one of these:
   0002). `kysely` is `@netvark/kysely-keyset`'s only peer dependency, at `>= 0.28.17`, and
   `drizzle-orm` is `@netvark/drizzle-keyset`'s, at `>=0.45.2 <1.0.0`. Each floor is the first
   release past its builder's published SQL injection advisories (ADR 0017, ADR 0018), and an
-  advisory published against a release in a range raises that floor. CI tests both floors, so an API
-  an adapter uses must exist at its floor: Kysely 0.28.17, drizzle-orm 0.45.2.
+  advisory published against a release in a range raises that floor (root ADR 0007). CI tests both
+  floors, so an API an adapter uses must exist at its floor: Kysely 0.28.17, drizzle-orm 0.45.2.
 - A definition is validated once, in `defineKeyset`, with a `TypeError` naming the option. A
   request-time check that a definition mistake could trigger belongs there, not in the planner.
 - A request-time error is one of the `KeysetError` classes in `errors.ts`, with a constant message

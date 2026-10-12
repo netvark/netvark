@@ -34,7 +34,10 @@ dependency, and also each `@netvark` package whose values the application hands 
 `@netvark/resource-core` and `@netvark/keyset-core`, `@netvark/hono-resource` takes
 `@netvark/hono-jsonapi` and `@netvark/resource-core`, and `@netvark/react-resource` takes
 `@netvark/resource-core`. `@netvark/pg-catalog` depends on `pg` and takes PGlite and
-`@netvark/resource-core` as optional peers.
+`@netvark/resource-core` as optional peers. A peer range on a package outside the workspace starts
+past that package's published advisories, so an affected release in your application is an unmet
+peer dependency, and CI runs the binding's tests on the range's floor
+([ADR 0007](docs/adr/0007-a-peer-range-starts-past-published-advisories-and-ci-tests-its-floor.md)).
 
 ## Install
 
