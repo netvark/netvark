@@ -37,12 +37,17 @@
       "source": "./src/tanstack-form/index.ts",
       "default": "./dist/form.js"
     },
+    "./query": {
+      "source": "./src/tanstack-query/index.ts",
+      "default": "./dist/query.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js",
       "./form": "./dist/form.js",
+      "./query": "./dist/query.js",
       "./package.json": "./package.json"
     },
     "access": "public",
@@ -58,8 +63,10 @@
   },
   "devDependencies": {
     "@netvark/jsonapi-client": "workspace:^",
+    "@netvark/jsonapi-core": "workspace:^",
     "@netvark/resource-core": "workspace:^",
     "@tanstack/react-form": "1.33.5",
+    "@tanstack/react-query": "5.104.1",
     "@types/react": "19.3.0",
     "react": "19.3.0",
     "zod": "catalog:"
@@ -67,10 +74,14 @@
   "peerDependencies": {
     "@netvark/jsonapi-client": "^0.1.0",
     "@netvark/resource-core": "^0.1.0",
-    "@tanstack/react-form": "^1.17.0"
+    "@tanstack/react-form": "^1.17.0",
+    "@tanstack/react-query": "^5.89.0"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-form": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
       "optional": true
     }
   },

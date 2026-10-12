@@ -15,6 +15,7 @@ const config: UserConfig = defineConfig({
   entry: {
     index: 'src/index.ts',
     form: 'src/tanstack-form/index.ts',
+    query: 'src/tanstack-query/index.ts',
   },
   format: 'esm',
   platform: 'neutral',

@@ -15,8 +15,8 @@ and
 [ADR 0017](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0017-a-refusal-of-several-fields-binds-where-a-change-to-any-clears-it.md).
 
 Status: in development and unreleased. Field descriptors (`fieldsOf`), the form model
-(`resourceForm`), and its TanStack Form binding (`@netvark/react-resource/form`) have shipped; the
-list model and the TanStack Query binding follow.
+(`resourceForm`), its TanStack Form binding (`@netvark/react-resource/form`), and the TanStack Query
+binding (`@netvark/react-resource/query`) have shipped; the list model follows.
 
 ## Install
 
@@ -30,11 +30,12 @@ catches its errors with its own copy of the other, and the bindings read those s
 ([ADR 0006](https://github.com/netvark/netvark/blob/main/docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
 The root entry runs wherever JavaScript does, so server rendering on Node 22.12+, Bun, Deno, and
 Cloudflare Workers reads the same model as the browser. `@netvark/react-resource/form` needs
-[TanStack Form](https://tanstack.com/form/v1) 1.17 or later, an optional peer that only that entry
-imports:
+[TanStack Form](https://tanstack.com/form/v1) 1.17 or later and `@netvark/react-resource/query`
+[TanStack Query](https://tanstack.com/query/v5) 5.89 or later, each an optional peer that only its
+entry imports:
 
 ```bash
-pnpm add @tanstack/react-form
+pnpm add @tanstack/react-form @tanstack/react-query
 ```
 
 ## Field descriptors
@@ -298,3 +299,102 @@ sent again unchanged.
 - `resourceFormOptions` and `bindResponseErrors` throw `TypeError` for a model no `resourceForm`
   returned, and `bindResponseErrors` for a form that is no TanStack Form `FormApi`. The form's
   values must hold the model's members; TypeScript refuses a form made from another model.
+
+## TanStack Query
+
+`@netvark/react-resource/query` turns a client into
+[TanStack Query](https://tanstack.com/query/v5/docs/framework/react/overview) options.
+`resourceQueries(client)` gives each read and write of one resource, made with TanStack Query's own
+`queryOptions`, `infiniteQueryOptions`, and `mutationOptions` and keyed by the request it sends.
+Make them once per resource, beside the clients:
+
+```ts
+// src/api/queries.ts
+import { resourceQueries } from '@netvark/react-resource/query';
+
+import { clients } from './clients';
+
+export const contacts = resourceQueries(clients.contacts);
+export const meetings = resourceQueries(clients.meetings);
+```
+
+```tsx
+// src/contacts/contact-list.tsx
+import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
+
+import { contacts, meetings } from '../api/queries';
+
+export function ContactList() {
+  const list = useInfiniteQuery(contacts.pages({ sort: ['name'], page: { size: 25 } }));
+  // Removing a contact sets their meetings' contact to null, so the meetings refetch too.
+  const remove = useMutation(contacts.remove({ invalidates: [meetings.all] }));
+  if (list.isPending) {
+    return <p>Loading</p>;
+  }
+  if (list.isError) {
+    return <p role="alert">The contacts could not be loaded.</p>;
+  }
+  return (
+    <>
+      <ul>
+        {list.data.pages
+          .flatMap((page) => page.data)
+          .map((contact) => (
+            <li key={contact.id}>
+              {contact.name}
+              <button disabled={remove.isPending} onClick={() => remove.mutate(contact.id)}>
+                Remove
+              </button>
+            </li>
+          ))}
+      </ul>
+      {list.hasNextPage && (
+        <button disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
+          More
+        </button>
+      )}
+    </>
+  );
+}
+```
+
+| Member                                      | Give it to          | Key                                                  |
+| ------------------------------------------- | ------------------- | ---------------------------------------------------- |
+| `contacts.list(query)`                      | `useQuery`          | `['contacts', 'list', <query string>]`               |
+| `contacts.pages(query)`                     | `useInfiniteQuery`  | `['contacts', 'pages', <query string>]`              |
+| `contacts.get(id, query)`                   | `useQuery`          | `['contacts', 'get', id, <include, fields>]`         |
+| `contacts.create()`, `update()`, `remove()` | `useMutation`       | `['contacts', 'create']` and so on, as `mutationKey` |
+| `contacts.all`                              | `invalidateQueries` | `['contacts']`, every list, page, and record         |
+
+A read resolves to the client's result: the records in `data`, the document's `links` and `meta`
+beside them, each record typed by the query's `include` and `fields`. A write resolves once every
+read it invalidated has refetched, so its `isPending` covers the refresh, and `remove` drops the
+record's own entries first, so a screen still showing it does not ask the server for it again.
+
+## TanStack Query rules
+
+- Make the options once per resource, at module scope, and call a member where you read. The key is
+  the query string the request sends: two queries that send one request share one entry, whatever
+  order their members are written in, while a filter whose fields come in another order is another
+  request. Build a screen's query in one place, such as its route's search.
+- Name the other resources a write changes on the server in `invalidates`, such as the meetings a
+  contact's removal touches, or the record a database trigger updates. Never invalidate in a
+  callback passed to `mutate`: TanStack Query runs one only while the component that called it is
+  mounted, and for the last of consecutive calls only. Keep those callbacks for what the screen does
+  next, such as navigating.
+- Add options by spreading: `useQuery({ ...contacts.get(id), staleTime: 30_000 })`. Never override a
+  write's `onSuccess`, which holds its invalidation.
+- Do not retry a refusal. In the browser TanStack Query retries a failed query three times by
+  default, and a `4xx` answers the same each time; set `retry` in the `QueryClient`'s defaults:
+  `retry: (failures, error) => failures < 3 && !(isResponseError(error) && error.status < 500)`. A
+  read the server refused settles with the client's `ResponseError`, which `isResponseError` reads.
+- Page an infinite list with `fetchNextPage` and `fetchPreviousPage`. It starts at the query's own
+  `page.after` or `page.before`, keeps its `page.size`, follows the server's links, and ends a
+  direction at a page without records.
+- Prefetch in a route loader with the same options: `queryClient.ensureQueryData(contacts.get(id))`,
+  or from TanStack Query 5.102, which deprecates it,
+  `queryClient.query({ ...contacts.get(id), staleTime: 'static' })`. Keys and results are JSON, so
+  `dehydrate` and a persister take them as they are.
+- `resourceQueries` throws `TypeError` for a value `createClients` did not return, `pages` for a
+  resource that does not paginate, and a write for `invalidates` that is not a list of keys:
+  `[meetings.all]`, not `meetings.all`.

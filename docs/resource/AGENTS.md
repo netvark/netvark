@@ -75,7 +75,11 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   a cleared input as `null` (ADR 0016); never fill a write from the record or drop a blank. A
   refusal of one field binds into its `onSubmit` error and a refusal of several into their
   `onServer` errors (ADR 0017): never bind every text into `onSubmit`, which keeps a joint refusal
-  on a member after the person answered it through another. `@netvark/resource-core` and
+  on a member after the person answered it through another. A write's invalidations live in its
+  options, the other types it changes named in `invalidates`, never in a callback passed to
+  `mutate`, which TanStack Query skips once the component that called it unmounts. The query tests
+  read through TanStack Query's observers: from 5.102 `fetchQuery` and its kin are deprecated for
+  `queryClient.query`, which the 5.89 floor lacks. `@netvark/resource-core` and
   `@netvark/jsonapi-client` are peers, since the application hands the bindings declarations,
   messages, and clients made with its own copies. Component tests run TanStack Form, Query, and
   Table v9 as an application does, in jsdom with Testing Library, against a fetch double that
@@ -123,11 +127,12 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 - `fields/` `fieldsOf` and each member's filter kind; `form/` the form model: values, the write, the
   validator, and a refusal's errors by field; `list/` the list model: sorting, column filters, and
   the lenient read of a route's search
-- `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry and its keys
+- `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry, its keys, and an
+  infinite list's pages
 - `internal/` reading a declared resource and the labels of its type in the messages, with the
   `TypeError`s of an argument that is neither; `test-support/` the fixture: migrations, the public
   catalog `@netvark/pg-catalog` extracts from them (`e2e/resource` proves it current), resources,
-  and messages whose labels read a locale variable
+  messages whose labels read a locale variable, and the API the query tests meet (`query-server.ts`)
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
