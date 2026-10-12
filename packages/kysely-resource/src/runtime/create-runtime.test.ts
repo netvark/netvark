@@ -106,7 +106,11 @@ describe('createResourceRuntime (resource SPEC 18.3, 18.4)', () => {
         await runtime.as(member('2')).tasks.list?.(),
       ];
     });
-    expect(inside?.rows.map((row) => row['title'])).toEqual(['One', 'Two']);
+    // A list without a sort orders by the random primary key.
+    expect(inside?.rows.map((row) => row['title']).toSorted()).toEqual([
+      'One',
+      'Two',
+    ]);
     expect(mine?.rows).toEqual(inside?.rows);
     expect(theirs?.rows).toEqual([]);
   });
