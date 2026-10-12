@@ -86,8 +86,8 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 
 - `storage/` `createKyselyStorage`: its options, the transaction protocol, names and casts, `list`,
   and the scope predicate
-- `boot/` the boot checks and their report; `runtime/` `createResourceRuntime`, the domain, and the
-  lifecycle of each operation; `outbox/` `relayOutbox`
+- `boot/` the boot checks and their report; `runtime/` `createResourceRuntime`, the domain, the
+  lifecycle of each operation, and `transaction` with its session; `outbox/` `relayOutbox`
 
 `packages/hono-resource/src/` (SPEC 19.1):
 

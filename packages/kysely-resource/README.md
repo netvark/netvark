@@ -16,8 +16,9 @@ insert, and the runtime maps what an operation throws to the client's error (a r
 keyset refusal, a PostgreSQL integrity violation through its declared code, partitions included).
 `relayOutbox` delivers the events operations recorded. `createResourceRuntime` checks the
 composition against the catalog and the role it connects as, then runs each operation as the actor
-through `runtime.as(actor)`; `checkResourceRuntime` runs the same static checks in CI, without a
-database.
+through `runtime.as(actor)`, or several in one transaction through
+`runtime.transaction(actor, work)`; `checkResourceRuntime` runs the same static checks in CI,
+without a database.
 [`@netvark/hono-resource`](https://github.com/netvark/netvark/tree/main/packages/hono-resource)
 serves the runtime over HTTP on Hono.
 
@@ -145,6 +146,36 @@ it('boots against the catalog', () => {
 - **Options mistakes throw first.** A key that is not an option, a storage that
   `createKyselyStorage` did not return, or a copy of a behavior is a `TypeError` naming the option,
   before any check.
+
+## Running operations together
+
+`runtime.transaction(actor, work)` runs every operation of the domain `work` receives in one
+transaction, with the actor's scopes, so they commit or roll back together, as an Atomic Operations
+request needs:
+
+```ts
+const call = await runtime.transaction(actor, async (domain) => {
+  const contact = await domain.contacts.create({ attributes: { name: 'Grace', kind: 'person' } });
+  return domain.calls.create({
+    attributes: { minutes: 12, note: 'Intro call' },
+    relationships: { contact: { type: 'contacts', id: contact.id } },
+  });
+});
+```
+
+- **One transaction, one operation at a time.** Each operation runs its whole lifecycle in the
+  shared transaction, so a later operation sees what an earlier one wrote: the call above links a
+  contact no other transaction can see yet. A call while another is pending rejects with a
+  `TypeError`: await each operation before the next.
+- **It commits when `work` resolves** and no operation failed. The events every operation recorded
+  then go to `afterCommit` once, in order, and `transaction` resolves to what `work` returned.
+- **The first failure ends it.** The operation rejects with what it threw, and the transaction rolls
+  back at once, releasing its locks and its connection while `work` goes on. Every later call of
+  that domain rejects with a `TypeError`, even when `work` catches the failure. `transaction` then
+  rejects with the failure as the operation alone answers it, a constraint violation through its
+  declared code included, or with what `work` rejected with when that is another value, such as an
+  error `work` built from the failure.
+- **A rejected `work` rolls everything back** too, and `transaction` rejects with what it threw.
 
 ## What a transaction runs
 
@@ -366,6 +397,13 @@ sequence grant, on PostgreSQL 14 and 18.
 grant insert on outbox to api;
 grant select, update, delete on outbox to relay;
 ```
+
+**Run everything inside `work` through its domain.** A transaction started inside `work`, by
+`runtime.as(actor)` or another `runtime.transaction`, does not nest: it waits for the locks the open
+transaction holds, such as the quota lock a create takes or a row an update locked, while `work`
+waits for it, so neither settles. On PGlite, whose one connection the open transaction holds, any
+transaction started inside `work` waits forever. Read what `work` needs through its own domain, and
+start the next transaction once `transaction` settled.
 
 **Pool freely.** Settings and parameters are local to their transaction, so a pooled connection
 carries nothing into the next one: CI checks it on four connections of a node-postgres pool on

@@ -102,9 +102,9 @@ type NewContact = Infer<typeof Contacts>['create']; // { name: string; status?: 
   can produce; a missing one, or a translation using a variable its kind does not receive, fails
   `tsc`. `localizeErrors` turns the server's errors into the request's locale.
 - **An API served from the declarations.** `createResourceRuntime` runs each operation in one
-  transaction scoped to the actor, and `jsonApiRoutes({ runtime, actor })` serves the operations it
-  runs at the paths the declarations' links name, so the links, the routes, and the OpenAPI paths
-  never disagree.
+  transaction scoped to the actor, or several together with `runtime.transaction`, and
+  `jsonApiRoutes({ runtime, actor })` serves the operations it runs at the paths the declarations'
+  links name, so the links, the routes, and the OpenAPI paths never disagree.
 - **Definitions for the rest of the stack.** `Contacts.resource` is a `@netvark/jsonapi-core`
   definition and `Contacts.keyset` a `@netvark/keyset-core` one, and `openapi([...])` documents
   every operation, parameter, schema, and error code, with every example validated.

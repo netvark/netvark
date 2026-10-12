@@ -3,8 +3,8 @@
  * roles and row security as a server has: the static checks, then the
  * connected ones as the role the session runs as. A role row security
  * applies to starts the runtime, which lists the declared resource of
- * each behavior and whose domain runs each operation as the actor; a
- * superuser, a role with BYPASSRLS, and a role that owns a
+ * each behavior and whose domain runs each operation as the actor, alone
+ * or in a transaction with others; a superuser, a role with BYPASSRLS, and a role that owns a
  * scoped table without FORCE are refused, each with every other problem.
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -87,6 +87,27 @@ describe('createResourceRuntime (resource SPEC 18.3, 18.4)', () => {
     });
     expect(created).toMatchObject({ title: 'Boot', workspace: '1' });
     expect(mine?.rows).toEqual([created]);
+    expect(theirs?.rows).toEqual([]);
+  });
+
+  it("runs a transaction's operations as the actor under row security, committing them together", async () => {
+    const runtime = await as('boot_app', async () =>
+      createResourceRuntime(await liveOptions()),
+    );
+    const [inside, mine, theirs] = await as('boot_app', async () => {
+      const seen = await runtime.transaction(member('1'), async (domain) => {
+        await domain.tasks.create?.({ attributes: { title: 'One' } });
+        await domain.tasks.create?.({ attributes: { title: 'Two' } });
+        return domain.tasks.list?.();
+      });
+      return [
+        seen,
+        await runtime.as(member('1')).tasks.list?.(),
+        await runtime.as(member('2')).tasks.list?.(),
+      ];
+    });
+    expect(inside?.rows.map((row) => row['title'])).toEqual(['One', 'Two']);
+    expect(mine?.rows).toEqual(inside?.rows);
     expect(theirs?.rows).toEqual([]);
   });
 

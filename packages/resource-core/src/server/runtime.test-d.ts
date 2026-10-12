@@ -153,6 +153,19 @@ describe('Domain and ResourceRuntime (SPEC 12.10)', () => {
     runtime.resources = [];
   });
 
+  it("hands transaction's work the same domain, and resolves to what work resolves to", () => {
+    expectTypeOf(runtime.transaction).parameter(0).toEqualTypeOf<Member>();
+    const created = runtime.transaction(member, async (domain) => {
+      expectTypeOf(domain.tasks).toEqualTypeOf<TaskOperations>();
+      return domain.tasks.create({ attributes: { title: 'Boot' } });
+    });
+    expectTypeOf(created).resolves.toEqualTypeOf<PublicRowOf<typeof Tasks>>();
+    void runtime.transaction(member, async (domain) => {
+      // @ts-expect-error workspaces does not declare create
+      await domain.workspaces.create({});
+    });
+  });
+
   it('passes where a host takes the runtime typed wide, down to each operation', () => {
     expectTypeOf<TaskOperations>().toExtend<ResourceOperations>();
     expectTypeOf<Domain<Resources>>().toExtend<Domain>();

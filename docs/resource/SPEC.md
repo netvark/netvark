@@ -2177,9 +2177,13 @@ https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-6.html#s
     value.
   - When `work` rejects and no operation failed, the transaction rolls back and `transaction`
     rejects with what `work` rejected with.
-  - A call while another operation of the same domain is pending, or once `transaction` settled,
-    rejects with a `TypeError`. A `transaction` called inside `work` opens a transaction of its own;
-    the two do not nest.
+  - A call while another operation of the same domain is pending, or once `work` settled, rejects
+    with a `TypeError`; when `work` settles while an operation is pending, the transaction ends once
+    that operation settled.
+  - A `transaction` called inside `work`, or an operation of `as`, opens a transaction of its own;
+    the two do not nest, and the inner one waits for any lock the open one holds, such as a quota's,
+    so a `work` that awaits it never settles; on a driver with one connection, such as PGlite, it
+    waits for the connection itself.
 
 The first failure decides because a statement PostgreSQL refused aborts the transaction, so nothing
 after it could commit, and because an operations request is all or nothing. @ref
@@ -3476,10 +3480,17 @@ tenant. An actor without a value for every scope runs no operation: `scopeValues
 `work` a domain whose operations run their lifecycle in that transaction instead of opening one;
 `include` reads in it too. The events every operation records gather in one list, written to the
 outbox as each effect records them and handed to `afterCommit` once the transaction committed. The
-first operation that fails records what it threw with its resource and operation; once
-`storage.transaction` rejected, `transaction` maps it with `operationFailure` exactly as the
-operation alone would (18.5), the partition's names included, which the adapter reads outside the
-transaction.
+first operation that fails records what it threw with the resource and the operation its lifecycle
+raised it in, and ends the transaction at once, without waiting for `work`, so its row locks, the
+quota's lock, and its connection are released while `work` goes on; once `storage.transaction`
+rejected, `transaction` maps it with `operationFailure` exactly as the operation alone would (18.5),
+the partition's names included, which the adapter reads outside the transaction. A failure raised
+before the lifecycle, such as an input the write schema refuses, is the client's error as it is.
+What the commit itself throws, which no operation threw, and a failure to open the transaction,
+before `work` runs, reject unchanged. `work` that is not a function is a `TypeError`, and so is an
+actor without a value for every scope, both before any statement. Modules: `runtime/session.ts` (the
+shared transaction, its events, the one-at-a-time rule, and the first failure) and
+`runtime/transaction.ts`.
 
 | Operation                  | Runs                                                                                                                                                       | Resolves to           |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
@@ -3619,8 +3630,14 @@ what `report` itself throws; neither reaches the operation's caller, whose write
   that only starts as the parameter's, and unique indexes that keep to the scope through a reference
   or a predicate, or do not; the connected checks on PGlite as a superuser, a role with `BYPASSRLS`,
   a role that owns a table with and without `FORCE`, and a role row security applies to; the types
-  of `Domain` for typed and wide behaviors; the keyset refusal mapping; and the lifecycle of each
-  operation, a test per step and per failure path, on PGlite.
+  of `Domain` for typed and wide behaviors; the keyset refusal mapping; the lifecycle of each
+  operation, a test per step and per failure path, on PGlite; and `transaction` on PGlite
+  (`transaction.test.ts`, `transaction-failure.test.ts`): a commit with every event once, a target
+  and an include that see an earlier operation's row, a call still pending when `work` resolves, the
+  first failure rolling back when `work` rethrows it, catches it, or rejects with another value, a
+  constraint violation of a partition mapped once the transaction ended, the transaction ending at
+  the first failure (on PGlite's one connection, a transaction of its own inside `work` then runs),
+  and each `TypeError`.
 - The storage contract (12.9) over `createKyselyStorage`, on PGlite in the package and on PGlite and
   a PostgreSQL server in `e2e/resource` (`RESOURCE_PG_URL`), with obligation 12: a cursor issued in
   one workspace is refused in another.
@@ -3642,6 +3659,11 @@ what `report` itself throws; neither reaches the operation's caller, whose write
   alike. The HTTP API the OpenAPI exchanges run against (15.4) runs on `createResourceRuntime`, and
   each failure the domain throws, rendered by the API's error handler, is the API's answer to the
   same request (`runtime-parity.e2e.test.ts`), so a worker's call and a request take the same path.
+  `runtime-transaction.e2e.test.ts` commits a contact and the call that links it together, rolls
+  both back on the first failure with its declared code, a partition's included, and releases the
+  row locks at the first failure while `work` goes on; on the server, a reader on another connection
+  sees nothing before the commit, a transaction inside `work` commits on its own, and the contacts
+  quota serializes two transactions of one organization.
 - Real catalogs: the static checks and a boot against stern's migrations (15.5).
 
 ### 18.8 Packaging

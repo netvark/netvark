@@ -1029,9 +1029,11 @@ lifecycle is in
 
 A host or a worker takes a runtime by the contract this subpath types (SPEC 12.10), so it needs no
 query builder or driver to type the one it is given: `warnings`, `resources`, each behavior's
-declared resource in their order, and `as(actor)`. Typed by the behaviors, each resource holds
-exactly the operations it declares; typed wide, as a host that mounts any application takes it,
-every operation is optional:
+declared resource in their order, `as(actor)`, and `transaction(actor, work)`, whose `work` receives
+the same domain with its operations sharing one transaction, which commits when `work` resolves and
+rolls back at the first failure. Typed by the behaviors, each resource holds exactly the operations
+it declares; typed wide, as a host that mounts any application takes it, every operation is
+optional:
 
 ```ts
 // server/people.ts
@@ -1048,6 +1050,14 @@ export async function peopleOf(runtime: ResourceRuntime<AppDomain, Resources>, a
     sort: ['name'],
   });
   return page.rows; // public rows: id, kind, name, email, createdAt, organization
+}
+
+// two creates that commit together, or not at all
+export async function importPair(runtime: ResourceRuntime<AppDomain, Resources>, actor: AppActor) {
+  return runtime.transaction(actor, async (domain) => [
+    await domain.contacts.create({ attributes: { name: 'Ada', kind: 'person' } }),
+    await domain.contacts.create({ attributes: { name: 'Grace', kind: 'person' } }),
+  ]);
 }
 
 // a host, typed wide
