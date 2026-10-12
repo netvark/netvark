@@ -19,21 +19,12 @@
 import type { BanError, ErrorItem, HandlerOptions } from '@netvark/ban-core';
 
 import type { Dictionary } from './dictionary';
-import type { DerivedCode } from './message-index';
-import type { ConstraintInputs, ErrorText, Messages } from './types';
+import type { Messages } from './types';
 
 import { isRecord } from '../internal/object';
-import { ISSUE_KINDS } from '../schema/issue-kinds';
 import { checkedMessages } from './define-messages';
 import { dictionaryOf } from './dictionary';
-import {
-  derivedType,
-  fieldsFor,
-  issueDetail,
-  labelFor,
-  memberAt,
-  valuesFor,
-} from './error-inputs';
+import { detailOf } from './object-detail';
 
 const CALLER = 'localizeErrors';
 
@@ -73,61 +64,6 @@ function isErrorDocument(body: unknown): body is ErrorDocument {
       (name) => DOCUMENT_MEMBERS.has(name) || name.includes(':'),
     )
   );
-}
-
-/** One error object's facts. */
-interface Occurrence {
-  readonly code: string;
-  readonly text: ErrorText<ConstraintInputs>;
-  readonly derived: DerivedCode | undefined;
-  readonly item: ErrorItem | undefined;
-  readonly type: string | undefined;
-}
-
-/** A derived code's detail: its own, else its constraint kind's, with its members' labels. */
-function constraintDetail(
-  dictionary: Dictionary,
-  code: string,
-  derived: DerivedCode,
-  { item, type }: Occurrence,
-): string {
-  const text =
-    dictionary.errors.get(code) ??
-    dictionary.messages.constraints[derived.kind];
-  const labels = derivedType(derived, type);
-  return (
-    text?.detail({
-      field: labelFor(dictionary, labels, memberAt(item?.path)),
-      fields: fieldsFor(dictionary, derived, labels),
-    }) ?? ''
-  );
-}
-
-function isIssueKind(reason: string): reason is (typeof ISSUE_KINDS)[number] {
-  return ISSUE_KINDS.some((kind) => kind === reason);
-}
-
-/** The detail of one object: by its item's issue kind or validator code, else by its own code. */
-function detailOf(dictionary: Dictionary, occurrence: Occurrence): string {
-  const { code, text, derived, item, type } = occurrence;
-  const reason = item?.reason;
-  const member = memberAt(item?.path);
-  if (reason !== undefined && isIssueKind(reason)) {
-    return issueDetail(dictionary, reason, {
-      field: labelFor(dictionary, type, member),
-      expected: item?.expected ?? '',
-      values: () => valuesFor(dictionary, type, member, item?.expected ?? ''),
-    });
-  }
-  const validated =
-    reason === undefined ? undefined : dictionary.index.derived.get(reason);
-  if (reason !== undefined && validated !== undefined) {
-    return constraintDetail(dictionary, reason, validated, occurrence);
-  }
-  if (derived !== undefined) {
-    return constraintDetail(dictionary, code, derived, occurrence);
-  }
-  return text.detail({ field: labelFor(dictionary, type, member), fields: '' });
 }
 
 function localizeObject(

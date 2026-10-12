@@ -1531,10 +1531,14 @@ words the server would answer with, in the locale its message functions read whe
 - The text is computed on every call, never cached: a message function reads the locale when it
   runs.
 
-Tests: `localize-issues.test.ts` (each issue kind of 6.4 and a validator's code over the contacts
-fixture: the text equals the `detail` `localizeErrors` writes into the 422 that the fixture's
-JSON:API definition answers for the same value; a relationship's issue; a type without labels; the
-`TypeError`) and the German form of `e2e/resource/react/` (20.8).
+Tests: `localize-issues.test.ts` (the contacts fixture: the texts of `write.create`'s issues equal
+the details `localizeErrors` writes into the 422 jsonapi-core's parser answers for the same
+attributes, over eight issue kinds and a domain validator's code; each text computed in the locale
+of its call; a type the messages do not label; a code they do not derive; the `TypeError`),
+`localize-issues-relationships.test.ts` (a validator on a relationship and a CHECK over a field and
+a relationship, against the items of 9.3), and `e2e/resource/http/writes.e2e.test.ts`, where the
+texts a client computes in a Paraglide locale equal the details the contacts server answers over
+HTTP in German and in English.
 
 ---
 
