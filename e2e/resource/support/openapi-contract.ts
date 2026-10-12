@@ -60,6 +60,11 @@ export interface Contract {
     path: string,
     body: unknown,
   ) => ReadonlyArray<string>;
+  /** How `value` breaks the schema at `segments` of the document; empty when it passes. */
+  readonly schema: (
+    segments: ReadonlyArray<string>,
+    value: unknown,
+  ) => ReadonlyArray<string>;
   /** The codes the response of `status` lists. */
   readonly codes: (
     method: Method,
@@ -216,6 +221,7 @@ export function contractOf(document: OpenApiDocument): Contract {
   ];
   return {
     codes,
+    schema: validate,
     request: (method, path, body) => {
       const content = at(document, [
         'paths',

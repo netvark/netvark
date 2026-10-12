@@ -578,7 +578,9 @@ A missing code, constraint kind, issue kind, member label, or option label fails
 an unknown key. Paraglide types each message with its variables across all locales, so a translation
 that uses a variable its kind does not receive fails the build too, in any locale. A derived code
 needs no entry, since its constraint kind's texts cover it; add one to `errors` only to override
-them. A detail receives:
+them. A `@netvark/ban-core` built-in needs none either, but give one to each your host throws
+itself, such as the `UNAUTHORIZED` of its actor resolver: without an entry, that error keeps its
+English title and the detail your host wrote, in every language. A detail receives:
 
 | Detail                                                                                               | Inputs                                                              |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |

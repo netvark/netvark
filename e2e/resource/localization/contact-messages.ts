@@ -55,6 +55,12 @@ export const contactMessages: MessagesFor<typeof RESOURCES> = defineMessages(
         title: m.error_forbidden_title,
         detail: m.error_forbidden_detail,
       },
+      // A built-in of @netvark/ban-core that the actor resolver throws. Its
+      // entry is optional; without one, a 401 keeps its English text.
+      UNAUTHORIZED: {
+        title: m.error_unauthorized_title,
+        detail: m.error_unauthorized_detail,
+      },
       CLIENT_GENERATED_ID_NOT_SUPPORTED: {
         title: m.error_client_generated_id_not_supported_title,
         detail: m.error_client_generated_id_not_supported_detail,

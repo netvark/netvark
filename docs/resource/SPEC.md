@@ -3971,13 +3971,19 @@ related route and the failing operation's on the operations endpoint, or `undefi
   `RESOURCE_PG_URL`, a PostgreSQL server: a call linking a contact by `lid`, one batch of events
   after the commit, a violation mapped once the transaction ended at its operation, a partition's
   code, a refusal inside the transaction, row security, and `href` targets.
-- End to end (`e2e/resource/http/`): the contacts application on `createResourceRuntime` over
-  `@hono/node-server`, against PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server: defaults on
-  create, omission on update, a 400 with codes, pointers, and localized messages per problem, a 409
-  from a unique violation in German, row security isolation, role checks per operation and include,
-  search with cursors over ties, a cursor from another organization refused, an operations request
-  that commits once and one that rolls back with its pointer, and every example of the served
-  document valid against its schema.
+- End to end (`e2e/resource/http/`, served by `e2e/resource/support/contacts-server.ts`): the
+  contacts application on `createResourceRuntime` over `@hono/node-server`, composed as the
+  package's README composes a host (Paraglide's middleware, the JSON:API middleware, and a ban that
+  localizes with `localizeErrors` and `resourceTypeOf`), against PGlite and, with `RESOURCE_PG_URL`,
+  a PostgreSQL server, nothing mocked and every answer held to the served document: defaults on
+  create, omission and `null` on update, a member a create does not write refused 403 before any
+  validator, a 422 and a 400 with each problem's code, pointer or parameter, and message in German
+  and in English, a 409 from a unique violation in either language, row security isolation, role
+  checks per operation and include, 401 for a request without a known actor, search with cursors
+  over ties and a previous link, a cursor from another organization refused, an operations request
+  that commits once with its events and one that rolls back with its pointer, and the served
+  document equal to `openapi`'s, accepted by an independent validator, with every example in it
+  valid against its schema.
 
 ### 19.8 Packaging
 

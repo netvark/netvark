@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@hono/node-server": "catalog:",
     "@inlang/paraglide-js": "2.26.0",
     "@inlang/plugin-message-format": "4.4.5",
     "@netvark/ban-core": "workspace:*",
