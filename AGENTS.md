@@ -61,6 +61,7 @@ A pnpm workspace of five families:
 | jsonapi  | `packages/jsonapi-core`   | `packages/hono-jsonapi`    | `docs/jsonapi`  | `e2e/jsonapi`  |
 |          | `packages/jsonapi-client` |                            |                 |                |
 | keyset   | `packages/keyset-core`    | `packages/kysely-keyset`   | `docs/keyset`   | `e2e/keyset`   |
+|          |                           | `packages/drizzle-keyset`  |                 |                |
 | resource | `packages/resource-core`  | `packages/kysely-resource` | `docs/resource` | `e2e/resource` |
 |          |                           | `packages/hono-resource`   |                 |                |
 |          |                           | `packages/react-resource`  |                 |                |
