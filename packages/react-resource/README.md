@@ -135,7 +135,7 @@ default it holds every member the operation writes, in declaration order.
 | The model       | What it is                                                                                                                                                      |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `fields`        | the descriptors of the members it holds (see above), each `required` as the operation requires it                                                               |
-| `defaultValues` | what the form starts from: on create each member's literal default or its blank, on update the record's values; frozen                                          |
+| `defaultValues` | what the form starts from: on create each member's default as a read gives it, else its blank, on update the record's values; frozen                            |
 | `validator`     | a synchronous [Standard Schema](https://standardschema.dev) of the values: the declaration's own write validator, each issue on its field in the server's words |
 | `write(values)` | what the client's `create` or `update` takes: the members the person changed, in their wire forms                                                               |
 | `errors(error)` | a refused write's texts, `{ fields, form }`: one per field the server refused, and the rest for a banner                                                        |

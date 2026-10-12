@@ -7,10 +7,10 @@
  * `null` is stored as SQL `NULL` or refused, never changed.
  * @packageDocumentation
  */
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 import type { OracleVerdict } from './types';
 
-import { readForm, UNREPRESENTABLE } from './read-form';
+import { readForm, UNREPRESENTABLE } from '../../wire/read-form';
 import { sameValue } from './same-value';
 
 /** A refusal as a report shows it: the SQLSTATE, and the constraint it names. */

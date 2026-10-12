@@ -8,12 +8,12 @@ import type { $ZodType } from 'zod/v4/core';
 
 import type { DeclaredInternals } from '../../declare/declared-resource';
 import type { MemberSpec } from '../../schema/field-spec';
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 
 import { safeParse } from 'zod/v4/core';
 
 import { describe, ownValue } from '../../internal/object';
-import { columnType } from './column-type';
+import { columnType } from '../../wire/column-type';
 import { parameterText } from './pg-text';
 
 /**

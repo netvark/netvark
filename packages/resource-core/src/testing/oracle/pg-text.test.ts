@@ -1,16 +1,15 @@
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 
 /**
- * Wire values as PostgreSQL parameter text and array literals read back
- * (SPEC 5.1, 7.3): JSON as JSON text, an array as a literal whose string
- * elements are quoted and escaped, a value with no text form, or one JSON
- * writes as another, refused, and literals split with `NULL` and quoted
- * elements kept apart.
+ * Wire values as PostgreSQL parameter text (SPEC 5.1, 7.3): JSON as JSON
+ * text, an array as a literal whose string elements are quoted and
+ * escaped, and a value with no text form, or one JSON writes as another,
+ * refused.
  * @ref https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO
  */
 import { describe, expect, it } from 'vitest';
 
-import { arrayElements, parameterText } from './pg-text';
+import { parameterText } from './pg-text';
 import { Unwritable } from './unwritable';
 
 const TEXT: ColumnType = { base: 'text', enum: false, array: false };
@@ -75,23 +74,4 @@ describe('parameterText', () => {
       new Unwritable(`JSON writes it as ${text}`),
     );
   });
-});
-
-describe('arrayElements', () => {
-  it.each([
-    ['{}', []],
-    ['{a,b}', ['a', 'b']],
-    ['{"a b","c\\"d","e\\\\f"}', ['a b', 'c"d', 'e\\f']],
-    ['{NULL,"NULL"}', [null, 'NULL']],
-    ['{1,,2}', ['1', '', '2']],
-  ])('reads %s', (text, elements) => {
-    expect(arrayElements(text)).toEqual(elements);
-  });
-
-  it.each(['a', '{a', 'a}', '{{a}}', '{a,{b}}'])(
-    'gives undefined for %s, which is no one-dimensional literal',
-    (text) => {
-      expect(arrayElements(text)).toBeUndefined();
-    },
-  );
 });

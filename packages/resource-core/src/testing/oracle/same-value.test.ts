@@ -1,4 +1,4 @@
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 
 /**
  * Whether a read form is the value sent (ADR 0005): the spellings a type's

@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 
-import { describe, isRecord, ownValue } from './object';
+import { deepFreeze, describe, isRecord, ownValue } from './object';
 
 group('isRecord', () => {
   it('accepts objects and rejects null, arrays, and scalars', () => {
@@ -35,5 +35,17 @@ group('describe', () => {
     for (const [value, text] of cases) {
       expect(describe(value)).toBe(text);
     }
+  });
+});
+
+group('deepFreeze', () => {
+  it('freezes the value and every object in it, and returns it', () => {
+    const value = { list: [1, { a: 'b' }], record: { c: null } };
+    expect(deepFreeze(value)).toBe(value);
+    expect(Object.isFrozen(value)).toBe(true);
+    expect(Object.isFrozen(value.list)).toBe(true);
+    expect(Object.isFrozen(value.list[1])).toBe(true);
+    expect(Object.isFrozen(value.record)).toBe(true);
+    expect(deepFreeze('text')).toBe('text');
   });
 });

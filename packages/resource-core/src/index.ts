@@ -55,6 +55,7 @@ export type {
   Messages,
 } from './messages/types';
 export type {
+  FieldDefault,
   FieldFacts,
   FieldLimits,
   FieldMeta,

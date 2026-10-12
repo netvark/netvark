@@ -129,12 +129,12 @@ describe('fields (SPEC 8)', () => {
   it("lists an enum's labels and an enum rule's values, with the defaults that make them optional", () => {
     expect(Contacts.fields.kind).toMatchObject({
       options: ['person', 'company'],
-      default: { literal: 'person' },
+      default: { literal: 'person', value: 'person' },
       required: false,
     });
     expect(Contacts.fields.status).toMatchObject({
       options: ['active', 'archived'],
-      default: { literal: 'active' },
+      default: { literal: 'active', value: 'active' },
       required: false,
     });
   });
@@ -144,7 +144,7 @@ describe('fields (SPEC 8)', () => {
       wire: 'string',
       format: 'decimal',
       nullable: true,
-      default: { literal: '0' },
+      default: { literal: '0', value: '0' },
       limits: {
         ...NO_LIMITS,
         minimum: '0',
@@ -166,7 +166,7 @@ describe('fields (SPEC 8)', () => {
       format: 'date-time',
       fractionDigits: 6,
       required: false,
-      default: { literal: null },
+      default: { literal: null, value: undefined },
       sortable: true,
     });
   });
@@ -174,7 +174,7 @@ describe('fields (SPEC 8)', () => {
   it("describes an array by its elements, a domain's included", () => {
     expect(Contacts.fields.tags).toMatchObject({
       wire: 'array',
-      default: { literal: '{}' },
+      default: { literal: '{}', value: [] },
       items: { wire: 'string', format: null, options: null },
     });
     expect(Meetings.fields.attendees.items).toEqual({

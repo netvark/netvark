@@ -3,6 +3,7 @@
  * a label naming the limit, so an oracle's failure says what it probed.
  * @packageDocumentation
  */
+import { deepFreeze } from '../internal/object';
 
 /** A wire value at or next to a limit of a member's value. */
 export interface BoundaryFixture {
@@ -10,16 +11,6 @@ export interface BoundaryFixture {
   readonly value: unknown;
   /** What the value probes, such as `maxLength 3, plus one`. */
   readonly label: string;
-}
-
-function deepFreeze(value: unknown): unknown {
-  if (typeof value === 'object' && value !== null) {
-    for (const member of Object.values(value)) {
-      deepFreeze(member);
-    }
-    Object.freeze(value);
-  }
-  return value;
 }
 
 /** A fixture, frozen with its value: the lists are shared between calls. */

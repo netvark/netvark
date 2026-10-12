@@ -399,7 +399,7 @@ name.required; // true: NOT NULL without a default, so a create carries it
 name.limits; // { minLength: 1, maxLength: 200, minimum: null, ..., patterns: [] }
 name.filter; // ['eq', 'startsWithi'], typed as that tuple
 kind.options; // ['person', 'company'], typed ReadonlyArray<'person' | 'company'>
-kind.default; // { literal: 'person' }: a create may leave it out
+kind.default; // { literal: 'person', value: 'person' }: a create may leave it out
 createdAt.format; // 'date-time', with fractionDigits 6 and access 'read'
 organization.wire; // 'string': a relationship describes its id, here an int8 key's
 organization.limits.maximum; // '9223372036854775807', a decimal string
@@ -1294,8 +1294,9 @@ option, operator, or code, a loosened limit, and a new default page size break n
   refuse otherwise
   ([HTML](https://html.spec.whatwg.org/multipage/input.html#the-pattern-attribute)).
 - **Show `default`, never send it.** It is the value PostgreSQL applies when a create leaves the
-  member out: show `literal` as a placeholder, and leave the member out to get it. An expression
-  default such as `now()` has `literal: null`.
+  member out: start the input from `value`, the constant as a read gives it, or show `literal` as a
+  placeholder, and leave the member out to get it. An expression default such as `now()` has
+  `literal: null` and no `value`, and so does a codec's field.
 - **Validate responses with `read`.** It strips members it does not know, so a deployed client keeps
   working when the server adds one. For a sparse fieldset, validate with `schema.read.pick(...)` of
   the requested members.

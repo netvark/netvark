@@ -58,7 +58,7 @@ packages/resource-core/src/
   declare/                  createDeclareResource, declareResource, the declaration types, checks (2, 3, 14)
   catalog/                  type-level and prototype-safe runtime lookups into the public catalog
   names/                    derived names and codes, the reverse maps, their type-level twins and checks (4)
-  wire/                     the wire forms and their formats, exact decimal comparison, the JSON Schema of each form (5)
+  wire/                     the wire forms and their formats, exact decimal comparison, the JSON Schema of each form, PostgreSQL's text read into the read form (5)
   schema/                   value, read, create, and update schemas; rules; issue mapping; Standard Schema (6)
   codecs/                   defineCodec, defineValidator, StorageCodecs (7)
   meta/                     field metadata (8)
@@ -659,6 +659,39 @@ read forms an id is output in (3.4), `real`'s with PostgreSQL's output at the ed
 shortest-digit search (a midpoint between two floats, a far neighbor, a tie); the oracle runs the
 same values and generated boundaries through PostgreSQL (15.3).
 
+### 5.4 PostgreSQL's text (`wire/read-form.ts`)
+
+A value as PostgreSQL prints it, in the settings the catalog pins (catalog SPEC 7.1: `TimeZone`
+`UTC`, `DateStyle` `ISO, YMD`, `extra_float_digits` `1`), becomes its read form by the column's
+type, followed through its domains to the base type (`wire/column-type.ts`): whether that is an
+enum, and whether the column, or a domain on the way, is an array. A text outside the read form
+gives `UNREPRESENTABLE`. The oracle reads a stored value this way (7.3), the field metadata a
+default's constant (8), and the Kysely adapter every selected value (18.2).
+
+| Type                                                   | Read form                                                                                                        |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `int2`, `int4`                                         | `Number(text)`                                                                                                   |
+| `int8`                                                 | the text                                                                                                         |
+| `numeric`                                              | the text; `NaN` and the infinities have none                                                                     |
+| `float4`, `float8`                                     | `Number(text)`; `NaN` and the infinities have none                                                               |
+| `bool`                                                 | `true` for `true` and `t`, `false` for `false` and `f`: a cast prints the words, an array's elements the letters |
+| `date`                                                 | the text when it is `YYYY-MM-DD`; a BC date, a year past 9999, and the infinities have none                      |
+| `timestamp`                                            | `YYYY-MM-DD HH:MM:SS[.f]` with `T` for the space; anything else has none                                         |
+| `timestamptz`                                          | `YYYY-MM-DD HH:MM:SS[.f]+00` as `YYYY-MM-DDTHH:MM:SS[.f]Z`; anything else has none                               |
+| `json`, `jsonb`                                        | `JSON.parse(text)`; the JSON value `null` at the top has none                                                    |
+| `text`, `varchar`, `bpchar`, `citext`, `uuid`, an enum | the text                                                                                                         |
+| an array of any of these but `json` and `jsonb`        | the array literal read element by element; a `NULL` element, a nested array, or explicit bounds have none        |
+
+An array literal (`wire/array-literal.ts`) separates its elements by commas, the delimiter of every
+element type with a wire form, and double-quotes an element that is empty, holds a brace, a comma, a
+quote, a backslash, or white space, or spells `NULL`, with a backslash before each quote and
+backslash inside it; `NULL` unquoted is the null element. PostgreSQL prints an array's dimensions
+only when a lower bound is not 1 (`[0:1]={a,b}`). @ref
+https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO @ref
+https://www.postgresql.org/docs/18/datatype-boolean.html
+
+Tests: `read-form.test.ts`, `array-literal.test.ts`, and `column-type.test.ts`.
+
 ---
 
 ## 6. Schemas (`schema/`, ADR 0004)
@@ -1013,8 +1046,8 @@ fits, and what it returns is checked instead. A codec without one throws `TypeEr
 Tests: `define-codec.test.ts` and `define-validator.test.ts` (every runtime rule, Zod Mini schemas),
 `define-codec.test-d.ts` and `define-validator.test-d.ts` (the fixtures a call needs, typed by the
 schema's input), `storage-codecs.test-d.ts`; `oracle-cases.test.ts` (each case's probe and texts and
-every reason of its judge), `unwritable.test.ts`, `pg-text.test.ts`, `verdict.test.ts`,
-`read-form.test.ts`, `same-value.test.ts`, and `column-type.test.ts`. The database's verdicts are
+every reason of its judge), `unwritable.test.ts`, `pg-text.test.ts`, `verdict.test.ts`, and
+`same-value.test.ts`; the stored texts are read as 5.4 reads them. The database's verdicts are
 pg-catalog's to take, in its tests and in `e2e/resource/rules.e2e.test.ts` (15.4).
 
 ---
@@ -1039,7 +1072,7 @@ interface FieldMeta<TFacts extends FieldFacts = FieldFacts> {
   readonly fractionDigits: number | null; // a date-time's: p of timestamp(p), 6 without one
   readonly nullable: TFacts['nullable'];
   readonly required: TFacts['required']; // a create must carry it (6.3)
-  readonly default: PublicColumnDefault | null; // for display, never sent
+  readonly default: FieldDefault | null; // for display, never sent
   readonly limits: FieldLimits;
   readonly options: TFacts['options']; // enum labels or an enum rule's values, in order
   readonly items: TFacts['items']; // an array's elements
@@ -1049,6 +1082,11 @@ interface FieldMeta<TFacts extends FieldFacts = FieldFacts> {
   readonly codec: TFacts['codec'];
   readonly description: string | null;
   readonly example: unknown; // undefined when none is declared
+}
+
+interface FieldDefault {
+  readonly literal: string | null; // the constant's text; null for an expression
+  readonly value: unknown; // the constant's read form; undefined without one
 }
 
 interface FieldLimits {
@@ -1090,9 +1128,13 @@ interface ItemMeta<TOptions> {
 - **`required`**: whether `schema.create` or `linkage.create` requires the member: an access
   `create` takes (3.1) over a column required on insert (6.3).
 - **`default`**: the column's default, else the nearest domain default above the first array level,
-  which PostgreSQL applies when a create leaves the member out. `literal` is a constant's text,
-  `null` for an expression such as `now()`. It is for display: a client never sends it, and the
-  database decides the value.
+  which PostgreSQL applies when a create leaves the member out. `literal` is a constant's text as
+  PostgreSQL prints it in the catalog's settings (catalog SPEC 7.1), `null` for an expression such
+  as `now()`. `value` is the constant read as a read gives the value (5.4), before the column's type
+  modifier applies (a `numeric(5,2)` column's `1` is `'1'`, which a read gives as `'1.00'`), and a
+  relationship's as its id's text; it is `undefined` for an expression, a codec's field, and a
+  constant outside the read form (5.2), and frozen. It is for display: a client never sends it, and
+  the database decides the value.
 - **`description`**, **`example`**: the declaration's own. A declared `example` MUST pass the
   field's value schema; otherwise `declareResource` throws `TypeError`.
 - **A relationship** describes its id (3.4): `wire` is `string`, with its key's `format`,
@@ -1112,11 +1154,13 @@ rules allow. Without a typed table, `fields` is a record of `FieldMeta`. Declari
 computes the type; reading `fields` does (15.5).
 
 Tests: `meta/value-meta.test.ts` (one case per row of 5.1, the folds, patterns, fraction digits,
-elements, domain defaults), `meta/field-meta.test.ts` (the contacts fixture, `required` against
-`schema.create` and `linkage.create`, frozen, built on first read), `meta/id-meta.test.ts` (one case
-per key type, the `bool` ids against the linkage schema), `field-meta.test-d.ts` and
-`id-meta.test-d.ts`, the NOT ENFORCED case of `declare/not-enforced.test.ts`, and the end-to-end
-suites `fields.e2e.test.ts` and `fields-create.e2e.test.ts` (15.4).
+elements, domain defaults), `meta/field-default.test.ts` (a default's read form per row of 5.4, none
+for an expression, a codec, and a constant outside the read form, a relationship's id text),
+`meta/field-meta.test.ts` (the contacts fixture, `required` against `schema.create` and
+`linkage.create`, frozen, built on first read), `meta/id-meta.test.ts` (one case per key type, the
+`bool` ids against the linkage schema), `field-meta.test-d.ts` and `id-meta.test-d.ts`, the NOT
+ENFORCED case of `declare/not-enforced.test.ts`, and the end-to-end suites `fields.e2e.test.ts`,
+`fields-create.e2e.test.ts`, and `field-defaults.e2e.test.ts` (15.4).
 
 ---
 
@@ -2652,28 +2696,32 @@ one step past a stated bound, outside the stated options or form, or with a frac
 is refused or changed, and the schemas give the metadata's verdict on each (`fields.e2e.test.ts`,
 over every column type of the oracle and the ids of each key type); that the `required` members of
 the contacts application are exactly the ones an insert needs, and a member left out holds its
-stated `default` (`fields-create.e2e.test.ts`); the derived error codes, recorded in a reviewed
-snapshot (`snapshots/errors.json`), each raised by a real violation (`support/violations.ts`) on
-PGlite and both servers with the SQLSTATE and fields of 9.5, and the catalog `errorCatalog`
-assembles from them, rendered by `createBan`; `constraintError` against the same violations, each
-mapped to its code's error; a domain CHECK with a rule given a code in the definer (3.6), which the
-declared errors, `errorCatalog`, and `constraintError` give for a real refusal on PGlite and the
-server, while the definer refuses a validator on that CHECK and a code alone on a CHECK without a
-rule (`domain-codes.e2e.test.ts`); localized error documents (`localization.e2e.test.ts`): messages
-the Paraglide compiler builds from `localization/messages/`, mapped with `defineMessages` and served
-through Hono and `@netvark/hono-ban`, answer a 422 in German with option labels, in English with its
-plural forms, in the base locale for a language the project lacks, in a regional tag's language, and
-a 409, which `constraintError` makes of a real violation, with a code's own texts, each with
-`Content-Language` and `Vary`, while `tsc` accepts the mapping and refuses a translation that names
-a variable its kind does not receive; that a row breaking every NOT ENFORCED constraint is stored by
-the database and accepted by the schemas, while the enforced CHECK beside them refuses in both
-(`not-enforced.e2e.test.ts`); the storage contract, passed by the reference adapter on PGlite and on
-the server and failed by each of its defects (`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`,
-12.9); the oracle's cases (7.3), run by `pg-catalog rules --check` over the oracle's schema, the
-contacts application, and the PostgreSQL 18 schema, agreeing with PGlite and the server, while each
-fault a review misses is reported: a validator that refuses what its CHECK holds, a storage codec
-whose text the database refuses, and a catalog older than the migrations (`rules.e2e.test.ts`), and
-the built bin's output (`rules-cli.e2e.test.ts`); the client types of each resource's `resource`
+stated `default` (`fields-create.e2e.test.ts`); that each `default.literal` is the constant as
+PostgreSQL prints it and each `default.value` the read form of what it stores, over a table with a
+constant default for every type with a wire form, added by one more migration
+(`field-defaults.e2e.test.ts`, `support/defaults-table.ts`); the derived error codes, recorded in a
+reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
+(`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
+catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
+same violations, each mapped to its code's error; a domain CHECK with a rule given a code in the
+definer (3.6), which the declared errors, `errorCatalog`, and `constraintError` give for a real
+refusal on PGlite and the server, while the definer refuses a validator on that CHECK and a code
+alone on a CHECK without a rule (`domain-codes.e2e.test.ts`); localized error documents
+(`localization.e2e.test.ts`): messages the Paraglide compiler builds from `localization/messages/`,
+mapped with `defineMessages` and served through Hono and `@netvark/hono-ban`, answer a 422 in German
+with option labels, in English with its plural forms, in the base locale for a language the project
+lacks, in a regional tag's language, and a 409, which `constraintError` makes of a real violation,
+with a code's own texts, each with `Content-Language` and `Vary`, while `tsc` accepts the mapping
+and refuses a translation that names a variable its kind does not receive; that a row breaking every
+NOT ENFORCED constraint is stored by the database and accepted by the schemas, while the enforced
+CHECK beside them refuses in both (`not-enforced.e2e.test.ts`); the storage contract, passed by the
+reference adapter on PGlite and on the server and failed by each of its defects
+(`contract.e2e.test.ts`, `contract-faults.e2e.test.ts`, 12.9); the oracle's cases (7.3), run by
+`pg-catalog rules --check` over the oracle's schema, the contacts application, and the PostgreSQL 18
+schema, agreeing with PGlite and the server, while each fault a review misses is reported: a
+validator that refuses what its CHECK holds, a storage codec whose text the database refuses, and a
+catalog older than the migrations (`rules.e2e.test.ts`), and the built bin's output
+(`rules-cli.e2e.test.ts`); the client types of each resource's `resource`
 (`client-types.e2e.test.ts`, 11.1); that a module exporting declared resources and a `resource`
 alone emits declarations with no diagnostics, naming types only through package entry points
 (`declaration-emit.e2e.test.ts`); the package surface (every value export listed); and the runtime
@@ -3311,30 +3359,13 @@ connection's `search_path`. Every selected value is cast to text,
 `"column" = $n::text::<type>` for the transaction's value of the resource's scope. A resource
 without a scope gets no predicate, and runs only when boot allowed it (18.3).
 
-**Read forms** (obligation 3). A selected text becomes the read form of 5.1 by its column's type,
-followed through its domains to the base type. A value outside the read form fails the read with
-`Error('<type>.<member>: the stored value has no read form')`; no other value is emitted.
-
-| Type                                                   | Read form                                                                                                        |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `int2`, `int4`                                         | `Number(text)`                                                                                                   |
-| `int8`                                                 | the text                                                                                                         |
-| `numeric`                                              | the text; `NaN` and the infinities have none                                                                     |
-| `float4`, `float8`                                     | `Number(text)`; `NaN` and the infinities have none                                                               |
-| `bool`                                                 | `true` for `true` and `t`, `false` for `false` and `f`: a cast prints the words, an array's elements the letters |
-| `date`                                                 | the text when it is `YYYY-MM-DD`; a BC date, a year past 9999, and the infinities have none                      |
-| `timestamp`                                            | `YYYY-MM-DD HH:MM:SS[.f]` with `T` for the space; anything else has none                                         |
-| `timestamptz`                                          | `YYYY-MM-DD HH:MM:SS[.f]+00` as `YYYY-MM-DDTHH:MM:SS[.f]Z`; anything else has none                               |
-| `json`, `jsonb`                                        | `JSON.parse(text)`; the JSON value `null` at the top has none                                                    |
-| `text`, `varchar`, `bpchar`, `citext`, `uuid`, an enum | the text                                                                                                         |
-| an array of any of these but `json` and `jsonb`        | the array literal read element by element; a `NULL` element, a nested array, or explicit bounds have none        |
-
-A codec field's text goes through its storage codec's `read`; a relationship's is the target's id.
-Every selected value is text, so a driver that returns anything else, as a type parser registered
-for `text` would, fails the read with
-`TypeError('<type>.<member>: the driver returned a value that is not text')`. @ref
-https://www.postgresql.org/docs/18/arrays.html#ARRAYS-IO @ref
-https://www.postgresql.org/docs/18/datatype-boolean.html
+**Read forms** (obligation 3). A selected text becomes the read form of 5.1 by its column's type, as
+5.4 reads it. A value outside the read form fails the read with
+`Error('<type>.<member>: the stored value has no read form')`; no other value is emitted. A codec
+field's text goes through its storage codec's `read`; a relationship's is the target's id. Every
+selected value is text, so a driver that returns anything else, as a type parser registered for
+`text` would, fails the read with
+`TypeError('<type>.<member>: the driver returned a value that is not text')`.
 
 **Parameter text** (obligation 4). A write's value becomes the text its column's input function
 reads: a string as it is; a number with `String`; a boolean as `true` or `false`; a `json` or
@@ -4206,16 +4237,18 @@ create, `false` on update (6.2).
 array `Array<string>`, a string or number member `string`, a relationship `string`, and anything
 else `unknown`.
 
-**Start values.** On create each member starts from its display default (8) when that is a literal
-and the member is a scalar, the literal as its value and `true` or `false` as a boolean's, and blank
-otherwise; an array starts as `[]` and `any` as `undefined` whatever their defaults, which apply
-when the member is left alone. On update each member starts from the record: a string as it is, a
-number by `String`, a boolean as it is, `null` as blank, an array's elements likewise, `any` as it
-is, a relationship from its linkage's or included record's `id`, blank when it is `null`. A `write`
-member, which no read returns, starts blank. A record that lacks any other member the form holds
-throws `TypeError` (`resourceForm: the record has no <name>, which the form holds`), since the form
-would show a value the server does not hold, and so does a member whose value is not what its type
-reads, a string, number, or boolean for a scalar and a list of them for an array
+**Start values.** On create each member starts from its display default's `value` (8), read as an
+update reads a record's value: a `boolean[]` column's `'{t,t,t,t,t,f,f}'` starts as
+`['true', 'true', 'true', 'true', 'true', 'false', 'false']`, and a relationship's `'free'` as the
+id `free`. A member whose default has no `value`, such as `now()`, starts blank, and an array as
+`[]`; a member left alone is not sent, so the database applies its default. On update each member
+starts from the record: a string as it is, a number by `String`, a boolean as it is, `null` as
+blank, an array's elements likewise, `any` as it is, a relationship from its linkage's or included
+record's `id`, blank when it is `null`. A `write` member, which no read returns, starts blank. A
+record that lacks any other member the form holds throws `TypeError`
+(`resourceForm: the record has no <name>, which the form holds`), since the form would show a value
+the server does not hold, and so does a member whose value is not what its type reads, a string,
+number, or boolean for a scalar and a list of them for an array
 (`resourceForm: the record's <name> is not the value its type reads`), or a relationship that is
 neither linkage nor a record (`resourceForm: the record's <name> is neither linkage nor a record`);
 each names the member, never the value. `defaultValues` is frozen, its arrays included; TanStack
@@ -4273,8 +4306,8 @@ an update leaves out what the person did not change, and only the server holds t
 When the write carries them all, the refusal is on each of its members.
 
 Tests: `form/form-values.test.ts` (one case per row of the values table and of 5.1, start values on
-create from literal defaults and blanks, on update from a record with linkage and with an included
-target, a record lacking a member, a `write` member, each `TypeError` of a record),
+create from each default's read form and from blanks, on update from a record with linkage and with
+an included target, a record lacking a member, a `write` member, each `TypeError` of a record),
 `form/form-write.test.ts` (each step: changed and unchanged members on both operations, a required
 member left blank, a cleared input as `null` on nullable and non-nullable members, the number texts,
 arrays, identifiers, parts present, the `TypeError` of refused values),
@@ -4533,7 +4566,9 @@ definition's sort names, operators, and search).
   server, with the application's Paraglide messages and nothing mocked: the German create form, its
   client refusal and the server's 422 and its `CONTACT_EMAIL_TAKEN` 409 each on their field in the
   server's words, an update sending the changed members only, the list's sort, filter, search, and
-  cursors over real pages, a stale link read back leniently, and the list refetched after a create.
+  cursors over real pages, a stale link read back leniently, and the list refetched after a create;
+  and over the table of `support/defaults-table.ts`, a create form starting where an update of the
+  row PostgreSQL stores for it starts (`form-defaults.e2e.test.ts`).
 - Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
   and write and a list model's `query` on Bun, Deno, and workerd, where server rendering runs.
 - Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).

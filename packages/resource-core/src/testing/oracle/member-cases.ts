@@ -12,8 +12,8 @@ import type { $ZodType } from 'zod/v4/core';
 import type { DeclaredInternals } from '../../declare/declared-resource';
 import type { MemberSpec } from '../../schema/field-spec';
 import type { RelationshipSpec } from '../../schema/relationship-specs';
+import type { ColumnType } from '../../wire/column-type';
 import type { BoundaryFixture } from '../fixture';
-import type { ColumnType } from './column-type';
 import type { OracleCase, OracleVerdict } from './types';
 
 import { ownValue } from '../../internal/object';

@@ -1,14 +1,16 @@
 /**
- * The read form of SPEC 5.1: what a stored value, printed by PostgreSQL as
- * text in a UTC session with ISO dates, becomes on the wire, or
+ * PostgreSQL's text read into the read form (SPEC 5.4): what a stored
+ * value, printed in a UTC session with ISO dates, becomes on the wire, or
  * `UNREPRESENTABLE` for a value outside it (a year past 9999, a BC date,
  * `infinity`, `NaN`, a `NULL` element, the JSON `null` at the top), which a
- * storage adapter refuses to read (SPEC 12.8).
+ * storage adapter refuses to read (SPEC 12.8). The oracle reads what the
+ * database stored with it (SPEC 7.3), and the field metadata a default's
+ * constant (SPEC 8), which the catalog extracts in the same settings.
  * @packageDocumentation
  */
 import type { ColumnType } from './column-type';
 
-import { arrayElements } from './pg-text';
+import { arrayElements } from './array-literal';
 
 export const UNREPRESENTABLE: unique symbol = Symbol('unrepresentable');
 
@@ -78,9 +80,13 @@ export function readForm(text: string, type: ColumnType): unknown {
     return readScalar(text, type);
   }
   const elements = arrayElements(text);
-  if (elements === undefined || elements.includes(null)) {
+  if (elements === undefined) {
     return UNREPRESENTABLE;
   }
-  const values = elements.map((element) => readScalar(element ?? '', type));
+  const texts = elements.filter((element) => element !== null);
+  if (texts.length < elements.length) {
+    return UNREPRESENTABLE;
+  }
+  const values = texts.map((element) => readScalar(element, type));
   return values.includes(UNREPRESENTABLE) ? UNREPRESENTABLE : values;
 }

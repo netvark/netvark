@@ -1,9 +1,8 @@
 /**
  * The values a form starts from (resource SPEC 20.3): on create, each
- * scalar member's literal display default (SPEC 8) or blank, and on
- * update, the record's value as the member's input edits it. An array
- * starts as `[]` and a JSON or codec value as `undefined` on create,
- * whatever their defaults, which apply when the member is left alone.
+ * member's display default (SPEC 8), the value a read gives for it, or
+ * blank without one, and on update, the record's value; either read as
+ * the member's input edits it, by one set of readers.
  * @packageDocumentation
  */
 import type { FieldMeta } from '@netvark/resource-core';
@@ -24,20 +23,6 @@ export interface HeldMember {
   readonly kind: ValueKind;
   /** What the write compares the member's value to. */
   readonly start: unknown;
-}
-
-/**
- * A member's display default as its input edits it: a boolean's literal
- * is `true` or `false`, the only spellings PostgreSQL's deparser gives a
- * boolean constant.
- * @ref https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/utils/adt/ruleutils.c (`get_const_expr`, `BOOLOID`)
- */
-function createStart(meta: FieldMeta, kind: ValueKind): unknown {
-  const literal = meta.default?.literal ?? null;
-  if (literal === null || kind === 'array' || kind === 'any') {
-    return blankOf(kind);
-  }
-  return kind === 'boolean' ? literal === 'true' : literal;
 }
 
 /** The scalar JSON values a record holds, as their texts: a string as it is, a number or a boolean by `String`. */
@@ -92,6 +77,12 @@ function idOf(name: string, value: unknown): string {
   return id;
 }
 
+/** A member's display default as its input edits it; blank without one, for an expression, a codec's field, and a constant outside the read form (SPEC 8). */
+function createStart(meta: FieldMeta, kind: ValueKind): unknown {
+  const value = meta.default?.value;
+  return value === undefined ? blankOf(kind) : READERS[kind](value);
+}
+
 function updateStart(
   meta: FieldMeta,
   kind: ValueKind,
@@ -122,7 +113,7 @@ function updateStart(
 export function heldMember(
   descriptor: FieldDescriptor,
   operation: FormOperation,
-  record: FormRecord | undefined,
+  record?: FormRecord,
 ): HeldMember {
   const { meta } = descriptor;
   const kind = valueKind(meta);

@@ -1,4 +1,4 @@
-import type { ColumnType } from './column-type';
+import type { ColumnType } from '../../wire/column-type';
 import type { OracleVerdict } from './types';
 
 /**
