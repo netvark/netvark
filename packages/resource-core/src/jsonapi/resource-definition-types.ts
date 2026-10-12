@@ -1,9 +1,9 @@
 /**
  * A declared resource's JSON:API definition in types (SPEC 11.1): the
  * `ResourceDefinition` whose type, attribute and relationship names, row,
- * sort and filter names, and create and update attributes are the
- * declaration's, so `RowOf`, `CreateAttributesOf`, and the names a query
- * takes follow from it.
+ * sort and filter names, create and update attributes, and client types
+ * are the declaration's, so `RowOf`, `CreateAttributesOf`, the names a
+ * query takes, and what a client reads and writes follow from it.
  * @packageDocumentation
  */
 import type { ResourceDefinition } from '@netvark/jsonapi-core';
@@ -16,6 +16,7 @@ import type {
   TypeNameOf,
 } from '../names/public-names';
 import type { TableDefOf, TypesOf } from '../schema/resource-types';
+import type { ClientTypesOf } from './client-types';
 import type { FilterNameOf, SortNameOf } from './query-name-types';
 
 type Simplify<TValue> = { readonly [K in keyof TValue]: TValue[K] };
@@ -57,5 +58,6 @@ export type ResourceOf<
   SortNameOf<TDecl>,
   FilterNameOf<TDecl>,
   Validated<TDecl, 'create', TypesOf<TContext, TTable, TDecl>['create']>,
-  Validated<TDecl, 'update', TypesOf<TContext, TTable, TDecl>['update']>
+  Validated<TDecl, 'update', TypesOf<TContext, TTable, TDecl>['update']>,
+  ClientTypesOf<TContext, TTable, TDecl>
 >;
