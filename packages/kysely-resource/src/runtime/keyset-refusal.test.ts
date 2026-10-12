@@ -109,6 +109,39 @@ describe('keysetRefusal: the refusals the profile leaves to the server', () => {
     expect(objects[0]?.detail).not.toContain('very-old');
   });
 
+  it('every value its field does not accept: one object each, in the order of the conditions', async () => {
+    const { status, objects } = await refused({
+      filter: {
+        and: [
+          { field: 'age', op: 'gte', value: 'very-old' },
+          { field: 'name', op: 'eq', value: 'Ada' },
+          {
+            or: [
+              { field: 'age', op: 'lte', value: 'young' },
+              { field: 'id', op: 'eq', value: 'not-a-uuid' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(status).toBe(400);
+    expect(objects.map(({ code, source }) => ({ code, source }))).toEqual([
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[age][gte]' },
+      },
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[age][lte]' },
+      },
+      {
+        code: 'INVALID_QUERY_PARAMETER',
+        source: { parameter: 'filter[id][eq]' },
+      },
+    ]);
+    expect(JSON.stringify(objects)).not.toMatch(/very-old|young|not-a-uuid/u);
+  });
+
   it('an undeclared field or a malformed filter: at filter, naming nothing the client sent', async () => {
     for (const filter of [
       { field: 'secret-column', op: 'eq', value: 1 },

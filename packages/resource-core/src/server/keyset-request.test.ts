@@ -178,12 +178,25 @@ describe('keysetRequest: filters (SPEC 11.2)', () => {
       const planned = keyset.plan(requestOf(query));
       await expect(planned).rejects.toBeInstanceOf(InvalidFilterValueError);
       await expect(planned).rejects.toMatchObject({
-        field,
-        operator,
-        expected,
+        values: [{ field, operator, expected }],
       });
     },
   );
+
+  it('leaves every refused value to keyset-core, the conditions before the groups', async () => {
+    const planned = keyset.plan(
+      requestOf(
+        'filter[or][0][mood]=angry&filter[or][0][active]=yes&filter[count][gte]=many',
+      ),
+    );
+    await expect(planned).rejects.toMatchObject({
+      values: [
+        { field: 'count', operator: 'gte', expected: 'integer' },
+        { field: 'mood', operator: 'eq', expected: 'one of "calm", "busy"' },
+        { field: 'active', operator: 'eq', expected: 'boolean' },
+      ],
+    });
+  });
 
   it("throws keyset-core's UnsupportedFilterError for an operator it does not have", () => {
     const query = {

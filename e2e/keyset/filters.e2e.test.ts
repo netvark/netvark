@@ -249,7 +249,7 @@ describe('PGlite: filters', () => {
       expect(await names(filter)).toEqual(['Bob', 'Eve', 'Frank', 'Ivan']);
     });
 
-    it('rejects an operator the field does not accept and a bad value before querying', async () => {
+    it('rejects an operator the field does not accept and every bad value before querying', async () => {
       const events: Array<unknown> = [];
       const options = { onQuery: (event: unknown) => events.push(event) };
       await expect(
@@ -266,11 +266,20 @@ describe('PGlite: filters', () => {
           options,
         ),
       ).rejects.toBeInstanceOf(InvalidFilterValueError);
+      const statusAndAge = {
+        and: [
+          { field: 'status', op: 'eq', value: 'vip' },
+          { field: 'age', op: 'gte', value: 'thirty' },
+        ],
+      } as never;
       await expect(
-        binding.contacts(harness, {
-          filter: { field: 'status', op: 'eq', value: 'vip' } as never,
-        }),
-      ).rejects.toMatchObject({ expected: 'one of "lead", "customer"' });
+        binding.contacts(harness, { filter: statusAndAge }, options),
+      ).rejects.toMatchObject({
+        values: [
+          { field: 'status', expected: 'one of "lead", "customer"' },
+          { field: 'age', operator: 'gte', expected: 'integer' },
+        ],
+      });
       expect(events).toEqual([]);
     });
 

@@ -1247,8 +1247,10 @@ option, operator, or code, a loosened limit, and a new default page size break n
   status of one code is a `$ref` into `components.responses`: read the response where it points. A
   response outside the document is a bug in one of them.
 - **Answer the planner's refusals as the parser's.** Map keyset-core's `InvalidCursorError` to
-  `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and `InvalidFilterValueError` at its
-  `filter[<field>][<operator>]`, as the document's 400 lists them; left unmapped, they answer 500.
+  `INVALID_QUERY_PARAMETER` at `page[after]` or `page[before]`, and each of
+  `InvalidFilterValueError`'s `values` to its own `INVALID_QUERY_PARAMETER` at
+  `filter[<field>][<operator>]`, as the document's 400 lists them, so a client hears of every bad
+  value at once; left unmapped, they answer 500.
 - **Commit the surface and review its diff.** Write it with `pg-catalog surface` next to the
   catalog, run `pg-catalog surface --check` in CI, and record a breaking change only with the API
   major version that announces it. A migration that renames a column, tightens a CHECK, or widens an
