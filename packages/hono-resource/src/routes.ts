@@ -1,9 +1,9 @@
 /**
  * `jsonApiRoutes(options)` (resource SPEC 19.2): the routes of a runtime
  * of the contract (SPEC 12.10) on Hono, at the full paths each resource's
- * links name, and the Atomic Operations endpoint beside them (SPEC 19.4),
- * for the host to mount at `/` behind `jsonApi()`, its error handler, and
- * `notFound`. A route maps a request to an operation's input and its
+ * links name, and the Atomic Operations endpoint (SPEC 19.4) and the
+ * OpenAPI document (SPEC 19.5) beside them, for the host to mount at `/`
+ * behind `jsonApi()`, its error handler, and `notFound`. A route maps a request to an operation's input and its
  * result to a document: `@netvark/hono-jsonapi` negotiates, validates,
  * and builds documents, the runtime authorizes and runs, and the host's
  * ban renders every error.
@@ -13,6 +13,7 @@
  */
 import type { Env } from 'hono';
 
+import type { OpenApiOptions } from '@netvark/resource-core/openapi';
 import type {
   DomainShape,
   ResourceRuntime,
@@ -28,6 +29,7 @@ import { collectionRoutes } from './collection';
 import { targetsOf } from './context';
 import { memberRoutes } from './member';
 import { refuseOtherMethods } from './methods';
+import { documentRoute } from './openapi';
 import { operationsRoute } from './operations';
 import { planPaths } from './paths';
 import { relationshipRoutes } from './relationships';
@@ -45,9 +47,14 @@ export interface JsonApiRoutesOptions<
    * `UNAUTHORIZED`, is the response.
    */
   readonly actor: ActorOf<TEnv, TDomain['actor']>;
+  /**
+   * The options of `openapi` (resource SPEC 13.1), whose resources are the
+   * runtime's: with them, `<base>/openapi.json` serves the document.
+   */
+  readonly openapi?: OpenApiOptions | undefined;
 }
 
-const OPTIONS: ReadonlySet<string> = new Set(['runtime', 'actor']);
+const OPTIONS: ReadonlySet<string> = new Set(['runtime', 'actor', 'openapi']);
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
@@ -63,7 +70,7 @@ function checkOptions(options: unknown): void {
       throw new TypeError(`jsonApiRoutes: options.${key} is not an option`);
     }
   }
-  const { runtime, actor } = options;
+  const { runtime, actor, openapi } = options;
   if (
     !isRecord(runtime) ||
     !Array.isArray(runtime['resources']) ||
@@ -79,15 +86,23 @@ function checkOptions(options: unknown): void {
       'jsonApiRoutes: options.actor must be a function from the request to its actor',
     );
   }
+  if (openapi !== undefined && !isRecord(openapi)) {
+    throw new TypeError(
+      "jsonApiRoutes: options.openapi must be openapi's options",
+    );
+  }
 }
 
 /**
- * The routes of `options.runtime`'s resources, and its operations
- * endpoint when a resource declares a write. Throws `TypeError` before it
- * serves anything when the runtime runs no resource, when a resource's
- * links give no paths, when the links have different origins or bases,
- * when two routes have one path, the endpoint's among them, or when a
- * relationship's target is not among the runtime's resources.
+ * The routes of `options.runtime`'s resources, its operations endpoint
+ * when a resource declares a write, and its document with
+ * `options.openapi`. Throws `TypeError` before it serves anything when the
+ * runtime runs no resource, when a resource's links give no paths, when
+ * the links have different origins or bases, when two routes have one
+ * path, the endpoint's or the document's among them, or when a
+ * relationship's target is not among the runtime's resources; what
+ * `openapi` throws for its options, such as an invalid example, it throws
+ * too.
  */
 export function jsonApiRoutes<TEnv extends Env, TDomain extends DomainShape>(
   options: JsonApiRoutesOptions<TEnv, TDomain>,
@@ -109,6 +124,7 @@ export function jsonApiRoutes<TEnv extends Env, TDomain extends DomainShape>(
     relationshipRoutes(context, mounted);
   }
   operationsRoute(context, plan);
+  documentRoute(context, plan, options.openapi);
   refuseOtherMethods(app, context.methods);
   return app;
 }

@@ -99,6 +99,8 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   held the input
 - `operations.ts` the Atomic Operations endpoint over `runtime.transaction`; `operation-calls.ts`
   where each operation's failure points; `hrefs.ts` the targets an `href` names
+- `openapi.ts` the document's route; `resource-type.ts` `resourceTypeOf`, which every route records
+  first; `operation-type.ts` the type of the operation an operations request failed in
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted

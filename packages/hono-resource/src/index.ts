@@ -11,4 +11,5 @@
  */
 export type { JsonApiRoutesOptions } from './routes';
 
+export { resourceTypeOf } from './resource-type';
 export { jsonApiRoutes } from './routes';

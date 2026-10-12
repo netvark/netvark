@@ -45,8 +45,8 @@ export interface PathPlan {
   /** As Hono matches it: `''` for root-relative links. */
   readonly base: string;
   readonly resources: ReadonlyArray<MountedResource>;
-  /** Every route of the resources. */
-  readonly routes: ReadonlySet<string>;
+  /** Every route the plan holds: the resources', and each endpoint's `claimRoute` added. */
+  readonly routes: Set<string>;
 }
 
 const TEMPLATE = '{id}';
@@ -57,6 +57,14 @@ const ROOT_RELATIVE = 'root-relative';
 /** `path` as Hono's router reads a request's: decoded by `decodeURI` but for `%25`. */
 export function requestPath(path: string): string {
   return tryDecodeURI(path.replaceAll('%25', '%2525'));
+}
+
+/** Adds `route`, an endpoint's beside the resources', to `plan`; a `TypeError` when a route has it. */
+export function claimRoute(plan: PathPlan, route: string): void {
+  if (plan.routes.has(route)) {
+    throw new TypeError(`jsonApiRoutes: two routes have the path ${route}`);
+  }
+  plan.routes.add(route);
 }
 
 /** `path`, which holds `{id}` at most once, as a Hono route. */

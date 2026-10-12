@@ -40,6 +40,7 @@ import {
 import { idOf, includedOf, notRun, operationsOf, targetOf } from './context';
 import { allow } from './methods';
 import { linkagePath, moveItems } from './pointers';
+import { servesType } from './resource-type';
 
 const UNSUPPORTED = 'The relationship does not support this update';
 /** Where a relationship document holds the linkage. */
@@ -75,7 +76,8 @@ function selfRoutes<TEnv extends Env, TDomain extends DomainShape>(
   path: string,
 ): void {
   const { app, actors, methods } = context;
-  app.get(path, actors.resolve, async (c) => {
+  const serves = servesType(declared.names.type);
+  app.get(path, serves, actors.resolve, async (c) => {
     const domain = operationsOf(context, c, declared);
     if (domain.get === undefined) {
       throw notRun(declared, 'get');
@@ -92,6 +94,7 @@ function selfRoutes<TEnv extends Env, TDomain extends DomainShape>(
   if (updates) {
     app.patch(
       path,
+      serves,
       actors.resolve,
       relationshipValidator(declared.resource, name, 'one'),
       async (c) => {
@@ -113,6 +116,7 @@ function selfRoutes<TEnv extends Env, TDomain extends DomainShape>(
   app.on(
     updates ? ['POST', 'DELETE'] : ['PATCH', 'POST', 'DELETE'],
     path,
+    serves,
     () => {
       throw jsonApiError('FORBIDDEN', { detail: UNSUPPORTED });
     },
@@ -131,27 +135,37 @@ function relatedRoute<TEnv extends Env, TDomain extends DomainShape>(
     return;
   }
   const { app, actors, methods } = context;
-  app.get(path, actors.resolve, queryValidator(target.resource), async (c) => {
-    const query = c.req.valid('query');
-    const source = operationsOf(context, c, declared);
-    if (source.get === undefined) {
-      throw notRun(declared, 'get');
-    }
-    const { data } = relationshipOf(declared, await source.get(idOf(c)), name);
-    if (data === null) {
-      return respond(c, resourceDocument(target.resource, null, { query }));
-    }
-    const domain = operationsOf(context, c, target);
-    if (domain.get === undefined) {
-      throw notRun(target, 'get');
-    }
-    const row = await domain.get(data.id);
-    const included = await includedOf(context, domain, target, [row], query);
-    return respond(
-      c,
-      resourceDocument(target.resource, row, { query, included }),
-    );
-  });
+  app.get(
+    path,
+    servesType(target.names.type),
+    actors.resolve,
+    queryValidator(target.resource),
+    async (c) => {
+      const query = c.req.valid('query');
+      const source = operationsOf(context, c, declared);
+      if (source.get === undefined) {
+        throw notRun(declared, 'get');
+      }
+      const { data } = relationshipOf(
+        declared,
+        await source.get(idOf(c)),
+        name,
+      );
+      if (data === null) {
+        return respond(c, resourceDocument(target.resource, null, { query }));
+      }
+      const domain = operationsOf(context, c, target);
+      if (domain.get === undefined) {
+        throw notRun(target, 'get');
+      }
+      const row = await domain.get(data.id);
+      const included = await includedOf(context, domain, target, [row], query);
+      return respond(
+        c,
+        resourceDocument(target.resource, row, { query, included }),
+      );
+    },
+  );
   allow(methods, path, 'GET');
 }
 

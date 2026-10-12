@@ -3707,15 +3707,15 @@ and builds documents, the runtime authorizes and runs, and the host's ban render
 
 ```
 @netvark/hono-resource
-├── jsonApiRoutes(options)   routes.ts   the routes of a runtime (19.2 to 19.5)
-└── resourceTypeOf(c)        actor.ts    the type a request's route serves, for localizeErrors (19.6)
+├── jsonApiRoutes(options)   routes.ts          the routes of a runtime (19.2 to 19.5)
+└── resourceTypeOf(c)        resource-type.ts   the type a request addresses, for localizeErrors (19.6)
 ```
 
 | Module               | Holds                                                                         |
 | -------------------- | ----------------------------------------------------------------------------- |
 | `paths.ts`           | each resource's paths from its links, as Hono routes, and the base            |
 | `methods.ts`         | the methods each path answers, and the 405 of any other                       |
-| `actor.ts`           | the request's actor, resolved once, and `resourceTypeOf`                      |
+| `actor.ts`           | the request's actor, resolved once                                            |
 | `context.ts`         | what every route reads: the runtime, a request's operations, and its includes |
 | `collection.ts`      | `list` and `create`                                                           |
 | `member.ts`          | `get`, `update`, and `remove`                                                 |
@@ -3725,8 +3725,10 @@ and builds documents, the runtime authorizes and runs, and the host's ban render
 | `hrefs.ts`           | the targets an operation's `href` names                                       |
 | `pointers.ts`        | moving an error's items to where the request held the input                   |
 | `openapi.ts`         | the document's route                                                          |
+| `resource-type.ts`   | `resourceTypeOf`, and the middleware each route records its type with first   |
+| `operation-type.ts`  | the type of the operation an operations request failed in                     |
 
-Types exported: `JsonApiRoutesOptions`, `RoutesOpenApiOptions`.
+Types exported: `JsonApiRoutesOptions`; `openapi` takes resource-core's `OpenApiOptions` (13.1).
 
 ### 19.2 `jsonApiRoutes(options)`
 
@@ -3751,7 +3753,7 @@ app.route(
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `runtime` | A runtime of the contract (12.10); its `resources` are what the routes serve.                                                                                                                                                                                                              |
 | `actor`   | `(c: Context<TEnv>) => TActor \| Promise<TActor>`, the actor the request runs as. It runs once per request, before the query or the document is read, so a request it refuses answers that refusal whatever else is wrong with it; what it throws is the response, such as `UNAUTHORIZED`. |
-| `openapi` | `openapi`'s options (13.1) without the resources, which are the runtime's. Without it, no document is served.                                                                                                                                                                              |
+| `openapi` | `openapi`'s options (13.1), `OpenApiOptions`, whose resources are the runtime's. Without it, no document is served (19.5).                                                                                                                                                                 |
 
 It returns a `Hono<TEnv>` whose routes sit at the full paths the links name; the host mounts it at
 `/` and owns the rest: `jsonApi()` before it, which negotiates every request (jsonapi SPEC 10.1),
@@ -3768,14 +3770,15 @@ https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath)
 
 `jsonApiRoutes` throws `TypeError` before it serves anything for an option a JavaScript caller got
 wrong (one that is not an option, a runtime without `resources`, `as`, and `transaction`, an actor
-that is not a function), when the runtime runs no resource, when a resource's links give no paths
-(13.1's messages, starting `resourcePaths:`), when two resources' links have different origins or
-bases, when two routes have one path, the operations endpoint's among them (19.4), or when a
-relationship's target, includable or not, is not among the runtime's resources, since its related
-link serves the target and its linkage names it. A runtime that breaks the contract on a request,
-whose domain lacks a resource it lists or an operation a declaration declares, or whose row lacks a
-relationship its declaration declares, fails that request with a `TypeError` naming it, which the
-host's handler answers with 500.
+that is not a function, an `openapi` that is not an object), when the runtime runs no resource, when
+a resource's links give no paths (13.1's messages, starting `resourcePaths:`), when two resources'
+links have different origins or bases, when two routes have one path, the operations endpoint's
+(19.4) or the document's (19.5) among them, or when a relationship's target, includable or not, is
+not among the runtime's resources, since its related link serves the target and its linkage names
+it; and with `openapi`, what `openapi` throws for its options (19.5). A runtime that breaks the
+contract on a request, whose domain lacks a resource it lists or an operation a declaration
+declares, or whose row lacks a relationship its declaration declares, fails that request with a
+`TypeError` naming it, which the host's handler answers with 500.
 
 A path answers the methods its operations take and any other with `METHOD_NOT_ALLOWED` (405), whose
 `Allow` header lists them, `HEAD` beside `GET` since Hono answers `HEAD` with a `GET` route. The 405
@@ -3871,7 +3874,11 @@ https://www.rfc-editor.org/rfc/rfc3986#section-5.2
 With `openapi`, the document is `openapi(runtime.resources, options.openapi)` (13.1), built once
 when `jsonApiRoutes` runs, so a document that cannot be built, such as one with an invalid example,
 throws there rather than on a request. It is served as `application/json`, without an actor: a
-client reads it before it has a session.
+client reads it before it has a session. Like every route, the path answers another method 405 with
+`Allow: GET, HEAD` (19.2), and a resource whose route has the path, which a definition's own
+`links.self` can give it, is refused when the routes are made. The routes and the document read the
+same links, so the document names the paths the routes serve. @ref
+https://spec.openapis.org/oas/v3.1.2.html
 
 ### 19.6 Errors and localization
 
@@ -3890,6 +3897,18 @@ const handle = ban.onError({ transform: localizeErrors(messages, { resource: res
 related route and the failing operation's on the operations endpoint, or `undefined`: what
 `localizeErrors` takes to label members (10.4).
 
+- A collection, resource, or relationship route records its resource's type, and a related route its
+  target's, in middleware that runs first, so every error the route throws has it, the actor's
+  refusal and the 403 of an update a relationship link does not support among them.
+- On the operations endpoint, the operation is the one the error's items point under
+  (`/atomic:operations/<index>...`), since the processor stops at the first failure (jsonapi SPEC
+  11.4), and its type is read from the request document as the processor reads it: its `ref`'s type,
+  else the type its `href` names, else its `data`'s. The document is request text, so a type the
+  runtime does not run is `undefined`, as is a refusal of the whole document, which points under no
+  operation.
+- A 405, and a request no route of `jsonApiRoutes` served, have none. The type is held by the
+  request's `Context`, so it lasts as long as the request.
+
 ### 19.7 Test plan
 
 - Unit tests (`packages/hono-resource/src/*.test.ts`) over a runtime of the contract held in memory
@@ -3897,11 +3916,20 @@ related route and the failing operation's on the operations endpoint, or `undefi
   the operation is not declared, the 405 and its `Allow`, the actor's order before the validators,
   includes, the 403 of an update a relationship link does not support, the relationship routes'
   pointers, the operations endpoint's transaction, moved pointers, and `resolveHref`, the document
-  route, `resourceTypeOf`, and each `TypeError` of 19.2.
+  route (its body, `HEAD`, the 405, its absence without `openapi`, a document that cannot be built,
+  the path a resource's route takes), `resourceTypeOf` on every route and on the operations
+  endpoint, with `localizeErrors` labeling a member with it and without it, and each `TypeError` of
+  19.2.
 - Smoke (`e2e/resource/smoke/route-checks.ts`): the built package's routes over a runtime held in
   memory answer a resource, a 405 with `Allow`, the actor's refusal, a relationship link, the 403 of
-  an update it does not support, a related link, and an operations request on Bun, Deno, and
-  workerd.
+  an update it does not support, a related link, an operations request, and the document, and the
+  error handler reads a related route's type through `resourceTypeOf`, on Bun, Deno, and workerd.
+- The document and localized errors over the runtime (`e2e/resource/runtime-document.e2e.test.ts`):
+  the contacts application on `createResourceRuntime` through `app.request`, against PGlite and,
+  with `RESOURCE_PG_URL`, a PostgreSQL server: the served document is `openapi` of the runtime's
+  resources, which an independent validator accepts, and the host's ban, localizing with the
+  application's Paraglide messages and `resourceTypeOf`, labels a route's refusal, one inside an
+  operation, and a violation mapped once the transaction ended in the request's language.
 - The operations endpoint over the runtime (`e2e/resource/runtime-operations.e2e.test.ts`): the
   contacts application on `createResourceRuntime` through `app.request`, against PGlite and, with
   `RESOURCE_PG_URL`, a PostgreSQL server: a call linking a contact by `lid`, one batch of events
