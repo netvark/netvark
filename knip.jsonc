@@ -20,6 +20,13 @@
       "entry": ["smoke/worker.ts"],
       "project": ["**/*.ts"]
     },
+    "e2e/jsonapi": {
+      // As e2e/*, plus `declarations/`: modules declarations.e2e.test.ts
+      // compiles with tsc to emit their declarations, so all of their
+      // exports are public.
+      "entry": ["smoke/worker.ts", "declarations/*.ts"],
+      "project": ["**/*.ts"]
+    },
     "e2e/catalog": {
       // As e2e/*, plus the generated files under `fixtures/*/expected/`:
       // modules an application imports, so all of their exports are public.
@@ -29,14 +36,17 @@
     "e2e/resource": {
       // As e2e/*, plus: the generated catalogs (all exports public); the
       // extraction config the pg-catalog bin loads; `fails/`, which
-      // fails.e2e.test.ts compiles with tsc instead of importing; and
-      // `localization/transform-forms.ts`, which only the type check reads.
+      // fails.e2e.test.ts compiles with tsc instead of importing, and
+      // `declarations/`, which declaration-emit.e2e.test.ts compiles to emit
+      // declarations; and `localization/transform-forms.ts`, which only the
+      // type check reads.
       // The inlang project loads the message-format plugin by path.
       "entry": [
         "smoke/worker.ts",
         "fixtures/*/*catalog.ts",
         "fixtures/*/netvark.config.mjs",
         "fails/*.ts",
+        "declarations/*.ts",
         "localization/transform-forms.ts"
       ],
       "project": ["**/*.ts", "**/*.mjs"],

@@ -212,6 +212,9 @@ Best practices:
   send each writable attribute as `unknown`.
 - **Keep definition modules importable by a client.** A client imports the definitions; import row
   types with `import type` and keep database code out of the modules that define resources.
+- **Publish them as declarations.** A package of shared definitions compiles with
+  `declaration: true` and no annotations: every type an inferred definition names (`InferredTypes`,
+  `DefinitionOf`) is exported, so the emitted `.d.ts` imports only `@netvark/jsonapi-core`.
 
 ### Links
 

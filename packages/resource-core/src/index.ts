@@ -38,6 +38,7 @@ export type {
 } from './declare/types';
 export type { ErrorCatalog } from './errors/error-catalog';
 export type { ConstraintKind, ErrorEntry } from './errors/error-entry';
+export type { ClientTypesOf } from './jsonapi/client-types';
 export type {
   ErrorTransform,
   LocalizeErrorsOptions,
