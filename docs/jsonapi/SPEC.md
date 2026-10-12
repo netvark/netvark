@@ -1174,7 +1174,7 @@ runtime-neutral assertions over every feature area; `run.ts` drives it in-proces
 and runs it in Miniflare's workerd. `client-checks.ts` calls a blog of its own through the client,
 in-process, inside the runtime that hosts the app, which answers `GET /client-checks` with the
 outcome; each harness reports it beside the app's checks (15.9). `pnpm test:runtimes` runs all
-three; CI runs them on every push.
+three; CI runs them on every pull request and every push to `main`.
 
 ---
 
