@@ -189,6 +189,30 @@ const Calls = defineResource({
 declared type; identifier objects pass through for polymorphic relationships. The attribute and
 relationship names it may return are the declared ones: a typo is a type error.
 
+### What a client sees
+
+Every definition also carries, in types only, what a client reads and writes:
+`TypesOf<typeof Articles>` holds the attributes as the JSON `serialize` produces (a `Date` arrives
+as a string, an attribute that may be `undefined` is optional), each relationship's type and
+cardinality, the filter operators, the include paths, whether the resource paginates and has a
+search parameter, the validators' inputs for a create and an update, and the fields each write
+takes. [`@netvark/jsonapi-client`](../jsonapi-client#readme) types its calls and records from it.
+The member, `'~types'`, is never present at runtime.
+
+```ts
+type Article = TypesOf<typeof Articles>['attributes'];
+// { readonly title: string; readonly body: string; readonly createdAt: string }
+```
+
+Best practices:
+
+- **Type the row `serialize` takes.** The attributes' types come from what `serialize` returns, so
+  an untyped row gives a client `unknown` everywhere.
+- **Give every write a validator.** Its input type is what a client sends; without one, a client may
+  send each writable attribute as `unknown`.
+- **Keep definition modules importable by a client.** A client imports the definitions; import row
+  types with `import type` and keep database code out of the modules that define resources.
+
 ### Links
 
 `links: { base }` derives every link from the type by the URL design the
