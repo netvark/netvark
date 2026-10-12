@@ -22,14 +22,16 @@ import { RESOURCES } from './test-support/resources';
 const OPTIONS = { info: { title: 'Tasks API', version: '1.0.0' } };
 
 describe('GET <base>/openapi.json (resource SPEC 19.5)', () => {
-  it("answers the runtime's document as application/json, without an actor", async () => {
+  it("answers the runtime's document, the operations endpoint listed, as application/json, without an actor", async () => {
     const app = testApp(memoryRuntime(RESOURCES), { openapi: OPTIONS });
     const response = await app.request('/api/openapi.json');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/json');
-    expect(await response.json()).toStrictEqual(
+    const document: unknown = await response.json();
+    expect(document).toStrictEqual(
       JSON.parse(JSON.stringify(openapi(RESOURCES, OPTIONS))),
     );
+    expect(document).toHaveProperty(['paths', '/api/operations', 'post']);
   });
 
   it('answers HEAD with no body', async () => {

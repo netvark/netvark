@@ -6,10 +6,6 @@
  * @ref https://hono.dev/docs/api/hono#request
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-clients
  */
-import type { Hono } from 'hono';
-
-import type { AppEnv } from '../runtime/api.ts';
-
 const JSON_API = 'application/vnd.api+json';
 
 /** What a request sends. */
@@ -31,9 +27,17 @@ export interface Sent {
   readonly body: unknown;
 }
 
+/** What a request goes through: a Hono app's `request`, the full pipeline without a socket. */
+export interface Requester {
+  readonly request: (
+    url: string,
+    init: RequestInit,
+  ) => Response | Promise<Response>;
+}
+
 /** Sends `request` to `url` with `method`. */
 export async function send(
-  app: Hono<AppEnv>,
+  app: Requester,
   method: string,
   url: string,
   request: Request = {},

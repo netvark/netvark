@@ -13,9 +13,14 @@ import type { ErrorObject } from 'ajv/dist/2020.js';
  * OpenAPI members declared as vocabulary, so a schema anywhere in it
  * compiles by its JSON Pointer with its `$ref`s resolved in the document.
  * A response that is a Reference Object is read where it points, in
- * `components.responses`.
+ * `components.responses`. A response's media type is the most specific
+ * key of the status's content that matches its `Content-Type`: the same
+ * type and subtype, and each parameter the key names, such as the `ext`
+ * of an operations response, carried with the same value.
  * @ref https://spec.openapis.org/oas/v3.1.2.html#responses-object
  * @ref https://spec.openapis.org/oas/v3.1.2.html#reference-object
+ * @ref https://spec.openapis.org/oas/v3.1.2.html#response-content ("only the most specific key is applicable")
+ * @ref https://www.rfc-editor.org/rfc/rfc9110#section-12.5.1 (a media range with parameters is more specific)
  * @ref https://spec.openapis.org/registry/format/
  * @ref https://ajv.js.org/api.html#ajv-addvocabulary-vocabulary-ajv
  * @ref https://www.rfc-editor.org/rfc/rfc6901
@@ -26,6 +31,8 @@ import type { Sent } from './http.ts';
 
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020.js';
+
+import { parseMediaType } from '@netvark/jsonapi-core';
 
 import { openApiFormats } from './openapi-formats.ts';
 
@@ -134,6 +141,41 @@ function sentCodes(body: unknown): Array<string> {
     : [];
 }
 
+/** A parameter of a media type as one string; a name is lowercase already, and its value keeps its case. */
+function parameterOf({
+  name,
+  value,
+}: {
+  readonly name: string;
+  readonly value: string;
+}): string {
+  return `${name}=${value}`;
+}
+
+/** The key of `content` that matches `contentType` most specifically, or `undefined`. */
+function listedMedia(
+  content: Readonly<Record<string, unknown>>,
+  contentType: string,
+): string | undefined {
+  const sent = parseMediaType(contentType);
+  if (sent === undefined) {
+    return undefined;
+  }
+  const carried = new Set(sent.parameters.map(parameterOf));
+  const matching = Object.keys(content).flatMap((key) => {
+    const listed = parseMediaType(key);
+    return listed !== undefined &&
+      listed.type === sent.type &&
+      listed.subtype === sent.subtype &&
+      listed.parameters.every((parameter) =>
+        carried.has(parameterOf(parameter)),
+      )
+      ? [{ key, specificity: listed.parameters.length }]
+      : [];
+  });
+  return matching.toSorted((a, b) => b.specificity - a.specificity)[0]?.key;
+}
+
 function described(
   errors: ReadonlyArray<ErrorObject> | null | undefined,
 ): Array<string> {
@@ -198,14 +240,15 @@ export function contractOf(document: OpenApiDocument): Contract {
         return [`${method} ${path} documents no ${status}`];
       }
       const content = isRecord(response['content']) ? response['content'] : {};
-      const media = sent.mediaType;
-      if (media === undefined) {
+      const contentType = sent.headers.get('Content-Type') ?? sent.mediaType;
+      if (sent.mediaType === undefined || contentType === undefined) {
         return Object.keys(content).length === 0
           ? []
           : [`${status} has no body`];
       }
-      if (!Object.hasOwn(content, media)) {
-        return [`${status} documents no ${media}`];
+      const media = listedMedia(content, contentType);
+      if (media === undefined) {
+        return [`${status} documents no ${contentType}`];
       }
       const listed = new Set(codes(method, path, sent.status));
       return [

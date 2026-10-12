@@ -111,8 +111,10 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const DEFAULT_MAX_PAGE_SIZE = 100;
 
 /**
- * Default cap on the number of operations in one atomic request. The same
- * default as JsonApiDotNetCore's `MaximumOperationsPerRequest`.
+ * Default cap on the number of operations in one atomic request, exported
+ * from `/atomic` so a document of the endpoint states the processor's own
+ * limit. The same default as JsonApiDotNetCore's
+ * `MaximumOperationsPerRequest`.
  * @ref https://www.jsonapi.net/usage/options.html
  */
 export const DEFAULT_MAX_OPERATIONS = 10;

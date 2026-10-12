@@ -216,6 +216,10 @@ app.route(
 - **Served without an actor**, as `application/json`: a client reads it before it has a session.
 - **The same paths as the routes**, since both come from the links, so the document cannot drift
   from what the server answers.
+- **The operations endpoint is listed** when a resource declares a write: `POST /api/operations`
+  under the extension's media type, with a schema for each operation a resource takes, its results,
+  and the codes of every write. A client can hold an operations request to it before sending it, and
+  a test can hold the endpoint's answers to it, as this repository's end-to-end suite does.
 
 ## Errors and localization
 

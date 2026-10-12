@@ -148,6 +148,10 @@ describe('openapi describes what each resource serves', () => {
     });
     expect(
       Object.keys(openapi([Organizations, Removable], { info: INFO }).paths),
-    ).toEqual(['/api/organizations/{id}', '/api/contacts/{id}']);
+    ).toEqual([
+      '/api/organizations/{id}',
+      '/api/contacts/{id}',
+      '/api/operations',
+    ]);
   });
 });

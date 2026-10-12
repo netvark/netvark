@@ -25,7 +25,7 @@ const URIS: JsonSchema = {
 };
 
 /** The members every document may carry beside its primary data. */
-const TOP_LEVEL: Readonly<Record<string, JsonSchema>> = {
+export const TOP_LEVEL: Readonly<Record<string, JsonSchema>> = {
   jsonapi: {
     type: 'object',
     properties: {

@@ -107,6 +107,7 @@ describe('openapi', () => {
       'patch /api/contacts/{id} contacts.update',
       'patch /api/contacts/{id}/relationships/organization contacts.organization.relationship.update',
       'post /api/contacts contacts.create',
+      'post /api/operations atomic:operations',
     ]);
   });
 

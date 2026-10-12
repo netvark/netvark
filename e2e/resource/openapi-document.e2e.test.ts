@@ -101,7 +101,7 @@ describe("the contacts application's OpenAPI document", () => {
 
   it('lists the codes of codes.all on every operation', () => {
     const all = operations();
-    expect(all).toHaveLength(37);
+    expect(all).toHaveLength(38);
     for (const [method, path] of all) {
       expect(
         contract.codes(method, path, UNAUTHORIZED),
@@ -124,21 +124,35 @@ describe("the contacts application's OpenAPI document", () => {
       'organizations.identifier',
       'organizations.create',
       'organizations.update',
+      'organizations.local',
+      'organizations.atomic-add',
+      'organizations.atomic-update',
       'contacts.resource',
       'contacts.identifier',
       'contacts.create',
       'contacts.update',
+      'contacts.local',
+      'contacts.atomic-add',
+      'contacts.atomic-update',
       'meetings.resource',
       'meetings.identifier',
       'meetings.create',
       'meetings.update',
+      'meetings.local',
+      'meetings.atomic-add',
+      'meetings.atomic-update',
       'notes.resource',
       'notes.identifier',
       'notes.create',
       'notes.update',
+      'notes.local',
+      'notes.atomic-add',
+      'notes.atomic-update',
       'calls.resource',
       'calls.identifier',
       'calls.create',
+      'calls.local',
+      'calls.atomic-add',
     ]);
   });
 

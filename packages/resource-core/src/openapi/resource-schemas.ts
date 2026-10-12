@@ -8,10 +8,14 @@
  * request object is closed, as `@netvark/jsonapi-core`'s parser is: a
  * member the resource does not declare is a 400, one the operation does
  * not write a 403 (SPEC 9.4), a create's `id` without client ids a 403.
- * `@`-members are skipped by the parser, so the schemas allow them.
+ * `@`-members are skipped by the parser, so the schemas allow them. An
+ * Atomic Operations operation's resource object may also carry a `lid` and
+ * link by one, which the processor resolves to the id an earlier `add`
+ * made (jsonapi SPEC 11.3); only a type with `create` has lids to name.
  * @ref https://jsonapi.org/format/1.1/#document-resource-objects
  * @ref https://jsonapi.org/format/1.1/#document-member-names-at-members
- * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (section 9.2)
+ * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (sections 9.2 and 11.3)
+ * @ref https://jsonapi.org/ext/atomic/#operation-objects (lid)
  * @packageDocumentation
  */
 import type { JsonSchema } from '@netvark/ban-core';
@@ -34,6 +38,8 @@ export type RequestSide = Exclude<DocumentSide, 'response'>;
 
 /** Members a request may carry beside the ones it declares. */
 const AT_MEMBERS = { '^@': {} };
+/** A `lid`, which the processor resolves to the id an earlier `add` made. */
+const LID: JsonSchema = Object.freeze({ type: 'string' });
 
 /** One member's schema per public name, for an object's `properties`. */
 type Members = Readonly<Record<string, JsonSchema>>;
@@ -62,23 +68,29 @@ function attributesOf(
   );
 }
 
+/** The relationship objects of `side`, each linking by lid where `lids` holds its target. */
 function relationshipsOf(
   internals: DeclaredInternals,
   side: DocumentSide,
+  lids: ReadonlySet<string> = new Set(),
 ): Members {
   const links = internals.resource.resource.links.relationship !== undefined;
   return Object.fromEntries(
     internals.specs.relationships
       .filter((spec) => carries(side, spec.access))
-      .map((spec) => [
-        spec.name,
-        relationshipSchema(
-          fieldMetaOf(internals, spec.name),
-          spec.target().names.type,
-          side,
-          links,
-        ),
-      ]),
+      .map((spec) => {
+        const target = spec.target().names.type;
+        return [
+          spec.name,
+          relationshipSchema(
+            fieldMetaOf(internals, spec.name),
+            target,
+            side,
+            links,
+            lids.has(target),
+          ),
+        ];
+      }),
   );
 }
 
@@ -97,6 +109,21 @@ export function identifierSchema(internals: DeclaredInternals): JsonSchema {
       meta: { type: 'object' },
     },
     required: ['type', 'id'],
+  };
+}
+
+/** `{ type, lid }`, the linkage that names a resource an earlier `add` of the request created. */
+export function localIdentifierSchema(
+  internals: DeclaredInternals,
+): JsonSchema {
+  return {
+    type: 'object',
+    properties: {
+      type: { const: internals.resource.names.type },
+      lid: LID,
+      meta: { type: 'object' },
+    },
+    required: ['type', 'lid'],
   };
 }
 
@@ -161,22 +188,42 @@ function closedObject(
  * The resource object a create or an update sends: `id` on a create only
  * with client ids, and required on an update; `attributes` and
  * `relationships` required on a create when one of their members is.
+ * With `lids`, the types an `add` can create, it is an operation's: it
+ * may carry a `lid`, which an `add` defines and an update may name the
+ * resource by in place of `id`, and its linkage may name each target
+ * `lids` holds by lid. The processor resolves an update's `lid` only when
+ * the operation has no target, and reads past one beside an `id` (jsonapi
+ * SPEC 11.4), so an update of any type takes it.
  */
 export function requestObjectSchema(
   internals: DeclaredInternals,
   side: RequestSide,
+  lids?: ReadonlySet<string>,
 ): JsonSchema {
   const { resource, names } = internals.resource;
   const attributes = attributesOf(internals, side);
-  const relationships = relationshipsOf(internals, side);
+  const relationships = relationshipsOf(internals, side, lids);
   const requiredAttributes = requiredOf(internals, attributes, side);
   const requiredRelationships = requiredOf(internals, relationships, side);
   const takesId = side === 'update' || resource.clientIds;
+  const operation = lids !== undefined;
+  // Each branch declares its member: a strict validator refuses a
+  // `required` whose property its own schema does not name.
+  const identifiedBy =
+    side === 'update' && operation
+      ? {
+          anyOf: [
+            { properties: { id: idSchema(internals) }, required: ['id'] },
+            { properties: { lid: LID }, required: ['lid'] },
+          ],
+        }
+      : {};
   return {
     type: 'object',
     properties: {
       type: { const: names.type },
       ...(takesId ? { id: idSchema(internals) } : {}),
+      ...(operation ? { lid: LID } : {}),
       attributes: closedObject(attributes, requiredAttributes),
       relationships: closedObject(relationships, requiredRelationships),
       links: {},
@@ -184,10 +231,11 @@ export function requestObjectSchema(
     },
     required: [
       'type',
-      ...(side === 'update' ? ['id'] : []),
+      ...(side === 'update' && !operation ? ['id'] : []),
       ...(requiredAttributes.length === 0 ? [] : ['attributes']),
       ...(requiredRelationships.length === 0 ? [] : ['relationships']),
     ],
+    ...identifiedBy,
     patternProperties: AT_MEMBERS,
     additionalProperties: false,
   };

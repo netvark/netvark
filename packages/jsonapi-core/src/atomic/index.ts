@@ -24,6 +24,7 @@ export type {
   ResourceHandlers,
 } from './types';
 
+export { DEFAULT_MAX_OPERATIONS } from '../internal/constants';
 export { assertOperationsContentType } from './content-type';
 export { errorAtOperation } from './operation-error';
 export { parseOperationsDocument } from './parse-document';

@@ -72,20 +72,39 @@ export function fieldSchema(
 }
 
 /**
+ * A relationship's linkage: the target's identifier, its local identifier
+ * where `local` is set, and `null` where the foreign key may be null.
+ */
+export function linkageSchema(
+  target: string,
+  nullable: boolean,
+  local: boolean,
+): JsonSchema {
+  const identifiers = [
+    schemaRef(target, 'identifier'),
+    ...(local ? [schemaRef(target, 'local')] : []),
+    ...(nullable ? [{ type: 'null' }] : []),
+  ];
+  const [only] = identifiers;
+  return identifiers.length === 1 && only !== undefined
+    ? only
+    : { anyOf: identifiers };
+}
+
+/**
  * A relationship object: its linkage in `data`, the target's identifier
- * or `null` where the foreign key may be null, and in a response the
- * relationship's links when the definition builds them.
+ * or `null` where the foreign key may be null, or the target's local
+ * identifier where `local` is set, and in a response the relationship's
+ * links when the definition builds them.
  */
 export function relationshipSchema(
   meta: FieldMeta,
   target: string,
   side: DocumentSide,
   links: boolean,
+  local = false,
 ): JsonSchema {
-  const identifier = schemaRef(target, 'identifier');
-  const data = meta.nullable
-    ? { anyOf: [identifier, { type: 'null' }] }
-    : identifier;
+  const data = linkageSchema(target, meta.nullable, local);
   const responseMembers =
     side === 'response'
       ? {

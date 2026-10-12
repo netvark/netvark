@@ -16,12 +16,17 @@
  *   resource's derived codes the operation can raise (9.1, 9.5);
  * - a remove: `NOT_FOUND`, and `CONFLICT` for a row still referenced (9.5);
  * - a relationship's endpoints: a get's `NOT_FOUND`, and an update's
- *   document codes with the derived codes over that relationship.
+ *   document codes with the derived codes over that relationship;
+ * - the Atomic Operations endpoint: the processor's own, a document's
+ *   codes, `FORBIDDEN` for an operation its resource does not declare,
+ *   and `NOT_FOUND` for a type no resource has (jsonapi SPEC 11.2, 11.4),
+ *   and every code of each write an operation can run.
  *
  * The codes of the application's rules and quotas, and the ones its
  * middleware adds to every response, come from the options, since rules
  * are functions the declaration cannot read.
  * @ref https://jsonapi.org/format/1.1/#crud
+ * @ref https://jsonapi.org/ext/atomic/#processing-errors
  * @packageDocumentation
  */
 import type { DeclaredInternals } from '../declare/declared-resource';
@@ -192,6 +197,37 @@ export function operationCodes(
       ...ownCodes(internals, operation),
       ...configured,
       ...(codes.all ?? []),
+    ]),
+  ];
+}
+
+/**
+ * The writes an operation can run on the resource: its declared create,
+ * update, and remove. An update of a relationship writes what the
+ * resource's update can, so it raises none of its own codes.
+ */
+function writesOf(internals: DeclaredInternals): Array<DocumentOperation> {
+  return internals.resource.declaration.operations
+    .filter((operation) => operation !== 'list' && operation !== 'get')
+    .map((kind) => ({ kind }));
+}
+
+/** Every code the Atomic Operations endpoint may answer with, each once, in a stable order. */
+export function atomicCodes(
+  listed: ReadonlyArray<DeclaredInternals>,
+  codes: OperationCodes = {},
+): ReadonlyArray<string> {
+  return [
+    ...new Set([
+      ...ALWAYS,
+      ...DOCUMENT,
+      'FORBIDDEN',
+      'NOT_FOUND',
+      ...listed.flatMap((internals) =>
+        writesOf(internals).flatMap((operation) =>
+          operationCodes(internals, operation, codes),
+        ),
+      ),
     ]),
   ];
 }

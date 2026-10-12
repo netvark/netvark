@@ -1107,6 +1107,19 @@ date-time's range, stays with the server, whose refusals the error responses doc
 that the server would refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the
 build fails instead of the document lying.
 
+When a resource declares `create`, `update`, or `remove`, the document also lists the
+[Atomic Operations](https://jsonapi.org/ext/atomic/) endpoint a host serves,
+`POST <base>/operations` (operation id `atomic:operations`), under the extension's media type,
+`application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"`. Its request schema holds each
+operation a resource takes: an `add` of `contacts.atomic-add`, which may carry a `lid` that a later
+operation names in a `ref` or in linkage (`contacts.local`); an `update` of `contacts.atomic-update`
+by `ref`, `href`, or its data; a `remove`; and an `update` of each `readWrite` relationship. At most
+`DEFAULT_MAX_OPERATIONS` (10, from `@netvark/jsonapi-core/atomic`) operations fit in a request, the
+processor's default. The 200 answers `atomic:results`, and the 204 a request whose operations have
+no result; the error responses list every code of each write. The collections must share one base,
+and no collection may sit at `<base>/operations`, or `openapi` throws `TypeError`, as the routes
+would.
+
 The surface is the part of the document a client can break on, as sorted JSON: its `format`, then
 per type the operations, each member's access, form, limits, options, nullability, requiredness,
 operators, and sortability, the codes with their statuses, and the page bounds. Commit it next to
