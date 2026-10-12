@@ -1,10 +1,10 @@
 /**
  * A schema with one column per row of the Kysely type table (SPEC 9.2):
- * every type pg-types parses, its array where pg-types parses that, enums
- * and domains inside and outside the configured schemas, domains over
- * domains and over arrays, arrays of domains, and every insert rule. It
- * runs on PostgreSQL 14 to 18, so the driver's own results can be compared
- * with the generated types on a server.
+ * every type pg-types or PGlite parses, its array, enums and domains inside
+ * and outside the configured schemas, domains over domains and over
+ * arrays, a domain over each type PGlite serializes, arrays of domains, and
+ * every insert rule. It runs on PostgreSQL 14 to 18, so each driver's own
+ * results can be compared with the generated types.
  */
 import type { Migration } from '../migrations/load';
 
@@ -23,6 +23,10 @@ create domain int_list as int4[];
 create domain required_text as text not null;
 create domain defaulted_text as text default 'x';
 create domain moment as timestamptz;
+create domain blob as bytea;
+create domain document as jsonb;
+create domain tally as int8;
+create domain toggle as bool;
 create table kinds (
   id int8 generated always as identity primary key,
   small int2,
@@ -70,6 +74,11 @@ create table kinds (
   required required_text,
   defaulted defaulted_text,
   moments moment[],
+  instant moment,
+  chunk blob,
+  payload document,
+  counter tally,
+  switched toggle,
   flags bool[],
   smalls int2[],
   regulars int4[],

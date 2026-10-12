@@ -1,7 +1,7 @@
 /**
  * What the Kysely tests share: running work as the contacts application's
  * tenant, and reading every column of every table a generated `DB`
- * declares back through node-postgres.
+ * declares back through the application's driver.
  */
 import type { Kysely, Transaction } from 'kysely';
 
@@ -16,11 +16,11 @@ import { hasType } from './declared-types';
 /** Runs `work` in a transaction as the tenant, as the row security policies of V6 expect. */
 export async function asTenant<TDatabase, TResult>(
   db: Kysely<TDatabase>,
-  organization: string,
+  organization: string | number | bigint,
   work: (trx: Transaction<TDatabase>) => Promise<TResult>,
 ): Promise<TResult> {
   return db.transaction().execute(async (trx) => {
-    await sql`select set_config('app.organization_id', ${organization}, true)`.execute(
+    await sql`select set_config('app.organization_id', ${String(organization)}, true)`.execute(
       trx,
     );
     return work(trx);

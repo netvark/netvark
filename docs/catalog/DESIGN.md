@@ -309,9 +309,10 @@ committed catalog.ts ──parse──▶ Catalog ◀──diffCatalogs──▶
 | 0004 | The catalog is deterministic TypeScript: JSON under `as const`, fixed order, no volatile facts  |
 | 0005 | The public catalog is an explicit, expression-free slice                                        |
 | 0006 | CHECK constraints become rules only when the rule is equivalent                                 |
-| 0007 | Kysely types are generated from the catalog with node-postgres's default mapping                |
+| 0007 | Kysely types are generated from the catalog with node-postgres's default mapping (amended)      |
 | 0008 | Drift compares a live database with the committed catalog                                       |
 | 0009 | A unique index that no constraint backs is a public unique constraint                           |
 | 0010 | A NOT ENFORCED constraint is public and marked as such                                          |
 | 0011 | The catalog's type is a named interface, so compile errors print its name                       |
 | 0012 | The oracle writes fixtures into copies of the columns, catching refusals in the database        |
+| 0013 | The Kysely types follow the application's driver: node-postgres or PGlite's own parsers         |

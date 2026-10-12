@@ -117,6 +117,21 @@ describe('validateConfig: out (SPEC 11.1)', () => {
       'out.types.file must be a string',
     ],
     [
+      'an unknown driver',
+      out({ types: { file: 'db.ts', driver: 'postgres.js' } }),
+      'out.types.driver must be "node-postgres" or "pglite"',
+    ],
+    [
+      'a driver that is not a string',
+      out({ types: { file: 'db.ts', driver: ['pglite'] } }),
+      'out.types.driver must be "node-postgres" or "pglite"',
+    ],
+    [
+      'a driver named like an inherited property',
+      out({ types: { file: 'db.ts', driver: 'toString' } }),
+      'out.types.driver must be "node-postgres" or "pglite"',
+    ],
+    [
       'a misspelled types option',
       out({ types: { file: 'db.ts', camelcase: true } }),
       'out.types.camelcase is not an option',

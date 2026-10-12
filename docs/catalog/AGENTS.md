@@ -15,9 +15,10 @@ file adds what is specific to `@netvark/catalog-core` (the database-free model) 
   (`pg_get_constraintdef`, `pg_get_expr`, `pg_get_indexdef`, `format_type`), never from parsing
   migration text. Behavior comes from the PostgreSQL manual (system catalogs, pattern matching,
   configuration), PostgreSQL's source where the manual is silent (`ruleutils.c` for deparsing,
-  `printtup.c` for wire types), the ECMAScript specification for regular expressions, pg-types for
-  the driver's parsers, Kysely's documentation, PGlite's documentation, and Flyway's naming rules.
-  Cite the clause next to the decision with an `@ref <url>` comment and name it in the test.
+  `printtup.c` for wire types), the ECMAScript specification for regular expressions, pg-types and
+  PGlite's source (`types.ts`, `base.ts`) for the drivers' parsers and serializers, Kysely's
+  documentation, PGlite's documentation, and Flyway's naming rules. Cite the clause next to the
+  decision with an `@ref <url>` comment and name it in the test.
 - Deparsed text in tests is real. Every expression a recognizer or normalizer test feeds in is text
   PostgreSQL 14 or 18 printed, captured by running the SQL, not typed from memory; the e2e suite
   proves the captured forms by extracting them again on PGlite and both servers.
@@ -50,7 +51,8 @@ never imports anything outside itself.
   default literals, search configuration, names and keys)
 - `sql/` the tokenizer and expression parser for deparsed SQL
 - `recognize/` the CHECK recognizer and the regular expression subset
-- `render/` the catalog modules, their parser, and the Kysely types with their mapping table
+- `render/` the catalog modules, their parser, and the Kysely types with one type table per driver
+  (`kysely-node-postgres.ts`, `kysely-pglite.ts`) and the mapping over them (`kysely-mapping.ts`)
 - `commands/` `extractCatalog`, `extract`, `introspectCatalog`, `drift`, `formatDiff`
 - `config.ts`, `config-validate.ts`, `config-file.ts` `defineExtraction`, its checks, and loading
   `netvark.config.*`
@@ -58,8 +60,9 @@ never imports anything outside itself.
 
 `e2e/catalog/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`. `fixtures/contacts/` holds a realistic
-application's migrations and `expected/` the three files extraction must produce for them; `smoke/`
-runs the packages on Bun, Deno, and workerd.
+application's migrations and `expected/` the three files extraction must produce for them, with the
+types rendered with `camelCase` and for PGlite; `smoke/` runs the packages on Bun, Deno, and
+workerd.
 
 - `docs/catalog/DESIGN.md` what we are building and why; `docs/catalog/SPEC.md` the normative
   contract; `docs/catalog/adr/` decisions

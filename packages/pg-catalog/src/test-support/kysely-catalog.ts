@@ -1,6 +1,7 @@
 /**
  * Small hand-built catalogs for the Kysely renderer's edge cases: name
- * collisions, overrides, and domains the test schema cannot express.
+ * collisions, overrides, and domains the test schema cannot express; and
+ * the mapping contexts and type references the mapping tests read.
  */
 import type {
   Catalog,
@@ -8,6 +9,10 @@ import type {
   CatalogDomain,
   CatalogTable,
 } from '@netvark/catalog-core';
+
+import type { KyselyDriver } from '../config';
+import type { MappingContext } from '../render/kysely-mapping';
+import type { PositionTypes, TypeRef } from '../render/kysely-type-table';
 
 import { CATALOG_FORMAT } from '@netvark/catalog-core';
 
@@ -89,5 +94,38 @@ export function catalogOf(parts: {
     enums: parts.enums ?? {},
     domains: parts.domains ?? {},
     tables: parts.tables ?? {},
+  };
+}
+
+/** A mapping context over `catalog` with the enum `mood` named `Mood`. */
+export function mappingContext(
+  catalog: Catalog,
+  driver: KyselyDriver = 'node-postgres',
+  overrides: Readonly<Record<string, PositionTypes>> = {},
+): MappingContext {
+  return {
+    catalog,
+    enumNames: new Map([['mood', 'Mood']]),
+    overrides: new Map(Object.entries(overrides)),
+    driver,
+  };
+}
+
+/** The select, insert, and update type texts. */
+export function texts(types: PositionTypes): ReadonlyArray<string> {
+  return [types.select.text, types.insert.text, types.update.text];
+}
+
+/** A reference to the base type `type`, or to its arrays. */
+export function baseRef(type: string, array = false): TypeRef {
+  return { type, typeKind: 'base', array };
+}
+
+/** The same type, without helpers, in all three positions, as an override gives it. */
+export function plainTypes(text: string): PositionTypes {
+  return {
+    select: { text, helpers: [] },
+    insert: { text, helpers: [] },
+    update: { text, helpers: [] },
   };
 }

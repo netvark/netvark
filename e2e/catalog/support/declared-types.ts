@@ -1,6 +1,6 @@
 /**
  * Reads a generated Kysely types file back as data, each table's select
- * types by column and each enum's labels, and checks a value node-postgres
+ * types by column and each enum's labels, and checks a value a driver
  * returned against a declared type. Only the types `renderKyselyTypes`
  * writes are understood; anything else fails loudly.
  */
@@ -112,6 +112,7 @@ const CHECKS: ReadonlyMap<string, (value: unknown) => boolean> = new Map([
   ['null', (value: unknown) => value === null],
   ['string', (value: unknown) => typeof value === 'string'],
   ['number', (value: unknown) => typeof value === 'number'],
+  ['bigint', (value: unknown) => typeof value === 'bigint'],
   ['boolean', (value: unknown) => typeof value === 'boolean'],
   [
     'Date',

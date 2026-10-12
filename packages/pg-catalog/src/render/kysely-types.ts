@@ -1,7 +1,8 @@
 /**
- * The Kysely types (SPEC 9.2, ADR 0007): one string literal union per enum,
- * one interface per table with each column's select, insert, and update
- * types, and the `DB` interface, rendered from the catalog so the types and
+ * The Kysely types (SPEC 9.2, ADR 0007, ADR 0013): one string literal
+ * union per enum, one interface per table with each column's select,
+ * insert, and update types as the configured driver returns and sends
+ * them, and the `DB` interface, rendered from the catalog so the types and
  * the catalog cannot disagree.
  * @ref https://kysely.dev/docs/generating-types
  * @ref https://kysely-org.github.io/kysely-apidoc/types/ColumnType.html
@@ -15,24 +16,26 @@ import type {
   CatalogTable,
 } from '@netvark/catalog-core';
 
-import type { TypeOverride } from '../config';
+import type { KyselyDriver, TypeOverride } from '../config';
+import type { MappingContext } from './kysely-mapping';
 import type {
   Helper,
-  MappingContext,
   PositionTypes,
   TsType,
   TypeRef,
-} from './kysely-mapping';
+} from './kysely-type-table';
 
 import { PgCatalogError } from '../errors';
 import { compareCodeUnits } from '../internal/code-units';
 import { FILE_HEADER } from './catalog-module';
 import { KeyNames } from './key-names';
+import { HELPER_DECLARATIONS, HELPER_ORDER } from './kysely-helpers';
 import { mapType } from './kysely-mapping';
 import { memberName, pascalCase, stringLiteral } from './kysely-names';
 
-/** How `renderKyselyTypes` maps types: `TypesConfig` without its file. */
+/** How `renderKyselyTypes` maps types: `TypesConfig` without its file; the driver defaults to node-postgres. */
 export interface KyselyTypesOptions {
+  readonly driver?: KyselyDriver;
   readonly overrides?: Readonly<Record<string, string | TypeOverride>>;
   readonly imports?: ReadonlyArray<string>;
   readonly camelCase?: boolean | CamelCaseOptions;
@@ -42,46 +45,6 @@ type KyselyImport = 'ColumnType' | 'Generated' | 'GeneratedAlways';
 
 const UNKNOWN = 'unknown';
 
-const HELPER_ORDER: ReadonlyArray<Helper> = [
-  'JsonValue',
-  'PostgresInterval',
-  'Point',
-  'Circle',
-];
-const HELPER_DECLARATIONS: Readonly<Record<Helper, ReadonlyArray<string>>> = {
-  JsonValue: [
-    'export type JsonValue =',
-    '  | string',
-    '  | number',
-    '  | boolean',
-    '  | null',
-    '  | Array<JsonValue>',
-    '  | { [key: string]: JsonValue };',
-  ],
-  // The object postgres-interval 1.x returns; its own declaration, with `toPostgres` for parameters.
-  PostgresInterval: [
-    'export interface PostgresInterval {',
-    '  years?: number;',
-    '  months?: number;',
-    '  days?: number;',
-    '  hours?: number;',
-    '  minutes?: number;',
-    '  seconds?: number;',
-    '  milliseconds?: number;',
-    '  toPostgres(): string;',
-    '  toISO(): string;',
-    '  toISOString(): string;',
-    '}',
-  ],
-  Point: ['export interface Point {', '  x: number;', '  y: number;', '}'],
-  Circle: [
-    'export interface Circle {',
-    '  x: number;',
-    '  y: number;',
-    '  radius: number;',
-    '}',
-  ],
-};
 const RESERVED: ReadonlyArray<readonly [string, string]> = [
   ['DB', 'the DB interface'],
   ['ColumnType', "Kysely's ColumnType"],
@@ -268,6 +231,7 @@ export function renderKyselyTypes(
       catalog,
       enumNames: new Map(enums.map(({ key, name }) => [key, name])),
       overrides: resolveOverrides(options.overrides ?? {}),
+      driver: options.driver ?? 'node-postgres',
     },
     keys,
   );

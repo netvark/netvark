@@ -3,7 +3,7 @@
  * in Flyway order the way a deploy applies them: on PGlite behind a socket
  * server, which node-postgres reaches over the wire protocol with its stock
  * type parsers, or in a throwaway database on the server `CATALOG_PG_URL`
- * names.
+ * names; or PGlite itself, for PGlite's own parsers.
  * @ref https://pglite.dev/docs/pglite-socket
  * @ref https://documentation.red-gate.com/fd/migrations-271585107.html (versioned migrations, then repeatable ones)
  */
@@ -99,6 +99,29 @@ export async function openPgliteDatabase(): Promise<LiveDatabase> {
       await pglite.close();
     },
   });
+}
+
+/**
+ * PGlite with the contacts application, for a driver that calls its own
+ * `query()`, such as Kysely's `PGliteDialect`. Migrations create types
+ * after startup, so the array types are read again afterwards, as PGlite
+ * documents for added array types; the caller closes it.
+ * @ref https://pglite.dev/docs/api#refresharraytypes
+ */
+export async function openMigratedPglite(): Promise<PGlite> {
+  const pglite = await PGlite.create({
+    extensions: { btree_gist, citext, pg_trgm },
+  });
+  try {
+    for (const sql of await migrations()) {
+      await pglite.exec(sql);
+    }
+    await pglite.refreshArrayTypes();
+  } catch (error) {
+    await pglite.close();
+    throw error;
+  }
+  return pglite;
 }
 
 /** Runs one statement on the server the URL names, on a connection of its own. */

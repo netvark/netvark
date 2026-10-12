@@ -19,6 +19,8 @@ export const EXPECTED_PUBLIC: string = fixture('expected/public-catalog.ts');
 export const EXPECTED_TYPES: string = fixture('expected/db.ts');
 /** The types rendered with `camelCase: true`, for applications that use CamelCasePlugin. */
 export const EXPECTED_CAMEL_TYPES: string = fixture('expected/db-camel.ts');
+/** The types rendered with `driver: 'pglite'`, for applications on Kysely's PGliteDialect. */
+export const EXPECTED_PGLITE_TYPES: string = fixture('expected/db-pglite.ts');
 
 export const PUBLIC_TABLES: ReadonlyArray<string> = [
   'contacts',

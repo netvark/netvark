@@ -1,174 +1,159 @@
-import type { Catalog } from '@netvark/catalog-core';
-
-import type { MappingContext, PositionTypes, TypeRef } from './kysely-mapping';
-
+/**
+ * `mapType` across drivers (SPEC 9.2): domains over domains and arrays,
+ * types outside the catalog, and the overrides, the nearest winning. The
+ * rows of each driver's table are in `kysely-node-postgres.test.ts` and
+ * `kysely-pglite.test.ts`.
+ */
 import { describe, expect, it } from 'vitest';
 
-import { catalogOf, domain } from '../test-support/kysely-catalog';
+import {
+  baseRef,
+  catalogOf,
+  domain,
+  mappingContext,
+  plainTypes,
+  texts,
+} from '../test-support/kysely-catalog';
 import { mapType } from './kysely-mapping';
 
-function context(
-  catalog: Catalog,
-  overrides: Readonly<Record<string, PositionTypes>> = {},
-): MappingContext {
-  return {
-    catalog,
-    enumNames: new Map([['mood', 'Mood']]),
-    overrides: new Map(Object.entries(overrides)),
-  };
-}
-
-function texts(types: PositionTypes): ReadonlyArray<string> {
-  return [types.select.text, types.insert.text, types.update.text];
-}
-
-function base(type: string, array = false): TypeRef {
-  return { type, typeKind: 'base', array };
-}
-
-const plain = (text: string): PositionTypes => ({
-  select: { text, helpers: [] },
-  insert: { text, helpers: [] },
-  update: { text, helpers: [] },
+const catalog = catalogOf({
+  domains: {
+    amount: domain('amount', 'int8'),
+    small_amount: domain('small_amount', 'amount', { typeKind: 'domain' }),
+    amounts: domain('amounts', 'int8', { array: true }),
+    moment: domain('moment', 'timestamptz'),
+  },
 });
+const small = {
+  type: 'small_amount',
+  typeKind: 'domain',
+  array: false,
+} as const;
+const moment = { type: 'moment', typeKind: 'domain', array: false } as const;
 
-const EMPTY = context(catalogOf({}));
-
-describe('mapType: node-postgres defaults (SPEC 9.2)', () => {
-  it.each([
-    ['int4', ['number', 'number', 'number']],
-    [
-      'int8',
-      ['string', 'string | number | bigint', 'string | number | bigint'],
-    ],
-    ['numeric', ['string', 'string | number', 'string | number']],
-    ['timestamptz', ['Date', 'Date | string', 'Date | string']],
-    ['point', ['Point', 'string', 'string']],
-    ['citext', ['string', 'string', 'string']],
-  ])('%s', (type, expected) => {
-    expect(texts(mapType(base(type), EMPTY))).toEqual(expected);
-  });
-
-  it('parses the arrays pg-types parses, numeric[] as floats, and returns the rest as text', () => {
-    expect(texts(mapType(base('numeric', true), EMPTY))).toEqual([
-      'Array<number>',
-      'Array<string | number> | string',
-      'Array<string | number> | string',
-    ]);
-    expect(texts(mapType(base('circle', true), EMPTY))).toEqual([
-      'string',
-      'Array<string> | string',
-      'Array<string> | string',
-    ]);
-    const numranges = {
-      type: 'numrange',
-      typeKind: 'range',
-      array: true,
-    } as const;
-    expect(mapType(numranges, EMPTY).select.text).toBe('Array<string>');
-  });
-
-  it('names the helper types a mapping uses, per position', () => {
-    const json = mapType(base('jsonb'), EMPTY);
-    expect(json.select.helpers).toEqual(['JsonValue']);
-    expect(json.insert.helpers).toEqual([]);
-    expect(mapType(base('interval', true), EMPTY).insert.helpers).toEqual([
-      'PostgresInterval',
-    ]);
-  });
-
-  it('types an enum as its label union, and one outside the catalog as text', () => {
-    const mood = { type: 'mood', typeKind: 'enum', array: false } as const;
-    expect(texts(mapType(mood, EMPTY))).toEqual(['Mood', 'Mood', 'Mood']);
-    expect(texts(mapType({ ...mood, array: true }, EMPTY))).toEqual([
-      'string',
-      'Array<Mood> | string',
-      'Array<Mood> | string',
-    ]);
-    const other = {
-      type: 'other.level',
-      typeKind: 'enum',
-      array: false,
-    } as const;
-    expect(mapType(other, EMPTY).select.text).toBe('string');
-  });
-});
-
-describe('mapType: domains and overrides', () => {
-  const catalog = catalogOf({
-    domains: {
-      amount: domain('amount', 'int8'),
-      small_amount: domain('small_amount', 'amount', { typeKind: 'domain' }),
-      amounts: domain('amounts', 'int8', { array: true }),
-    },
-  });
-  const small = {
-    type: 'small_amount',
-    typeKind: 'domain',
-    array: false,
-  } as const;
-
+describe('mapType: domains', () => {
   it('resolves a domain through domains over domains to its base type', () => {
-    expect(mapType(small, context(catalog)).select.text).toBe('string');
+    expect(mapType(small, mappingContext(catalog)).select.text).toBe('string');
     const amounts = {
       type: 'amounts',
       typeKind: 'domain',
       array: false,
     } as const;
-    expect(mapType(amounts, context(catalog)).select.text).toBe(
+    expect(mapType(amounts, mappingContext(catalog)).select.text).toBe(
       'Array<string>',
     );
-  });
-
-  it('returns an array of a domain as text, its elements typed as the domain', () => {
-    expect(texts(mapType({ ...small, array: true }, context(catalog)))).toEqual(
-      [
-        'string',
-        'Array<string | number | bigint> | string',
-        'Array<string | number | bigint> | string',
-      ],
+    expect(mapType(small, mappingContext(catalog, 'pglite')).select.text).toBe(
+      'number | bigint',
     );
   });
 
-  it('types a domain outside the catalog as unknown', () => {
+  it('returns an array of a domain as text with node-postgres, its elements typed as the domain', () => {
+    expect(
+      texts(mapType({ ...small, array: true }, mappingContext(catalog))),
+    ).toEqual([
+      'string',
+      'Array<string | number | bigint> | string',
+      'Array<string | number | bigint> | string',
+    ]);
+  });
+
+  it('types a domain outside the catalog as unknown with either driver', () => {
     const outside = {
       type: 'other.score',
       typeKind: 'domain',
       array: false,
     } as const;
-    expect(texts(mapType(outside, EMPTY))).toEqual([
-      'unknown',
-      'unknown',
-      'unknown',
-    ]);
+    const unknown = ['unknown', 'unknown', 'unknown'];
+    expect(texts(mapType(outside, mappingContext(catalog)))).toEqual(unknown);
+    expect(texts(mapType(outside, mappingContext(catalog, 'pglite')))).toEqual(
+      unknown,
+    );
   });
 
+  it("gives a domain the driver's parameter type: node-postgres's base type, PGlite's text", () => {
+    expect(texts(mapType(moment, mappingContext(catalog)))).toEqual([
+      'Date',
+      'Date | string',
+      'Date | string',
+    ]);
+    expect(texts(mapType(moment, mappingContext(catalog, 'pglite')))).toEqual([
+      'Date',
+      'string',
+      'string',
+    ]);
+  });
+});
+
+describe('mapType: overrides', () => {
   it('lets the nearest override win: the column type, then each domain, then the base type', () => {
-    const overrides = { int8: plain('bigint'), amount: plain('Amount') };
-    expect(mapType(small, context(catalog, overrides)).select.text).toBe(
-      'Amount',
-    );
+    const overrides = {
+      int8: plainTypes('bigint'),
+      amount: plainTypes('Amount'),
+    };
+    expect(
+      mapType(small, mappingContext(catalog, 'node-postgres', overrides)).select
+        .text,
+    ).toBe('Amount');
     expect(
       mapType(
         small,
-        context(catalog, { ...overrides, small_amount: plain('Small') }),
+        mappingContext(catalog, 'node-postgres', {
+          ...overrides,
+          small_amount: plainTypes('Small'),
+        }),
       ).select.text,
     ).toBe('Small');
-    expect(mapType(base('int8'), context(catalog, overrides)).select.text).toBe(
-      'bigint',
-    );
-  });
-
-  it('keys an array override by <type>[] and leaves parsed arrays to the table otherwise', () => {
-    const overrides = { int8: plain('bigint') };
-    expect(
-      mapType(base('int8', true), context(catalog, overrides)).select.text,
-    ).toBe('Array<string>');
     expect(
       mapType(
-        base('int8', true),
-        context(catalog, { 'int8[]': plain('Array<bigint>') }),
+        baseRef('int8'),
+        mappingContext(catalog, 'node-postgres', overrides),
+      ).select.text,
+    ).toBe('bigint');
+  });
+
+  it('keeps an override as written under a domain, PGlite included', () => {
+    const overrides = { timestamptz: plainTypes('Instant') };
+    expect(
+      texts(mapType(moment, mappingContext(catalog, 'pglite', overrides))),
+    ).toEqual(['Instant', 'Instant', 'Instant']);
+  });
+
+  it('keys an array override by <type>[]; node-postgres leaves parsed arrays to the table otherwise', () => {
+    const overrides = { int8: plainTypes('bigint') };
+    const context = mappingContext(catalog, 'node-postgres', overrides);
+    expect(mapType(baseRef('int8', true), context).select.text).toBe(
+      'Array<string>',
+    );
+    expect(
+      mapType(
+        baseRef('int8', true),
+        mappingContext(catalog, 'node-postgres', {
+          'int8[]': plainTypes('Array<bigint>'),
+        }),
       ).select.text,
     ).toBe('Array<bigint>');
+  });
+
+  it('types the elements of a PGlite array with the override of the element type, except under a domain', () => {
+    const overrides = {
+      int8: plainTypes('bigint'),
+      amount: plainTypes('Amount'),
+    };
+    const context = mappingContext(catalog, 'pglite', overrides);
+    expect(texts(mapType(baseRef('int8', true), context))).toEqual([
+      'Array<bigint>',
+      'Array<bigint> | string',
+      'Array<bigint> | string',
+    ]);
+    const amounts = {
+      type: 'amount',
+      typeKind: 'domain',
+      array: true,
+    } as const;
+    expect(texts(mapType(amounts, context))).toEqual([
+      'Array<string>',
+      'Array<Amount> | string',
+      'Array<Amount> | string',
+    ]);
   });
 });

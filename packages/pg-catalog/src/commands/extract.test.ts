@@ -162,17 +162,23 @@ describe('extract with out.types (SPEC 9.2, 10.1)', () => {
     expect(types).toContain("export type Mood = 'happy' | 'sad';");
   });
 
-  it('passes overrides and imports through, and checks the file like the others', async () => {
+  it('passes the driver, overrides, and imports through, and checks the file like the others', async () => {
+    await writeFile(
+      join(directory, 'V2__counts.sql'),
+      'create table counts (total int8);',
+    );
     const types = {
       file: 'db.ts',
+      driver: 'pglite',
       overrides: { int4: 'Id' },
       imports: ["import type { Id } from './ids';"],
-    };
+    } as const;
     const withTypes = { migrations: '.', out: { catalog: 'c.ts', types } };
     const report = await extract(withTypes, { cwd: directory });
     const text = await readFile(join(directory, 'db.ts'), 'utf8');
     expect(text).toBe(renderKyselyTypes(report.catalog, types));
     expect(text).toContain('  id: Id;');
+    expect(text).toContain('  total: ColumnType<number | bigint | null,');
     expect(
       (await extract(withTypes, { cwd: directory, check: true })).files.map(
         (file) => [file.kind, file.status],

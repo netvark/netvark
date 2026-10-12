@@ -5,7 +5,7 @@
  * JavaScript configuration may write them.
  * @packageDocumentation
  */
-import type { ExtractionConfig } from './config';
+import type { ExtractionConfig, KyselyDriver } from './config';
 
 import {
   fail,
@@ -30,6 +30,11 @@ const CAMEL_CASE_OPTIONS = [
   'underscoreBeforeDigits',
   'underscoreBetweenUppercaseLetters',
 ];
+/** Every `out.types.driver`, so a new driver cannot be left out. */
+const KYSELY_DRIVERS: Readonly<Record<KyselyDriver, true>> = {
+  'node-postgres': true,
+  pglite: true,
+};
 const encoder = new TextEncoder();
 
 function schemas(value: unknown): void {
@@ -122,11 +127,19 @@ function types(value: unknown): void {
   }
   const config = options(value, 'out.types', [
     'file',
+    'driver',
     'overrides',
     'imports',
     'camelCase',
   ]);
   text(config['file'], 'out.types.file');
+  const driver = config['driver'];
+  if (
+    driver !== undefined &&
+    (typeof driver !== 'string' || !Object.hasOwn(KYSELY_DRIVERS, driver))
+  ) {
+    fail('out.types.driver must be "node-postgres" or "pglite"');
+  }
   if (config['overrides'] !== undefined) {
     overrides(config['overrides']);
   }
