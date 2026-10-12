@@ -18,13 +18,14 @@ import type { ServerType } from '@hono/node-server';
 import type { Context } from 'hono';
 
 import type { JsonApiVariables } from '@netvark/hono-jsonapi';
+import type { ResourceRuntime } from '@netvark/kysely-resource';
 import type {
   OpenApiDocument,
   OpenApiOptions,
 } from '@netvark/resource-core/openapi';
 
 import type { RuntimeDatabase } from '../runtime/database.ts';
-import type { AppActor } from '../runtime/domain.ts';
+import type { AppActor, AppDomain } from '../runtime/domain.ts';
 import type { Request, Sent } from './http.ts';
 import type { Contract, Method } from './openapi-contract.ts';
 
@@ -163,11 +164,13 @@ export interface ContactsServer {
   readonly close: () => Promise<void>;
 }
 
-/** Boots the runtime over `database` and serves the application on a socket. */
+/** Serves the application on a socket: `booted`, or the runtime it boots over `database`. */
 export async function openContactsServer(
   database: RuntimeDatabase,
+  booted?: ResourceRuntime<AppDomain>,
 ): Promise<ContactsServer> {
-  const runtime = await createResourceRuntime(runtimeOptions(database.db));
+  const runtime =
+    booted ?? (await createResourceRuntime(runtimeOptions(database.db)));
   const ban = createBan({
     errors: {
       ...ERROR_CATALOG,

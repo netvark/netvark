@@ -4112,6 +4112,7 @@ the model renders comes from the application's one messages object, computed whe
 | `list/column-filters.ts`        | `filter` and Table's column filters                                                 |
 | `list/lenient-query.ts`         | a route's search read back against the definition                                   |
 | `list/resource-list.ts`         | `resourceList`                                                                      |
+| `tanstack-form/form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one            |
 | `tanstack-form/form-options.ts` | `resourceFormOptions`                                                               |
 | `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                                |
 | `tanstack-query/query-keys.ts`  | the keys of 20.6                                                                    |
@@ -4120,7 +4121,8 @@ the model renders comes from the application's one messages object, computed whe
 Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
 `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`, `FormResource`,
 `FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`, `FormErrors`, `ListModel`,
-`ListState`, `ListSorting`, `ListColumnFilters`.
+`ListState`, `ListSorting`, `ListColumnFilters`. Types exported from `./form`: `BindableForm`,
+`ResourceFormOptions`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
@@ -4348,7 +4350,7 @@ Tests: `form/form-errors.test.ts` (a 422 with items on two fields and one on `/d
 of two texts per field, `title` without `detail`, a member the form does not hold, a `ResponseError`
 without error objects, a `TypeError`, a `ResponseError` from another copy of the client).
 
-### 20.5 TanStack Form (`./form`)
+### 20.5 TanStack Form (`./form`, ADR 0017)
 
 ```ts
 const form = useForm({
@@ -4367,25 +4369,51 @@ const form = useForm({
   `formOptions({ defaultValues, validationLogic: revalidateLogic(), validators: { onDynamic: model.validator } })`:
   the form validates when it is first submitted and on every change after, so nobody sees an error
   before submitting. It spreads into `useForm` and into the `useAppForm` of `createFormHook` alike,
-  so an application keeps its own field components.
-- `bindResponseErrors(form, model, error)` reads `model.errors(error)` and, for every member the
-  form holds, sets the field's `errorMap.onSubmit` to `{ message }` where a text landed and to
-  `undefined` elsewhere, clearing the previous refusal's, and marks a field touched where a text
-  landed, so a field that shows its errors once touched shows it. It returns the `FormErrors`.
-- TanStack Form clears a field's `onSubmit` error when the field validates again for another cause
-  without an error, which is when its value changes; until then the error blocks the next submit, so
-  a value the server refused changes before it is sent again.
+  so an application keeps its own field components. `ResourceFormOptions<TValues>` is its type.
+- `bindResponseErrors(form, model, error)` reads `model.errors(error)` and sets each text on the
+  field of its member, where the form has one (`getFieldMeta` returns its meta), as `{ message }`
+  from the form (`errorSourceMap` `'form'`), and marks the field touched, so a field that shows its
+  errors once touched shows it:
+  - When the texts land on one field, the text is that field's `errorMap.onSubmit`. TanStack Form
+    clears it when the field validates again for another cause, which it does when its value changes
+    or it loses focus; another field's change or blur leaves it.
+  - When they land on several fields, as a unique or exclusion constraint over two columns or a
+    CHECK over several refuses them together (9.1), each is its field's `errorMap.onServer`, which
+    the form's own validation clears when any field changes or loses focus, since a change to any
+    one of them may answer the refusal. That validation runs only on a form with a form-level
+    validator, which `resourceFormOptions` gives it. The texts are grouped by response, never by
+    code or detail.
+  - Either error blocks a submit until it goes: TanStack Form validates the fields before the form,
+    so a submit of the same values sends nothing.
+  - A member the form holds but has no field for gives its text to the form's texts.
+  - A binding first clears the texts the binding before it set, in either slot, and leaves every
+    other error. It returns what it bound: `fields`, the text of each field it set, and `form`, the
+    texts no field holds, each distinct text once, frozen. An error that is no `ResponseError` binds
+    nothing (20.4).
 - Every error a field holds is an object with a `message`, the validator's issue and the server's
   text alike, so a field component renders `field.state.meta.errors[0]?.message`.
 - `isSubmitSuccessful` is `true` after a refused write, since the handler resolves (ADR 0015); a
   screen reads a refusal from what `bindResponseErrors` returned.
 
 `form` is a TanStack Form `FormApi`: the `formApi` a submit handler receives, or what `useForm` or
-`useAppForm` returned. @ref https://tanstack.com/form/v1/docs/framework/react/guides/validation @ref
-https://tanstack.com/form/v1/docs/framework/react/guides/form-composition
+`useAppForm` returned. Its type, `BindableForm<TValues>`, is the form's `state.values`, which must
+hold the model's values, and the `getFieldMeta` and `setFieldMeta` the binding calls, typed so that
+every `FormApi` is one. TanStack Form's own `AnyFormApi` is not: its type parameters are invariant,
+and a form made without `onSubmitMeta` has the submit meta `never`. `resourceFormOptions` and
+`bindResponseErrors` throw `TypeError` for a model without the members every form model has
+(`<function>: model must be what a resourceForm returned`), and `bindResponseErrors` for a form
+without those two methods (`bindResponseErrors: form must be a TanStack Form FormApi`). @ref
+https://tanstack.com/form/v1/docs/framework/react/guides/validation @ref
+https://tanstack.com/form/v1/docs/framework/react/guides/dynamic-validation @ref
+https://tanstack.com/form/v1/docs/framework/react/guides/form-composition @ref
+https://tanstack.com/form/v1/docs/reference/classes/FormApi
 
-Tests: `tanstack-form/form-options.test.ts` and `tanstack-form/bind-errors.test.ts` over a `FormApi`
-made with `new FormApi(...)`, and the component tests of 20.8.
+Tests: `tanstack-form/form-options.test.ts`, `tanstack-form/bind-errors.test.ts`, and
+`tanstack-form/bind-errors-result.test.ts` over a `FormApi` made with `new FormApi(...)` and a
+mounted `FieldApi` per member, driven by `handleChange` and `handleBlur`;
+`tanstack-form/form-binding.test-d.ts` (the options in `useForm` and in `useAppForm`, the values a
+submit handler receives, a field's errors, and the forms `bindResponseErrors` takes and refuses);
+`e2e/resource/react/form-binding.e2e.test.ts`; and the component tests of 20.8.
 
 ### 20.6 TanStack Query (`./query`): `resourceQueries(client)`
 
@@ -4568,7 +4596,12 @@ definition's sort names, operators, and search).
   server's words, an update sending the changed members only, the list's sort, filter, search, and
   cursors over real pages, a stale link read back leniently, and the list refetched after a create;
   and over the table of `support/defaults-table.ts`, a create form starting where an update of the
-  row PostgreSQL stores for it starts (`form-defaults.e2e.test.ts`).
+  row PostgreSQL stores for it starts (`form-defaults.e2e.test.ts`). A TanStack Form made with
+  `resourceFormOptions`, whose handler writes through the client and binds the refusal, over a
+  runtime that serves meetings too (`runtime/meetings.ts`): a taken email held on its field until
+  the email changes, a submit of the same values that sends nothing, and the 409 of a room booked
+  twice for one period on the room and the period, cleared when the person changes either
+  (`form-binding.e2e.test.ts`).
 - Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
   and write and a list model's `query` on Bun, Deno, and workerd, where server rendering runs.
 - Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).

@@ -4,7 +4,8 @@
  * server that records each request as it leaves: the method, the path,
  * and the request document. Each request acts as the editor and sends
  * the language `language` returns when it leaves, as an application's
- * transport sends Paraglide's locale.
+ * transport sends Paraglide's locale. Meetings answer where the server
+ * serves them (`runtime/meetings.ts`).
  */
 import type { Clients, ResponseError } from '@netvark/jsonapi-client';
 
@@ -15,11 +16,13 @@ import {
 } from '@netvark/jsonapi-client';
 
 import { Contacts } from '../resources/contacts.ts';
+import { Meetings } from '../resources/meetings.ts';
 import { Organizations } from '../resources/organizations.ts';
 
 const DEFINITIONS = {
   contacts: Contacts.resource,
   organizations: Organizations.resource,
+  meetings: Meetings.resource,
 };
 
 export type ContactClients = Clients<typeof DEFINITIONS>;
