@@ -1325,14 +1325,18 @@ their definition by type (15.6). The result holds a `ResourceClient` per name:
   `'~types'.update`, required when that input has a required member and `never` for an operation the
   definition does not serve, so no input compiles; `relationships` take the names `creatable` and
   `updatable` list, and are `never` when they list none, since an object type without members
-  accepts any member; `id` is accepted when `clientIds` is `true`; `list` takes `ListQuery` (15.5),
-  with `page` only on a definition that paginates and `search` only on one with a search parameter;
-  `get` and `related` take `GetQuery`. Both take `fields` only where `'~types'.fields` is `true`,
-  keyed by the types 6.5 accepts: the definition's own and each type a segment of its declared
-  include paths reaches through the definitions passed. A type's names are the attributes and
-  relationships of its definition, any string when no definition passed has that type. The server
-  stays the authority: the client checks none of this at run time, and `parseQuery` and the request
-  parsers answer what the types would have caught (6, 9).
+  accepts any member; `setRelationship`, `addToRelationship`, and `removeFromRelationship` take the
+  relationships `updatable` lists, to-many alone for the last two, and none when `'~types'.update`
+  is `never`, since the server refuses a write to any other with 403
+  (`#crud-updating-relationship-responses-403`; 10.4, 11.4, resource SPEC 19.3); `id` is accepted
+  when `clientIds` is `true`; `list` takes `ListQuery` (15.5), with `page` only on a definition that
+  paginates and `search` only on one with a search parameter; `get` and `related` take `GetQuery`.
+  Both take `fields` only where `'~types'.fields` is `true`, keyed by the types 6.5 accepts: the
+  definition's own and each type a segment of its declared include paths reaches through the
+  definitions passed. A type's names are the attributes and relationships of its definition, any
+  string when no definition passed has that type. The server stays the authority: the client checks
+  none of this at run time, and `parseQuery` and the request parsers answer what the types would
+  have caught (6, 9).
 
 ### 15.5 Query serialization (`serialize-query.ts`, `serialize-filter.ts`)
 

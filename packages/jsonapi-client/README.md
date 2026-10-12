@@ -82,7 +82,9 @@ A write's `attributes` are the server's validator input, required when it has a 
 `relationships` are the ones the definition's writable lists name, each an id, an identifier object,
 or a record (only its `type` and `id` are sent), `null` to empty a to-one, and a list for a to-many.
 `id` is accepted where the definition takes client ids. A create or an update the definition does
-not serve takes no input at all.
+not serve takes no input at all. `setRelationship`, `addToRelationship`, and
+`removeFromRelationship` take the relationships an update may carry, as the server refuses any other
+with 403, and none where the definition serves no update.
 
 The client checks what the types cannot: an id that is empty, `.`, or `..` throws `TypeError` before
 sending, since the URL parser would drop it from the path; a 2xx that is not a JSON:API document, or

@@ -10,6 +10,7 @@ import type {
   Links,
   Meta,
   Relationships,
+  TypesOf,
 } from '@netvark/jsonapi-core';
 
 import type { AnyRecord, Identifier } from '../document/types';
@@ -103,6 +104,35 @@ const Articles = defineResource({
 const DEFINITIONS = { articles: Articles, people: People, tags: Tags };
 const transport = createTransport({ origin: 'https://api.example.test' });
 const { articles, people, tags } = createClients(DEFINITIONS, transport);
+
+/** Relationship writes: `owner` and `labels` updatable, `creator` and `watchers` set on create alone. */
+const Notes = defineResource({
+  type: 'notes',
+  attributes: ['text'],
+  relationships: {
+    owner: { type: 'people', cardinality: 'one' },
+    creator: { type: 'people', cardinality: 'one' },
+    labels: { type: 'tags', cardinality: 'many' },
+    watchers: { type: 'people', cardinality: 'many' },
+  },
+  serialize: (row: { readonly id: string; readonly text: string }) => ({
+    id: row.id,
+    attributes: { text: row.text },
+  }),
+  writable: { update: ['text', 'owner', 'labels'] },
+});
+
+/** A definition that serves no update, as `@netvark/resource-core` types a declaration without the operation. */
+declare const Archives: Omit<typeof Notes, '~types'> & {
+  readonly '~types'?: Omit<TypesOf<typeof Notes>, 'update'> & {
+    readonly update: never;
+  };
+};
+
+const { notes, archives } = createClients(
+  { notes: Notes, archives: Archives, people: People, tags: Tags },
+  transport,
+);
 
 /** The members of a union that have `TKey`: a record, never the identifier beside it. */
 type WithKey<TUnion, TKey extends PropertyKey> = TUnion extends unknown
@@ -261,14 +291,43 @@ describe('relationship calls (SPEC 15.4)', () => {
   });
 
   it('writes linkage by cardinality, to-many alone for add and remove', () => {
-    void articles.setRelationship('a1', 'author', null);
-    void articles.setRelationship('a1', 'author', { type: 'people', id: 'p1' });
+    void notes.setRelationship('n1', 'owner', null);
+    void notes.setRelationship('n1', 'owner', { type: 'people', id: 'p1' });
+    void notes.setRelationship('n1', 'labels', ['t1']);
+    void notes.addToRelationship('n1', 'labels', ['t1']);
+    void notes.removeFromRelationship('n1', 'labels', [
+      { type: 'tags', id: 't1' },
+    ]);
     // @ts-expect-error -- a to-many takes a list
-    void articles.setRelationship('a1', 'tags', 't1');
-    // @ts-expect-error -- author is a to-one
-    void articles.addToRelationship('a1', 'author', ['p1']);
+    void notes.setRelationship('n1', 'labels', 't1');
+    // @ts-expect-error -- owner is a to-one
+    void notes.addToRelationship('n1', 'owner', ['p1']);
     // @ts-expect-error -- people declare no editor
     void people.relationship('p1', 'editor');
+  });
+
+  it('writes only the relationships an update may carry, as the server answers 403 otherwise', () => {
+    // @ts-expect-error -- creator is set on create alone
+    void notes.setRelationship('n1', 'creator', 'p1');
+    // @ts-expect-error -- watchers are set on create alone
+    void notes.addToRelationship('n1', 'watchers', ['p1']);
+    // @ts-expect-error -- watchers are set on create alone
+    void notes.removeFromRelationship('n1', 'watchers', ['p1']);
+    // @ts-expect-error -- author is not in the articles' update list
+    void articles.setRelationship('a1', 'author', null);
+    void articles.addToRelationship('a1', 'tags', ['t1']);
+    // A definition without writable lists updates every relationship.
+    void people.setRelationship('p1', 'articles', ['a1']);
+  });
+
+  it('writes no relationship of a definition that serves no update, and reads each', () => {
+    // @ts-expect-error -- archives serve no update
+    void archives.setRelationship('x1', 'owner', null);
+    // @ts-expect-error -- archives serve no update
+    void archives.addToRelationship('x1', 'labels', ['t1']);
+    expectTypeOf(archives.relationship('x1', 'creator')).toEqualTypeOf<
+      Promise<ReadResult<IdentifierObject<'people'> | null>>
+    >();
   });
 
   it('follows the pages of records, not linkage', async () => {
