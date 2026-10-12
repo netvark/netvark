@@ -42,7 +42,9 @@ and e2e directory imports; read the family's file before changing that family.
   catalog in `pnpm-workspace.yaml` (`"zod": "catalog:"`); peer ranges stay in each package
   (`docs/adr/0005-share-dependency-versions-through-a-pnpm-catalog.md`). Each floor is past its
   peer's published advisories, and a CI job runs the package's typecheck and tests on it
-  (`docs/adr/0007-a-peer-range-starts-past-published-advisories-and-ci-tests-its-floor.md`).
+  (`docs/adr/0007-a-peer-range-starts-past-published-advisories-and-ci-tests-its-floor.md`);
+  `pnpm check:floors` and `pnpm audit:floors` check both
+  (`docs/adr/0008-scripts-check-the-peer-floors.md`).
 - One pull request per epic (or a few related issues) with one commit per issue; each commit passes
   the gates on its own and ends with `Closes #<issue>`, and the pull request merges with rebase.
 - Commit subjects use conventional commits with the package or family as the scope. Every

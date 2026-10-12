@@ -17,7 +17,9 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "check": "pnpm run --sequential \"/^check:/\"",
+    "audit:floors": "node --experimental-strip-types scripts/peer-floors/audit-advisories.ts",
     "check:deps": "knip",
+    "check:floors": "node --experimental-strip-types scripts/peer-floors/check-jobs.ts",
     "check:format": "oxfmt --check",
     "check:lint": "oxlint",
     "check:pkg": "pnpm -r --filter \"./packages/**\" run check:pkg",
@@ -39,6 +41,7 @@
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
     "@types/node": "catalog:",
+    "@types/semver": "7.8.0",
     "@vitest/coverage-v8": "5.0.3",
     "knip": "6.40.0",
     "lefthook": "2.1.17",
@@ -46,9 +49,11 @@
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2003",
     "publint": "0.3.25",
+    "semver": "7.8.5",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "2.9.1"
   },
   "engines": {
     "node": ">=22.12.0"

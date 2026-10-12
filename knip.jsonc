@@ -2,7 +2,9 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "project": ["*.config.ts"]
+      // The scripts' entry points are found through the package.json scripts
+      // and their tests through the root Vitest config's `scripts` project.
+      "project": ["*.config.ts", "scripts/**/*.ts"]
     },
     "packages/*": {
       // Entries come from each package's tsdown config (knip's tsdown

@@ -3,7 +3,8 @@ import type { ViteUserConfig } from 'vitest/config';
 import { defineConfig } from 'vitest/config';
 
 /**
- * One Vitest run over every package's project (`packages/x/vitest.config.ts`).
+ * One Vitest run over every package's project (`packages/x/vitest.config.ts`)
+ * and the repository's scripts (the inline `scripts` project).
  * Coverage is a whole-process concern that Vitest configures only here, so
  * the thresholds apply to the combined source of all packages.
  * @ref https://vitest.dev/guide/projects
@@ -11,10 +12,13 @@ import { defineConfig } from 'vitest/config';
  */
 const config: ViteUserConfig = defineConfig({
   test: {
-    projects: ['packages/*'],
+    projects: [
+      'packages/*',
+      { test: { name: 'scripts', include: ['scripts/**/*.test.ts'] } },
+    ],
     coverage: {
       provider: 'v8',
-      include: ['packages/*/src/**/*.ts'],
+      include: ['packages/*/src/**/*.ts', 'scripts/**/*.ts'],
       // Tests, the repository's own test helpers, and the files that hold
       // re-exports only: every package's root barrel, the nested barrels of
       // the jsonapi and keyset packages, and the one-line twins in
@@ -24,9 +28,13 @@ const config: ViteUserConfig = defineConfig({
       // e2e suite runs it as a built bin. The storage contract's cases, and
       // the list data and walks they page through, need a database: the
       // resource e2e suite runs each case, and each defect a case must
-      // catch, against its reference adapter through the built package.
+      // catch, against its reference adapter through the built package. The
+      // scripts' entry points only hand the repository to the checks; CI
+      // runs them.
       exclude: [
         'packages/*/src/**/*.test.ts',
+        'scripts/**/*.test.ts',
+        'scripts/peer-floors/{check-jobs,audit-advisories}.ts',
         'packages/*/src/**/*.test-d.ts',
         'packages/*/src/test-support/**',
         'packages/*/src/index.ts',

@@ -1,0 +1,50 @@
+name: Peer floors
+
+# The advisory half of the peer floor checks (root ADR 0008): no published
+# advisory in GitHub's advisory database affects the floor of a peer range.
+# Advisories appear without a commit, so it runs weekly and on demand, and on
+# pull requests that change what it reads. It is not part of `CI passed`: an
+# advisory published today must not block unrelated work. A failed scheduled
+# run notifies the user who last changed the cron line.
+# @ref https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+
+on:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/*/package.json'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/peer-floors/**'
+      - '.github/workflows/peer-floors.yml'
+
+permissions: {}
+
+concurrency:
+  group: peer-floors-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  advisories:
+    name: Peer floors past published advisories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      # The token raises the REST API's rate limit; the advisory database
+      # itself is public.
+      - run: pnpm run audit:floors
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
