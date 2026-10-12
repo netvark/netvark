@@ -1,8 +1,10 @@
 /**
  * Requests to the contacts application's API, sent through Hono's
- * `app.request`, the full pipeline without a socket: `Accept` and, with a
- * body, `Content-Type` are the JSON:API media type unless a test sets
- * them, and `X-Actor` names the member.
+ * `app.request`, the full pipeline without a socket, or through anything
+ * that answers a request as it does, such as a fetch over a socket:
+ * `Accept` and, with a body, `Content-Type` are the JSON:API media type
+ * unless a test sets them, `X-Actor` names the member, and
+ * `Accept-Language` the language.
  * @ref https://hono.dev/docs/api/hono#request
  * @ref https://jsonapi.org/format/1.1/#content-negotiation-clients
  */
@@ -17,6 +19,8 @@ export interface Request {
   readonly raw?: string | undefined;
   readonly accept?: string | undefined;
   readonly contentType?: string | undefined;
+  /** Sent as `Accept-Language`. */
+  readonly language?: string | undefined;
 }
 
 /** What came back: the status, the headers, the media type without parameters, and the parsed body. */
@@ -51,6 +55,9 @@ export async function send(
   }
   if (request.actor !== undefined) {
     headers.set('X-Actor', request.actor);
+  }
+  if (request.language !== undefined) {
+    headers.set('Accept-Language', request.language);
   }
   const response = await app.request(url, {
     method: method.toUpperCase(),

@@ -16,6 +16,8 @@
   "error_range_pagination_not_supported_detail": "The server does not paginate by a range of cursors.",
   "error_forbidden_title": "Forbidden",
   "error_forbidden_detail": "The request is not allowed.",
+  "error_unauthorized_title": "Unauthorized",
+  "error_unauthorized_detail": "The request names no actor the server knows.",
   "error_client_generated_id_not_supported_title": "Client-Generated ID Not Supported",
   "error_client_generated_id_not_supported_detail": "The server assigns the id of this resource.",
   "error_not_found_title": "Not Found",

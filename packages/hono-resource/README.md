@@ -275,6 +275,10 @@ With German messages that label a contact's `email` as `E-Mail`, a client that s
 `E-Mail muss vom Typ string sein.` at `/data/attributes/email` or
 `/atomic:operations/1/data/attributes/email`.
 
+The contacts application of this repository's end-to-end suite is a complete host composed this way,
+served over a socket and held to the document it serves:
+[`e2e/resource/support/contacts-server.ts`](https://github.com/netvark/netvark/tree/main/e2e/resource/support/contacts-server.ts).
+
 ## Best practices
 
 **Mount at `/` and keep the prefix in `links.base`.** `app.route('/api', routes)` would serve the
@@ -284,9 +288,10 @@ routes at `/api/api/...` while the links and the document still name `/api/...`.
 **Resolve the actor from the request's credentials alone.** `actor` runs once per request, before
 the query or the document is read, so a client without a session gets your `UNAUTHORIZED` and learns
 nothing about the resource from a 400. Throw the catalog's error, never return a guest actor you did
-not mean to have, and leave the body to the validators. A 405, and the 403 of an update a
-relationship does not support, answer without the actor: the OpenAPI document lists every path's
-methods to anyone.
+not mean to have, and leave the body to the validators. `UNAUTHORIZED` is a `@netvark/ban-core`
+built-in, which your messages need not cover, so give it an entry, or a German client reads that 401
+in English. A 405, and the 403 of an update a relationship does not support, answer without the
+actor: the OpenAPI document lists every path's methods to anyone.
 
 **Type the actor with your `Env`.** Pass a function whose parameter is `Context<AppEnv>`, such as
 `sessionActor` above, and the routes are a `Hono<AppEnv>`; an inline arrow with an untyped `c` gets

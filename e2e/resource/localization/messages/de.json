@@ -16,6 +16,8 @@
   "error_range_pagination_not_supported_detail": "Der Server paginiert nicht nach einem Bereich von Cursorn.",
   "error_forbidden_title": "Verboten",
   "error_forbidden_detail": "Die Anfrage ist nicht erlaubt.",
+  "error_unauthorized_title": "Nicht angemeldet",
+  "error_unauthorized_detail": "Die Anfrage nennt keinen Akteur, den der Server kennt.",
   "error_client_generated_id_not_supported_title": "Vom Client erzeugte ID nicht unterstützt",
   "error_client_generated_id_not_supported_detail": "Der Server vergibt die ID dieser Ressource.",
   "error_not_found_title": "Nicht gefunden",
