@@ -20,7 +20,12 @@ describe('request errors', () => {
     [new UnsupportedSortError(['x']), 'UNSUPPORTED_SORT'],
     [new UnsupportedFilterError('x'), 'UNSUPPORTED_FILTER'],
     [new InvalidFilterError(['and', 0]), 'INVALID_FILTER'],
-    [new InvalidFilterValueError('x', 'eq', 'text'), 'INVALID_FILTER_VALUE'],
+    [
+      new InvalidFilterValueError([
+        { field: 'x', operator: 'eq', expected: 'text' },
+      ]),
+      'INVALID_FILTER_VALUE',
+    ],
     [new UnsupportedSearchError(), 'UNSUPPORTED_SEARCH'],
     [new InvalidPageSizeError('ten'), 'INVALID_PAGE_SIZE'],
     [new PageSizeExceededError(500, 100), 'PAGE_SIZE_EXCEEDED'],
@@ -34,11 +39,13 @@ describe('request errors', () => {
   });
 
   it('keeps request values out of the message', () => {
-    const error = new InvalidFilterValueError('secretField', 'eq', 'text');
-    expect(error.message).not.toContain('secretField');
-    expect(error.field).toBe('secretField');
-    expect(error.operator).toBe('eq');
-    expect(error.expected).toBe('text');
+    const values = [
+      { field: 'secretField', operator: 'eq', expected: 'text' },
+      { field: 'otherField', operator: 'gte', expected: 'integer' },
+    ];
+    const error = new InvalidFilterValueError(values);
+    expect(error.message).not.toMatch(/secretField|otherField/u);
+    expect(error.values).toEqual(values);
   });
 
   it('exposes the structured details', () => {

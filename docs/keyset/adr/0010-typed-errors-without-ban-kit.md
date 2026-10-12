@@ -1,6 +1,7 @@
 # ADR 0010: Typed error classes with constant messages; no @netvark/ban-core dependency
 
-- Status: accepted
+- Status: accepted; amended by ADR-0019 (`InvalidFilterValueError` lists every refused value, in the
+  order of the request's conditions, in `values`)
 - Date: 2026-10-08
 
 ## Context

@@ -40,6 +40,17 @@ function ties(count: number) {
   };
 }
 
+/** An `INVALID_QUERY_PARAMETER` at `parameter`, in English, as `problemsOf` lists a problem. */
+function refused(parameter: string): Array<string> {
+  return [
+    '400',
+    'INVALID_QUERY_PARAMETER',
+    parameter,
+    'Invalid Query Parameter',
+    'A query parameter has a value the server cannot process.',
+  ];
+}
+
 /** Each primary resource's `createdAt`. */
 function createdAts(sent: Sent): Array<unknown> {
   const { data } = sent.body as {
@@ -160,6 +171,21 @@ describe.each(runtimeDatabases())(
           'Unsupported Sort',
           'The server cannot sort by the requested fields.',
         ],
+      ]);
+    });
+
+    it('answers every filter value its field refuses, each at its parameter', async () => {
+      const url =
+        '/api/contacts?filter[priority][gte]=high&filter[createdAt][lt]=yesterday&filter[status]=gone';
+      const sent = await server.exchange('get', CONTACTS, url, {
+        actor: 'editor',
+        language: 'en',
+      });
+      expect(problemsOf(sent)).toEqual([
+        400,
+        refused('filter[priority][gte]'),
+        refused('filter[createdAt][lt]'),
+        refused('filter[status][eq]'),
       ]);
     });
 

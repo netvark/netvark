@@ -21,6 +21,15 @@ import { checkScalar } from './values';
 
 const BETWEEN_ARITY = 2;
 
+/** The refusal of one condition's value; `normalizeFilter` gathers every condition's (SPEC 4.1). */
+function refusal(
+  field: string,
+  operator: Operator,
+  expected: string,
+): InvalidFilterValueError {
+  return new InvalidFilterValueError([{ field, operator, expected }]);
+}
+
 export function targetOf(
   table: string,
   field: Field,
@@ -73,7 +82,7 @@ function scalar(
     field.kind === 'column' ? field.values : null,
   );
   if (!check.ok) {
-    throw new InvalidFilterValueError(name, op, check.expected);
+    throw refusal(name, op, check.expected);
   }
   const lower = field.kind === 'column' && field.collation === 'insensitive';
   return lower && typeof check.value === 'string'
@@ -88,7 +97,7 @@ function scalars(
   name: string,
 ): Array<ScalarValue> {
   if (!Array.isArray(value)) {
-    throw new InvalidFilterValueError(name, op, 'an array of values');
+    throw refusal(name, op, 'an array of values');
   }
   return value.map((item: unknown) => scalar(field, op, item, name));
 }
@@ -112,7 +121,7 @@ function patternPredicate(
   name: string,
 ): Predicate {
   if (typeof value !== 'string') {
-    throw new InvalidFilterValueError(name, op, 'text');
+    throw refusal(name, op, 'text');
   }
   return {
     kind: 'like',
@@ -129,7 +138,7 @@ function nullPredicate(
   name: string,
 ): Predicate {
   if (value !== undefined && typeof value !== 'boolean') {
-    throw new InvalidFilterValueError(name, op, 'boolean');
+    throw refusal(name, op, 'boolean');
   }
   return { kind: 'null', target, negate: value === false };
 }
@@ -193,7 +202,7 @@ export function conditionPredicate(
       low === undefined ||
       high === undefined
     ) {
-      throw new InvalidFilterValueError(name, op, '[low, high]');
+      throw refusal(name, op, '[low, high]');
     }
     return { kind: 'between', target, low, high };
   }

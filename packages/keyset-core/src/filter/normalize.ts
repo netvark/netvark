@@ -2,14 +2,22 @@
  * Filter normalization (SPEC 4.1): the request's tree becomes a
  * `Predicate` over validated targets and values. Unknown fields and
  * operators, bad values, and malformed nodes are errors; nothing is
- * dropped.
+ * dropped. The structure is checked before the values: a structural
+ * error is thrown where the walk meets it, while refused values are
+ * gathered over the whole tree and thrown together (ADR 0019).
+ * @ref https://jsonapi.org/format/1.1/#errors-processing ("it MAY continue processing and encounter multiple problems")
  * @packageDocumentation
  */
 import type { Field, KeysetDefinition, Relation } from '../definition/types';
+import type { InvalidFilterValue } from '../errors';
 import type { Predicate } from '../plan/types';
 import type { Filter } from './types';
 
-import { InvalidFilterError, UnsupportedFilterError } from '../errors';
+import {
+  InvalidFilterError,
+  InvalidFilterValueError,
+  UnsupportedFilterError,
+} from '../errors';
 import { describe, isRecord, ownMember } from '../internal/object';
 import { conditionPredicate } from './condition';
 import { isOperator } from './operators';
@@ -25,6 +33,9 @@ interface Scope {
 }
 
 const RELATION_NODE_SIZE = 2;
+
+/** A refused condition's place in the tree; `normalizeFilter` throws before anything reads it. */
+const REFUSED: Predicate = { kind: 'literal', value: false };
 
 function relationScope(relation: Relation): Scope {
   return {
@@ -79,10 +90,32 @@ function condition(
   );
 }
 
+/**
+ * The condition's predicate, or `REFUSED` with its value's refusal added
+ * to `refused`, so the walk goes on to the next condition.
+ */
+function gathered(
+  scope: Scope,
+  node: Record<string, unknown>,
+  path: Path,
+  refused: Array<InvalidFilterValue>,
+): Predicate {
+  try {
+    return condition(scope, node, path);
+  } catch (error) {
+    if (!(error instanceof InvalidFilterValueError)) {
+      throw error;
+    }
+    refused.push(...error.values);
+    return REFUSED;
+  }
+}
+
 function relationNode(
   scope: Scope,
   node: Record<string, unknown>,
   path: Path,
+  refused: Array<InvalidFilterValue>,
 ): Predicate {
   const name = ownMember(node, 'relation');
   const relation =
@@ -96,11 +129,17 @@ function relationNode(
     relationScope(relation),
     ownMember(node, 'some'),
     [...path, 'some'],
+    refused,
   );
   return { kind: 'exists', relation, predicate };
 }
 
-function normalizeNode(scope: Scope, node: unknown, path: Path): Predicate {
+function normalizeNode(
+  scope: Scope,
+  node: unknown,
+  path: Path,
+  refused: Array<InvalidFilterValue>,
+): Predicate {
   if (!isRecord(node)) {
     throw new InvalidFilterError(path);
   }
@@ -114,14 +153,19 @@ function normalizeNode(scope: Scope, node: unknown, path: Path): Predicate {
     return {
       kind: head,
       items: items.map((item: unknown, index) =>
-        normalizeNode(scope, item, [...path, head, index]),
+        normalizeNode(scope, item, [...path, head, index], refused),
       ),
     };
   }
   if (head === 'not' && keys.length === 1) {
     return {
       kind: 'not',
-      item: normalizeNode(scope, ownMember(node, 'not'), [...path, 'not']),
+      item: normalizeNode(
+        scope,
+        ownMember(node, 'not'),
+        [...path, 'not'],
+        refused,
+      ),
     };
   }
   if (
@@ -129,19 +173,23 @@ function normalizeNode(scope: Scope, node: unknown, path: Path): Predicate {
     keys.includes('relation') &&
     keys.includes('some')
   ) {
-    return relationNode(scope, node, path);
+    return relationNode(scope, node, path, refused);
   }
   if (
     keys.includes('field') &&
     keys.includes('op') &&
     keys.every((key) => key === 'field' || key === 'op' || key === 'value')
   ) {
-    return condition(scope, node, path);
+    return gathered(scope, node, path, refused);
   }
   throw new InvalidFilterError(path);
 }
 
-/** The request's filter as a predicate over the definition; `null` when absent. */
+/**
+ * The request's filter as a predicate over the definition; `null` when
+ * absent. Throws `InvalidFilterValueError` with every refused value, in
+ * the order of the request's conditions, once the tree is walked.
+ */
 export function normalizeFilter(
   definition: KeysetDefinition,
   filter?: Filter<string, Readonly<Record<string, string>>>,
@@ -149,7 +197,8 @@ export function normalizeFilter(
   if (filter === undefined) {
     return null;
   }
-  return normalizeNode(
+  const refused: Array<InvalidFilterValue> = [];
+  const predicate = normalizeNode(
     {
       table: definition.table,
       fields: definition.fields,
@@ -157,5 +206,10 @@ export function normalizeFilter(
     },
     filter,
     [],
+    refused,
   );
+  if (refused.length > 0) {
+    throw new InvalidFilterValueError(refused);
+  }
+  return predicate;
 }

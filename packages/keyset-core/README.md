@@ -328,17 +328,17 @@ Every request-time error is a `KeysetError` with a stable `code` and the detail 
 message is constant, so nothing from the request leaks through a log or a response. Definition
 mistakes are `TypeError`s thrown by `defineKeyset`.
 
-| `code`                 | Fields                          | When                                                         |
-| ---------------------- | ------------------------------- | ------------------------------------------------------------ |
-| `INVALID_CURSOR`       | `parameter`, `reason`           | a cursor is malformed, forged, foreign, outdated, or expired |
-| `UNSUPPORTED_SORT`     | `fields`                        | a sort item is unknown, unsortable, repeated, or malformed   |
-| `UNSUPPORTED_FILTER`   | `field`, `operator`             | an unknown field or path, or an operator the field rejects   |
-| `INVALID_FILTER`       | `path`                          | a filter node that is not one of the five shapes             |
-| `INVALID_FILTER_VALUE` | `field`, `operator`, `expected` | a value the field's type rejects                             |
-| `UNSUPPORTED_SEARCH`   |                                 | a search term on a definition without `search`               |
-| `INVALID_PAGE_SIZE`    | `requested`                     | `page.size` is not a positive integer                        |
-| `PAGE_SIZE_EXCEEDED`   | `requested`, `max`              | `page.size` above the definition's `max`                     |
-| `RANGE_NOT_SUPPORTED`  |                                 | both cursors on a definition without `page.range`            |
+| `code`                 | Fields                | When                                                         |
+| ---------------------- | --------------------- | ------------------------------------------------------------ |
+| `INVALID_CURSOR`       | `parameter`, `reason` | a cursor is malformed, forged, foreign, outdated, or expired |
+| `UNSUPPORTED_SORT`     | `fields`              | a sort item is unknown, unsortable, repeated, or malformed   |
+| `UNSUPPORTED_FILTER`   | `field`, `operator`   | an unknown field or path, or an operator the field rejects   |
+| `INVALID_FILTER`       | `path`                | a filter node that is not one of the five shapes             |
+| `INVALID_FILTER_VALUE` | `values`              | values their fields' types reject, every one at once         |
+| `UNSUPPORTED_SEARCH`   |                       | a search term on a definition without `search`               |
+| `INVALID_PAGE_SIZE`    | `requested`           | `page.size` is not a positive integer                        |
+| `PAGE_SIZE_EXCEEDED`   | `requested`, `max`    | `page.size` above the definition's `max`                     |
+| `RANGE_NOT_SUPPORTED`  |                       | both cursors on a definition without `page.range`            |
 
 They map onto the profile's error objects: `UNSUPPORTED_SORT` is `unsupported-sort`,
 `PAGE_SIZE_EXCEEDED` is `max-size-exceeded` (with `max` for `meta.page.maxSize`),
@@ -347,6 +347,15 @@ errors with `source.parameter` `sort`, `filter`, `page[size]`, `page[after]`, or
 fields hold the request's own text (a sort item, a field path, a page size), so a layer that writes
 one into a detail quotes it only when it is a plain token, as `@netvark/jsonapi-core`'s builders do
 ([jsonapi ADR 0016](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0016-details-quote-request-text-as-plain-tokens.md)).
+
+`INVALID_FILTER_VALUE` reports every condition whose value its field refuses, in the order of the
+request's conditions: each entry of `values` is one condition's `field`, `operator`, and `expected`
+(`integer`, `date (YYYY-MM-DD)`, `one of "lead", "customer"`, ...), and a condition with several bad
+items is one entry. Give each entry its own invalid query parameter error, at
+`filter[<field>][<operator>]` in `@netvark/jsonapi-core`'s filter grammar, so a client fixes every
+value in one round trip. A malformed filter or an undeclared field or operator is reported alone,
+before any value
+([keyset ADR 0019](https://github.com/netvark/netvark/blob/main/docs/keyset/adr/0019-every-refused-filter-value-at-once.md)).
 
 ```ts
 try {

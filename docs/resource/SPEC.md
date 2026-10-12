@@ -3668,12 +3668,13 @@ Keyset refusals map as keyset's design maps them to `@netvark/jsonapi-core` (key
 `MAX_PAGE_SIZE_EXCEEDED` with the maximum, `RANGE_NOT_SUPPORTED` to
 `RANGE_PAGINATION_NOT_SUPPORTED`, `INVALID_CURSOR`, whatever its reason, to `invalidCursor` at
 `page[after]` or `page[before]`, and every other code to `INVALID_QUERY_PARAMETER` at the parameter
-it names: `filter[<field>][<operator>]` for `INVALID_FILTER_VALUE`, `filter` for
-`UNSUPPORTED_FILTER` and `INVALID_FILTER`, `filter[q]` for `UNSUPPORTED_SEARCH`, and `page[size]`
-for `INVALID_PAGE_SIZE`. A detail the runtime writes itself names the parameter, never its value;
-`unsupportedSortError` quotes a refused field only when it is a plain token (jsonapi ADR 0016).
-Anything else an operation throws (a lost connection, a statement the adapter got wrong) is rethrown
-unchanged, so the host's ban renders it as a 500 without detail. @ref
+it names: one item per entry of `INVALID_FILTER_VALUE`'s `values`, in their order, at
+`filter[<field>][<operator>]` (keyset ADR 0019), `filter` for `UNSUPPORTED_FILTER` and
+`INVALID_FILTER`, `filter[q]` for `UNSUPPORTED_SEARCH`, and `page[size]` for `INVALID_PAGE_SIZE`. A
+detail the runtime writes itself names the parameter, never its value; `unsupportedSortError` quotes
+a refused field only when it is a plain token (jsonapi ADR 0016). Anything else an operation throws
+(a lost connection, a statement the adapter got wrong) is rethrown unchanged, so the host's ban
+renders it as a 500 without detail. @ref
 https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
 
 ### 18.6 Events and the outbox

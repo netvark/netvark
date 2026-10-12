@@ -89,7 +89,11 @@ export type {
   CursorContextValue,
   PlanOptions,
 } from './plan/context';
-export type { InvalidCursorReason, KeysetErrorCode } from './errors';
+export type {
+  InvalidCursorReason,
+  InvalidFilterValue,
+  KeysetErrorCode,
+} from './errors';
 
 export { createDefineKeyset } from './definition/create-define-keyset';
 export {

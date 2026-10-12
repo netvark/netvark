@@ -194,8 +194,9 @@ const request: KeysetRequestOf<typeof contacts> = {
 
 The filter is a tree, not a grammar (ADR-0005): an API layer builds it from its own syntax
 (`@netvark/jsonapi-core`'s parsed conditions map one to one). Values arrive as JSON or as the type's
-text form, because query strings carry text; a value the type does not accept is an
-`InvalidFilterValueError` naming the field, the operator, and what was expected.
+text form, because query strings carry text. Values the types do not accept are one
+`InvalidFilterValueError` listing, for each such condition in request order, the field, the
+operator, and what was expected (ADR-0019), so a client fixes them all in one round trip.
 
 ### 3.4 The plan
 
@@ -244,6 +245,15 @@ try {
       throw jsonApiError(rangePaginationNotSupportedError());
     case 'INVALID_CURSOR':
       throw invalidCursor(`page[${error.parameter}]`);
+    case 'INVALID_FILTER_VALUE':
+      throw jsonApiError(
+        error.values.map(({ field, operator }) =>
+          errorItem('INVALID_QUERY_PARAMETER', {
+            detail: 'The value is not valid for its field.',
+            source: { parameter: `filter[${field}][${operator}]` },
+          }),
+        ),
+      );
     default:
       throw badRequest(error.code, error);
   }
@@ -251,9 +261,10 @@ try {
 ```
 
 Every request-time error is a `KeysetError` with a stable `code` and the detail in fields
-(ADR-0010). The example maps them to `@netvark/jsonapi-core`'s profile errors; any API layer does
-the same with its own catalog. The fields hold the request's text, which `unsupportedSortError`
-quotes only when it is a plain token (jsonapi ADR 0016); a layer of its own does the same.
+(ADR-0010). The example maps them to `@netvark/jsonapi-core`'s profile errors, one error object per
+refused sort field and per refused filter value; any API layer does the same with its own catalog.
+The fields hold the request's text, which `unsupportedSortError` quotes only when it is a plain
+token (jsonapi ADR 0016); a layer of its own does the same.
 
 ### 3.7 With Drizzle
 
@@ -391,3 +402,4 @@ checks from the schema object's type, `createDefineKeyset(schema, defaults?)`, a
 | 0016 | The seek leads with a range on the first key; declared nullability shapes seek and order                    |
 | 0017 | The Drizzle binding takes names from the schema object and builds the select itself                         |
 | 0018 | The `kysely` peer range starts past Kysely's published advisories                                           |
+| 0019 | The planner reports every refused filter value at once                                                      |

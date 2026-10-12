@@ -2,6 +2,7 @@
  * Helpers for the filter tests: column targets of the shared fixture and
  * readers of the structured error fields.
  */
+import type { InvalidFilterValue } from '../errors';
 import type { ColumnTarget } from '../plan/types';
 
 import { expect } from 'vitest';
@@ -42,10 +43,19 @@ export function unsupported(fn: () => unknown): {
   return { field, operator };
 }
 
-export function invalidValue(fn: () => unknown): string {
+export function invalidValues(
+  fn: () => unknown,
+): ReadonlyArray<InvalidFilterValue> {
   const error = thrown(fn);
   expect(error).toBeInstanceOf(InvalidFilterValueError);
-  return (error as InvalidFilterValueError).expected;
+  return (error as InvalidFilterValueError).values;
+}
+
+/** The expected form of the one value `fn` refuses. */
+export function invalidValue(fn: () => unknown): string {
+  const values = invalidValues(fn);
+  expect(values).toHaveLength(1);
+  return (values[0] as InvalidFilterValue).expected;
 }
 
 export function invalidPath(fn: () => unknown): ReadonlyArray<string | number> {

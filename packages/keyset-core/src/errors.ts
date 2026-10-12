@@ -87,18 +87,23 @@ export class InvalidFilterError extends KeysetError {
   }
 }
 
-export class InvalidFilterValueError extends KeysetError {
-  readonly code = 'INVALID_FILTER_VALUE' as const;
+/** A condition whose value its field's type refuses (SPEC 4.3). */
+export interface InvalidFilterValue {
+  /** The field or relation path as the request named it. */
   readonly field: string;
   readonly operator: string;
   /** What a valid value looks like, in the vocabulary of SPEC 4.3 (`text`, `integer`, `[low, high]`, ...). */
   readonly expected: string;
+}
 
-  constructor(field: string, operator: string, expected: string) {
+export class InvalidFilterValueError extends KeysetError {
+  readonly code = 'INVALID_FILTER_VALUE' as const;
+  /** Every condition whose value its field refuses, in the order of the request's conditions (ADR 0019). */
+  readonly values: ReadonlyArray<InvalidFilterValue>;
+
+  constructor(values: ReadonlyArray<InvalidFilterValue>) {
     super('A filter value is not valid for its field');
-    this.field = field;
-    this.operator = operator;
-    this.expected = expected;
+    this.values = values;
   }
 }
 

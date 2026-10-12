@@ -3,9 +3,9 @@
  * design maps refusals onto `@netvark/jsonapi-core` (keyset DESIGN 3.6):
  * the Cursor Pagination profile's error where the profile defines one,
  * and `INVALID_QUERY_PARAMETER` at the parameter the refusal names
- * otherwise. A detail written here names the parameter, never its value,
- * and a field or operator only once the keyset has accepted it as
- * declared.
+ * otherwise, one object per refused filter value (keyset ADR 0019). A
+ * detail written here names the parameter, never its value, and a field
+ * or operator only once the keyset has accepted it as declared.
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
  * @ref https://jsonapi.org/format/1.1/#query-parameters ("the server MUST respond with 400 Bad Request")
  * @packageDocumentation
@@ -13,6 +13,7 @@
 import type { BanError } from '@netvark/ban-core';
 
 import {
+  errorItem,
   invalidCursor,
   jsonApiError,
   maxPageSizeExceededError,
@@ -50,41 +51,55 @@ function profileError(error: unknown): BanError | undefined {
   return undefined;
 }
 
-/** The parameter a refusal names and what is wrong with it, for the refusals the profile leaves to the server. */
-function refusedParameter(
-  error: unknown,
-): { readonly parameter: string; readonly detail: string } | undefined {
+/** A parameter a refusal names and what is wrong with it. */
+interface Refused {
+  readonly parameter: string;
+  readonly detail: string;
+}
+
+/** The parameters a refusal names, for the refusals the profile leaves to the server. */
+function refusedParameters(error: unknown): ReadonlyArray<Refused> | undefined {
   if (error instanceof InvalidFilterValueError) {
-    const parameter = `filter[${error.field}][${error.operator}]`;
-    return {
-      parameter,
-      detail: `${parameter} has a value its field does not accept.`,
-    };
+    return error.values.map(({ field, operator }) => {
+      const parameter = `filter[${field}][${operator}]`;
+      return {
+        parameter,
+        detail: `${parameter} has a value its field does not accept.`,
+      };
+    });
   }
   if (error instanceof UnsupportedFilterError) {
-    return {
-      parameter: 'filter',
-      detail:
-        'filter names a field or an operator this endpoint does not support.',
-    };
+    return [
+      {
+        parameter: 'filter',
+        detail:
+          'filter names a field or an operator this endpoint does not support.',
+      },
+    ];
   }
   if (error instanceof InvalidFilterError) {
-    return {
-      parameter: 'filter',
-      detail: 'filter is not a filter this endpoint can read.',
-    };
+    return [
+      {
+        parameter: 'filter',
+        detail: 'filter is not a filter this endpoint can read.',
+      },
+    ];
   }
   if (error instanceof UnsupportedSearchError) {
-    return {
-      parameter: 'filter[q]',
-      detail: 'filter[q] is not supported by this endpoint.',
-    };
+    return [
+      {
+        parameter: 'filter[q]',
+        detail: 'filter[q] is not supported by this endpoint.',
+      },
+    ];
   }
   if (error instanceof InvalidPageSizeError) {
-    return {
-      parameter: 'page[size]',
-      detail: 'page[size] must be a positive integer.',
-    };
+    return [
+      {
+        parameter: 'page[size]',
+        detail: 'page[size] must be a positive integer.',
+      },
+    ];
   }
   return undefined;
 }
@@ -98,11 +113,15 @@ export function keysetRefusal(error: unknown): BanError | undefined {
   if (profile !== undefined) {
     return profile;
   }
-  const refused = refusedParameter(error);
+  const refused = refusedParameters(error);
   return refused === undefined
     ? undefined
-    : jsonApiError('INVALID_QUERY_PARAMETER', {
-        detail: refused.detail,
-        source: { parameter: refused.parameter },
-      });
+    : jsonApiError(
+        refused.map(({ parameter, detail }) =>
+          errorItem('INVALID_QUERY_PARAMETER', {
+            detail,
+            source: { parameter },
+          }),
+        ),
+      );
 }
