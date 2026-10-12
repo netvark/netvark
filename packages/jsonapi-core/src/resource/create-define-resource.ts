@@ -7,8 +7,15 @@
  * and nothing depends on import order (ADR 0015).
  * @packageDocumentation
  */
+import type { Empty } from './client-types';
+import type {
+  DefinitionOf,
+  RelationshipsInit,
+  ResourceDefinitionInit,
+} from './init-types';
 import type { ResourceDefaults } from './links';
-import type { ResourceDefinition, ResourceDefinitionInit } from './types';
+import type { QueryCapabilitiesInit } from './types';
+import type { ResourceValidators, WritableFieldsInit } from './write-types';
 
 import { defineResource } from './define-resource';
 import { assertLinkBase } from './links';
@@ -32,42 +39,48 @@ export function createDefineResource(
   return function configured<
     const TType extends string,
     const TAttribute extends string,
-    const TRelationship extends string = never,
+    const TRelationships extends RelationshipsInit = Empty,
     TRow = never,
-    const TSort extends string = never,
-    const TFilter extends string = never,
-    TCreate = unknown,
-    TUpdate = unknown,
+    TAttributes = Empty,
+    const TQuery extends QueryCapabilitiesInit<string, string> = Empty,
+    TValidate extends ResourceValidators<unknown, unknown> = Empty,
+    const TWritable extends WritableFieldsInit<
+      NoInfer<TAttribute | (keyof TRelationships & string)>
+    > = Empty,
+    const TClientIds extends boolean = false,
   >(
     init: ResourceDefinitionInit<
       TType,
       TAttribute,
-      TRelationship,
+      TRelationships,
       TRow,
-      TSort,
-      TFilter,
-      TCreate,
-      TUpdate
+      TAttributes,
+      TQuery,
+      TValidate,
+      TWritable,
+      TClientIds
     >,
-  ): ResourceDefinition<
+  ): DefinitionOf<
     TType,
     TAttribute,
-    TRelationship,
+    TRelationships,
     TRow,
-    TSort,
-    TFilter,
-    TCreate,
-    TUpdate
+    TAttributes,
+    TQuery,
+    TValidate,
+    TWritable,
+    TClientIds
   > {
     return defineResource<
       TType,
       TAttribute,
-      TRelationship,
+      TRelationships,
       TRow,
-      TSort,
-      TFilter,
-      TCreate,
-      TUpdate
+      TAttributes,
+      TQuery,
+      TValidate,
+      TWritable,
+      TClientIds
     >({ ...init, links: { ...links, ...init.links } });
   };
 }

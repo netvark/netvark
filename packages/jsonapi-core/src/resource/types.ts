@@ -11,12 +11,9 @@ import type {
   Meta,
   ResourceIdentifier,
 } from '../document/types';
-import type { ResourceLinks, ResourceLinksInit } from './links';
-import type {
-  ResourceValidators,
-  WritableFields,
-  WritableFieldsInit,
-} from './write-types';
+import type { ResourceTypes } from './client-types';
+import type { ResourceLinks } from './links';
+import type { ResourceValidators, WritableFields } from './write-types';
 
 export type Cardinality = 'one' | 'many';
 
@@ -142,40 +139,6 @@ export interface QueryCapabilities<
   readonly custom: ReadonlyArray<string>;
 }
 
-export interface ResourceDefinitionInit<
-  TType extends string,
-  TAttribute extends string,
-  TRelationship extends string,
-  TRow,
-  TSort extends string,
-  TFilter extends string,
-  TCreate,
-  TUpdate,
-> {
-  readonly type: TType;
-  readonly attributes: ReadonlyArray<TAttribute>;
-  readonly relationships?:
-    | Readonly<Record<TRelationship, RelationshipDefinition>>
-    | undefined;
-  /**
-   * `NoInfer` keeps the field names flowing from `attributes` and
-   * `relationships` into `serialize`, never the other way round, so a name
-   * used only in `serialize` is an error instead of a silent declaration.
-   */
-  readonly serialize: (
-    row: TRow,
-  ) => SerializedResource<NoInfer<TAttribute>, NoInfer<TRelationship>>;
-  readonly links?: ResourceLinksInit | undefined;
-  readonly query?: QueryCapabilitiesInit<TSort, TFilter> | undefined;
-  readonly validate?: ResourceValidators<TCreate, TUpdate> | undefined;
-  /** The fields a create and an update may carry; default every field (403 otherwise). */
-  readonly writable?:
-    | WritableFieldsInit<NoInfer<TAttribute | TRelationship>>
-    | undefined;
-  /** Accept client-generated ids on create; default false (403). */
-  readonly clientIds?: boolean | undefined;
-}
-
 export interface ResourceDefinition<
   TType extends string,
   TAttribute extends string,
@@ -185,6 +148,7 @@ export interface ResourceDefinition<
   TFilter extends string,
   TCreate,
   TUpdate,
+  TTypes extends ResourceTypes = ResourceTypes,
 > {
   readonly type: TType;
   readonly attributes: ReadonlyArray<TAttribute>;
@@ -203,6 +167,8 @@ export interface ResourceDefinition<
   readonly validate: ResourceValidators<TCreate, TUpdate>;
   readonly writable: WritableFields;
   readonly clientIds: boolean;
+  /** Type-only, always absent at runtime: what a client reads and writes (SPEC 5.3). */
+  readonly '~types'?: TTypes | undefined;
 }
 
 /** Any definition, for registries and generic document code. */

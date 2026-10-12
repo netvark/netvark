@@ -47,6 +47,8 @@ describe('defineResource', () => {
     expect(resource.links).toEqual({});
     expect(resource.validate).toEqual({});
     expect(resource.clientIds).toBe(false);
+    // The client types (SPEC 5.3) are type-only.
+    expect(Object.hasOwn(resource, '~types')).toBe(false);
   });
 
   it('rejects types and fields that break the member name or namespace rules', () => {

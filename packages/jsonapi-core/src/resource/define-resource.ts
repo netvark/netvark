@@ -8,11 +8,16 @@
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-identification
  * @packageDocumentation
  */
+import type { Empty } from './client-types';
+import type {
+  DefinitionOf,
+  RelationshipsInit,
+  ResourceDefinitionInit,
+} from './init-types';
 import type {
   AnyResource,
+  QueryCapabilitiesInit,
   RelationshipDefinition,
-  ResourceDefinition,
-  ResourceDefinitionInit,
 } from './types';
 import type {
   ResourceValidators,
@@ -124,48 +129,55 @@ function resolveWritable(
  * the offending option; never throws for a valid definition.
  *
  * The literal types of `type`, `attributes`, the relationship names, and the
- * sort and filter names are inferred and carried on the result.
+ * sort and filter names are inferred and carried on the result, with the
+ * client types (`'~types'`, SPEC 5.3) inferred from the whole init.
  */
 export function defineResource<
   const TType extends string,
   const TAttribute extends string,
-  const TRelationship extends string = never,
+  const TRelationships extends RelationshipsInit = Empty,
   TRow = never,
-  const TSort extends string = never,
-  const TFilter extends string = never,
-  TCreate = unknown,
-  TUpdate = unknown,
+  TAttributes = Empty,
+  const TQuery extends QueryCapabilitiesInit<string, string> = Empty,
+  TValidate extends ResourceValidators<unknown, unknown> = Empty,
+  const TWritable extends WritableFieldsInit<
+    NoInfer<TAttribute | (keyof TRelationships & string)>
+  > = Empty,
+  const TClientIds extends boolean = false,
 >(
   init: ResourceDefinitionInit<
     TType,
     TAttribute,
-    TRelationship,
+    TRelationships,
     TRow,
-    TSort,
-    TFilter,
-    TCreate,
-    TUpdate
+    TAttributes,
+    TQuery,
+    TValidate,
+    TWritable,
+    TClientIds
   >,
-): ResourceDefinition<
+): DefinitionOf<
   TType,
   TAttribute,
-  TRelationship,
+  TRelationships,
   TRow,
-  TSort,
-  TFilter,
-  TCreate,
-  TUpdate
+  TAttributes,
+  TQuery,
+  TValidate,
+  TWritable,
+  TClientIds
 >;
 export function defineResource(
   init: ResourceDefinitionInit<
     string,
     string,
-    string,
+    RelationshipsInit,
     unknown,
-    string,
-    string,
     unknown,
-    unknown
+    QueryCapabilitiesInit<string, string>,
+    ResourceValidators<unknown, unknown>,
+    WritableFieldsInit<string>,
+    boolean
   >,
 ): AnyResource {
   assertMemberName('type', init.type);
