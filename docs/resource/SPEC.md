@@ -4060,33 +4060,36 @@ the model renders comes from the application's one messages object, computed whe
 └── resourceQueries(client)                tanstack-query/queries.ts     (20.6)
 ```
 
-| Module                          | Holds                                                                            |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| `internal/declared.ts`          | reading a declared resource, and the `TypeError`s of an argument that is not one |
-| `fields/fields-of.ts`           | `fieldsOf` and the descriptor of one member                                      |
-| `fields/filter-kind.ts`         | the control a member's filter takes                                              |
-| `form/form-values.ts`           | the value each member's input edits, and the values a form starts from           |
-| `form/form-write.ts`            | the write a form's values make                                                   |
-| `form/form-validator.ts`        | the form's Standard Schema                                                       |
-| `form/form-errors.ts`           | a refused write's error objects by field                                         |
-| `form/resource-form.ts`         | `resourceForm`                                                                   |
-| `list/sorting.ts`               | `sort` and Table's sorting state                                                 |
-| `list/column-filters.ts`        | `filter` and Table's column filters                                              |
-| `list/lenient-query.ts`         | a route's search read back against the definition                                |
-| `list/resource-list.ts`         | `resourceList`                                                                   |
-| `tanstack-form/form-options.ts` | `resourceFormOptions`                                                            |
-| `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                             |
-| `tanstack-query/query-keys.ts`  | the keys of 20.6                                                                 |
-| `tanstack-query/queries.ts`     | `resourceQueries`                                                                |
+| Module                          | Holds                                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------- |
+| `internal/declared.ts`          | reading a declared resource, and the `TypeError`s of an argument that is not one    |
+| `internal/labels.ts`            | the labels of a type in the messages, and the `TypeError`s of messages without them |
+| `internal/object.ts`            | lookups of own members only                                                         |
+| `fields/fields-of.ts`           | `fieldsOf` and the descriptor of one member                                         |
+| `fields/filter-kind.ts`         | the control a member's filter takes                                                 |
+| `form/form-values.ts`           | the value each member's input edits, and the values a form starts from              |
+| `form/form-write.ts`            | the write a form's values make                                                      |
+| `form/form-validator.ts`        | the form's Standard Schema                                                          |
+| `form/form-errors.ts`           | a refused write's error objects by field                                            |
+| `form/resource-form.ts`         | `resourceForm`                                                                      |
+| `list/sorting.ts`               | `sort` and Table's sorting state                                                    |
+| `list/column-filters.ts`        | `filter` and Table's column filters                                                 |
+| `list/lenient-query.ts`         | a route's search read back against the definition                                   |
+| `list/resource-list.ts`         | `resourceList`                                                                      |
+| `tanstack-form/form-options.ts` | `resourceFormOptions`                                                               |
+| `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                                |
+| `tanstack-query/query-keys.ts`  | the keys of 20.6                                                                    |
+| `tanstack-query/queries.ts`     | `resourceQueries`                                                                   |
 
-Types exported from the root: `FieldDescriptor`, `FilterKind`, `ColumnFilterDescriptor`,
-`FormModel`, `FormModelOptions`, `FormValues`, `FormValue`, `FormErrors`, `ListModel`, `ListState`,
-`ListSorting`, `ListColumnFilters`.
+Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
+`ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormValues`, `FormValue`, `FormErrors`,
+`ListModel`, `ListState`, `ListSorting`, `ListColumnFilters`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `fields`, `write`, `resource`, and
 `keyset`), messages no definer returned, or messages that label no member of the resource's type
-(10.1), since every label would be empty. Messages name the function and the declaration's names,
+(10.1), since every label would be empty, or not every member and option of it, as messages defined
+for another declaration of the type do. Messages name the function and the declaration's names,
 never a value (resource AGENTS).
 
 ### 20.2 Field descriptors: `fieldsOf(resource, messages)`
@@ -4095,12 +4098,22 @@ never a value (resource AGENTS).
 interface FieldDescriptor<TName extends string = string> {
   readonly name: TName; // the public name, a form field's name and a table column's id
   readonly label: () => string; // messages.fields[type][name]
-  readonly options: ReadonlyArray<{ readonly value: string; readonly label: () => string }> | null;
+  readonly options: ReadonlyArray<FieldOption> | null;
   readonly required: boolean;
   readonly sortable: boolean;
   readonly filter: ColumnFilterDescriptor | null;
   readonly meta: FieldMeta; // resource.fields[name] (8)
 }
+
+interface FieldOption {
+  readonly value: string;
+  readonly label: () => string; // messages.options[type][name][value]
+}
+
+// The descriptors of a resource, keyed by its public names.
+type FieldDescriptors<TResource> = {
+  readonly [K in keyof TResource['fields'] & string]: FieldDescriptor<K>;
+};
 
 interface ColumnFilterDescriptor {
   readonly kind: FilterKind;
@@ -4139,8 +4152,11 @@ writes (`{ in: [...] }` for a multiple choice among `options`, `{ gte, lte }` fo
 `{ startsWithi }` for a `text` box) and nothing between the control and the request reshapes it.
 
 Tests: `fields/fields-of.test.ts` (the fixture catalog: order, labels and option labels as the
-messages' own functions, element options, a relationship's, each kind of the table, frozen),
-`fields/fields-of.test-d.ts` (names typed by the resource).
+messages' own functions in either locale, element options, a relationship's, each kind of the table,
+frozen), `fields/fields-of-refusals.test.ts` (each `TypeError`), `fields/filter-kind.test.ts` (every
+member of the fixture, filtered or not, by the table), `fields/fields-of.test-d.ts` (names typed by
+the resource); end to end, `e2e/resource/react/fields.e2e.test.ts` (the built package over the
+contacts application's declarations, with its Paraglide messages in German and English).
 
 ### 20.3 The form model: `resourceForm(resource, operation, options)`
 
@@ -4478,10 +4494,13 @@ definition's sort names, operators, and search).
 
 ### 20.8 Test plan
 
-- Unit and type tests beside each module (20.2 to 20.7), over a fixture catalog of contacts and
-  organizations in `src/test-support/` modeled on resource-core's, with messages from
-  `defineMessages` whose texts are closures reading a locale variable, so a test switches the
-  language as Paraglide does it, by changing what the functions read.
+- Unit and type tests beside each module (20.2 to 20.7), over the fixture in `src/test-support/`:
+  contacts, their organizations, and the plans an organization is on, a lookup table keyed by an
+  enum, declared over the public catalog `@netvark/pg-catalog` extracts from the fixture's
+  migrations (`e2e/resource` proves the committed file current), so between them every filter kind
+  and every wire type occurs; with messages from `defineMessages` whose texts are closures reading a
+  locale variable, so a test switches the language as Paraglide does it, by changing what the
+  functions read.
 - Component tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, and Table v9
   as an application uses them) against a fetch double that answers with documents jsonapi-core
   builds from the fixture's definitions: a create form that shows no error before its first submit,

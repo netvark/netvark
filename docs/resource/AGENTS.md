@@ -119,6 +119,10 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   validator, and a refusal's errors by field; `list/` the list model: sorting, column filters, and
   the lenient read of a route's search
 - `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry and its keys
+- `internal/` reading a declared resource and the labels of its type in the messages, with the
+  `TypeError`s of an argument that is neither; `test-support/` the fixture: migrations, the public
+  catalog `@netvark/pg-catalog` extracts from them (`e2e/resource` proves it current), resources,
+  and messages whose labels read a locale variable
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
