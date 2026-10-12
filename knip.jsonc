@@ -10,7 +10,7 @@
       // vitest plugin does not read; list them so they are not reported as
       // unused.
       "entry": ["src/**/*.test-d.ts"],
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.{ts,tsx}"]
     },
     "e2e/*": {
       // Consumer packages: every test file is an entry (vitest plugin);

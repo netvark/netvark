@@ -25,7 +25,7 @@ const NO_CONTENT = 204;
 const MEDIA_TYPE = 'application/vnd.api+json';
 
 /** The fixture's definitions, by the names the clients take; a type alias, which `createClients`'s record constraint accepts. */
-type FixtureDefinitions = {
+export type FixtureDefinitions = {
   readonly plans: AnyResource;
   readonly organizations: AnyResource;
   readonly contacts: AnyResource;
@@ -40,6 +40,8 @@ const DEFINITIONS: FixtureDefinitions = {
 /** A request as it arrived. */
 export interface Arrival {
   readonly method: string;
+  /** The request's URL as sent, from which a document's links derive. */
+  readonly url: string;
   /** The path and the query string, decoded, as `page[after]=c2`. */
   readonly target: string;
   /** The request document, `undefined` without a body. */
@@ -109,6 +111,7 @@ export function queryServer(handler: Handler): QueryServer {
       const url = new URL(request.url);
       const arrival: Arrival = {
         method: request.method,
+        url: request.url,
         target: decodeURIComponent(`${url.pathname}${url.search}`),
         body: text === '' ? undefined : JSON.parse(text),
         signal: request.signal,

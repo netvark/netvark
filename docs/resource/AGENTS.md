@@ -82,14 +82,18 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   `manualSorting` and `manualFiltering`, every change but paging drops the cursors, and paging
   follows the result's links, never Table's pagination feature, which counts pages a cursor API has
   not. `query` reads a search back leniently and keeps JSON in its own forms, since a router
-  validates its search after every navigation; it checks names and shapes, never values, which the
+  validates its search after every navigation; it names every member of the list query, `undefined`
+  where the state holds none, since TanStack Router spreads the validated search over the URL's, so
+  never drop an `undefined` member from it; it checks names and shapes, never values, which the
   server words when it refuses them. The query tests read through TanStack Query's observers: from
   5.102 `fetchQuery` and its kin are deprecated for `queryClient.query`, which the 5.89 floor lacks.
   `@netvark/resource-core` and `@netvark/jsonapi-client` are peers, since the application hands the
-  bindings declarations, messages, and clients made with its own copies. Component tests run
-  TanStack Form, Query, and Table v9 as an application does, in jsdom with Testing Library, against
-  a fetch double that answers with documents jsonapi-core builds; the real server over HTTP runs in
-  `e2e/resource/react/`.
+  bindings declarations, messages, and clients made with its own copies. Screen tests run TanStack
+  Form, Query, Router, and Table v9 as an application does, in jsdom with Testing Library, against
+  the contacts API of `src/test-support/contacts-api.ts`, whose documents jsonapi-core builds; each
+  names jsdom in a `// @vitest-environment jsdom` line, since the JSDoc lint knows no such tag, and
+  drives the screen as a person does, through `userEvent`, reading an error from its control's
+  `aria-describedby`. The real server over HTTP runs in `e2e/resource/react/`.
 
 ## Repository map
 
@@ -138,7 +142,9 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 - `internal/` reading a declared resource and the labels of its type in the messages, with the
   `TypeError`s of an argument that is neither; `test-support/` the fixture: migrations, the public
   catalog `@netvark/pg-catalog` extracts from them (`e2e/resource` proves it current), resources,
-  messages whose labels read a locale variable, and the API the query tests meet (`query-server.ts`)
+  messages whose labels read a locale variable, the API the query tests meet (`query-server.ts`),
+  the contacts API the screen tests meet (`contacts-api.ts`), and the screens they render
+  (`screens/`)
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
