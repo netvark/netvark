@@ -10,9 +10,9 @@ is written down in
 [`docs/keyset/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/keyset/SPEC.md).
 
 Using [Kysely](https://kysely.dev)?
-[`@netvark/kysely-keyset`](https://www.npmjs.com/package/kysely-keyset) renders the plan onto your
-select query and runs it, checks every name against your `DB` interface, and re-exports all of this
-package.
+[`@netvark/kysely-keyset`](https://www.npmjs.com/package/@netvark/kysely-keyset) renders the plan
+onto your select query and runs it, checks every name against your `DB` interface, and re-exports
+all of this package.
 
 ## Install
 

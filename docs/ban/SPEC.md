@@ -1563,14 +1563,14 @@ only by tests; `@electric-sql/pglite`, `@electric-sql/pglite-socket`, `drizzle-o
 `postgres` are devDependencies of `e2e/ban/` only. Both packages set `sideEffects: false`. publint
 and attw run as part of each build.
 
-The repository is a pnpm workspace with four packages: the private root (`ban-kit-monorepo`),
-`packages/ban-core`, `packages/hono-ban`, and `e2e/ban/` (private, `@netvark/ban-e2e`). `e2e/ban/`
-depends on both published packages through `workspace:*`, so its imports resolve through the
-`exports` map above into each `dist/`, and its own `tsconfig.json` checks the emitted declarations.
-`pnpm test:e2e` builds first, then type-checks and runs it. `e2e/ban/smoke/` holds the runtime smoke
-test and its Bun, Deno, and workerd entry points (14.2); `pnpm test:runtimes` builds and runs the
-three. Section 14 lists the suites. Changesets version the two packages independently;
-`updateInternalDependencies: patch` bumps `@netvark/hono-ban` whenever `@netvark/ban-core` releases.
+The family's packages are `packages/ban-core`, `packages/hono-ban`, and `e2e/ban/` (private,
+`@netvark/ban-e2e`) in the netvark repository's pnpm workspace. `e2e/ban/` depends on both published
+packages through `workspace:*`, so its imports resolve through the `exports` map above into each
+`dist/`, and its own `tsconfig.json` checks the emitted declarations. `pnpm test:e2e` builds first,
+then type-checks and runs it. `e2e/ban/smoke/` holds the runtime smoke test and its Bun, Deno, and
+workerd entry points (14.2); `pnpm test:runtimes` builds and runs the three. Section 14 lists the
+suites. Changesets version the two packages independently; `updateInternalDependencies: patch` bumps
+`@netvark/hono-ban` whenever `@netvark/ban-core` releases.
 
 ## 13. Constants (`internal/constants.ts`)
 

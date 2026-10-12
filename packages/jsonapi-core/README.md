@@ -10,7 +10,7 @@ server, the choice is written down in
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
 Using [Hono](https://hono.dev)?
-[`@netvark/hono-jsonapi`](https://www.npmjs.com/package/hono-jsonapi) wraps this package as
+[`@netvark/hono-jsonapi`](https://www.npmjs.com/package/@netvark/hono-jsonapi) wraps this package as
 middleware, validators, response helpers, and handlers, and re-exports all of it.
 
 ## Install
