@@ -49,7 +49,7 @@
         "declarations/*.ts",
         "localization/transform-forms.ts"
       ],
-      "project": ["**/*.ts", "**/*.mjs"],
+      "project": ["**/*.{ts,tsx}", "**/*.mjs"],
       "ignoreDependencies": ["@inlang/plugin-message-format"]
     }
   }

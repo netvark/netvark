@@ -16,8 +16,11 @@
     "allowImportingTsExtensions": true,
     "declaration": false,
     "declarationMap": false,
-    "isolatedDeclarations": false
+    "isolatedDeclarations": false,
+    // The screens render with React's automatic runtime.
+    // @ref https://www.typescriptlang.org/tsconfig/#jsx
+    "jsx": "react-jsx"
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules", ".tmp", "fails"]
 }
