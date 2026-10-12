@@ -58,20 +58,45 @@ export function handlersFor<TTransaction, TContext>(
   return handlers;
 }
 
-/** The targeted resource's id, resolving a `lid` from an earlier `add`. */
+/**
+ * Where the request holds the target's `member`, or the target itself:
+ * under `ref`, or at `href`, the one string the resolver read every
+ * member from.
+ * @ref https://jsonapi.org/ext/atomic/#processing-errors ("a pointer to the source of the problem in the request document")
+ */
+export function targetPointer(
+  operation: RawOperation,
+  member?: keyof OperationTarget,
+): string {
+  if (operation.targetMember === 'href') {
+    return `${operation.pointer}/href`;
+  }
+  return member === undefined
+    ? `${operation.pointer}/ref`
+    : `${operation.pointer}/ref/${member}`;
+}
+
+/** The id of the resource `target`, `operation`'s, names, resolving a `lid` from an earlier `add`. */
 export function targetId<TTransaction, TContext>(
   execution: Execution<TTransaction, TContext>,
+  operation: RawOperation,
   target: OperationTarget,
-  pointer: string,
 ): string {
   if (target.id !== undefined) {
     return target.id;
   }
   if (target.lid !== undefined) {
-    return execution.lids.resolve(target.type, target.lid, `${pointer}/lid`);
+    return execution.lids.resolve(
+      target.type,
+      target.lid,
+      targetPointer(operation, 'lid'),
+    );
   }
   throw jsonApiError(
-    invalidDocument(pointer, 'The target must name a resource by id or lid'),
+    invalidDocument(
+      targetPointer(operation),
+      'The target must name a resource by id or lid',
+    ),
   );
 }
 

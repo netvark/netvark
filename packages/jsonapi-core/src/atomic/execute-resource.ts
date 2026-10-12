@@ -20,7 +20,15 @@ import {
   parseData,
   resultOf,
   targetId,
+  targetPointer,
 } from './execute-support';
+
+/** Where the request holds the type of `operation`'s resource: its target's, else `data`'s. */
+function typePointer(operation: RawOperation): string {
+  return operation.target === undefined
+    ? `${operation.pointer}/data/type`
+    : targetPointer(operation, 'type');
+}
 
 /**
  * `add` without a relationship target creates a resource. The target, when
@@ -41,11 +49,7 @@ export async function create<TTransaction, TContext>(
     );
   }
   const type = target?.type ?? dataType(operation);
-  const handlers = handlersFor(
-    execution,
-    type,
-    `${operation.pointer}/${target === undefined ? 'data' : 'ref'}/type`,
-  );
+  const handlers = handlersFor(execution, type, typePointer(operation));
   if (handlers.create === undefined) {
     throw forbidden(
       operation.pointer,
@@ -112,11 +116,7 @@ export async function update<TTransaction, TContext>(
 ): Promise<OperationResult> {
   const { target } = operation;
   const type = target?.type ?? dataType(operation);
-  const handlers = handlersFor(
-    execution,
-    type,
-    `${operation.pointer}/${target === undefined ? 'data' : 'ref'}/type`,
-  );
+  const handlers = handlersFor(execution, type, typePointer(operation));
   if (handlers.update === undefined) {
     throw forbidden(
       operation.pointer,
@@ -124,9 +124,7 @@ export async function update<TTransaction, TContext>(
     );
   }
   const targeted =
-    target === undefined
-      ? undefined
-      : targetId(execution, target, `${operation.pointer}/ref`);
+    target === undefined ? undefined : targetId(execution, operation, target);
   const data = await parseData(
     execution,
     handlers.resource,
@@ -170,7 +168,7 @@ export async function remove<TTransaction, TContext>(
   const handlers = handlersFor(
     execution,
     target.type,
-    `${operation.pointer}/ref/type`,
+    targetPointer(operation, 'type'),
   );
   if (handlers.remove === undefined) {
     throw forbidden(
@@ -178,7 +176,7 @@ export async function remove<TTransaction, TContext>(
       `"${handlers.resource.type}" does not support remove`,
     );
   }
-  const id = targetId(execution, target, `${operation.pointer}/ref`);
+  const id = targetId(execution, operation, target);
   await handlers.remove({ id }, execution.context);
   return {};
 }

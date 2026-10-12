@@ -26,6 +26,7 @@ import {
   handlersFor,
   requireData,
   targetId,
+  targetPointer,
 } from './execute-support';
 
 function relationshipDefinition<TTransaction, TContext>(
@@ -40,7 +41,7 @@ function relationshipDefinition<TTransaction, TContext>(
   if (definition === undefined) {
     throw jsonApiError(
       invalidDocument(
-        `${operation.pointer}/ref/relationship`,
+        targetPointer(operation, 'relationship'),
         quotable(name)
           ? `"${resource.type}" has no relationship "${name}"`
           : `"${resource.type}" has no relationship by this name`,
@@ -73,12 +74,12 @@ export async function relationship<TTransaction, TContext>(
   const handlers = handlersFor(
     execution,
     target.type,
-    `${operation.pointer}/ref/type`,
+    targetPointer(operation, 'type'),
   );
   const definition = relationshipDefinition(handlers, operation, name);
   const relationshipHandlers: RelationshipHandlers<TTransaction, TContext> =
     handlers.relationships?.[name] ?? {};
-  const id = targetId(execution, target, `${operation.pointer}/ref`);
+  const id = targetId(execution, operation, target);
   const pointer = `${operation.pointer}/data`;
   const data = requireData(operation, 'changes a relationship');
   const options = { lids: true, type: definition.type };

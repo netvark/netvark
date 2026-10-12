@@ -113,7 +113,7 @@ describe('operationsProcessor: handler coverage', () => {
       status: 400,
       error: {
         detail: 'The target must name a resource by id or lid',
-        source: { pointer: '/atomic:operations/0/ref' },
+        source: { pointer: '/atomic:operations/0/href' },
       },
     });
   });

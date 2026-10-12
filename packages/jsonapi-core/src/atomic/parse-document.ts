@@ -42,6 +42,9 @@ const OPERATION_CODES: ReadonlySet<string> = new Set([
   'remove',
 ]);
 
+/** The member of an operation that holds its target. */
+export type TargetMember = 'ref' | 'href';
+
 /** One operation as sent, with its position for pointers. */
 export interface RawOperation {
   readonly index: number;
@@ -49,6 +52,8 @@ export interface RawOperation {
   readonly op: OperationCode;
   /** From `ref`, or from `href` through the resolver. */
   readonly target: OperationTarget | undefined;
+  /** The member `target` came from, which an error about the target points at. */
+  readonly targetMember: TargetMember | undefined;
   readonly hasData: boolean;
   readonly data: unknown;
   readonly meta: Meta | undefined;
@@ -56,6 +61,16 @@ export interface RawOperation {
 
 function isOperationCode(value: unknown): value is OperationCode {
   return typeof value === 'string' && OPERATION_CODES.has(value);
+}
+
+/** The member that holds `operation`'s target, when one does; both is a 400 `parseTarget` reports. */
+function targetMemberOf(
+  operation: Record<string, unknown>,
+): TargetMember | undefined {
+  if (hasOwnMember(operation, 'ref')) {
+    return 'ref';
+  }
+  return hasOwnMember(operation, 'href') ? 'href' : undefined;
 }
 
 function parseOperation(
@@ -98,6 +113,7 @@ function parseOperation(
     pointer,
     op,
     target,
+    targetMember: target === undefined ? undefined : targetMemberOf(value),
     hasData: hasOwnMember(value, 'data'),
     data: ownMember(value, 'data'),
     meta: isRecord(meta) ? meta : undefined,

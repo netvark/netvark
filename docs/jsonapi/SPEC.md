@@ -966,8 +966,9 @@ problem, each pointing into the request:
   members. `href` is accepted only when `resolveHref` is given and returns a target; otherwise 400
   at `/atomic:operations/<i>/href`.
 
-The result is `RawOperation = { index, pointer, op, target, hasData, data, meta }` in order, with
-`data` untouched: it is parsed against the targeted definition during execution.
+The result is `RawOperation = { index, pointer, op, target, targetMember, hasData, data, meta }` in
+order, with `data` untouched: it is parsed against the targeted definition during execution.
+`targetMember` names the member the target came from, `ref` or `href`.
 
 ### 11.3 Local identities (`lids.ts`)
 
@@ -986,6 +987,12 @@ identifiers, keeping `meta`.
 | `update`, no relationship target | Type from the target or `data.type`; 404 and 403 as above. The id is the target's (`lid` resolved), else `data.id`, else `data.lid` resolved; a `data.lid` that disagrees with the target's `lid` is 409 at `.../data/lid`. `data` is parsed as an `update` with that id.                                                                                                                                                                                                                                                                    |
 | `remove`, no relationship target | A target is required (400). 404 and 403 as above. `remove({ id })`; the result is empty.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | any `op` with `ref.relationship` | The relationship MUST be declared (400 at `.../ref/relationship`). `add` and `remove` apply only to to-many relationships (400 at `.../op` for to-one). `data` is required and parsed as linkage of the declared cardinality and type with `lids` on (`add` and `remove`: always an array). No handler for the `op`, or a relationship that `writable.update` leaves out: 403. The result is empty.                                                                                                                                          |
+
+An error about the target points at the member of `ref` at fault (`.../ref/type`, `.../ref/lid`,
+`.../ref/relationship`), or at `.../ref` for a target without `id` or `lid`; for a target the
+resolver read from `href`, every such error points at `.../href`, the one string that holds every
+member then (extension: an error's pointer names "the source of the problem in the request
+document").
 
 Results carry `data` only when a handler returned a row (extension: results for `remove` and
 relationship operations MUST NOT contain `data`).
