@@ -145,17 +145,22 @@ describe('fetching', () => {
     ).toEqual(['Rails is Omakase', 'Compilers']);
   });
 
-  it('reads the query only up to a literal fragment in the request target', async () => {
+  it('answers a literal fragment in the request target as the URL without it', async () => {
     // A cache in front of the API keys these requests on their URLs without
-    // the fragment, so the API must answer what those URLs name.
+    // the fragment, so the API must answer, links included, the document
+    // those URLs name.
     const filtered = await blog.requestTarget(
       '/articles?filter[title][like]=omakase#&filter[author]=3',
     );
-    expect(titlesOf(filtered)).toEqual(
-      await titles('filter[title][like]=omakase'),
+    expect(titlesOf(filtered)).toEqual(['Rails is Omakase']);
+    expect(filtered.body).toEqual(
+      (await blog.request('/articles?filter[title][like]=omakase')).body,
     );
-    const hidden = await blog.requestTarget('/articles#?filter[author]=3');
-    expect(titlesOf(hidden)).toEqual(await titles(''));
+    const hidden = await blog.requestTarget('/articles?page[size]=1#?sort=x');
+    expect(titlesOf(hidden)).toHaveLength(1);
+    expect(hidden.body).toEqual(
+      (await blog.request('/articles?page[size]=1')).body,
+    );
   });
 
   it('answers 400 with every offending parameter and 404 for a missing resource', async () => {

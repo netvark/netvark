@@ -42,6 +42,21 @@ describe('paginationLinks', () => {
     ).toBe(false);
   });
 
+  it('carries no fragment of the request URL into any link', () => {
+    const links = paginationLinks('https://x.test/a?page[size]=1#&b=2', {
+      next: 'n',
+      prev: 'p',
+      last: 'l',
+    });
+    expect(links).toEqual({
+      self: 'https://x.test/a?page%5Bsize%5D=1',
+      first: 'https://x.test/a?page%5Bsize%5D=1',
+      last: 'https://x.test/a?page%5Bsize%5D=1&page%5Bbefore%5D=l',
+      prev: 'https://x.test/a?page%5Bsize%5D=1&page%5Bbefore%5D=p',
+      next: 'https://x.test/a?page%5Bsize%5D=1&page%5Bafter%5D=n',
+    });
+  });
+
   it('can omit first and render relative references', () => {
     const links = paginationLinks(
       'https://x.test/a?b=1&page[after]=c',

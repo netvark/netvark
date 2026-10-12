@@ -63,6 +63,10 @@ export function paginationLinks(
 ): Links {
   const relative = options.relative ?? false;
   const self = new URL(url);
+  // A fragment is no part of what was requested, though a literal `#` can
+  // reach the request URL; every link derives from `self`, so none carries it.
+  // @ref https://www.rfc-editor.org/rfc/rfc3986#section-3.5
+  self.hash = '';
   // Serialize the query once so square brackets a browser left bare come out
   // percent-encoded, as the specification's serialization rules say; the
   // request is to be treated as equivalent either way.
