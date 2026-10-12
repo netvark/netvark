@@ -1180,9 +1180,9 @@ so the same build runs in browsers, workers, Node, Bun, and Deno. The client rea
 
 ### 15.1 Surface and module map
 
-| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `PageCursors` |
+| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Identifier`, `RecordMembers`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `ResponseErrorInit`, `ResponseErrorHeaders`, `PageCursors` |
 
 ```
 packages/jsonapi-client/src/
@@ -1199,6 +1199,7 @@ packages/jsonapi-client/src/
   document/
     types.ts                   AnyRecord, Deserialized (15.6)
     deserialize.ts             deserialize() (15.6)
+    members.ts                 links, the jsonapi object, relationship objects, identifiers, held to their shapes (15.6)
     include-tree.ts            include paths as a tree (15.6)
   errors/response-error.ts     ResponseError, isResponseError() (15.7)
   client/
@@ -1339,48 +1340,76 @@ among them.
 
 `deserialize(document, { include? })` returns
 `Deserialized = { data, included, links, meta, jsonapi }`, `data` being a record, `null`, an array
-of records, or the linkage of a relationship document. `include` is the include paths the request
-sent.
+of records, or `undefined` when the document has no `data`. `include` is the include paths the
+request sent. A relationship document's identifiers deserialize as records of `type` and `id`; the
+relationship calls read its linkage (15.4).
 
 - A record is a plain object: `type`, `id`, each attribute as sent, each relationship as below, and,
   when the resource object has them, `$links` (its `links`), `$meta` (its `meta`), and
   `$relationships` (each relationship object as sent). No field can collide with them: `$` is a
   reserved character no member name may contain (`#document-member-names-reserved-characters`), and
-  no field is named `type` or `id`. @-Members are skipped (`#document-member-names-at-members`).
+  no field is named `type` or `id`. @-Members are skipped (`#document-member-names-at-members`), as
+  is any member a conforming server cannot send under those rules (`type`, `id`, a name holding
+  `$`). Fields are own data properties, so a member named `__proto__` stays a plain key.
+- What a record keeps as sent is held to the shape JSON:API gives it, so its type is true: a link is
+  a string, `null`, or a link object with a string `href` whose other members keep their types; the
+  `jsonapi` object's `version` is a string and its `ext` and `profile` lists of strings; a
+  relationship object keeps its `links`, its linkage with each identifier's `meta`, and its `meta`.
+  A member of another shape is left out. The document's `links`, `meta`, and `jsonapi` are read the
+  same way.
 - A relationship on a requested include path is resolved: a to-one is the included record or `null`,
   a to-many the included records in linkage order. A linked resource the document leaves out is left
   out (a to-one is `undefined`); its identifier stays in `$relationships`. Full linkage asks every
   included resource to be linked, not every linked resource to be included
   (`#document-compound-documents`).
 - Every other relationship is its linkage: an identifier `{ type, id }`, `null`, or a list of
-  identifiers, or `undefined` when the relationship object has no `data`.
+  identifiers, or `undefined` when the relationship object has no `data`. An identifier's `meta`
+  stays in `$relationships`.
 - Resolution follows the include paths only, so records form a tree: a record never reaches itself,
   and every result survives `JSON.stringify`, `structuredClone`, and a cache's structural sharing.
   Resources are found by `type` and `id` among the primary data and `included`
   (`#document-compound-documents`: one resource object per type and id).
 - `included` holds every included resource as a record with its linkage.
-- A resource object without a string `type` and `id` throws `TypeError`.
+- A document that is not a JSON object, a `data` or `included` of another shape, and a resource
+  object or identifier without a string `type` and `id` throw `TypeError`, whose message quotes
+  nothing of the document.
 
 `RecordOf<TDefinitions, TDefinition, TQuery>` types a record: `type` is the definition's, `id` a
 string; the attributes are `'~types'.attributes` (JSON forms, 5.3), narrowed to `fields[type]` when
 the query names that type; each relationship by `'~types'.relationships`: on an include path the
 related definition's record (looked up in `TDefinitions` by type, with the rest of the path), else
 its linkage. A type no definition in `TDefinitions` has is `AnyRecord`, whose fields are `unknown`.
+A query's `include` or fieldset that is a tuple, as a literal passed to a call is (a `const` type
+parameter), says what the response holds. One typed as a list says only what it may hold: a
+relationship on one of its paths is the related record or its linkage, and the fields of a fieldset
+so typed are optional, every field so when the fieldset may be absent.
+
+Tests: `deserialize.test.ts` (records, the result, refusals), `relationships.test.ts` (linkage,
+resolution, the tree, resources left out), `members.test.ts`, `round-trip.test.ts` (documents
+`collectionDocument` builds from the blog's rows, per query, sent as JSON and deserialized, are the
+records the rows describe), and `record-types.test-d.ts`.
 
 ### 15.7 Errors (`response-error.ts`)
 
 A response whose status is not 2xx, a 4xx and a 5xx alike, rejects with `ResponseError`: `status`
 (the HTTP status, a number), `errors` (the error document's error objects, or empty when the body is
 not one, such as a proxy's HTML page), `document` (the error document or `undefined`), and `headers`
-(`Allow`, `Retry-After`). Each error object keeps its own `code`, a string (`#error-objects`); the
-status is never put in its place. The message names the resource type, the call, and the status,
-never the URL or the body: a URL carries ids and filter values, and a message goes to logs. The
-codes are the server's catalog (4.1 and the application's own), as the server sent them.
-`isResponseError(value, code?)` is `true` for a `ResponseError`, and with `code`, one whose error
-objects carry it; its type parameter types `code`, so `isResponseError<AppCode>(error, 'X')` rejects
-a code the application's catalog does not have. An error's `source.pointer` names a member of the
-request document, which a form maps to its field; JSON:API asks a client to ignore a pointer the
-request did not have.
+(`{ allow, retryAfter }`, from `Allow` and `Retry-After`).
+`new ResponseError({ type, call, status, body, headers? })` takes the response body as parsed JSON
+(`undefined` when it is not JSON); an error object keeps each member whose type is the one JSON:API
+gives it, and the document its `links`, `meta`, and `jsonapi`, read as 15.6 reads them. Each error
+object keeps its own `code`, a string (`#error-objects`); the status is never put in its place. The
+message names the resource type, the call, and the status, never the URL or the body: a URL carries
+ids and filter values, and a message goes to logs. The codes are the server's catalog (4.1 and the
+application's own), as the server sent them. `isResponseError(value, code?)` is `true` for a
+`ResponseError`, and with `code`, one whose error objects carry it; its type parameter types `code`,
+so `isResponseError<AppCode>(error, 'X')` rejects a code the application's catalog does not have. It
+recognizes an error made by another copy of the package, through a `Symbol.for` brand, where
+`instanceof` would not. An error's `source.pointer` names a member of the request document, which a
+form maps to its field; JSON:API asks a client to ignore a pointer the request did not have.
+
+Tests: `response-error.test.ts` (the message, the error objects, the headers, the guard across
+copies) and `response-error.test-d.ts` (the guard's code typed by the catalog).
 
 ### 15.8 Pagination (`cursors.ts`)
 
