@@ -1,8 +1,9 @@
 /**
- * Package surface. The core must resolve through its published `exports`
- * map at runtime and export exactly what SPEC 1 lists. Value imports on
- * purpose: a missing dist file or a wrong `exports` entry fails here before
- * any feature test runs.
+ * Package surface. Both packages must resolve through their published
+ * `exports` maps at runtime and export exactly what SPEC 1 lists, the
+ * binding re-exporting the core's own bindings. Value imports on purpose: a
+ * missing dist file or a wrong `exports` entry fails here before any feature
+ * test runs.
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import * as core from '@netvark/intl-core';
+import * as binding from '@netvark/paraglide-intl';
 
 function names(module: object): Array<string> {
   return Object.keys(module).toSorted();
@@ -32,23 +34,35 @@ const CORE = [
   'toTimeZone',
 ].toSorted();
 
+/** SPEC 1: the binding's values, the core's included. */
+const BINDING = [...CORE, 'compile'].toSorted();
+
 describe('package surface', () => {
   it('@netvark/intl-core exports the documented values', () => {
     expect(names(core)).toEqual(CORE);
   });
 
+  it("@netvark/paraglide-intl exports them too, as the core's own bindings", () => {
+    expect(names(binding)).toEqual(BINDING);
+    for (const name of CORE) {
+      expect(Reflect.get(binding, name)).toBe(Reflect.get(core, name));
+    }
+  });
+
   it('ships every bidi control as an escape, never as the character', async () => {
-    const dist = dirname(
-      fileURLToPath(import.meta.resolve('@netvark/intl-core')),
-    );
-    const files = await readdir(dist);
-    expect(files).toContain('index.js');
-    for (const file of files) {
-      const text = await readFile(join(dist, file), 'utf8');
-      expect({ file, controls: text.match(/\p{Bidi_Control}/gu) }).toEqual({
-        file,
-        controls: null,
-      });
+    for (const name of ['@netvark/intl-core', '@netvark/paraglide-intl']) {
+      const dist = dirname(fileURLToPath(import.meta.resolve(name)));
+      const files = await readdir(dist);
+      expect(files.filter((file) => /^index\.m?js$/u.test(file))).toHaveLength(
+        1,
+      );
+      for (const file of files) {
+        const text = await readFile(join(dist, file), 'utf8');
+        expect({ file, controls: text.match(/\p{Bidi_Control}/gu) }).toEqual({
+          file,
+          controls: null,
+        });
+      }
     }
   });
 
@@ -59,5 +73,11 @@ describe('package surface', () => {
       default: { name: string };
     };
     expect(corePkg.default.name).toBe('@netvark/intl-core');
+    const bindingPkg = (await import('@netvark/paraglide-intl/package.json', {
+      with: { type: 'json' },
+    })) as {
+      default: { name: string };
+    };
+    expect(bindingPkg.default.name).toBe('@netvark/paraglide-intl');
   });
 });

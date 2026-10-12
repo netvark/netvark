@@ -38,8 +38,8 @@ dependency, and also each `@netvark` package whose values the application hands 
 `@netvark/hono-jsonapi` and `@netvark/resource-core`, and `@netvark/react-resource` takes
 `@netvark/resource-core`. `@netvark/pg-catalog` depends on `pg` and takes PGlite and
 `@netvark/resource-core` as optional peers. `@netvark/paraglide-intl` takes `@inlang/paraglide-js`
-and `@inlang/sdk`, whose projects it hands to Paraglide's compiler
-([ADR 0009](docs/adr/0009-a-binding-takes-as-peers-the-packages-whose-values-it-hands-its-host.md)).
+and loads projects with the inlang SDK that Paraglide itself depends on
+([ADR 0009](docs/adr/0009-a-binding-makes-what-it-hands-its-host-with-the-hosts-own-dependency.md)).
 A peer range on a package outside the workspace starts past that package's published advisories, so
 an affected release in your application is an unmet peer dependency, and CI runs the binding's tests
 on the range's floor
@@ -59,7 +59,7 @@ pnpm add @netvark/kysely-resource @netvark/keyset-core kysely  # those resources
 pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono     # and served on Hono
 pnpm add @netvark/react-resource @netvark/resource-core        # and their forms and lists in React
 pnpm add @netvark/intl-core                                    # formatting and time zones for Paraglide apps
-pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js @inlang/sdk  # Paraglide's compile, values isolated
+pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js       # Paraglide's compile, values isolated
 pnpm add @netvark/ban-core                                     # a core on its own: a fetch handler, a worker, another framework
 ```
 

@@ -153,8 +153,9 @@ first so the scope is settled before code exists, then:
    package the application hands it values from, is a peer too, and a `workspace:^` development
    dependency
    ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
-   A package whose values the binding makes and hands its host is a peer as well
-   ([ADR 0009](docs/adr/0009-a-binding-takes-as-peers-the-packages-whose-values-it-hands-its-host.md)).
+   A binding that makes values with one of its host's dependencies and hands them to the host
+   imports that dependency from the host's package instead of declaring it
+   ([ADR 0009](docs/adr/0009-a-binding-makes-what-it-hands-its-host-with-the-hosts-own-dependency.md)).
 2. Keep `tsdown.config.ts` as the one source of the subpaths: `pnpm build` writes the `exports` maps
    into `package.json`, and CI fails on a diff. Name the Vitest project after the package.
 3. Add the package's re-export-only files, if any, to the coverage `exclude` list in the root

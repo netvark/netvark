@@ -25,10 +25,11 @@ compiled by a Paraglide built against another.
   types. The application hands it getters (`getLocale` from its Paraglide runtime) and a request
   scope (an `AsyncLocalStorage` it creates); the core imports neither.
 - `@netvark/paraglide-intl` is the binding to Paraglide. It re-exports the core in full, so an
-  application imports one package. It takes `@inlang/paraglide-js` and `@inlang/sdk` as peer
-  dependencies: it loads the project with the SDK and hands it to Paraglide's `compileProject()`, so
-  both must be the application's one copy, the one Paraglide's own dependency resolves to
-  ([root ADR 0009](../../adr/0009-a-binding-takes-as-peers-the-packages-whose-values-it-hands-its-host.md)).
+  application imports one package. It takes `@inlang/paraglide-js` as its peer dependency and loads
+  the project with the inlang SDK that Paraglide itself depends on, resolved from Paraglide's
+  package, so the project it hands to `compileProject()` and Paraglide's compiler share one copy of
+  the SDK whichever Paraglide the application installs
+  ([root ADR 0009](../../adr/0009-a-binding-makes-what-it-hands-its-host-with-the-hosts-own-dependency.md)).
 - The binding is a build-time tool, like `@netvark/pg-catalog`: it reads and writes files through
   the file system Paraglide's compiler is given (`node:fs` by default), so it is the second
   exception to the web-standards rule. It reads no environment at module scope.
@@ -36,6 +37,7 @@ compiled by a Paraglide built against another.
 ## Consequences
 
 A browser bundle, a Worker, or a server that formats imports only the core's code. A Paraglide
-upgrade that changes the SDK major is an unmet peer dependency at install, not a failed compile. The
-binding's floor is the oldest Paraglide and SDK pair its tests pass on, and CI runs them there (root
-ADR 0007).
+upgrade that changes the SDK major needs nothing from the application: the binding loads the project
+with the new SDK. The binding calls only the SDK API that SDK 2 to 4 all export, and its floor is
+the oldest Paraglide its tests pass on, which CI runs together with the last release on each older
+SDK major (root ADR 0007).

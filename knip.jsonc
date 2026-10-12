@@ -14,6 +14,13 @@
       "entry": ["src/**/*.test-d.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
+    "packages/paraglide-intl": {
+      // As packages/*; the compile tests' fixture projects load the
+      // message-format plugin by path.
+      "entry": ["src/**/*.test-d.ts"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@inlang/plugin-message-format"]
+    },
     "e2e/*": {
       // Consumer packages: every test file is an entry (vitest plugin);
       // `support/` is reached from them. `smoke/run.ts` and `smoke/workerd.ts`
@@ -21,6 +28,13 @@
       // entry named as a string inside `workerd.ts`, so it is listed.
       "entry": ["smoke/worker.ts"],
       "project": ["**/*.ts"]
+    },
+    "e2e/intl": {
+      // As e2e/*; the compiled fixture projects load the message-format
+      // plugin by path.
+      "entry": ["smoke/worker.ts"],
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["@inlang/plugin-message-format"]
     },
     "e2e/jsonapi": {
       // As e2e/*, plus `declarations/`: modules declarations.e2e.test.ts

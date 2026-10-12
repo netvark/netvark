@@ -14,15 +14,16 @@ Why each piece exists, with the measurements, is in [`DESIGN.md`](DESIGN.md); th
 ## Install
 
 ```bash
-pnpm add @netvark/intl-core                                   # formatters and time zones
-pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js @inlang/sdk  # the compile step
+pnpm add @netvark/intl-core                               # formatters and time zones
+pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js  # the compile step
 ```
 
 `@netvark/intl-core` runs on Node 22.12+, Bun, Deno, Cloudflare Workers, and browsers.
-`@netvark/paraglide-intl` runs at build time on Node 22.12+, Bun, and Deno, and takes
-`@inlang/paraglide-js` and `@inlang/sdk` as peers: install the SDK major your Paraglide uses. It
-re-exports the core for build scripts, but its entry also loads the inlang SDK, so application code
-imports the formatters from `@netvark/intl-core`.
+`@netvark/paraglide-intl` runs at build time on Node 22.12+, Bun, and Deno 2.6.10+, and takes
+`@inlang/paraglide-js` 2.11 or later as its peer. It loads projects with the inlang SDK that
+Paraglide itself depends on, so there is no SDK version to install or match. It re-exports the core
+for build scripts, but its entry also loads Paraglide's compiler, so application code imports the
+formatters from `@netvark/intl-core`.
 
 ## Quick start
 
