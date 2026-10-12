@@ -212,6 +212,32 @@ jobs:
       - run: pnpm --filter @netvark/pg-catalog run typecheck
       - run: pnpm --filter @netvark/pg-catalog run test
 
+  test-paraglide-floor:
+    name: Test (Paraglide 2.11, the peer range floor, and 2.26, the last on SDK 3)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      # @netvark/paraglide-intl declares `@inlang/paraglide-js >=2.11.0
+      # <3.0.0`: 2.11.0 is the first release that compiles markup. It loads
+      # projects with the inlang SDK Paraglide depends on (root ADR 0009), so
+      # its typecheck and tests run on 2.11.0, which depends on SDK 2, and on
+      # 2.26.0, the last release on SDK 3; the test job runs SDK 4.
+      - run: pnpm --filter @netvark/paraglide-intl add --save-dev @inlang/paraglide-js@2.11.0
+      - run: pnpm --filter @netvark/paraglide-intl run typecheck
+      - run: pnpm --filter @netvark/paraglide-intl run test
+      - run: pnpm --filter @netvark/paraglide-intl add --save-dev @inlang/paraglide-js@2.26.0
+      - run: pnpm --filter @netvark/paraglide-intl run typecheck
+      - run: pnpm --filter @netvark/paraglide-intl run test
+
   build:
     name: Build and package checks
     runs-on: ubuntu-latest
@@ -463,6 +489,7 @@ jobs:
       - test-tanstack-floor
       - test-hono-floor
       - test-pglite-floor
+      - test-paraglide-floor
       - build
       - e2e
       - e2e-postgres

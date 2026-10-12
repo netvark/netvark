@@ -28,7 +28,8 @@ Contents
 Two packages (ADR 0002). `@netvark/intl-core` is the core: web standards only, no dependencies,
 nothing imported from Paraglide or the inlang SDK. `@netvark/paraglide-intl` is the Paraglide
 binding: it depends on the core through `workspace:^`, re-exports all of it, and adds `compile()`.
-`@inlang/paraglide-js` and `@inlang/sdk` are its peer dependencies (root ADR 0009).
+`@inlang/paraglide-js` is its peer dependency, and it loads projects with the inlang SDK that
+Paraglide itself depends on (root ADR 0009).
 
 | Package                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,9 +56,13 @@ packages/intl-core/src/
 packages/paraglide-intl/src/
   index.ts                    the public surface
   compile.ts                  compile (6.1)
-  compile-options.ts          the binding's own options (6.1)
+  compile-options.ts          the options and their checks (6.1)
+  paraglide-sdk.ts            the inlang SDK that Paraglide depends on (6.1)
   isolate-patterns.ts         the pattern rewrite (6.2)
   formatting-annotations.ts   the annotations a message formats with (6.3)
+  escape-bidi-controls.ts     the bidi controls of the compiled code as escapes (6.4)
+  internal/
+    is-record.ts              the options-object check
 ```
 
 Every module with behavior has a sibling `*.test.ts`; contract types have `*.test-d.ts`.
@@ -244,55 +249,73 @@ interface TimeZoneResolver {
 Every message is constant apart from the names of options and of configured locales, and names the
 function. No message contains a cookie, a header, a request URL, or a value read from a request.
 
-| Thrown by                     | Class                    | When                                                                                                                                                       |
-| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createIntl()`                | `TypeError`              | the options are not an object; `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string        |
-| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                                               |
-| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` is not `av-octet`s; `sameSite` is another value; a user agent would drop the cookie |
-| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a positive integer                                                                                                                         |
-| `createTimeZone()`            | `TypeError`              | the options are not an object; the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                            |
-| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                                          |
-| `TimeZoneResolver.run()`      | `TypeError`              | the resolver has no scope: none was given to `createTimeZone()` or `useScope()`                                                                            |
-| `compile()`                   | `TypeError`              | `isolate` is not a boolean or an array of strings, or names a locale the project does not declare; `formatters` is another value                           |
-| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                                     |
+| Thrown by                     | Class                    | When                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createIntl()`                | `TypeError`              | the options are not an object; `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string                                                                                                                                                                                      |
+| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                                                                                                                                                                                                                             |
+| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` is not `av-octet`s; `sameSite` is another value; a user agent would drop the cookie                                                                                                                                                                               |
+| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a positive integer                                                                                                                                                                                                                                                                                                       |
+| `createTimeZone()`            | `TypeError`              | the options are not an object; the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                                                                                                                                                                                                          |
+| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                                                                                                                                                                                                                        |
+| `TimeZoneResolver.run()`      | `TypeError`              | the resolver has no scope: none was given to `createTimeZone()` or `useScope()`                                                                                                                                                                                                                                                          |
+| `compile()`                   | `TypeError`              | the options are not an object; `project` or `outdir` is not a string; `isolate` is not a boolean or an array of strings, or lists a locale the project does not declare; `fs` is not a file system module; `formatters` is another value; Paraglide's SDK lacks a function the binding calls or returns a bundle the binding cannot read |
+| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                                                                                                                                                                                                                   |
 
 ## 6. Paraglide binding (`@netvark/paraglide-intl`, `packages/paraglide-intl/src/`)
 
-### 6.1 `compile(options)` (`compile.ts`, `compile-options.ts`, ADR 0007)
+### 6.1 `compile(options)` (`compile.ts`, `compile-options.ts`, `paraglide-sdk.ts`, ADR 0007)
 
 ```ts
 type CompileOptions = CompilerOptions & {
-  readonly previousCompilation?: CompilationResult;
+  readonly previousCompilation?: { readonly outputHashes?: Record<string, string> };
   readonly isolate?: boolean | ReadonlyArray<string>;
   readonly formatters?: 'refuse' | 'allow';
 };
 interface CompileResult {
-  readonly outputHashes: Record<string, string> | undefined;
+  readonly outputHashes: Record<string, string>;
   readonly warnings: ReadonlyArray<Error>;
 }
 ```
 
-`CompilerOptions` and `CompilationResult` are Paraglide's. `compile()` MUST:
+`CompilerOptions` is Paraglide's; a result is itself a `previousCompilation`, and so is the result
+of Paraglide's `compile()`. `compile()` MUST:
 
-1. Check `isolate` (absent, a boolean, or an array of strings) and `formatters` (absent, `'refuse'`,
-   or `'allow'`), and throw a `TypeError` before reading anything when either is another value.
+1. Check the options before reading anything, and throw a `TypeError` when they are not an object,
+   `project` or `outdir` is not a string, `isolate` is not absent, a boolean, or an array of
+   strings, `fs` is not absent or an object with a `promises` object, or `formatters` is not absent,
+   `'refuse'`, or `'allow'`.
 2. Merge Paraglide's `defaultCompilerOptions` under the given options, without `isolate`,
    `formatters`, and `previousCompilation`, as Paraglide's `compile()` does.
-3. Load the project with `loadProjectFromDirectory({ path: project, fs })`, where `fs` is the `fs`
+3. Wait for any compile still running, then run, so two compiles never write at once, as Paraglide's
+   `compile()` does
+   ([paraglide-js#320](https://github.com/opral/paraglide-js/issues/320#issuecomment-2596951222)).
+4. Import the inlang SDK that Paraglide depends on: `@inlang/sdk` resolved with `createRequire()`
+   from the file `@inlang/paraglide-js` resolves to, where Paraglide's own imports resolve it (root
+   ADR 0009). A module without the functions `loadProjectFromDirectory`, `selectBundleNested`, and
+   `upsertBundleNested`, which SDK 2, 3, and 4 all export, is a `TypeError` naming each one it
+   lacks.
+5. Load the project with `loadProjectFromDirectory({ path: project, fs })`, where `fs` is the `fs`
    option or `node:fs`.
-4. Throw a `TypeError` when `isolate` lists a locale the project's settings do not declare.
-5. Read every bundle with its messages and variants (`selectBundleNested(project.db)`).
-6. When `formatters` is `'refuse'` (the default), throw a `MessageFormattingError` carrying every
+6. Throw a `TypeError` when `isolate` lists a locale the project's settings do not declare.
+7. Read every bundle with its messages and variants (`selectBundleNested(project.db)`), and throw a
+   `TypeError` for one without an `id`, `messages`, each with a `locale` and `variants`, each with a
+   `pattern` of parts that have a `type`.
+8. When `formatters` is `'refuse'` (the default), throw a `MessageFormattingError` carrying every
    finding (6.3) when there is any. Nothing has been written at that point.
-7. Rewrite the patterns (6.2) and write each changed bundle back with `upsertBundleNested()`.
-8. Compile with `compileProject({ project, projectPath: project, compilerOptions })` and write the
-   output with `writeOutput()` into the resolved `outdir`, cleaning it when `cleanOutdir` is set and
-   passing `previousCompilation.outputHashes` so unchanged files are not rewritten.
-9. Return the output hashes and `await project.errors.get()` as `warnings` (a plugin that failed to
-   import, a file that failed to parse), and close the project whether or not a step threw.
+9. Rewrite the patterns (6.2) and write each changed bundle back with `upsertBundleNested()`, one at
+   a time. A bundle is written back as it was read, but for its patterns, so the SDK of any major
+   reads its own fields back.
+10. Compile with `compileProject({ project, projectPath: project, compilerOptions })`, write the
+    bidi controls of the output as escapes (6.4), and write it with `writeOutput()` into `outdir`
+    resolved against the working directory, cleaning it when `cleanOutdir` is set and passing
+    `previousCompilation.outputHashes` so unchanged files are not rewritten.
+11. Return the output hashes and `await project.errors.get()` as `warnings` (a plugin that failed to
+    import, a file that failed to parse), and close the project whether or not a step threw.
 
 The catalogs on disk MUST be unchanged: the project is loaded without a `syncInterval`, so the SDK
-writes nothing back after the load (measured on inlang SDK 4.0.0, ADR 0007).
+writes nothing back after the load. As it loads the project, the SDK writes its own files into the
+project directory (`.gitignore`, `.meta.json`, `README.md`, `.lix/README.md`), as it does for
+Paraglide's `compile()` (measured on Paraglide 2.27.0 with inlang SDK 4.0.1, ADR 0007).
 
 ### 6.2 Isolating patterns (`isolate-patterns.ts`, ADR 0006)
 
@@ -324,12 +347,28 @@ writes nothing back after the load (measured on inlang SDK 4.0.0, ADR 0007).
   `<bundleId> (<locale or "every locale">): <variable>: <annotation>`; bundle ids are the
   application's own message keys.
 
-### 6.4 Peers and floors
+### 6.4 Bidi controls in the compiled code (`escape-bidi-controls.ts`, ADR 0007)
 
-`@inlang/paraglide-js` and `@inlang/sdk` are peer dependencies (root ADR 0009, ADR 0002). Each range
-starts at the oldest release on which `compileProject()`, `writeOutput()`, `selectBundleNested()`,
-and `upsertBundleNested()` behave as 6.1 to 6.3 require, past any published advisory (root ADR
-0007), and a CI job runs the binding's tests there. Section 8 lists the ranges.
+Paraglide writes the text parts of a pattern into the compiled code as they are, so the isolates of
+6.2, and any bidi control a catalog holds, would stand raw in the output: invisible in an editor,
+and what Trojan Source scanners flag
+([CVE-2021-42574](https://www.cve.org/CVERecord?id=CVE-2021-42574)). In every output file whose name
+ends in `.js`, `.cjs`, `.mjs`, `.ts`, `.cts`, `.mts`, or `.json`, each `\p{Bidi_Control}` character
+(U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) MUST be written as `\u` and four
+lowercase hex digits. In those languages such a character can stand only in a string, a template, a
+regular expression, or a comment, and in the first three the escape denotes the same character
+([ECMA-262, UnicodeEscapeSequence](https://tc39.es/ecma262/#prod-UnicodeEscapeSequence);
+[RFC 8259, 7](https://www.rfc-editor.org/rfc/rfc8259#section-7)), so the compiled messages return
+the same strings. Other files are written as Paraglide emits them.
+
+### 6.5 Peer and floor
+
+`@inlang/paraglide-js` is the one peer dependency (ADR 0002); the inlang SDK comes from Paraglide's
+own dependency (6.1, root ADR 0009). The range starts at the oldest release on which
+`compileProject()`, `writeOutput()`, and the SDK's `loadProjectFromDirectory()`,
+`selectBundleNested()`, and `upsertBundleNested()` behave as 6.1 to 6.4 require, past any published
+advisory (root ADR 0007). A CI job runs the binding's typecheck and tests there and on the last
+release of each SDK major between the floor and the current release. Section 8 lists the range.
 
 ## 7. Test plan
 
@@ -375,9 +414,15 @@ need.
 
 ESM only, TypeScript declarations emitted with isolated declarations, `sideEffects: false`.
 `@netvark/intl-core` runs on Node 22.12+, Bun, Deno, Cloudflare Workers, and browsers.
-`@netvark/paraglide-intl` runs at build time on Node 22.12+, Bun, and Deno; it reads and writes
-files through the `fs` it is given (ADR 0002). Peer ranges are recorded here when the binding lands
-(#166).
+`@netvark/paraglide-intl` runs at build time on Node 22.12+, Bun, and Deno 2.6.10+; it reads and
+writes files through the `fs` it is given (ADR 0002). inlang SDK 3.1 and 4 run their database in a
+`node:worker_threads` worker that Deno before 2.6.10 does not unref reliably
+([denoland/deno#32161](https://github.com/denoland/deno/pull/32161)): there the compile finishes, as
+Paraglide's own does, but the process does not exit (measured on Deno 2.1.4 and 2.6.9).
+
+| Peer                   | Range             | Floor                                                                                                                                                                                                           |
+| ---------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@inlang/paraglide-js` | `>=2.11.0 <3.0.0` | 2.11.0, the first release that compiles markup (`{#b}...{/b}`); 2.10.0 fails inside its own `compilePattern()`. No advisory is published. CI also runs 2.26.0, the last release on SDK 3; 2.11.0 runs on SDK 2. |
 
 ## 9. Constants
 
