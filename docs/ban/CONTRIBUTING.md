@@ -79,10 +79,11 @@ question is settled before code exists.
   differently is a root devDependency for a type-level test only. The README's database-errors table
   and the matrix in ADR 0015 say how each driver is verified; moving a driver from fixtures to a
   live connection updates both.
-- A format owns its JSON Schema as a literal and pins `status`, `code`, and `title` with
-  `constant()` from `schema-helpers.ts` (ADR 0003, ADR 0011). It renders from `ctx.meta`, which is
-  already sanitized, and derives `type` at render time (ADR 0010). A format cannot set response
-  headers; those stay with the error and the handler (SPEC 6.9).
+- A format owns its JSON Schema as a literal, pins `status` and `code` with `constant()`, and
+  documents `title` with `localizable()`, both from `schema-helpers.ts` (ADR 0003, ADR 0011, ADR
+  0020). It renders from `ctx.meta`, which is already sanitized, and derives `type` at render time
+  (ADR 0010). A format cannot set response headers; those stay with the error and the handler (SPEC
+  6.9).
 - A hook is `createHook(ban, extract)` from `validation/hook.ts` and throws `ban.validation()`; it
   never returns a `Response` (SPEC 8.4).
 

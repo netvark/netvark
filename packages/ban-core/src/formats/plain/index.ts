@@ -16,7 +16,7 @@ import {
   readLocation,
   toErrorEntries,
 } from '../error-entries';
-import { constant } from '../schema-helpers';
+import { constant, localizable } from '../schema-helpers';
 
 /** A closed JSON shape for teams migrating from ad hoc error bodies (SPEC 7.3). */
 export interface PlainBody {
@@ -58,7 +58,7 @@ function baseSchema(
     properties: {
       status: constant(definition.status, ctx.dialect),
       code: constant(definition.code, ctx.dialect),
-      title: constant(definition.title, ctx.dialect),
+      title: localizable(definition.title, ctx.dialect),
       detail: { type: 'string' },
       id: { type: 'string' },
       instance: { type: 'string' },

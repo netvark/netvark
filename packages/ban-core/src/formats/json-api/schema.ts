@@ -1,16 +1,17 @@
 /**
  * JSON Schema for the JSON:API error document (SPEC 7.2.3): a closed
  * `{ errors: [ErrorObject, ...] }` whose error objects are closed too and,
- * unless the document may mix entries, pin `status`, `code`, and `title` to
- * the definition. A document that combines known entries pins each object
- * to one of them (7.2.4).
+ * unless the document may mix entries, pin `status` and `code` to the
+ * definition, its `title` the example of a string a host may localize. A
+ * document that combines known entries pins each object to one of them
+ * (7.2.4).
  * @ref https://jsonapi.org/format/#error-objects
  * @packageDocumentation
  */
 import type { ResolvedDefinition } from '../../core/definition';
 import type { JsonSchema, SchemaContext } from '../context';
 
-import { constant } from '../schema-helpers';
+import { constant, localizable } from '../schema-helpers';
 
 /**
  * Top-level members of every error document (SPEC 7.2.5). Static: a value
@@ -43,7 +44,7 @@ function identity(
     return {
       status: constant(String(definition.status), ctx.dialect),
       code: constant(definition.code, ctx.dialect),
-      title: constant(definition.title, ctx.dialect),
+      title: localizable(definition.title, ctx.dialect),
     };
   }
   return {
@@ -134,7 +135,8 @@ export function bodySchema(
 
 /**
  * The object of one entry in a list that combines entries (7.2.4): closed,
- * and pinned to the entry's `status`, `code`, and `title`.
+ * and pinned to the entry's `status` and `code`, its `title` a string with
+ * the entry's as the example.
  */
 export function entryObjectSchema(
   definition: ResolvedDefinition,
@@ -148,7 +150,7 @@ export function entryObjectSchema(
  * The document of a list that combines entries (7.2.4): each object is the
  * pinned object of one definition, or a reference to it at
  * `ctx.objectRef(key)`, under `anyOf` when there are several, so an
- * object's `status`, `code`, and `title` always belong to one entry.
+ * object's `status` and `code` always belong to one entry.
  * `anyOf`, not `oneOf`, for the reason `errorResponses` gives (ADR 0011).
  * Throws `TypeError` for an empty list, which no body matches.
  */

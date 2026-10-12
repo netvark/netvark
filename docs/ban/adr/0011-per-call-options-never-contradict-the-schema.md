@@ -1,6 +1,7 @@
 # ADR 0011: Per-call options never contradict the generated schema
 
-- Status: accepted
+- Status: accepted; superseded in part by ADR-0020 (schemas document `title` as a string with the
+  catalog's title as its example, so a localized body conforms; `status` and `code` stay pinned)
 - Date: 2026-09-07
 
 ## Context

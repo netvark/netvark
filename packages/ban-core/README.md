@@ -449,7 +449,8 @@ List every code an operation can send. With `jsonApi({ mixedEntries: true })` on
 combine them, and `errorResponses` describes those documents too: each status admits the objects of
 its own codes, 400 also every client-error code once they span two statuses, and 500 every code once
 a server error is among them, which is how `responseStatus` picks the status of a combined document.
-Each object stays pinned to one entry's `status`, `code`, and `title`.
+Each object stays pinned to one entry's `status` and `code`; its `title` may be localized (see
+Localize or redact).
 
 Those responses repeat the object of every code they may carry, and 400 and 500 carry most of them,
 so in a document of many operations, place each object once and reference it. `objectRef` says where
@@ -548,6 +549,11 @@ const handle = ban.handler<{ language: string }>({
       : body,
 });
 ```
+
+The published schemas document `title` as any string, with the catalog's title as the example, and
+keep `status` and `code` pinned, so a localized body still matches the response its route documents.
+Under `jsonApi()` the titles sit in each object of `errors`, and the document is closed, so localize
+them there rather than adding a top-level `title`.
 
 ### Test
 

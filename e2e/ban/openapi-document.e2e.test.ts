@@ -197,7 +197,7 @@ describe('OpenAPI 3.1 document', () => {
     expect(schema).toEqual(errorSchema(ban, 404));
     expect(schema['properties']).toMatchObject({
       status: { const: 404 },
-      title: { const: 'Not Found' },
+      title: { type: 'string', examples: ['Not Found'] },
       code: { const: 'NOT_FOUND' },
     });
   });
@@ -237,10 +237,11 @@ describe('OpenAPI 3.0 document', () => {
     expect(schema).toEqual(errorSchema(ban, 404, OPENAPI_30));
     expect(schema['properties']).toMatchObject({
       status: { enum: [404] },
-      title: { enum: ['Not Found'] },
+      title: { type: 'string', example: 'Not Found' },
       code: { enum: ['NOT_FOUND'] },
     });
     expect(JSON.stringify(responses)).not.toContain('"const"');
+    expect(JSON.stringify(responses)).not.toContain('"examples"');
   });
 
   it('keeps the anyOf grouping and the validation schema in the 3.0 dialect', () => {

@@ -21,7 +21,7 @@ import {
   toErrorEntries,
 } from '../error-entries';
 import { flattenMeta } from '../extension-members';
-import { constant } from '../schema-helpers';
+import { constant, localizable } from '../schema-helpers';
 
 export interface ProblemDetailsOptions {
   /** Base for `type` URIs; overrides the instance `docsBaseUrl`. */
@@ -155,7 +155,7 @@ function baseSchema(
   const properties: Record<string, JsonSchema> = {
     type: { type: 'string', format: 'uri-reference' },
     status: constant(definition.status, ctx.dialect),
-    title: constant(definition.title, ctx.dialect),
+    title: localizable(definition.title, ctx.dialect),
     detail: { type: 'string' },
   };
   if (options.instance) {
