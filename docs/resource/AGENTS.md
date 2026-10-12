@@ -93,7 +93,9 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   the contacts API of `src/test-support/contacts-api.ts`, whose documents jsonapi-core builds; each
   names jsdom in a `// @vitest-environment jsdom` line, since the JSDoc lint knows no such tag, and
   drives the screen as a person does, through `userEvent`, reading an error from its control's
-  `aria-describedby`. The real server over HTTP runs in `e2e/resource/react/`.
+  `aria-describedby`. Vitest resolves a jsdom file through Vite's client environment, so the
+  package's config gives `source` to `resolve.conditions` as well as to `ssr.resolve.conditions`:
+  CI's test job builds nothing. The real server over HTTP runs in `e2e/resource/react/`.
 
 ## Repository map
 
