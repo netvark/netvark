@@ -82,9 +82,10 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # @netvark/kysely-keyset declares `kysely >= 0.28.0`; its unit tests
-      # compile SQL through the oldest version in that range. The e2e suite
-      # needs 0.29 for the built-in PGlite dialect.
+      # @netvark/kysely-keyset declares `kysely >= 0.28.17`, the first release
+      # past Kysely's published SQL injection advisories (keyset ADR 0018); its
+      # unit tests compile SQL through that floor. The e2e suite needs 0.29 for
+      # the built-in PGlite dialect.
       - run: pnpm --filter @netvark/kysely-keyset add --save-dev kysely@0.28.17
       - run: pnpm --filter @netvark/kysely-keyset run typecheck
       - run: pnpm --filter @netvark/kysely-keyset run test

@@ -1,6 +1,7 @@
 # ADR 0004: Two packages: the database-free core (`@netvark/keyset-core`) and the Kysely adapter (`@netvark/kysely-keyset`)
 
-- Status: accepted
+- Status: accepted; amended by ADR-0018 (the `kysely` peer range starts at 0.28.17, the first
+  release past Kysely's published SQL injection advisories)
 - Date: 2026-10-08
 
 ## Context
