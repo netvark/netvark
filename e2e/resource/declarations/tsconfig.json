@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // A consumer that publishes its declarations: emitted by inference
+  // (`isolatedDeclarations` off), as an application's shared package would,
+  // against the built packages. `declaration-emit.e2e.test.ts` passes
+  // `--outDir` (a fresh directory under `.tmp/`).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "isolatedDeclarations": false,
+    "noEmit": false
+  },
+  "include": ["exports.ts", "../resources/*.ts"],
+  "exclude": []
+}

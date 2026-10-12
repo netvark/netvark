@@ -113,12 +113,16 @@ export type {
 } from './request/types';
 export type {
   ClientRelationship,
+  InferredTypes,
   JsonOf,
   ResourceTypes,
   TypesOf,
 } from './resource/client-types';
 export type { DefineResource } from './resource/create-define-resource';
-export type { ResourceDefinitionInit } from './resource/init-types';
+export type {
+  DefinitionOf,
+  ResourceDefinitionInit,
+} from './resource/init-types';
 export type {
   RelationshipLinks,
   ResourceDefaults,
