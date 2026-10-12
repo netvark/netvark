@@ -1,6 +1,7 @@
 # ADR 0013: Hosts take the runtime contract, mount where the links point, and run an operations request in one transaction
 
-- Status: accepted
+- Status: accepted; amended by jsonapi ADR 0017 (`resourcePaths` lives in `@netvark/jsonapi-core`,
+  so a client reads the same paths; the decision stands)
 - Date: 2026-10-11
 
 ## Context

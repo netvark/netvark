@@ -34,7 +34,7 @@ import {
   errorResponseObjects,
   errorResponses,
 } from '@netvark/ban-core/openapi';
-import { ERROR_CATALOG } from '@netvark/jsonapi-core';
+import { ERROR_CATALOG, resourcePaths } from '@netvark/jsonapi-core';
 
 import { errorCatalog } from '../errors/error-catalog';
 import { checkRegistry } from '../registry/check-registry';
@@ -54,7 +54,6 @@ import {
 import { checkExamples, exampleObjects } from './examples';
 import { atomicCodes, operationCodes } from './operation-codes';
 import { pathItems } from './operations';
-import { readPaths } from './paths';
 import {
   identifierSchema,
   requestObjectSchema,
@@ -231,7 +230,7 @@ export function openapi(
   };
   const located = listed.map((internals) => ({
     internals,
-    paths: readPaths('openapi', internals.resource.resource),
+    paths: resourcePaths(internals.resource.resource, { caller: 'openapi' }),
   }));
   const server = serverOf(located.map(({ paths }) => paths.origin));
   const paths: Record<string, PathItem> = {};

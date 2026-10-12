@@ -1101,13 +1101,13 @@ Every operation the declarations serve has its path, parameters, request and res
 an error response for each status it can answer with, listing its codes; each code's error object is
 a component, written once and referenced, and so is the response of a status that carries one code,
 `components.responses['_error.<code>']`. Paths come from each resource's links, and an absolute base
-becomes the document's server; `resourcePaths(Contacts.resource)` returns the same paths, the
-collection, the resource with its `{id}`, each relationship's, and the origin, for a host that
-mounts its routes where the document says they are. The schemas admit every request the server
-accepts, and may admit more: what JSON Schema cannot state compactly, such as a validator or a
-date-time's range, stays with the server, whose refusals the error responses document. An example
-that the server would refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the
-build fails instead of the document lying.
+becomes the document's server. `@netvark/jsonapi-core`'s `resourcePaths(Contacts.resource)` returns
+the same paths, the collection, the resource with its `{id}`, each relationship's, and the origin,
+for a host that mounts its routes where the document says they are and a client that calls them. The
+schemas admit every request the server accepts, and may admit more: what JSON Schema cannot state
+compactly, such as a validator or a date-time's range, stays with the server, whose refusals the
+error responses document. An example that the server would refuse, or a code in `codes` the catalog
+lacks, throws `TypeError`, so the build fails instead of the document lying.
 
 When a resource declares `create`, `update`, or `remove`, the document also lists the
 [Atomic Operations](https://jsonapi.org/ext/atomic/) endpoint a host serves,

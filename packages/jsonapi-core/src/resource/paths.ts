@@ -1,21 +1,22 @@
 /**
- * The paths of a resource's operations (SPEC 13.1), read from its JSON:API
- * definition's links: the resource at `links.self(id)`, the collection at
- * that path without its last segment, and each relationship's `self` and
- * `related` links. A link is built for a marker id of unreserved
- * characters, which `encodeURIComponent` keeps, and the marker becomes
- * the template `{id}`. An absolute link splits into its origin, the
- * document's server, and its path. A host mounts its routes at the same
- * paths (SPEC 19.2).
+ * The paths of a resource's operations (SPEC 5.4), read from its links:
+ * the resource at `links.self(id)`, the collection at that path without
+ * its last segment, and each relationship's `self` and `related` links. A
+ * link is built for a marker id of unreserved characters, which
+ * `encodeURIComponent` keeps, and the marker becomes the template `{id}`.
+ * An absolute link splits into its origin and its path. The OpenAPI
+ * document of `@netvark/resource-core`, the routes of
+ * `@netvark/hono-resource`, and `@netvark/jsonapi-client` read paths only
+ * through it, so all three name the same URLs (ADR 0017).
  * @ref https://jsonapi.org/recommendations/#urls
  * @ref https://spec.openapis.org/oas/v3.1.2.html#path-templating
  * @packageDocumentation
  */
-import type { AnyResource } from '@netvark/jsonapi-core';
+import type { AnyResource } from './types';
 
 /** Where a resource's operations live. */
 export interface ResourcePaths {
-  /** The server the paths are relative to: an absolute link's origin, else `undefined`. */
+  /** An absolute link's origin, else `undefined`. */
   readonly origin: string | undefined;
   readonly collection: string;
   readonly resource: string;
@@ -26,7 +27,7 @@ export interface ResourcePaths {
   >;
 }
 
-const MARKER = 'netvark-openapi-id';
+const MARKER = 'netvark-resource-id';
 const TEMPLATE = '{id}';
 /** A base for parsing a root-relative link; never part of a result. */
 const PLACEHOLDER = 'http://placeholder.invalid';
@@ -73,14 +74,22 @@ function sameOrigin(
   return other.path;
 }
 
+/** How `resourcePaths` reports a link it cannot read. */
+export interface ResourcePathsOptions {
+  /** What each `TypeError` message starts with; default `resourcePaths`. */
+  readonly caller?: string | undefined;
+}
+
 /**
- * The paths of `definition`'s operations, each message of a link it
- * cannot read starting with `caller`.
+ * The paths of `definition`'s operations, as the OpenAPI document lists
+ * them, a host mounts its routes, and a client calls them; throws
+ * `TypeError`, starting with `caller`, when its links cannot give them.
  */
-export function readPaths(
-  caller: string,
+export function resourcePaths(
   definition: AnyResource,
+  options: ResourcePathsOptions = {},
 ): ResourcePaths {
+  const caller = options.caller ?? 'resourcePaths';
   const { type, links } = definition;
   if (links.self === undefined) {
     throw new TypeError(
@@ -117,13 +126,4 @@ export function readPaths(
     resource: self.path,
     relationships,
   };
-}
-
-/**
- * The paths of `definition`'s operations, as the OpenAPI document lists
- * them and a host mounts its routes; throws `TypeError` when its links
- * cannot give them.
- */
-export function resourcePaths(definition: AnyResource): ResourcePaths {
-  return readPaths('resourcePaths', definition);
 }

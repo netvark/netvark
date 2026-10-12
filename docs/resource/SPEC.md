@@ -2399,12 +2399,11 @@ an unknown code) and the endpoints a resource does not serve; `document.test-d.t
 and `surfaceOf` take `ReadonlyArray<AnyDeclaredResource>` and refuse a declaration;
 `value-schema-oracle.test.ts` runs the boundary fixtures through each value's Zod schema and its
 JSON Schema: each fixture the Zod schema accepts passes, and each it refuses fails, but those of the
-looseness above; `paths.test.ts`, `parameters.test.ts`, `filter-schemas.test.ts`,
-`form-pattern.test.ts`, `pattern.test.ts`, `resource-schemas.test.ts`, `value-schema.test.ts`,
-`operation-codes.test.ts`, `component-names.test.ts`, and `examples.test.ts` for each part;
-`surface.test.ts`; `diff.test.ts` with one case per row; and `parse-surface.test.ts`, which reads
-back every surface of the generated catalogs of 15.2 and refuses each kind of mistake. End to end,
-15.4.
+looseness above; `parameters.test.ts`, `filter-schemas.test.ts`, `form-pattern.test.ts`,
+`pattern.test.ts`, `resource-schemas.test.ts`, `value-schema.test.ts`, `operation-codes.test.ts`,
+`component-names.test.ts`, and `examples.test.ts` for each part; `surface.test.ts`; `diff.test.ts`
+with one case per row; and `parse-surface.test.ts`, which reads back every surface of the generated
+catalogs of 15.2 and refuses each kind of mistake. End to end, 15.4.
 
 ---
 

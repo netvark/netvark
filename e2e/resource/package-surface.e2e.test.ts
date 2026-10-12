@@ -67,7 +67,6 @@ describe('package surface (SPEC 1, 18.1, 19.1)', () => {
       'diffSurfaces',
       'openapi',
       'parseSurface',
-      'resourcePaths',
       'surfaceOf',
     ]);
   });

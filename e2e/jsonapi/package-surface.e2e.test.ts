@@ -72,6 +72,7 @@ const CORE = [
   'rangePaginationNotSupportedError',
   'relatedResource',
   'resourceDocument',
+  'resourcePaths',
   'serializeResource',
   'toManyLinkage',
   'toOneLinkage',

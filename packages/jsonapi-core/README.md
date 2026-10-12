@@ -251,6 +251,38 @@ Best practices:
   emits no `links` at all, which the specification allows, and then the 201 carries no `Location`
   unless the handler sets one.
 
+### Paths
+
+`resourcePaths(definition)` reads where a resource's operations live from its links: the resource at
+`links.self(id)` with the id as `{id}`, the collection at that path without its last segment, each
+relationship's `self` and `related` path, and an absolute link's origin.
+
+```ts
+resourcePaths(Articles);
+// { origin: undefined, collection: '/api/v1/articles', resource: '/api/v1/articles/{id}',
+//   relationships: Map { 'author' => { self: '/api/v1/articles/{id}/relationships/author',
+//                                      related: '/api/v1/articles/{id}/author' }, ... } }
+```
+
+The OpenAPI document of [`@netvark/resource-core`](../resource-core#readme), the routes of
+[`@netvark/hono-resource`](../hono-resource#readme), and
+[`@netvark/jsonapi-client`](../jsonapi-client#readme) read paths only through it, so the document,
+the routes, and the client name the URLs the links do. It throws `TypeError` when a definition has
+no `links.self`, when a link is neither an absolute URL nor a path starting with `/`, holds the id
+other than once, or carries a query or fragment, when `self` does not end with the id after the
+collection's path, and when a relationship link has another origin than `self`. `{ caller }` starts
+each message with the name of the function that called it.
+
+Best practices:
+
+- **Mount routes at these paths.** A hand-written Hono app that registers `/articles/:id` while the
+  links say `/api/v1/articles/1` serves documents whose links 404; derive the route from
+  `resourcePaths` instead of spelling it twice.
+- **Keep an override readable.** A `self` builder must end with the id after the collection's path,
+  as the recommended URL design does; otherwise `resourcePaths` throws, and the document, the
+  routes, and a client refuse the definition at startup instead of calling a URL that does not
+  exist.
+
 ### Parse the query
 
 `parseQuery(resource, queryString)` parses `include`, `fields`, `sort`, `page`, `filter`, the
