@@ -1,7 +1,7 @@
 # @netvark/jsonapi-core: design
 
-This document describes what @netvark/jsonapi-core and @netvark/hono-jsonapi are, the API they
-expose, and how they are built.
+This document describes what @netvark/jsonapi-core, @netvark/hono-jsonapi, and
+@netvark/jsonapi-client are, the API they expose, and how they are built.
 
 Architecture decisions referenced as ADR-NNNN live in `docs/jsonapi/adr/`. The normative,
 clause-by-clause specification that implementers work from is `docs/jsonapi/SPEC.md`; this document
@@ -41,8 +41,9 @@ It is a library for teams who treat their JSON:API surface as a contract.
   Kysely is a separate package.
 - OpenAPI generation. Definitions carry enough to generate schemas, and a future subpath may; this
   line does not.
-- Client-side serialization and deserialization. The request document types are exported so a typed
-  client can be written against them, but no client ships here.
+- A client for every JSON:API server. `@netvark/jsonapi-client` (section 3.6) calls servers whose
+  resources are this family's definitions, and reads paths from their links; it is not a generic
+  client for an arbitrary API (ADR-0017).
 - Supporting CommonJS-only consumers or Node older than 22.12 (ADR-0004).
 
 ## 2. Principles
@@ -192,6 +193,32 @@ operations in order inside `run`, parsing each operation's `data` against the ta
 with `lid` allowed, resolving `lid` references from earlier `add`s, and collecting results. An error
 from a handler is given the operation's pointer; every failure propagates after the rollback to
 `errorHandler()`. No data in any result means `204`.
+
+### 3.6 The client
+
+```ts
+export const transport = createTransport({
+  origin: 'https://api.example.com',
+  language: getLocale,
+});
+export const clients = createClients({ articles: Articles, people: People }, transport);
+
+const page = await clients.articles.list({
+  include: ['author'],
+  filter: { title: { like: 'rails' } },
+  sort: ['-createdAt'],
+  page: { size: 20 },
+});
+page.data[0].author?.name; // string | undefined: resolved, since the query includes author
+```
+
+`@netvark/jsonapi-client` takes the definitions the server is built from. The paths come from their
+links, the query serializes to what `parseQuery` reads, and the types come from `'~types'`, which
+`defineResource` infers from `serialize`, the relationships, the query capabilities, and the
+validators' inputs (ADR-0018). Records are flat, `type`, `id`, and the fields, with a relationship
+resolved into its included record on a path the query includes and left as linkage elsewhere, so
+every result is plain data a cache can hold (ADR-0019). An error response rejects with a
+`ResponseError` holding the status and the server's error objects, codes included.
 
 ## 4. Architecture
 

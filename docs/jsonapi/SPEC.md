@@ -1,7 +1,7 @@
 # @netvark/jsonapi-core: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/jsonapi-core` and `@netvark/hono-jsonapi`;
-  `docs/jsonapi/DESIGN.md` explains the why
+- Status: normative for the 0.x line of `@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, and
+  `@netvark/jsonapi-client`; `docs/jsonapi/DESIGN.md` explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. When this document and the code
@@ -24,6 +24,7 @@ Contents
 12. Packaging
 13. Constants
 14. Test plan
+15. The client (`@netvark/jsonapi-client`)
 
 ---
 
@@ -42,14 +43,15 @@ consumed through Standard Schema V1, whose interfaces are vendored in
 `packages/jsonapi-core/src/internal/standard-schema-types.ts`, so installing either package never
 pulls in Zod, Valibot, ArkType, or Ajv.
 
-| Subpath                        | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-core`        | Values: `defineResource`, `createDefineResource`, `relatedResource`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `BanError`, `isBanError`, `jsonApiBan`, `jsonApiError`, `errorItem`, `errorObjects`, `errorDocument`, `ERROR_CATALOG`, `ERROR_CODES`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5, 6.1, 7.2, 8, 9, with `Ban`, `BanError`, `ErrorItem`, and `ErrorStatusCode` re-exported from `@netvark/ban-core` |
-| `@netvark/jsonapi-core/atomic` | `operationsProcessor`, `assertOperationsContentType`, `errorAtOperation`, `parseOperationsDocument`, `DEFAULT_MAX_OPERATIONS`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `@netvark/hono-jsonapi`        | Everything of `@netvark/jsonapi-core` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `@netvark/hono-jsonapi/atomic` | Everything of `@netvark/jsonapi-core/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Subpath                        | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-core`        | Values: `defineResource`, `createDefineResource`, `relatedResource`, `resourcePaths`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `BanError`, `isBanError`, `jsonApiBan`, `jsonApiError`, `errorItem`, `errorObjects`, `errorDocument`, `ERROR_CATALOG`, `ERROR_CODES`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5 (`ResourceTypes`, `TypesOf`, `JsonOf`, `ResourcePaths`, and `ResourcePathsOptions` included), 6.1, 7.2, 8, 9, with `Ban`, `BanError`, `ErrorItem`, and `ErrorStatusCode` re-exported from `@netvark/ban-core` |
+| `@netvark/jsonapi-core/atomic` | `operationsProcessor`, `assertOperationsContentType`, `errorAtOperation`, `parseOperationsDocument`, `DEFAULT_MAX_OPERATIONS`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `@netvark/hono-jsonapi`        | Everything of `@netvark/jsonapi-core` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `@netvark/hono-jsonapi/atomic` | Everything of `@netvark/jsonapi-core/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `@netvark/jsonapi-client`      | Section 15.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-`e2e/jsonapi/package-surface.e2e.test.ts` asserts the exact value export list of all four subpaths
+`e2e/jsonapi/package-surface.e2e.test.ts` asserts the exact value export list of all five subpaths
 against the built packages, and that the adapter's re-exports are the core's own bindings.
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
@@ -88,6 +90,8 @@ packages/jsonapi-core/src/
     write-types.ts               ResourceValidators, WritableFieldsInit, WritableFields (5)
     define-resource.ts           defineResource(), relatedResource() (5.1)
     links.ts                     resolveLinks(): the links convention and its types (5.1)
+    client-types.ts              ResourceTypes, TypesOf, JsonOf: what a client reads and writes (5.3)
+    paths.ts                     resourcePaths(): the paths a definition's links name (5.4)
     create-define-resource.ts    createDefineResource() (5.1)
     query-capabilities.ts        query capability resolution (5.2)
   query/
@@ -365,7 +369,7 @@ reaching the same refusal quoted.
 
 ## 5. Resource definitions (`resource/types.ts`)
 
-`ResourceDefinition<TType, TAttribute, TRelationship, TRow, TSort, TFilter, TCreate, TUpdate>`:
+`ResourceDefinition<TType, TAttribute, TRelationship, TRow, TSort, TFilter, TCreate, TUpdate, TTypes>`:
 
 | Member          | Meaning                                                                                                                                                                                                                                    |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -379,6 +383,7 @@ reaching the same refusal quoted.
 | `validate`      | `{ create?: StandardSchema<unknown, TCreate>; update?: StandardSchema<unknown, TUpdate>; id?: StandardSchema<unknown, string> }`: the attributes of each write, and the resource id, a create's client-generated one and an update's (9.2) |
 | `clientIds`     | Whether `POST` may carry a client-generated `id`; default `false` (`#crud-creating-client-ids`)                                                                                                                                            |
 | `writable`      | `WritableFields = { create; update }`: each a `ReadonlySet` of the fields that operation accepts; every field when the init lists none (9.2)                                                                                               |
+| `'~types'`      | Type-only, always absent: what a client reads and writes (5.3)                                                                                                                                                                             |
 
 `serialize` may return relationships as an id, `null`, an array of ids, an identifier object, an
 array of identifier objects, or `{ data?, links?, meta? }`. `AnyResource` erases every parameter;
@@ -454,6 +459,47 @@ validation, inference through the configured definer).
 - `custom`: implementation-specific base names. A custom name MUST be a member name containing at
   least one character outside `a-z` (`#query-parameters-custom`); the same rule applies to a custom
   search name.
+
+### 5.3 Client types (`client-types.ts`, ADR 0018)
+
+`ResourceDefinition` takes a ninth parameter, `TTypes extends ResourceTypes`, the wide
+`ResourceTypes` by default, carried as `'~types'?: TTypes`: type-only and always absent at runtime,
+as Standard Schema's `types` member is. It is what a client reads and writes, which the other
+parameters do not record:
+
+| Member                   | `defineResource` infers it from                                                                                                                                                                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attributes`             | the attributes `serialize` returns, each as JSON (`JsonOf`): what `JSON.stringify` writes, `toJSON` applied, so a `Date` is a string; a function, a symbol, or a bigint has no JSON form; a member that may be `undefined` is optional, since 7.1 leaves it out |
+| `relationships`          | by name, the declared `type` and `cardinality`                                                                                                                                                                                                                  |
+| `filter`                 | by field, the union of its operators                                                                                                                                                                                                                            |
+| `include`                | the union of the declared include paths                                                                                                                                                                                                                         |
+| `search`                 | `true` when `query.search` is set                                                                                                                                                                                                                               |
+| `page`                   | `true` when the definition paginates                                                                                                                                                                                                                            |
+| `custom`                 | the union of the declared custom names                                                                                                                                                                                                                          |
+| `create`, `update`       | the input type of `validate.create` and `validate.update` (Standard Schema `types.input`), what a client sends; without a validator, the attributes the operation writes, each `unknown`                                                                        |
+| `creatable`, `updatable` | the fields `writable.create` and `writable.update` list, else every field                                                                                                                                                                                       |
+| `clientIds`              | `true` when `clientIds` is `true`                                                                                                                                                                                                                               |
+
+`AnyResource` has the wide `ResourceTypes`, to which every inferred one is assignable; `TypesOf`
+reads a definition's. The member costs nothing at runtime and nothing in a type check that never
+reads it: TypeScript computes a member's type when it is read.
+
+### 5.4 Paths (`paths.ts`)
+
+`resourcePaths(definition, { caller? })` reads the paths of a definition's operations from its
+links: the resource at `links.self(id)`, built for a marker id of unreserved characters, which
+`encodeURIComponent` keeps, and the marker becomes the template `{id}`; the collection at that path
+without its last segment; and each relationship's `self` and `related` links. It returns
+`ResourcePaths = { origin, collection, resource, relationships }`, `origin` being an absolute link's
+origin and `undefined` for a root-relative one. It throws `TypeError`, starting with `caller`
+(default `resourcePaths`), when `links.self` is absent, a link is neither an absolute URL nor a path
+starting with `/`, a link holds the id other than once or has a query or a fragment, `links.self`
+does not end with the id after the collection's path, or a relationship link has another origin than
+`links.self`. `@netvark/resource-core`'s OpenAPI document (resource SPEC 13.1),
+`@netvark/hono-resource`'s routes (resource SPEC 19.2), and the client (15.4) read paths only
+through it, so the three name the same URLs.
+
+Tests: `paths.test.ts`.
 
 ---
 
@@ -1012,8 +1058,8 @@ after the rollback); `atomic.e2e.test.ts` over HTTP.
 
 ## 12. Packaging
 
-Two packages under `packages/`, both ESM only with `type: module`, `sideEffects: false`, `files` of
-`dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, and
+Three packages under `packages/`, each ESM only with `type: module`, `sideEffects: false`, `files`
+of `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, and
 `publishConfig.provenance` (ADR 0013).
 
 - `@netvark/jsonapi-core`: `dependencies.ban-kit` (a caret range), no `peerDependencies`.
@@ -1021,8 +1067,10 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
   and `peerDependencies.hono >= 4.12.34` and `@netvark/hono-ban >= 2.0.0` (ADR 0014); one copy of
   `@netvark/ban-core` and of `hono` in the graph is what keeps `instanceof` true across the
   packages.
-- Each `exports` map has `.`, `./atomic`, and `./package.json`, with declarations next to the
-  `dist/*.js` files. tsdown rewrites both maps from its entry map on every build
+- `@netvark/jsonapi-client`: `dependencies.@netvark/jsonapi-core` (`workspace:^`, a caret range when
+  published), no `peerDependencies`; its `exports` map has `.` and `./package.json` (15.9).
+- Each of the other two `exports` maps has `.`, `./atomic`, and `./package.json`, with declarations
+  next to the `dist/*.js` files. tsdown rewrites both maps from its entry map on every build
   (`exports.devExports: 'source'`): the in-repo map resolves each subpath to `./dist/*.js` by
   default and to `./src/**/index.ts` under the `source` condition, which only
   `packages/hono-jsonapi/tsconfig.json` (`customConditions`) and its Vitest project
@@ -1065,36 +1113,37 @@ Two packages under `packages/`, both ESM only with `type: module`, `sideEffects:
 
 ## 14. Test plan
 
-One Vitest run over two projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled for
-its `*.test-d.ts`; `@netvark/hono-jsonapi`'s project resolves `@netvark/jsonapi-core` from source
-(section 12). V8 coverage thresholds of 90% for statements, branches, functions, and lines over
-`packages/*/src/` combined (the `index.ts` barrels excluded). Every test names the clause or server
-choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of the
-packages' own modules.
+One Vitest run over three projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled
+for its `*.test-d.ts`; `@netvark/hono-jsonapi`'s project resolves `@netvark/jsonapi-core` from
+source (section 12). V8 coverage thresholds of 90% for statements, branches, functions, and lines
+over `packages/*/src/` combined (the `index.ts` barrels excluded). Every test names the clause or
+server choice it pins. Fixtures with IO (`test-fixtures.ts`) are real in-memory stores, not mocks of
+the packages' own modules.
 
-| Area                           | Files                                                                                                                                                                     | What is pinned                                                                                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Internal                       | `object.test.ts`, `pointer.test.ts`, `quotable.test.ts`                                                                                                                   | prototype-safe reads, RFC 6901 escaping and unescaping, the quotable token's characters and bounds                                                                                               |
-| Media types                    | `parse.test.ts`, `json-api.test.ts`                                                                                                                                       | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
-| Negotiation                    | `negotiate.test.ts`                                                                                                                                                       | each rule of 3.3                                                                                                                                                                                 |
-| Errors                         | `json-api-error.test.ts`, `error-document.test.ts`, `errors/request-text.test.ts`, `atomic/request-text.test.ts`                                                          | catalog closure and spreading, item mapping, both call forms, status derivation, document order, no hostile request text in any detail (4.4)                                                     |
-| Documents                      | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                                        | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
-| Resources                      | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`                             | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets                                                                              |
-| Query                          | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                         | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
-| Pagination                     | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                                                    | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
-| Requests                       | `resource-document.test.ts`, `resource-update.test.ts`, `resource-writable.test.ts`, `resource-client-id.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts` | pointers for every structural error, 403/409/422 cases, the fields each operation writes, a client id's validation, an update's id in another spelling, lids                                     |
-| Hono (`@netvark/hono-jsonapi`) | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts`                       | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
-| Atomic                         | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `writable.test.ts`, `process-coverage.test.ts`          | the extension's examples, the host context, and every processing rule                                                                                                                            |
+| Area                               | Files                                                                                                                                                                                    | What is pinned                                                                                                                                                                                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal                           | `object.test.ts`, `pointer.test.ts`, `quotable.test.ts`                                                                                                                                  | prototype-safe reads, RFC 6901 escaping and unescaping, the quotable token's characters and bounds                                                                                               |
+| Media types                        | `parse.test.ts`, `json-api.test.ts`                                                                                                                                                      | RFC 9110 grammar, case rules, quoting, `q`, `ext` and `profile` lists                                                                                                                            |
+| Negotiation                        | `negotiate.test.ts`                                                                                                                                                                      | each rule of 3.3                                                                                                                                                                                 |
+| Errors                             | `json-api-error.test.ts`, `error-document.test.ts`, `errors/request-text.test.ts`, `atomic/request-text.test.ts`                                                                         | catalog closure and spreading, item mapping, both call forms, status derivation, document order, no hostile request text in any detail (4.4)                                                     |
+| Documents                          | `member-name.test.ts`, `serialize.test.ts`, `build.test.ts`, `conformance.test.ts`                                                                                                       | member grammar, serialization rules, sparse fieldsets, `included` rules, full linkage, JSON Schema conformance                                                                                   |
+| Resources                          | `define-resource.test.ts`, `define-resource.test-d.ts`, `links.test.ts`, `create-define-resource.test.ts`, `create-define-resource.test-d.ts`, `client-types.test-d.ts`, `paths.test.ts` | every definition-time rejection, inference, the links convention, configured defaults, the resolved `writable` sets, the client types, the paths links name                                      |
+| Query                              | `parse-query.test.ts`, `parse-families.test.ts`, `parse-filter.test.ts`, `parameter-name.test.ts`                                                                                        | dispatch, aggregation, each family, the filter grammar                                                                                                                                           |
+| Pagination                         | `links.test.ts`, `paginated.test.ts`, `errors.test.ts`                                                                                                                                   | link rebuilding, meta members, the profile's error objects                                                                                                                                       |
+| Requests                           | `resource-document.test.ts`, `resource-update.test.ts`, `resource-writable.test.ts`, `resource-client-id.test.ts`, `relationship-document.test.ts`, `cardinality.test.ts`                | pointers for every structural error, 403/409/422 cases, the fields each operation writes, a client id's validation, an update's id in another spelling, lids                                     |
+| Hono (`@netvark/hono-jsonapi`)     | `middleware.test.ts`, `respond.test.ts`, `body.test.ts`, `validators.test.ts`, `validators.test-d.ts`, `handlers.test.ts`, `atomic/handler.test.ts`                                      | `Vary`, `Content-Type` derivation, `Location`, validator storage and typing, the @netvark/hono-ban handler's rendering, ids, and reports, the operations endpoint's 405, 415, 204, and rendering |
+| Atomic                             | `parse-document.test.ts`, `lids.test.ts`, `content-type.test.ts`, `process.test.ts`, `process-semantics.test.ts`, `writable.test.ts`, `process-coverage.test.ts`                         | the extension's examples, the host context, and every processing rule                                                                                                                            |
+| Client (`@netvark/jsonapi-client`) | section 15.9                                                                                                                                                                             | section 15                                                                                                                                                                                       |
 
 ### 14.1 End-to-end suite (`e2e/jsonapi/`)
 
-A private workspace package that depends on `@netvark/jsonapi-core` and `@netvark/hono-jsonapi`
-through `workspace:*`, so imports resolve through the published `exports` maps into each `dist/`
-(never the `source` condition) and `tsc` checks the emitted declarations. `e2e/jsonapi/support/`
-holds a blog API (people, articles, tags; a keyset pagination engine over an in-memory store; a
-snapshot transaction) built only from the packages: `store.ts` and `resources.ts` import
-`@netvark/jsonapi-core`, the routes and handlers `@netvark/hono-jsonapi`. Each file starts it on
-`@hono/node-server` and asserts over `fetch`.
+A private workspace package that depends on `@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, and
+`@netvark/jsonapi-client` through `workspace:*`, so imports resolve through the published `exports`
+maps into each `dist/` (never the `source` condition) and `tsc` checks the emitted declarations.
+`e2e/jsonapi/support/` holds a blog API (people, articles, tags; a keyset pagination engine over an
+in-memory store; a snapshot transaction) built only from the packages: `store.ts` and `resources.ts`
+import `@netvark/jsonapi-core`, the routes and handlers `@netvark/hono-jsonapi`. Each file starts it
+on `@hono/node-server` and asserts over `fetch`.
 
 | File                          | Covers                                                                                                                                                                                                 |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1105,10 +1154,248 @@ snapshot transaction) built only from the packages: `store.ts` and `resources.ts
 | `negotiation.e2e.test.ts`     | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                   |
 | `atomic.e2e.test.ts`          | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                           |
 | `custom-catalog.e2e.test.ts`  | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                       |
+| `client-*.e2e.test.ts`        | the built client over HTTP: pages, records, writes, relationship calls, errors, `Accept-Language` (15.9)                                                                                               |
 
 ### 14.2 Runtime smoke test (`e2e/jsonapi/smoke/`)
 
 `app.ts` is the same blog API, so both packages load in each runtime; `checks.ts` holds
 runtime-neutral assertions over every feature area; `run.ts` drives it in-process on Bun and Deno;
 `worker.ts` is the Workers module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`)
-and runs it in Miniflare's workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
+and runs it in Miniflare's workerd. `client-checks.ts` drives the same app through the client in
+each runtime (15.9). `pnpm test:runtimes` runs all three; CI runs them on every push.
+
+---
+
+## 15. The client (`@netvark/jsonapi-client`, `packages/jsonapi-client/src/`, ADR 0017, ADR 0019)
+
+`@netvark/jsonapi-client` calls a JSON:API server from the definitions the server is built from: the
+paths come from their links (5.4), the query from their capabilities (5.2), and every type from
+`'~types'` (5.3). It depends on `@netvark/jsonapi-core` and on nothing else, imports no framework,
+and uses web standards only (`fetch`, `Request`, `Response`, `Headers`, `URL`, `URLSearchParams`),
+so the same build runs in browsers, workers, Node, Bun, and Deno. The client reads a definition's
+`type`, `relationships`, `links`, and `query.search`; it never calls `serialize` or a validator.
+
+### 15.1 Surface and module map
+
+| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Query`, `ListQuery`, `GetQuery`, `FilterInput`, `FilterValue`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `PageCursors` |
+
+```
+packages/jsonapi-client/src/
+  index.ts                     root entry
+  internal/object.ts           isRecord(), ownMember(): prototype-safe reads of response JSON
+  transport/
+    origin.ts                  assertOrigin(), atOrigin(): the origin and the links the client follows (15.2, 15.8)
+    transport.ts               createTransport() (15.2)
+    send.ts                    send(): negotiation headers, the body, reading the response (15.3)
+  query/
+    types.ts                   Query, ListQuery, GetQuery, FilterInput (15.5)
+    serialize-query.ts         serializeQuery() (15.5)
+    serialize-filter.ts        the filter family (15.5)
+  document/
+    types.ts                   AnyRecord, Deserialized (15.6)
+    deserialize.ts             deserialize() (15.6)
+    include-tree.ts            include paths as a tree (15.6)
+  errors/response-error.ts     ResponseError, isResponseError() (15.7)
+  client/
+    types.ts                   Clients, ResourceClient, inputs and results (15.4)
+    record-types.ts            RecordOf: records typed by the definitions and the query (15.6)
+    create-clients.ts          createClients() (15.4)
+    resource-client.ts         the methods of one resource (15.4)
+    request-documents.ts       the documents a write sends (15.4)
+  pagination/cursors.ts        pageCursors(), cursorOf() (15.8)
+```
+
+### 15.2 `createTransport(options)` (`transport.ts`, `origin.ts`)
+
+`TransportOptions = { origin, headers?, language?, fetch? }`; the result is a `Transport`, an opaque
+object the clients send through.
+
+- `origin`: an absolute `http:` or `https:` URL without user information, a path other than `/`, a
+  query, or a fragment, kept as its origin (`URL#origin`); otherwise `TypeError` naming `origin`. It
+  is where the client reaches the server. A definition's links may name another origin (an absolute
+  `links.base`, ADR 0015); the client takes only their paths, so one set of definitions serves
+  development, staging, production, and tests.
+- `headers`: a `HeadersInit`, or a function returning one or a promise of one, called on every
+  request so a rotating session token is current. They are applied first; the client's own `Accept`
+  and `Content-Type` replace any they set (15.3).
+- `language`: a function called on every request; a non-empty result is sent as `Accept-Language`
+  (RFC 9110 12.5.4), replacing one `headers` set. An application on Paraglide passes `getLocale`.
+- `fetch`: `(request: Request) => Promise<Response>`; by default the global `fetch`, looked up at
+  request time, so a polyfill or a test double installed later is used.
+
+### 15.3 Requests and responses (`send.ts`)
+
+- Every request carries `Accept: application/vnd.api+json`; one with a document carries
+  `Content-Type: application/vnd.api+json` and the document as `JSON.stringify` writes it, so a
+  member set to `undefined` is left out and an attribute a create leaves out keeps the server's
+  default (`#content-negotiation-all`: "Clients and servers MUST send all JSON:API payloads using
+  the JSON:API media type in the Content-Type header"). Neither carries `ext` or `profile`: the
+  client applies no extension, and the Cursor Pagination profile needs no request parameter (8.1).
+  The bare media type in `Accept` is also what a JSON:API 1.0 server requires. A request without a
+  document carries no `Content-Type`, which would make a cross-origin `GET` preflighted (Fetch,
+  CORS-safelisted request headers).
+- Each call takes `CallOptions = { signal?, headers? }`; `headers` are applied after the transport's
+  and before the client's own.
+- A response is read once, as text, and only through `status`, `headers`, and `text()`: the client
+  never clones it and never tests it with `instanceof Response`, so a `fetch` that returns another
+  realm's or library's response works.
+- A 2xx response other than 204 is read as a document when its `Content-Type` is the JSON:API media
+  type, parameters other than `ext` and `profile` ignored (`#content-negotiation-clients`), and its
+  body is a JSON object with `data`, `errors`, or `meta` (`#document-top-level`). A 202 or 204 may
+  have no document. Any other 2xx is a `TypeError` naming the resource type and the call, never the
+  body: the server broke the protocol, which no application handles.
+- Any other status is a `ResponseError` (15.7). Redirects are fetch's (`redirect: 'follow'`); a
+  rejected `fetch` (a network failure, an abort) reaches the caller as it is.
+
+### 15.4 `createClients(definitions, transport)` (`create-clients.ts`, `resource-client.ts`)
+
+`definitions` holds definitions by client name. Each one's paths are read with
+`resourcePaths(definition, { caller: 'createClients' })` (5.4), so a definition whose links give
+none throws its `TypeError`; two definitions with one type throw `TypeError`, since records find
+their definition by type (15.6). The result holds a `ResourceClient` per name:
+
+| Method                                      | Request                                                                         | Resolves to                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `list(query?, options?)`                    | `GET <collection>?<query>`                                                      | `ReadResult` of the records                                                  |
+| `get(id, query?, options?)`                 | `GET <resource>?<query>`; `include` and `fields` only                           | `ReadResult` of the record                                                   |
+| `create(input, options?)`                   | `POST <collection>` with `{ data: { type, id?, attributes?, relationships? } }` | `WriteResult` of the record                                                  |
+| `update(id, input, options?)`               | `PATCH <resource>` with `{ data: { type, id, attributes?, relationships? } }`   | `WriteResult` of the record                                                  |
+| `remove(id, options?)`                      | `DELETE <resource>`                                                             | `WriteResult` of nothing (`data` is `undefined`)                             |
+| `relationship(id, name, options?)`          | `GET <relationship link>`                                                       | `ReadResult` of the linkage                                                  |
+| `related(id, name, query?, options?)`       | `GET <related link>?<query>`                                                    | `ReadResult` of the related record, `null`, or records                       |
+| `setRelationship(id, name, linkage, o?)`    | `PATCH <relationship link>` with `{ data }`                                     | `WriteResult` of the linkage                                                 |
+| `addToRelationship(id, name, ids, o?)`      | `POST <relationship link>` with `{ data }`, to-many only                        | `WriteResult` of the linkage                                                 |
+| `removeFromRelationship(id, name, ids, o?)` | `DELETE <relationship link>` with `{ data }`, to-many only                      | `WriteResult` of the linkage                                                 |
+| `next(result, options?)`, `prev(...)`       | `GET` of `result.links.next` or `links.prev` (15.8)                             | `ReadResult` like `result`, or `undefined` when the link is `null` or absent |
+
+- An id fills the path's `{id}` percent-encoded (`encodeURIComponent`), as the links convention
+  encodes it (5.1). A relationship method for a relationship whose links give no path throws
+  `TypeError` naming it.
+- `ReadResult<TData> = { status, data, links, meta, jsonapi }` and
+  `WriteResult<TData> = { status, data: TData | undefined, links, meta, jsonapi }`: a write's `data`
+  is present when the server answered with a document holding it (201, 200) and `undefined` for 202
+  and 204 (`#crud-creating-responses-204`, `#crud-updating-responses-204`,
+  `#crud-deleting-responses-204`). A create carries no document back when the server stored it
+  unchanged; the input then is the resource.
+- `CreateInput = { id?, attributes?, relationships? }` and `UpdateInput` the same without `id`. A
+  relationship's value is an id, an identifier object, `null` (to-one), or a list of ids or
+  identifiers (to-many); an id becomes an identifier of the relationship's declared type
+  (`#document-resource-identifier-objects`).
+- Types: the records are `RecordOf` (15.6) over the definitions passed, which resolve related types;
+  `create`'s `attributes` are `'~types'.create`, `update`'s `'~types'.update`; `relationships` take
+  the names `creatable` and `updatable` list; `id` is accepted when `clientIds` is `true`; `list`
+  takes `ListQuery` (15.5), with `page` only on a definition that paginates and `search` only on one
+  with a search parameter; `get` and `related` take `GetQuery`. The server stays the authority: the
+  client checks none of this at run time, and `parseQuery` and the request parsers answer what the
+  types would have caught (6, 9).
+
+### 15.5 Query serialization (`serialize-query.ts`, `serialize-filter.ts`)
+
+`serializeQuery(definition, query)` returns the `URLSearchParams` `parseQuery` (6) reads, its pairs
+in this order, so one query always gives one URL:
+
+| Member    | Parameters                                                                                                                       |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `include` | `include` with the paths joined by `,`; an empty list is `include=` (6.4)                                                        |
+| `fields`  | `fields[<type>]` with the names joined by `,`, per type in key order; an empty list is the empty fieldset (6.5)                  |
+| `sort`    | `sort` with the names joined by `,`, each `-`-prefixed for descending (6.6)                                                      |
+| `page`    | `page[size]`, `page[after]`, `page[before]` (6.7)                                                                                |
+| `filter`  | `filter[<field>]` for a bare value (`eq`), `filter[<field>][<operator>]` per operator, then `filter[or][<n>]...` per group (6.8) |
+| `search`  | the definition's search parameter (5.2)                                                                                          |
+| `custom`  | each name with its value, repeated for a list                                                                                    |
+
+- A filter value is a string as it is, a finite number or a bigint by `String`, or a boolean as
+  `true` or `false`; a list is the parameter repeated, one pair per value, never joined, since a
+  comma belongs to the value (6.8). A number that is not finite throws `TypeError`.
+- `page.size` MUST be a positive safe integer (the profile's `^[0-9]+$`), otherwise `TypeError`
+  naming `page.size`. `search` on a definition without a search parameter, or `page` on one that
+  does not paginate, throws `TypeError`; the types reject both.
+- Names are not checked against the definition: the types restrict them, and `parseQuery` reports
+  what is left in one 400.
+- `toString()` is the `application/x-www-form-urlencoded` serializer JSON:API names
+  (`#appendix-query-details-parsing`): square brackets percent-encoded
+  (`#appendix-query-details-square-brackets`), a space as `+`, and a comma as `%2C`, which
+  `parseQuery` decodes before it splits `include`, `fields`, and `sort`. A list keeps its order: a
+  `sort` is applied in the order given (`#fetching-sorting`).
+
+Tests: `serialize-query.test.ts` (each member, order, values, refusals) and `round-trip.test.ts`:
+every query generated from the blog's definitions is what `parseQuery` reads back from its
+serialization.
+
+### 15.6 Records (`deserialize.ts`, `include-tree.ts`, `record-types.ts`, ADR 0019)
+
+`deserialize(document, { include? })` returns
+`Deserialized = { data, included, links, meta, jsonapi }`, `data` being a record, `null`, an array
+of records, or the linkage of a relationship document. `include` is the include paths the request
+sent.
+
+- A record is a plain object: `type`, `id`, each attribute as sent, each relationship as below, and,
+  when the resource object has them, `$links` (its `links`), `$meta` (its `meta`), and
+  `$relationships` (each relationship object as sent). No field can collide with them: `$` is a
+  reserved character no member name may contain (`#document-member-names-reserved-characters`), and
+  no field is named `type` or `id`. @-Members are skipped (`#document-member-names-at-members`).
+- A relationship on a requested include path is resolved: a to-one is the included record or `null`,
+  a to-many the included records in linkage order. A linked resource the document leaves out is left
+  out (a to-one is `undefined`); its identifier stays in `$relationships`. Full linkage asks every
+  included resource to be linked, not every linked resource to be included
+  (`#document-compound-documents`).
+- Every other relationship is its linkage: an identifier `{ type, id }`, `null`, or a list of
+  identifiers, or `undefined` when the relationship object has no `data`.
+- Resolution follows the include paths only, so records form a tree: a record never reaches itself,
+  and every result survives `JSON.stringify`, `structuredClone`, and a cache's structural sharing.
+  Resources are found by `type` and `id` among the primary data and `included`
+  (`#document-compound-documents`: one resource object per type and id).
+- `included` holds every included resource as a record with its linkage.
+- A resource object without a string `type` and `id` throws `TypeError`.
+
+`RecordOf<TDefinitions, TDefinition, TQuery>` types a record: `type` is the definition's, `id` a
+string; the attributes are `'~types'.attributes` (JSON forms, 5.3), narrowed to `fields[type]` when
+the query names that type; each relationship by `'~types'.relationships`: on an include path the
+related definition's record (looked up in `TDefinitions` by type, with the rest of the path), else
+its linkage. A type no definition in `TDefinitions` has is `AnyRecord`, whose fields are `unknown`.
+
+### 15.7 Errors (`response-error.ts`)
+
+A response whose status is not 2xx, a 4xx and a 5xx alike, rejects with `ResponseError`: `status`
+(the HTTP status, a number), `errors` (the error document's error objects, or empty when the body is
+not one, such as a proxy's HTML page), `document` (the error document or `undefined`), and `headers`
+(`Allow`, `Retry-After`). Each error object keeps its own `code`, a string (`#error-objects`); the
+status is never put in its place. The message names the resource type, the call, and the status,
+never the URL or the body: a URL carries ids and filter values, and a message goes to logs. The
+codes are the server's catalog (4.1 and the application's own), as the server sent them.
+`isResponseError(value, code?)` is `true` for a `ResponseError`, and with `code`, one whose error
+objects carry it; its type parameter types `code`, so `isResponseError<AppCode>(error, 'X')` rejects
+a code the application's catalog does not have. An error's `source.pointer` names a member of the
+request document, which a form maps to its field; JSON:API asks a client to ignore a pointer the
+request did not have.
+
+### 15.8 Pagination (`cursors.ts`)
+
+- A link is a string or a link object, whose `href` is read (`#document-links-link`).
+- `pageCursors(result)`: `{ next, prev }`, the `page[after]` of `links.next` and the `page[before]`
+  of `links.prev`, each `undefined` when the link is `null`, absent, or without it. An infinite list
+  keys each page by its cursor and lists with `page: { after }`. A page with no records ends the
+  list in its direction: the profile lets `next` point at an empty page.
+- `cursorOf(record)`: the record's `$meta.page.cursor` when it is a string (the profile's item
+  cursor, 8.3).
+- `next(result)` and `prev(result)` follow the link as the server wrote it, its query included and
+  untouched (rewriting a URL's `searchParams` re-serializes every pair), and deserialize with the
+  `include` the link carries. A link is followed only when it is absolute or root-relative and
+  resolves to the transport's origin; anything else throws `TypeError`. A document is the server's
+  data, and following a link it names to another origin would send the transport's headers there, as
+  fetch refuses to do with `Authorization` on a cross-origin redirect (ADR 0017).
+
+### 15.9 Packaging and tests
+
+ESM only, as the other packages (12): `dependencies` holds `@netvark/jsonapi-core` (`workspace:^`, a
+caret range when published); no peer dependencies; one subpath, `.`. Built with
+`platform: 'neutral'`, `@netvark/jsonapi-core` external.
+
+Unit tests sit beside each module; `record-types.test-d.ts` and `client.test-d.ts` pin the
+inference. `e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client:
+list and walk pages, compound documents into records, sparse fieldsets, each write and relationship
+call, every error status into a `ResponseError`, and `Accept-Language` from `language`.
+`e2e/jsonapi/smoke/client-checks.ts` runs the client against the blog app in-process on Bun, Deno,
+and workerd.
