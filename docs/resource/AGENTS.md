@@ -71,11 +71,13 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   reads, with no Table import. Every text comes from the application's messages object, passed in,
   and is computed when it is asked for: no provider, no `useMessages`, no text built when a module
   loads (ADR 0014). Never render an error's `message`; a response's error objects are shown by their
-  `detail` as the server localized it. `@netvark/resource-core` and `@netvark/jsonapi-client` are
-  peers, since the application hands the bindings declarations, messages, and clients made with its
-  own copies. Component tests run TanStack Form, Query, and Table v9 as an application does, in
-  jsdom with Testing Library, against a fetch double that answers with documents jsonapi-core
-  builds; the real server over HTTP runs in `e2e/resource/react/`.
+  `detail` as the server localized it. A form's write carries only what the person changed and sends
+  a cleared input as `null` (ADR 0016); never fill a write from the record or drop a blank.
+  `@netvark/resource-core` and `@netvark/jsonapi-client` are peers, since the application hands the
+  bindings declarations, messages, and clients made with its own copies. Component tests run
+  TanStack Form, Query, and Table v9 as an application does, in jsdom with Testing Library, against
+  a fetch double that answers with documents jsonapi-core builds; the real server over HTTP runs in
+  `e2e/resource/react/`.
 
 ## Repository map
 

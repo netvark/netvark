@@ -445,6 +445,9 @@ importers:
       '@netvark/hono-resource':
         specifier: workspace:*
         version: link:../../packages/hono-resource
+      '@netvark/jsonapi-client':
+        specifier: workspace:*
+        version: link:../../packages/jsonapi-client
       '@netvark/jsonapi-core':
         specifier: workspace:*
         version: link:../../packages/jsonapi-core
@@ -689,9 +692,15 @@ importers:
 
   packages/react-resource:
     devDependencies:
+      '@netvark/jsonapi-client':
+        specifier: workspace:^
+        version: link:../jsonapi-client
       '@netvark/resource-core':
         specifier: workspace:^
         version: link:../resource-core
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   packages/resource-core:
     dependencies:

@@ -4065,12 +4065,17 @@ the model renders comes from the application's one messages object, computed whe
 | `internal/declared.ts`          | reading a declared resource, and the `TypeError`s of an argument that is not one    |
 | `internal/labels.ts`            | the labels of a type in the messages, and the `TypeError`s of messages without them |
 | `internal/object.ts`            | lookups of own members only                                                         |
+| `internal/standard-schema.ts`   | the Standard Schema V1 types a validator the package makes satisfies                |
 | `fields/fields-of.ts`           | `fieldsOf` and the descriptor of one member                                         |
 | `fields/filter-kind.ts`         | the control a member's filter takes                                                 |
+| `form/form-types.ts`            | the types of the form model                                                         |
+| `form/value-kind.ts`            | the kind of each member's value, and its blank                                      |
 | `form/form-values.ts`           | the value each member's input edits, and the values a form starts from              |
 | `form/form-write.ts`            | the write a form's values make                                                      |
+| `form/form-plan.ts`             | what the validator, the write, and the error mapping read                           |
 | `form/form-validator.ts`        | the form's Standard Schema                                                          |
 | `form/form-errors.ts`           | a refused write's error objects by field                                            |
+| `form/form-options.ts`          | the operation and options, and the `TypeError`s of ones a caller got wrong          |
 | `form/resource-form.ts`         | `resourceForm`                                                                      |
 | `list/sorting.ts`               | `sort` and Table's sorting state                                                    |
 | `list/column-filters.ts`        | `filter` and Table's column filters                                                 |
@@ -4082,15 +4087,16 @@ the model renders comes from the application's one messages object, computed whe
 | `tanstack-query/queries.ts`     | `resourceQueries`                                                                   |
 
 Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
-`ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormValues`, `FormValue`, `FormErrors`,
-`ListModel`, `ListState`, `ListSorting`, `ListColumnFilters`.
+`ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`, `FormResource`,
+`FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`, `FormErrors`, `ListModel`,
+`ListState`, `ListSorting`, `ListColumnFilters`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
-resource that is not a declared resource (one without `names`, `fields`, `write`, `resource`, and
-`keyset`), messages no definer returned, or messages that label no member of the resource's type
-(10.1), since every label would be empty, or not every member and option of it, as messages defined
-for another declaration of the type do. Messages name the function and the declaration's names,
-never a value (resource AGENTS).
+resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
+`resource`, and `keyset`), messages no definer returned, or messages that label no member of the
+resource's type (10.1), since every label would be empty, or not every member and option of it, as
+messages defined for another declaration of the type do. Messages name the function and the
+declaration's names, never a value (resource AGENTS).
 
 ### 20.2 Field descriptors: `fieldsOf(resource, messages)`
 
@@ -4206,25 +4212,31 @@ otherwise; an array starts as `[]` and `any` as `undefined` whatever their defau
 when the member is left alone. On update each member starts from the record: a string as it is, a
 number by `String`, a boolean as it is, `null` as blank, an array's elements likewise, `any` as it
 is, a relationship from its linkage's or included record's `id`, blank when it is `null`. A `write`
-member, which no read returns, starts blank; a record that lacks any other member the form holds
-throws `TypeError` naming the member, since the form would show a value the server does not hold.
-`defaultValues` is frozen, its arrays included; TanStack Form never writes into it.
+member, which no read returns, starts blank. A record that lacks any other member the form holds
+throws `TypeError` (`resourceForm: the record has no <name>, which the form holds`), since the form
+would show a value the server does not hold, and so does a member whose value is not what its type
+reads, a string, number, or boolean for a scalar and a list of them for an array
+(`resourceForm: the record's <name> is not the value its type reads`), or a relationship that is
+neither linkage nor a record (`resourceForm: the record's <name> is neither linkage nor a record`);
+each names the member, never the value. `defaultValues` is frozen, its arrays included; TanStack
+Form never writes into it.
 
 **The write.** `write(values)` makes the input of the client's `create` (`CreateInput`) or `update`
 (`UpdateInput`, 15.4):
 
 1. A member goes into the write when its value differs from its start value (strings, booleans, and
    `null` by `Object.is`, arrays element by element, `any` by `Object.is`), and on create also when
-   it is required, so a required boolean the person left at its start is sent. Every member the
-   person left alone is absent: on create the database's default applies (ADR 0004), on update the
-   stored value stays.
-2. Each value is converted to its wire form (5.1) by the member's metadata: a blank becomes `null`
-   where the member is nullable and leaves the member out otherwise, so a required member left blank
-   is refused as `required`; a string wire's value is the text as typed; an `integer` or `number`
-   member's text becomes the number when it is a JSON number (RFC 8259 6), and stays text otherwise,
-   which the validator refuses with `type`; an array's elements convert by `items`; a relationship's
-   id becomes the identifier `{ type: <target>, id }`, which both the write validator and the client
-   take (15.4).
+   it is required, so the validator refuses a required member left blank on its own field. Every
+   other member the person left alone is absent: on create the database's default applies (ADR
+   0004), on update the stored value stays.
+2. Each value is converted to its wire form (5.1) by the member's metadata: a blank becomes `null`,
+   nullable or not, and a member that is not nullable refuses it as `required` (6.1, ADR 0016), so a
+   cleared input is never dropped; a string wire's value is the text as typed; an `integer` or
+   `number` member's text becomes the number when it is a JSON number (RFC 8259 6) whose value is
+   finite, and stays text otherwise (`1e999`, `01`, `0x10`), which the validator refuses with
+   `type`; an array's elements convert by `items`, a number's text as a number member's does and a
+   boolean's from `true` or `false`; a relationship's id becomes the identifier
+   `{ type: <target>, id }`, which both the write validator and the client take (15.4).
 3. Fields go under `attributes` and relationships under `relationships`, each part present when it
    holds a member.
 4. The operation's write validator (`write.create` or `write.update`, 6.2) runs over it, each
@@ -4254,19 +4266,24 @@ issues on the form's members:
 
 Each message is computed when the validator runs, so a re-validation after a locale change renders
 in the new locale. What a validator of the declaration (7.2) or the database refuses that the
-metadata does not state is the server's to answer (8), and lands by pointer (20.4).
+metadata does not state is the server's to answer (8), and lands by pointer (20.4). So is a rule
+across members, a CHECK over more than one column (7.2), whenever the write leaves one of its
+members out: the write validator runs a rule only over a write that carries every member it reads,
+an update leaves out what the person did not change, and only the server holds the stored values.
+When the write carries them all, the refusal is on each of its members.
 
 Tests: `form/form-values.test.ts` (one case per row of the values table and of 5.1, start values on
 create from literal defaults and blanks, on update from a record with linkage and with an included
-target, a record lacking a member, a `write` member), `form/form-write.test.ts` (each step: changed
-and unchanged members on both operations, the required boolean, blank to `null` and to absent, the
-number texts, arrays, identifiers, parts present, the `TypeError` of refused values),
+target, a record lacking a member, a `write` member, each `TypeError` of a record),
+`form/form-write.test.ts` (each step: changed and unchanged members on both operations, a required
+member left blank, a cleared input as `null` on nullable and non-nullable members, the number texts,
+arrays, identifiers, parts present, the `TypeError` of refused values),
 `form/form-validator.test.ts` (each issue kind of 6.4 placed on its member, the first per member,
-form-level issues, `required` for blank values, a multi-column CHECK on each of its members, texts
-from closures that read a locale variable re-rendered after it changes),
-`form/resource-form.test.ts` (the options and each `TypeError`), and `form/form-values.test-d.ts`
-(`FormValues` per member type, `write`'s result assignable to the client's `create` and `update`
-inputs).
+form-level issues, a multi-column CHECK on each of its members and left to the server when the write
+carries one of them), `form/form-validator-texts.test.ts` (`required` for blank values, texts from
+closures that read a locale variable re-rendered after it changes), `form/resource-form.test.ts`
+(the options and each `TypeError`), and `form/form-values.test-d.ts` (`FormValues` per member type,
+`write`'s result assignable to the client's `create` and `update` inputs).
 
 ### 20.4 Errors by field: `model.errors(error)`
 
@@ -4497,10 +4514,11 @@ definition's sort names, operators, and search).
 - Unit and type tests beside each module (20.2 to 20.7), over the fixture in `src/test-support/`:
   contacts, their organizations, and the plans an organization is on, a lookup table keyed by an
   enum, declared over the public catalog `@netvark/pg-catalog` extracts from the fixture's
-  migrations (`e2e/resource` proves the committed file current), so between them every filter kind
-  and every wire type occurs; with messages from `defineMessages` whose texts are closures reading a
-  locale variable, so a test switches the language as Paraglide does it, by changing what the
-  functions read.
+  migrations (`e2e/resource` proves the committed file current), so between them every filter kind,
+  every wire type, every value kind of 20.3, a self-relationship, a write-only member, and a CHECK
+  across a field and a relationship occur; with messages from `defineMessages` whose texts are
+  closures reading a locale variable, so a test switches the language as Paraglide does it, by
+  changing what the functions read.
 - Component tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, and Table v9
   as an application uses them) against a fetch double that answers with documents jsonapi-core
   builds from the fixture's definitions: a create form that shows no error before its first submit,

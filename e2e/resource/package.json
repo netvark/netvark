@@ -24,6 +24,7 @@
     "@netvark/hono-ban": "workspace:*",
     "@netvark/hono-jsonapi": "workspace:*",
     "@netvark/hono-resource": "workspace:*",
+    "@netvark/jsonapi-client": "workspace:*",
     "@netvark/jsonapi-core": "workspace:*",
     "@netvark/keyset-core": "workspace:*",
     "@netvark/kysely-resource": "workspace:*",

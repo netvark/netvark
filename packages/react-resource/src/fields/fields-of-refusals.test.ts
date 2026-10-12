@@ -13,19 +13,32 @@ describe('fieldsOf: what a JavaScript caller got wrong (resource SPEC 20.1)', ()
   const NOT_DECLARED =
     'fieldsOf: resource must be what a declareResource returned';
 
-  it.each([
+  const MEMBERS = [
+    'names',
+    'declaration',
+    'fields',
+    'write',
+    'resource',
+    'keyset',
+  ] as const;
+  const withoutOne = MEMBERS.map(
+    (member) =>
+      [
+        `a resource's members without ${member}`,
+        Object.fromEntries(
+          MEMBERS.filter((name) => name !== member).map((name) => [
+            name,
+            Contacts[name],
+          ]),
+        ),
+      ] as const,
+  );
+
+  it.each<readonly [string, unknown]>([
     ['null', null],
     ['a type name', 'contacts'],
     ['an object without the members', {}],
-    [
-      'an object without keyset',
-      {
-        names: Contacts.names,
-        fields: Contacts.fields,
-        write: Contacts.write,
-        resource: Contacts.resource,
-      },
-    ],
+    ...withoutOne,
   ])('throws for %s in place of a resource', (_name, resource) => {
     expect(() => fieldsOf(resource as DeclaredResource, messages)).toThrow(
       new TypeError(NOT_DECLARED),
@@ -122,6 +135,7 @@ describe('fieldsOf: what a JavaScript caller got wrong (resource SPEC 20.1)', ()
   it("reads the messages' own members only, never Object.prototype's", () => {
     const resource = {
       names: { ...Contacts.names, type: 'constructor' },
+      declaration: Contacts.declaration,
       fields: Contacts.fields,
       write: Contacts.write,
       resource: Contacts.resource,

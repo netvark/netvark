@@ -142,6 +142,8 @@ function actorOf(c: Context<Env>): AppActor {
 }
 
 export interface ContactsServer {
+  /** Where the server listens, such as `http://127.0.0.1:53211`, for a client's transport. */
+  readonly origin: string;
   /** The document of the runtime's resources, which `GET /api/openapi.json` serves. */
   readonly document: OpenApiDocument;
   readonly contract: Contract;
@@ -218,6 +220,7 @@ export async function openContactsServer(
   const document = openapi(runtime.resources, SLICE_DOCUMENT_OPTIONS);
   const contract = contractOf(document);
   return {
+    origin,
     document,
     contract,
     send: async (method, url, request = {}) =>

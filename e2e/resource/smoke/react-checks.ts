@@ -1,0 +1,107 @@
+/**
+ * Checks of the built `@netvark/react-resource` (resource SPEC 20.8): the
+ * root entry, which imports neither React nor TanStack, describes the
+ * contacts application's members and runs a form model, its start values,
+ * its validator, its write, and the error mapping of a refused write, and
+ * a mistake throws the documented `TypeError`. The messages are
+ * `defaultMessages`', constant in every runtime, since no request sets a
+ * locale here. No Node.js API, so the same module runs on Bun, Deno, and
+ * workerd, where server rendering runs.
+ */
+import type { Checks } from './report.ts';
+
+import { ResponseError } from '@netvark/jsonapi-client';
+import { fieldsOf, resourceForm } from '@netvark/react-resource';
+import { defaultMessages } from '@netvark/resource-core';
+
+import { Contacts } from '../resources/contacts.ts';
+import { Organizations } from '../resources/organizations.ts';
+import { check } from './report.ts';
+
+const messages = defaultMessages([Organizations, Contacts]);
+
+/** The `TypeError` message of calling `fn` with `args` as JavaScript would, types erased. */
+function messageOf(
+  fn: (...args: never) => unknown,
+  args: ReadonlyArray<unknown>,
+): string {
+  try {
+    Reflect.apply(fn, undefined, args);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return error.message;
+    }
+    throw error;
+  }
+  return 'no TypeError';
+}
+
+export const reactChecks: Checks = {
+  'describes the members with their labels and filters': () => {
+    const fields = fieldsOf(Contacts, messages);
+    const { status, priority } = fields;
+    check(status.label() === 'Status', status.label());
+    check(
+      status.options?.map(({ value }) => value).join() === 'active,archived',
+      JSON.stringify(status.options),
+    );
+    check(priority.filter?.kind === 'number', String(priority.filter?.kind));
+  },
+  'starts a create form from the defaults and refuses a blank name': () => {
+    const create = resourceForm(Contacts, 'create', { messages });
+    const { kind, discount, tags } = create.defaultValues;
+    check(kind === 'person' && discount === '0', `${kind} ${discount}`);
+    check(Array.isArray(tags) && Object.isFrozen(tags), 'tags');
+    const result = create.validator['~standard'].validate(create.defaultValues);
+    const issues = 'issues' in result ? result.issues : [];
+    check(
+      JSON.stringify(issues) ===
+        JSON.stringify([{ message: 'A value is required.', path: ['name'] }]),
+      JSON.stringify(issues),
+    );
+  },
+  'writes what changed, as the client sends it': () => {
+    const create = resourceForm(Contacts, 'create', { messages });
+    const write = create.write({
+      ...create.defaultValues,
+      name: 'Ada',
+      priority: '3',
+    });
+    check(
+      JSON.stringify(write) ===
+        JSON.stringify({ attributes: { name: 'Ada', priority: 3 } }),
+      JSON.stringify(write),
+    );
+  },
+  "places a refused write's error objects on their fields": () => {
+    const create = resourceForm(Contacts, 'create', { messages });
+    const error = new ResponseError({
+      type: 'contacts',
+      call: 'create',
+      status: 409,
+      body: {
+        errors: [
+          {
+            status: '409',
+            code: 'CONTACT_EMAIL_TAKEN',
+            detail: 'Email already belongs to another contact.',
+            source: { pointer: '/data/attributes/email' },
+          },
+        ],
+      },
+    });
+    const { fields, form } = create.errors(error);
+    check(
+      fields.email === 'Email already belongs to another contact.' &&
+        form.length === 0,
+      JSON.stringify(fields),
+    );
+  },
+  'refuses an operation it does not write': () => {
+    const message = messageOf(resourceForm, [Contacts, 'remove', { messages }]);
+    check(
+      message === 'resourceForm: operation must be create or update',
+      message,
+    );
+  },
+};

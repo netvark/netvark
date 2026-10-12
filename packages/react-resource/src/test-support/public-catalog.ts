@@ -84,6 +84,19 @@ const value = {
           "identity": null,
           "generated": null
         },
+        "referred_by_id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
         "kind": {
           "type": "contact_kind",
           "typeKind": "enum",
@@ -219,6 +232,19 @@ const value = {
           "default": {
             "literal": "{}"
           },
+          "identity": null,
+          "generated": null
+        },
+        "ratings": {
+          "type": "int2",
+          "typeKind": "base",
+          "array": true,
+          "sqlType": "smallint[]",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
           "identity": null,
           "generated": null
         },
@@ -406,6 +432,37 @@ const value = {
           },
           "enforced": true
         },
+        "contacts_referred_by_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "referred_by_id"
+          ],
+          "references": {
+            "table": "contacts",
+            "columns": [
+              "id"
+            ]
+          },
+          "enforced": true
+        },
+        "contacts_score_check": {
+          "kind": "check",
+          "columns": [
+            "score"
+          ],
+          "rule": {
+            "kind": "range",
+            "min": {
+              "value": "0",
+              "inclusive": false
+            },
+            "max": {
+              "value": "100",
+              "inclusive": false
+            }
+          },
+          "enforced": true
+        },
         "contacts_status_check": {
           "kind": "check",
           "columns": [
@@ -485,11 +542,52 @@ const value = {
           "identity": null,
           "generated": null
         },
+        "marketing_opt_in": {
+          "type": "bool",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "boolean",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "open_days": {
+          "type": "bool",
+          "typeKind": "base",
+          "array": true,
+          "sqlType": "boolean[]",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": {
+            "literal": "{t,t,t,t,t,f,f}"
+          },
+          "identity": null,
+          "generated": null
+        },
         "founded_on": {
           "type": "date",
           "typeKind": "base",
           "array": false,
           "sqlType": "date",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "invite_code": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
           "maxLength": null,
           "precision": null,
           "scale": null,
@@ -515,6 +613,27 @@ const value = {
         }
       },
       "constraints": {
+        "organizations_enterprise_verified": {
+          "kind": "check",
+          "columns": [
+            "plan_id",
+            "verified"
+          ],
+          "rule": null,
+          "enforced": true
+        },
+        "organizations_invite_code_check": {
+          "kind": "check",
+          "columns": [
+            "invite_code"
+          ],
+          "rule": {
+            "kind": "length",
+            "min": 6,
+            "max": 32
+          },
+          "enforced": true
+        },
         "organizations_name_check": {
           "kind": "check",
           "columns": [

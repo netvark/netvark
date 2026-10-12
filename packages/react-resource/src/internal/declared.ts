@@ -25,6 +25,7 @@ export interface DeclaredShape {
 /** The members every declared resource has (SPEC 3); `in` reads none of them, so no lazy member is built here. */
 const MEMBERS: ReadonlyArray<string> = [
   'names',
+  'declaration',
   'fields',
   'write',
   'resource',
