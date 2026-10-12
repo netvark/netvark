@@ -131,4 +131,15 @@ export interface ResourceRuntime<
   readonly resources: ReadonlyArray<DeclaredResource>;
   /** Each resource's operations as `actor` runs them, each in a transaction of its own. */
   readonly as: (actor: TDomain['actor']) => Domain<TResources>;
+  /**
+   * Runs `work` with the operations of `as(actor)` sharing one
+   * transaction, one at a time: it commits when `work` resolves and no
+   * operation failed, and resolves to what `work` resolved to. The first
+   * operation that fails ends it, rolled back, and every later call of
+   * that domain rejects with a `TypeError`.
+   */
+  readonly transaction: <TResult>(
+    actor: TDomain['actor'],
+    work: (domain: Domain<TResources>) => Promise<TResult>,
+  ) => Promise<TResult>;
 }

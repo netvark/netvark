@@ -4,9 +4,9 @@
  * the connected ones ask the database, on the storage's connection, what
  * only it knows about the role and each scoped table. Any problem rejects
  * with a `BootError` listing them all; otherwise the runtime carries the
- * warnings, the declared resource of each behavior, and `as(actor)`, which
- * HTTP hosts and workers call alike (resource-core's runtime contract,
- * SPEC 12.10).
+ * warnings, the declared resource of each behavior, `as(actor)`, and
+ * `transaction(actor, work)`, which HTTP hosts and workers call alike
+ * (resource-core's runtime contract, SPEC 12.10).
  * @packageDocumentation
  */
 import type {
@@ -23,6 +23,7 @@ import { bootContext } from '../boot/options';
 import { BootError } from '../boot/report';
 import { staticReport } from '../boot/static-report';
 import { createDomain } from './domain';
+import { runTransaction } from './transaction';
 
 /**
  * Checks the composition, statically and then on the database, and
@@ -42,13 +43,19 @@ export async function createResourceRuntime<
     throw new BootError(problems);
   }
   const domain = createDomain(options);
+  const typed = (...args: Parameters<typeof domain>): Domain<TResources> =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: the domain holds, under each key of resources, which boot held to the behavior's type, exactly the operations the declaration declares and include when a relationship is includable, as Domain types them
+    domain(...args) as unknown as Domain<TResources>;
   return Object.freeze({
     warnings: report.warnings,
     resources: Object.freeze(
       boot.resources.map(([, behavior]) => behavior.resource),
     ),
-    as: (actor: TDomain['actor']) =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: the domain holds, under each key of resources, which boot held to the behavior's type, exactly the operations the declaration declares and include when a relationship is includable, as Domain types them
-      domain(actor) as unknown as Domain<TResources>,
+    as: (actor: TDomain['actor']) => typed(actor),
+    transaction: async <TResult>(
+      actor: TDomain['actor'],
+      work: (domain: Domain<TResources>) => Promise<TResult>,
+    ) =>
+      runTransaction(options, actor, (session) => typed(actor, session), work),
   });
 }

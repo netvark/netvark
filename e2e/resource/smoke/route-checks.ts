@@ -53,13 +53,17 @@ async function rowOf(
   return row;
 }
 
+/** The domain of the smoke runtime, which only reads, so a transaction is its domain as it is. */
+const domain = {
+  organizations: { get: async (id: string) => rowOf([ACME], id) },
+  contacts: { get: async (id: string) => rowOf([ADA], id) },
+};
+
 const runtime: ResourceRuntime = {
   warnings: [],
   resources: [Organizations, Contacts],
-  as: () => ({
-    organizations: { get: async (id) => rowOf([ACME], id) },
-    contacts: { get: async (id) => rowOf([ADA], id) },
-  }),
+  as: () => domain,
+  transaction: async (_actor, work) => work(domain),
 };
 
 /** The host: negotiation, the error handlers, and the routes at `/`. */

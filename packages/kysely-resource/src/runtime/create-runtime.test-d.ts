@@ -63,6 +63,9 @@ const runtime = createResourceRuntime({
   resources: { tasks: TasksBehavior, workspaces: WorkspacesBehavior },
 });
 
+declare const booted: Awaited<typeof runtime>;
+declare const member: Member;
+
 describe('createResourceRuntime (resource SPEC 18.3, 18.4)', () => {
   it('runs as the actor of the domain the behaviors infer, each resource typed by its behavior', () => {
     expectTypeOf(runtime)
@@ -76,6 +79,14 @@ describe('createResourceRuntime (resource SPEC 18.3, 18.4)', () => {
     expectTypeOf(runtime)
       .resolves.toHaveProperty('resources')
       .toEqualTypeOf<ReadonlyArray<DeclaredResource>>();
+  });
+
+  it("hands transaction's work the domain as gives, and resolves to what work resolves to", () => {
+    const created = booted.transaction(member, async (domain) => {
+      expectTypeOf(domain.tasks).toEqualTypeOf<TaskOperations>();
+      return domain.tasks.create({ attributes: { title: 'Boot' } });
+    });
+    expectTypeOf(created).resolves.toHaveProperty('title');
   });
 
   it('resolves to what passes where a host takes the runtime typed wide', () => {

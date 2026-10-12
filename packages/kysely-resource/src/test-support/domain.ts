@@ -264,18 +264,22 @@ function declared(
   };
 }
 
+/** `domain`'s operations as a test calls them, each by name. */
+export function memberApi(
+  domain: Readonly<Record<string, ResourceOperations>>,
+): MemberApi {
+  return {
+    tasks: declared('tasks', domain['tasks']),
+    workspaces: declared('workspaces', domain['workspaces']),
+    logs: declared('logs', domain['logs']),
+  };
+}
+
 /** The domain of `domainOptions(storage, options)`, as each member runs it. */
 export function testDomain(
   storage: KyselyStorage,
   options: Partial<Omit<DomainOptions<TestDomain>, 'storage'>> = {},
 ): (actor: Member) => MemberApi {
   const as = createDomain(domainOptions(storage, options));
-  return (actor) => {
-    const domain = as(actor);
-    return {
-      tasks: declared('tasks', domain['tasks']),
-      workspaces: declared('workspaces', domain['workspaces']),
-      logs: declared('logs', domain['logs']),
-    };
-  };
+  return (actor) => memberApi(as(actor));
 }

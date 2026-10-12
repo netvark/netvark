@@ -9,18 +9,31 @@
  * target lookup answers (SPEC 12.3); an include of workspaces by an actor
  * without `workspaces:read` answers FORBIDDEN, as a policy would. A page
  * holds every row the actor sees, in insertion order, and has no other
- * page. Not published with the package.
+ * page. `transaction` keeps the contract's rules: the first failure ends
+ * it, every row returns to what it held when an operation failed or
+ * `work` rejected, and it rejects with the failure unless `work` rejected
+ * with another value. Not published with the package.
  */
 import type { DeclaredResource } from '@netvark/resource-core';
 import type {
   Actor,
+  Domain,
   PublicRow,
-  ResourceInput,
   ResourceOperations,
   ResourceRuntime,
 } from '@netvark/resource-core/server';
 
 import { jsonApiError } from '@netvark/hono-jsonapi';
+
+import {
+  checkTargets,
+  linkedRows,
+  membersOf,
+  newRow,
+  notFound,
+  pageOf,
+  roundTrip,
+} from './memory-rows';
 
 export type Permission = 'tasks:read' | 'tasks:write' | 'workspaces:read';
 
@@ -56,9 +69,13 @@ type Operations = {
   -readonly [K in keyof ResourceOperations]: ResourceOperations[K];
 };
 
+/** Runs one call of an operation: at once, or as a transaction admits it. */
+type Admit = <TResult>(operation: () => Promise<TResult>) => Promise<TResult>;
+
 /** The scope's member on a row of a scoped resource: the workspace it belongs to. */
 const SCOPE = 'workspace';
-const PAGE_SIZE = 10;
+
+const direct: Admit = async (operation) => operation();
 
 /** A member of `workspace` holding `permissions`. */
 export function member(
@@ -70,110 +87,16 @@ export function member(
   return { id, workspace, can: (permission) => held.has(permission) };
 }
 
-function notFound(): Error {
-  return jsonApiError('NOT_FOUND', { detail: 'The resource does not exist' });
-}
-
-/** Throws NOT_FOUND at the first relationship of `input` that links a row `state` does not hold. */
-function checkTargets(state: MemoryRuntime, input: ResourceInput): void {
-  for (const [name, linkage] of Object.entries(input.relationships ?? {})) {
-    const missing =
-      typeof linkage === 'object' &&
-      linkage !== null &&
-      'type' in linkage &&
-      'id' in linkage &&
-      state.rows.get(String(linkage.type))?.has(String(linkage.id)) !== true;
-    if (missing) {
-      throw jsonApiError([
-        {
-          code: 'NOT_FOUND',
-          status: 404,
-          detail: 'The related resource does not exist',
-          path: ['data', 'relationships', name],
-        },
-      ]);
-    }
-  }
-}
-
-/** The members `input` writes, each relationship as its target's id. */
-function membersOf(input: ResourceInput): Record<string, unknown> {
-  const relationships = Object.entries(input.relationships ?? {}).map(
-    ([name, linkage]) =>
-      [
-        name,
-        typeof linkage === 'object' && linkage !== null && 'id' in linkage
-          ? linkage.id
-          : null,
-      ] as const,
-  );
-  return { ...input.attributes, ...Object.fromEntries(relationships) };
-}
-
-/** A new row of `declared`: every member `null` but those `input` writes. */
-function newRow(
-  declared: DeclaredResource,
-  id: string,
-  input: ResourceInput,
-): Record<string, unknown> {
-  const { attributes, relationships } = declared.resource;
-  const members = [...attributes, ...Object.keys(relationships)];
-  return {
-    ...Object.fromEntries(members.map((name) => [name, null])),
-    ...membersOf(input),
-    id,
-  };
-}
-
-/**
- * `work`'s result once a turn of the microtask queue has passed, as a
- * storage round trip settles: a route that did not await an operation
- * would hold a pending promise.
- */
-async function roundTrip<TResult>(work: () => TResult): Promise<TResult> {
-  await Promise.resolve();
-  return work();
-}
-
-/** A page of every row in `rows`. */
-function pageOf(rows: Array<PublicRow>) {
-  return {
-    rows,
-    cursors: rows.map((row) => row.id),
-    next: null,
-    prev: null,
-    hasNext: false,
-    hasPrev: false,
-    size: PAGE_SIZE,
-    cursor: (row: PublicRow) => row.id,
-  };
-}
-
-/** The rows `rows` link to over `relationship` in `targets`, each once. */
-function linkedRows(
-  rows: ReadonlyArray<PublicRow>,
-  relationship: string,
-  targets: ReadonlyMap<string, PublicRow> | undefined,
-): Array<PublicRow> {
-  const ids = new Set(
-    rows.flatMap((row) => {
-      const id = row[relationship];
-      return typeof id === 'string' ? [id] : [];
-    }),
-  );
-  return [...ids].flatMap((id) => {
-    const target = targets?.get(id);
-    return target === undefined ? [] : [target];
-  });
-}
-
-/** Each declared operation of `declared` over `state`, as `actor` runs it. */
+/** Each declared operation of `declared` over `state`, as `actor` runs it, each call run by `call`. */
 function operationsOf(
   state: MemoryRuntime,
   declared: DeclaredResource,
   actor: Member,
+  call: Admit,
 ): ResourceOperations {
   const type = declared.names.type;
+  const trip = async <TResult>(work: () => TResult): Promise<TResult> =>
+    call(async () => roundTrip(work));
   const rows = state.rows.get(type) ?? new Map<string, PublicRow>();
   const scoped = declared.declaration.scope !== undefined;
   const visible = (row: PublicRow): boolean =>
@@ -194,23 +117,23 @@ function operationsOf(
   const operations: Operations = {};
   if (declaredOperations.has('list')) {
     operations.list = async (request, options) =>
-      roundTrip(() => {
+      trip(() => {
         record('list', [request, options]);
         return pageOf([...rows.values()].filter((row) => visible(row)));
       });
   }
   if (declaredOperations.has('get')) {
     operations.get = async (id) =>
-      roundTrip(() => {
+      trip(() => {
         record('get', [id]);
         return find(id);
       });
   }
   if (declaredOperations.has('create')) {
     operations.create = async (input) =>
-      roundTrip(() => {
+      trip(() => {
         record('create', [input]);
-        checkTargets(state, input);
+        checkTargets(state.rows, input);
         const id = input.id ?? crypto.randomUUID();
         const row = {
           ...newRow(declared, id, input),
@@ -223,9 +146,9 @@ function operationsOf(
   }
   if (declaredOperations.has('update')) {
     operations.update = async (id, input) =>
-      roundTrip(() => {
+      trip(() => {
         record('update', [id, input]);
-        checkTargets(state, input);
+        checkTargets(state.rows, input);
         const row = { ...find(id), ...membersOf(input), id };
         rows.set(id, row);
         return row;
@@ -233,7 +156,7 @@ function operationsOf(
   }
   if (declaredOperations.has('remove')) {
     operations.remove = async (id) =>
-      roundTrip(() => {
+      trip(() => {
         record('remove', [id]);
         find(id);
         rows.delete(id);
@@ -241,7 +164,7 @@ function operationsOf(
   }
   if (declared.resource.query.include.length > 0) {
     operations.include = async (relationship, linked) =>
-      roundTrip(() => {
+      trip(() => {
         record('include', [relationship, linked]);
         const target = declared.resource.relationships[relationship]?.type;
         if (target === 'workspaces' && !actor.can('workspaces:read')) {
@@ -259,6 +182,55 @@ function operationsOf(
   return Object.freeze(operations);
 }
 
+/** Every row of `rows` back to what `snapshot` holds, in the same maps the operations hold. */
+function restore(
+  rows: ReadonlyMap<string, Map<string, PublicRow>>,
+  snapshot: ReadonlyMap<string, ReadonlyMap<string, PublicRow>>,
+): void {
+  for (const [type, held] of snapshot) {
+    const live = rows.get(type);
+    live?.clear();
+    for (const [id, row] of held) {
+      live?.set(id, row);
+    }
+  }
+}
+
+/** `transaction(actor, work)` over `state`, with the domain `domainOf` makes for a call. */
+async function transactionOf<TResult>(
+  state: MemoryRuntime,
+  domainOf: (call: Admit) => Domain,
+  work: (domain: Domain) => Promise<TResult>,
+): Promise<TResult> {
+  const snapshot = new Map(
+    [...state.rows].map(([type, rows]) => [type, new Map(rows)] as const),
+  );
+  const failures: Array<unknown> = [];
+  const call: Admit = async (operation) => {
+    if (failures.length > 0) {
+      throw new TypeError(
+        'transaction: an operation was called after an earlier one failed, which ended the transaction',
+      );
+    }
+    try {
+      return await operation();
+    } catch (error) {
+      failures.push(error);
+      throw error;
+    }
+  };
+  try {
+    const value = await work(domainOf(call));
+    if (failures.length === 0) {
+      return value;
+    }
+    throw failures[0];
+  } catch (error) {
+    restore(state.rows, snapshot);
+    throw error;
+  }
+}
+
 /** A runtime of `resources` over `seed`, the rows of each type, by type. */
 export function memoryRuntime(
   resources: ReadonlyArray<DeclaredResource>,
@@ -274,20 +246,23 @@ export function memoryRuntime(
       ] as const;
     }),
   );
+  const domainOf = (actor: Member, call: Admit): Domain =>
+    Object.freeze(
+      Object.fromEntries(
+        resources.map((declared) => [
+          declared.names.type,
+          operationsOf(state, declared, actor, call),
+        ]),
+      ),
+    );
   const state: MemoryRuntime = {
     warnings: [],
     resources,
     rows,
     calls: [],
-    as: (actor) =>
-      Object.freeze(
-        Object.fromEntries(
-          resources.map((declared) => [
-            declared.names.type,
-            operationsOf(state, declared, actor),
-          ]),
-        ),
-      ),
+    as: (actor) => domainOf(actor, direct),
+    transaction: async (actor, work) =>
+      transactionOf(state, (call) => domainOf(actor, call), work),
   };
   return state;
 }
