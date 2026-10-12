@@ -1,8 +1,9 @@
 /**
- * Runtime-neutral checks (SPEC 7.3) over the built core: the isolates, and
- * the formatters on the runtime's own `Intl`, with the calendar and digits
- * a formatting tag names. No file system and no environment: the same
- * module runs on Bun, Deno, and workerd.
+ * Runtime-neutral checks (SPEC 7.3) over the built core: the isolates, the
+ * formatters on the runtime's own `Intl`, with the calendar and digits a
+ * formatting tag names, and the time zone checks of `time-zone-checks.ts`.
+ * No file system and no environment: the same module runs on Bun, Deno,
+ * and workerd.
  */
 import type { Check } from './assert.ts';
 
@@ -14,6 +15,7 @@ import {
 } from '@netvark/intl-core';
 
 import { check, equal } from './assert.ts';
+import { TIME_ZONE_CHECKS } from './time-zone-checks.ts';
 
 export interface SmokeResult {
   readonly runtime: string;
@@ -75,6 +77,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
       'Arabic plural categories',
     );
   },
+  ...TIME_ZONE_CHECKS,
 };
 
 export async function runChecks(runtime: string): Promise<SmokeResult> {

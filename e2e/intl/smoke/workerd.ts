@@ -27,6 +27,13 @@ function isSmokeResult(value: unknown): value is SmokeResult {
 }
 /** Any date at or before the pinned workerd release; current behavior is what is tested. */
 const COMPATIBILITY_DATE = '2026-07-01';
+/**
+ * `node:async_hooks` for the time zone checks' request scope. Compatibility
+ * dates from 2026-08-04 enable Node.js compatibility by default; the pinned
+ * workerd predates them.
+ * @ref https://developers.cloudflare.com/workers/configuration/compatibility-flags/#nodejs-asynclocalstorage
+ */
+const COMPATIBILITY_FLAGS = ['nodejs_als'];
 
 await build({
   // The root tsdown.config.ts builds the library; this bundle is self-contained.
@@ -45,6 +52,7 @@ const mf = new Miniflare({
   modules: true,
   scriptPath: `${OUT_DIR}/worker.mjs`,
   compatibilityDate: COMPATIBILITY_DATE,
+  compatibilityFlags: COMPATIBILITY_FLAGS,
 });
 await mf.ready;
 try {

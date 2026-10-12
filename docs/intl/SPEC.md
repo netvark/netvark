@@ -165,8 +165,9 @@ Returns the trimmed `value` when it is a time zone, and `undefined` otherwise:
    The value is returned as written, not canonicalized: engines canonicalize differently (Node 24
    resolves `Europe/Kyiv` to `Europe/Kiev`, Bun keeps it).
 
-An accepted name MAY be remembered so the next call skips the construction; a refused one MUST NOT
-be, so input cannot grow memory.
+Nothing is remembered between calls, so input cannot grow memory: names match
+ASCII-case-insensitively, so even the accepted spellings are unbounded. A call constructs one
+`Intl.DateTimeFormat`, once per request on a server.
 
 ### 4.2 `detectTimeZone()` (`to-time-zone.ts`)
 
@@ -175,8 +176,9 @@ seeding the cookie (4.3), never for formatting a render.
 
 ### 4.3 Cookies (`cookie.ts`)
 
-- A cookie name MUST be an RFC 6265 `token`
-  ([RFC 6265, 4.1.1](https://www.rfc-editor.org/rfc/rfc6265#section-4.1.1)).
+- A cookie name MUST be an HTTP `token`
+  ([RFC 9110, 5.6.2](https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2);
+  [RFC 6265bis-22, 4.1.1](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis-22#section-4.1.1)).
 - `timeZoneFromCookie(header, name)` reads a `Cookie` request header or `document.cookie`: the pairs
   are separated by `;` with optional whitespace
   ([RFC 6265, 5.4](https://www.rfc-editor.org/rfc/rfc6265#section-5.4)); the first pair whose name
@@ -187,10 +189,13 @@ seeding the cookie (4.3), never for formatting a render.
   `<name>=<zone>; Path=<path>; Max-Age=<maxAge>`, followed by `; Domain=<domain>`,
   `; SameSite=<sameSite>`, and `; Secure` when given. `zone` MUST be a time zone (4.1); an IANA name
   is made of cookie-octets, so it is written unencoded. `path` defaults to `/` and `maxAge` to
-  `TIME_ZONE_COOKIE_MAX_AGE`, Paraglide's locale cookie attributes. `maxAge` MUST be a non-negative
-  integer; `path` and `domain` MUST NOT contain a control character or `;`
-  ([RFC 6265, 4.1.1](https://www.rfc-editor.org/rfc/rfc6265#section-4.1.1), `av-octet`); `sameSite`
-  is `'Strict'`, `'Lax'`, or `'None'`.
+  `TIME_ZONE_COOKIE_MAX_AGE`, Paraglide's locale cookie attributes. `maxAge` MUST be a positive
+  integer (`max-age-av` is `non-zero-digit *DIGIT`); `path` and `domain` MUST be `av-octet`s, so no
+  control character, no `;`, and nothing outside US-ASCII; `sameSite` is `'Strict'`, `'Lax'`, or
+  `'None'`. A cookie a user agent would drop is refused: `sameSite: 'None'`, a `__Secure-` name, or
+  a `__Host-` name without `secure`, and a `__Host-` name with a `domain` or a `path` other than `/`
+  ([RFC 6265bis-22, 5.7](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis-22#section-5.7),
+  steps 19 to 21). The cookie is never `HttpOnly`: the browser reads it (4.4).
 
 ### 4.4 `createTimeZone(options)` (`create-time-zone.ts`)
 
@@ -226,25 +231,30 @@ interface TimeZoneResolver {
 - `run(request, callback)` calls `scope.run(fromRequest(request), callback)` and returns its result.
   Without a scope it throws (section 5).
 - `get()` returns, in order: `scope.getStore()` when a scope is given and that is not `undefined`;
-  when `globalThis.document` exists, the zone of its `cookie` read on the first such call and
-  returned unchanged by every later call of this resolver (the pin); the fallback otherwise.
+  when `globalThis.document` existed as `createTimeZone()` ran, the zone of its `cookie` at that
+  moment, or the fallback without one, returned unchanged by every later call (the pin); the
+  fallback otherwise. A document with an opaque origin, such as a sandboxed iframe, throws a
+  `SecurityError` when its cookie is read
+  ([HTML, `document.cookie`](https://html.spec.whatwg.org/multipage/dom.html#dom-document-cookie))
+  and reads as one without the cookie. Reading the cookie at creation, before any script can write
+  it, keeps the zone the server rendered with.
 
 ## 5. Errors
 
 Every message is constant apart from the names of options and of configured locales, and names the
 function. No message contains a cookie, a header, a request URL, or a value read from a request.
 
-| Thrown by                     | Class                    | When                                                                                                                                                |
-| ----------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createIntl()`                | `TypeError`              | the options are not an object; `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string |
-| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                                        |
-| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` holds a control character or `;`; `sameSite` is another value                |
-| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a non-negative integer                                                                                                              |
-| `createTimeZone()`            | `TypeError`              | the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                                                    |
-| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                                   |
-| `TimeZoneResolver.run()`      | `TypeError`              | the resolver was created without a scope                                                                                                            |
-| `compile()`                   | `TypeError`              | `isolate` is not a boolean or an array of strings, or names a locale the project does not declare; `formatters` is another value                    |
-| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                              |
+| Thrown by                     | Class                    | When                                                                                                                                                       |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createIntl()`                | `TypeError`              | the options are not an object; `locale` or `timeZone` is not a function; `formattingLocales` is not an object or holds a value that is not a string        |
+| `createIntl()`                | `RangeError`             | a `formattingLocales` value is not a BCP 47 tag; `cacheSize` is not an integer of at least 1                                                               |
+| `timeZoneCookie()`            | `TypeError`              | `zone` is not a time zone; the name is not a token; `path` or `domain` is not `av-octet`s; `sameSite` is another value; a user agent would drop the cookie |
+| `timeZoneCookie()`            | `RangeError`             | `maxAge` is not a positive integer                                                                                                                         |
+| `createTimeZone()`            | `TypeError`              | the options are not an object; the cookie name is not a token; `fallback` is not a time zone; `scope` lacks `getStore` or `run`                            |
+| `TimeZoneResolver.useScope()` | `TypeError`              | `scope` lacks `getStore` or `run`                                                                                                                          |
+| `TimeZoneResolver.run()`      | `TypeError`              | the resolver has no scope: none was given to `createTimeZone()` or `useScope()`                                                                            |
+| `compile()`                   | `TypeError`              | `isolate` is not a boolean or an array of strings, or names a locale the project does not declare; `formatters` is another value                           |
+| `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                                     |
 
 ## 6. Paraglide binding (`@netvark/paraglide-intl`, `packages/paraglide-intl/src/`)
 
@@ -344,6 +354,9 @@ and `upsertBundleNested()` behave as 6.1 to 6.3 require, past any published advi
 A private package that consumes the built packages through `workspace:*` and never imports `src/`:
 
 - `package-surface.e2e.test.ts`: the export lists of 1.
+- `time-zone.e2e.test.ts`: concurrent requests resolved from their cookies in a request scope, the
+  cookie `timeZoneCookie` writes read back by the next request, and a browser resolver keeping the
+  zone its document had when it was created.
 - `compile.e2e.test.ts`: a fixture project compiled with the built binding, its messages called in
   English and Arabic.
 - `hydration.e2e.test.ts`: a server render inside a request scope and a jsdom document render from
@@ -354,7 +367,9 @@ A private package that consumes the built packages through `workspace:*` and nev
 ### 7.3 Runtime smoke test (`e2e/intl/smoke/`)
 
 The core's formatters and time zone resolver, and the compiled fixture messages, on Bun, Deno, and
-workerd.
+workerd. The resolver's request scope is an `AsyncLocalStorage` from `node:async_hooks` on each;
+workerd runs with the `nodejs_als` compatibility flag, which compatibility dates before 2026-08-04
+need.
 
 ## 8. Packaging and support
 

@@ -19,10 +19,17 @@ function names(module: object): Array<string> {
 /** SPEC 1: the core's values. */
 const CORE = [
   'DEFAULT_CACHE_SIZE',
+  'DEFAULT_TIME_ZONE',
   'FIRST_STRONG_ISOLATE',
   'POP_DIRECTIONAL_ISOLATE',
+  'TIME_ZONE_COOKIE_MAX_AGE',
   'createIntl',
+  'createTimeZone',
+  'detectTimeZone',
   'isolate',
+  'timeZoneCookie',
+  'timeZoneFromCookie',
+  'toTimeZone',
 ].toSorted();
 
 describe('package surface', () => {
