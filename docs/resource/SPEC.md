@@ -1,10 +1,10 @@
 # resource: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/resource-core`, `@netvark/kysely-resource`, and
-  `@netvark/hono-resource`; `docs/resource/DESIGN.md` explains the why. Each binding adds its
-  sections after the core's when its epic starts, from 18 on, so the core's numbering stays stable:
-  `@netvark/kysely-resource` holds 18, `@netvark/hono-resource` 19, and `@netvark/react-resource`
-  follows.
+- Status: normative for the 0.x line of `@netvark/resource-core`, `@netvark/kysely-resource`,
+  `@netvark/hono-resource`, and `@netvark/react-resource`; `docs/resource/DESIGN.md` explains the
+  why. Each binding adds its sections after the core's when its epic starts, from 18 on, so the
+  core's numbering stays stable: `@netvark/kysely-resource` holds 18, `@netvark/hono-resource` 19,
+  and `@netvark/react-resource` 20.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source files that implement it and the tests that prove it. When this document and the code
@@ -33,6 +33,8 @@ Contents
 16. Packaging
 17. Constants
 18. The Kysely runtime
+19. Hono routes
+20. React bindings
 
 ---
 
@@ -45,7 +47,7 @@ driver, or a Node.js module.
 
 | Entry point                      | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `ClientTypesOf`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform`                                                                                                                  |
+| `@netvark/resource-core`         | `createDeclareResource`, `defineCodec`, `defineValidator`, `errorCatalog`, `defineMessages`, `defaultMessages`, `localizeErrors`, `localizeIssues`, `ISSUE_KINDS`, and the types `DeclareResource`, `DeclareResourceConfig`, `DeclareContext`, `DeclarationCheck`, `CodecRegistry`, `CodecTypes`, `ValidatorRegistry`, `ScopeRegistry`, `ScopeColumn`, `DomainRule`, `DomainRules`, `EmptyRegistry`, `DeclaredResource`, `AnyDeclaredResource`, `ResourceNames`, `Declaration`, `FieldDeclaration`, `RelationshipDeclaration`, `RelationshipOperator`, `RuleDeclaration`, `SearchDeclaration`, `SortDeclaration`, `Access`, `Operation`, `Infer`, `ClientTypesOf`, `FieldMeta`, `FieldFacts`, `FieldLimits`, `ItemMeta`, `WireType`, `ErrorCatalog`, `ErrorEntry`, `ConstraintKind`, `IssueKind`, `ResourceIssue`, `Codec`, `Validator`, `StorageCodec`, `StorageCodecs`, `Messages`, `MessagesFor`, `Message`, `Label`, `ErrorText`, `CodeInputs`, `ConstraintInputs`, `IssueInputs`, `LocalizeErrorsOptions`, `ErrorTransform`, `IssueText`                                                                                   |
 | `@netvark/resource-core/server`  | `createDomainDefiners`, `defineScope`, `scopeValues`, `scopeColumnOf`, `defineQuota`, `quotaExceeded`, `defineEvent`, `reject`, `Rejection`, `rejectionError`, `denyAll`, `isResourceBehavior`, `constraintError`, `partitionViolation`, `PARTITION_ROOT_SQL`, `relationshipTargets`, `keysetRequest`, and the types `Actor`, `AppCodeOf`, `DomainShape`, `DomainContext`, `DomainDefiners`, `Policy`, `PolicyContexts`, `PolicyInit`, `ResourceBehavior`, `CreateBehavior`, `UpdateBehavior`, `RemoveBehavior`, `Rule`, `RuleContext`, `Effect`, `ValuesContext`, `ServerValuesOf`, `PublicRowOf`, `CreateInputOf`, `UpdateInputOf`, `OperationOf`, `MemberNameOf`, `IncludableOf`, `Scope`, `ScopeBindings`, `ScopeKey`, `ScopeValue`, `Quota`, `QuotaContext`, `DomainEvent`, `EventDefinition`, `Reject`, `RejectOptions`, `RejectionErrorOptions`, `ConstraintErrorOptions`, `RelationshipTarget`, `RelationshipTargetsOptions`, `StorageAdapter`, `StorageWrite`, `StorageListRequest`, `StoragePage`, `PublicRow`, `ResourceRuntime`, `RuntimeResources`, `Domain`, `ResourceOperations`, `ResourceInput`, `ListOptions` |
 | `@netvark/resource-core/openapi` | `openapi`, `surfaceOf`, `diffSurfaces`, `parseSurface`, `SURFACE_FORMAT`, and the types `OpenApiOptions`, `OpenApiDocument`, `InfoObject`, `OperationCodes`, `ResourceExamples`, `ResourceExample`, `ExampleObject`, `Surface`, `ResourceSurface`, `FieldSurface`, `ValueSurface`, `RelationshipSurface`, `PageSurface`, `SurfaceChange`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `@netvark/resource-core/testing` | `storageContract`, `contractFixture`, `boundaryFixtures`, `oracleCases`, and the types `ContractCase`, `ContractHarness`, `ContractFixture`, `ContractCodecs`, `ContractActor`, `Point`, `BoundaryFixture`, `ResourceBoundaries`, `OracleOptions`, `TextStorageCodec`, `OracleCase`, `OracleProbe`, `OracleVerdict`, `WritableFixture`, `UnwritableFixture`, `OracleFixture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -62,7 +64,7 @@ packages/resource-core/src/
   meta/                     field metadata (8)
   errors/                   derived codes, errorCatalog (9)
   registry/                 the checks of every list of resources: types, codes, targets (4.2)
-  messages/                 defineMessages, defaultMessages, the inputs, localizeErrors (10)
+  messages/                 defineMessages, defaultMessages, the inputs, localizeErrors, localizeIssues (10)
   jsonapi/                  the JSON:API resource definition and the keyset definition (11)
   server/                   the server subpath (12)
   openapi/                  the document, the surface, the diff (13)
@@ -1510,6 +1512,29 @@ compiled shape fits), `define-messages.test.ts`, `default-messages.test.ts`, `en
 `error-inputs.test.ts`, `localize-errors.test.ts` (a 422 with two items and a 409 become the
 expected German document; the oversized body; what passes through), `localize-errors.test-d.ts`, and
 `e2e/resource/localization.e2e.test.ts` (15.4).
+
+### 10.5 `localizeIssues(messages)`
+
+Returns an `IssueText`, `(type: string, issue: ResourceIssue) => string`: the text a client shows
+for an issue of `write.create` or `write.update` (6.2) on a resource of type `type` before it sends
+anything: the detail `localizeErrors` gives the error object the server makes of the same issue
+(9.3), a `VALIDATION_FAILED` item pointing at `/data/` and the issue's path, its `reason` the
+issue's `code` and its `expected` the issue's. So an issue kind takes its kind's message with the
+inputs of 10.3, a validator's issue (7.2) its derived code's detail or its constraint kind's, and
+anything else `VALIDATION_FAILED`'s detail; `field` is the label of the member the path names in
+`type`, empty for a type the messages do not label. A form that validates before it sends shows the
+words the server would answer with, in the locale its message functions read when it renders (ADR
+0014).
+
+- `messages` is what `defineMessages` or `defaultMessages` returned; anything else is a `TypeError`,
+  as for `localizeErrors`.
+- The text is computed on every call, never cached: a message function reads the locale when it
+  runs.
+
+Tests: `localize-issues.test.ts` (each issue kind of 6.4 and a validator's code over the contacts
+fixture: the text equals the `detail` `localizeErrors` writes into the 422 that the fixture's
+JSON:API definition answers for the same value; a relationship's issue; a type without labels; the
+`TypeError`) and the German form of `e2e/resource/react/` (20.8).
 
 ---
 
@@ -4002,3 +4027,489 @@ related route and the failing operation's on the operations endpoint, or `undefi
   recognized by the copy that made it, and a `BanError` by `instanceof` (root ADR 0006). It imports
   no runtime: any runtime of the contract runs behind it.
 - Runs wherever Hono runs: Node.js 22.12 and later, Bun, Deno, and Cloudflare Workers.
+
+---
+
+## 20. React bindings (`@netvark/react-resource`, `packages/react-resource/src/`, ADR 0014, ADR 0015)
+
+A declared resource gives a browser application its forms, its lists, and its cache: labels,
+options, limits, validation, the write, where a refusal lands, and the query keys all come from the
+declaration, so a screen restates none of them. The root entry is a model of a declared resource
+that imports neither React nor TanStack; `./form` binds it to TanStack Form and `./query` to
+TanStack Query, and a table reads the list model's state as TanStack Table v9 holds it. Every text
+the model renders comes from the application's one messages object, computed when it is asked for
+(ADR 0014).
+
+### 20.1 Public surface and module map
+
+```
+@netvark/react-resource                    the model: no React, no TanStack
+├── fieldsOf(resource, messages)           fields/fields-of.ts           field descriptors (20.2)
+├── resourceForm(resource, operation, o)   form/resource-form.ts         the form model (20.3, 20.4)
+└── resourceList(resource, messages)       list/resource-list.ts         the list model (20.7)
+
+@netvark/react-resource/form               TanStack Form
+├── resourceFormOptions(model)             tanstack-form/form-options.ts (20.5)
+└── bindResponseErrors(form, model, error) tanstack-form/bind-errors.ts  (20.5)
+
+@netvark/react-resource/query              TanStack Query
+└── resourceQueries(client)                tanstack-query/queries.ts     (20.6)
+```
+
+| Module                          | Holds                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `internal/declared.ts`          | reading a declared resource, and the `TypeError`s of an argument that is not one |
+| `fields/fields-of.ts`           | `fieldsOf` and the descriptor of one member                                      |
+| `fields/filter-kind.ts`         | the control a member's filter takes                                              |
+| `form/form-values.ts`           | the value each member's input edits, and the values a form starts from           |
+| `form/form-write.ts`            | the write a form's values make                                                   |
+| `form/form-validator.ts`        | the form's Standard Schema                                                       |
+| `form/form-errors.ts`           | a refused write's error objects by field                                         |
+| `form/resource-form.ts`         | `resourceForm`                                                                   |
+| `list/sorting.ts`               | `sort` and Table's sorting state                                                 |
+| `list/column-filters.ts`        | `filter` and Table's column filters                                              |
+| `list/lenient-query.ts`         | a route's search read back against the definition                                |
+| `list/resource-list.ts`         | `resourceList`                                                                   |
+| `tanstack-form/form-options.ts` | `resourceFormOptions`                                                            |
+| `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                             |
+| `tanstack-query/query-keys.ts`  | the keys of 20.6                                                                 |
+| `tanstack-query/queries.ts`     | `resourceQueries`                                                                |
+
+Types exported from the root: `FieldDescriptor`, `FilterKind`, `ColumnFilterDescriptor`,
+`FormModel`, `FormModelOptions`, `FormValues`, `FormValue`, `FormErrors`, `ListModel`, `ListState`,
+`ListSorting`, `ListColumnFilters`.
+
+Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
+resource that is not a declared resource (one without `names`, `fields`, `write`, `resource`, and
+`keyset`), messages no definer returned, or messages that label no member of the resource's type
+(10.1), since every label would be empty. Messages name the function and the declaration's names,
+never a value (resource AGENTS).
+
+### 20.2 Field descriptors: `fieldsOf(resource, messages)`
+
+```ts
+interface FieldDescriptor<TName extends string = string> {
+  readonly name: TName; // the public name, a form field's name and a table column's id
+  readonly label: () => string; // messages.fields[type][name]
+  readonly options: ReadonlyArray<{ readonly value: string; readonly label: () => string }> | null;
+  readonly required: boolean;
+  readonly sortable: boolean;
+  readonly filter: ColumnFilterDescriptor | null;
+  readonly meta: FieldMeta; // resource.fields[name] (8)
+}
+
+interface ColumnFilterDescriptor {
+  readonly kind: FilterKind;
+  readonly operators: ReadonlyArray<Operator>; // the member's declared `filter`, in order
+}
+
+type FilterKind = 'options' | 'boolean' | 'number' | 'date' | 'text' | 'values' | 'reference';
+```
+
+`fieldsOf` returns a frozen record of descriptors keyed by public name, the fields and then the
+relationships in declaration order, as `fields` holds them (8). A descriptor holds message
+functions, never texts: `label` is the messages' label of the member, and each option's `label` the
+messages' label of that option (10.1), so a descriptor built once at startup renders in the locale
+of each render. A field's `options` lists `meta.options`, else an array's `meta.items.options`, in
+order, the values the messages label (10.1), and is `null` when neither has options; a
+relationship's is `null`, since its ids are the target's records, even where a `bool` key gives
+`meta.options` (8). `required` is `meta.required` (a create must carry the member); a form model's
+descriptors carry the operation's (20.3). `sortable` is `meta.sortable`.
+
+`filter` is `null` for a member without a declared `filter`; otherwise its `kind` names the control
+a filter of the member takes, read from the metadata in this order:
+
+| Kind        | When                                                                 |
+| ----------- | -------------------------------------------------------------------- |
+| `reference` | a relationship: its target's ids                                     |
+| `options`   | the member, or an array's elements, has `options`                    |
+| `values`    | an array without options                                             |
+| `boolean`   | `wire` is `boolean`                                                  |
+| `number`    | `wire` is `integer` or `number`, or `format` is `int64` or `decimal` |
+| `date`      | `format` is `date`, `date-time`, or `date-time-local`                |
+| `text`      | anything else                                                        |
+
+The kind picks a control; the operators say which conditions it may write. A filter's value is the
+member's condition as the query holds it (20.7), so the control decides which declared operator it
+writes (`{ in: [...] }` for a multiple choice among `options`, `{ gte, lte }` for a `number` range,
+`{ startsWithi }` for a `text` box) and nothing between the control and the request reshapes it.
+
+Tests: `fields/fields-of.test.ts` (the fixture catalog: order, labels and option labels as the
+messages' own functions, element options, a relationship's, each kind of the table, frozen),
+`fields/fields-of.test-d.ts` (names typed by the resource).
+
+### 20.3 The form model: `resourceForm(resource, operation, options)`
+
+```ts
+const create = resourceForm(Contacts, 'create', { messages });
+const edit = resourceForm(Contacts, 'update', { messages, record }); // record: a client record (15.6)
+
+interface FormModel<TValues, TWrite> {
+  readonly type: string;
+  readonly operation: 'create' | 'update';
+  readonly fields: ReadonlyArray<FieldDescriptor>; // the members the form holds
+  readonly defaultValues: TValues; // what the form starts from
+  readonly validator: StandardSchemaV1<TValues>; // 20.3, synchronous
+  write(values: TValues): TWrite; // CreateInput or UpdateInput of the resource's definition
+  errors(error: unknown): FormErrors; // 20.4
+}
+```
+
+| Option     | Meaning                                                                                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `messages` | The application's messages, what `defineMessages` or `defaultMessages` returned (ADR 0014).                                                                                |
+| `record`   | Required on update and refused on create: the record being edited, as the client reads it (15.6), whose values the form starts from and is compared to.                    |
+| `members`  | The public names the form holds, in any order; by default every member the operation writes (9.4). A member the operation does not write, or one listed twice, is refused. |
+
+The form holds the members the operation writes, `readWrite`, `immutable`, and `write` on create and
+`readWrite` and `write` on update (3.1), or those of them `members` lists, in declaration order;
+`fields` describes them (20.2), each `required` as the operation requires it: `meta.required` on
+create, `false` on update (6.2).
+
+**Values.** A form value is what the member's input edits:
+
+| Member                                                                        | Value                                               | Blank                 |
+| ----------------------------------------------------------------------------- | --------------------------------------------------- | --------------------- |
+| a `string` wire (text, enum, uuid, dates, `int64`, `decimal`), a relationship | `string`; a relationship's is the target's id       | `''`                  |
+| an `integer` or `number` wire                                                 | `string`, the text a number input edits             | `''`                  |
+| a `boolean` wire                                                              | `boolean \| null`                                   | `null`                |
+| an `array` wire                                                               | `Array<string>`, each element as its scalar's value | none: `[]` is a value |
+| an `any` wire (`json`, `jsonb`, a codec)                                      | the value as it is, `unknown`                       | `undefined`           |
+
+`FormValues` types them from the operation's input type: a boolean member is `boolean | null`, an
+array `Array<string>`, a string or number member `string`, a relationship `string`, and anything
+else `unknown`.
+
+**Start values.** On create each member starts from its display default (8) when that is a literal
+and the member is a scalar, the literal as its value and `true` or `false` as a boolean's, and blank
+otherwise; an array starts as `[]` and `any` as `undefined` whatever their defaults, which apply
+when the member is left alone. On update each member starts from the record: a string as it is, a
+number by `String`, a boolean as it is, `null` as blank, an array's elements likewise, `any` as it
+is, a relationship from its linkage's or included record's `id`, blank when it is `null`. A `write`
+member, which no read returns, starts blank; a record that lacks any other member the form holds
+throws `TypeError` naming the member, since the form would show a value the server does not hold.
+`defaultValues` is frozen, its arrays included; TanStack Form never writes into it.
+
+**The write.** `write(values)` makes the input of the client's `create` (`CreateInput`) or `update`
+(`UpdateInput`, 15.4):
+
+1. A member goes into the write when its value differs from its start value (strings, booleans, and
+   `null` by `Object.is`, arrays element by element, `any` by `Object.is`), and on create also when
+   it is required, so a required boolean the person left at its start is sent. Every member the
+   person left alone is absent: on create the database's default applies (ADR 0004), on update the
+   stored value stays.
+2. Each value is converted to its wire form (5.1) by the member's metadata: a blank becomes `null`
+   where the member is nullable and leaves the member out otherwise, so a required member left blank
+   is refused as `required`; a string wire's value is the text as typed; an `integer` or `number`
+   member's text becomes the number when it is a JSON number (RFC 8259 6), and stays text otherwise,
+   which the validator refuses with `type`; an array's elements convert by `items`; a relationship's
+   id becomes the identifier `{ type: <target>, id }`, which both the write validator and the client
+   take (15.4).
+3. Fields go under `attributes` and relationships under `relationships`, each part present when it
+   holds a member.
+4. The operation's write validator (`write.create` or `write.update`, 6.2) runs over it, each
+   missing part as `{}` as jsonapi-core's parser gives it; when it refuses, `write` throws
+   `TypeError` (`resourceForm.write: the values do not pass the form's validator`), since a submit
+   handler only receives values the validator accepted. The write returned is what the person
+   entered, not the validator's output.
+
+A `date-time` member needs its offset and seconds (5.1), which an HTML `datetime-local` input gives
+without the offset, and with seconds only when `step` asks for them; converting a local time is the
+application's until Intl formatting is (ADR 0015).
+
+**Validation.** `validator` is a synchronous Standard Schema V1 validator (`vendor: 'netvark'`): it
+makes the write as `write` does, steps 1 to 3, runs the operation's write validator, and reports its
+issues on the form's members:
+
+- An issue whose path starts `attributes/<name>` or `relationships/<name>` (6.2) belongs to `<name>`
+  when the form holds it, at the path `[<name>]`; any other belongs to the form, with no path.
+- A member keeps one issue, the first the validator reported; the form keeps each distinct message
+  once.
+- An issue's message is `localizeIssues(messages)(type, issue)` (10.5), the detail the server's
+  `localizeErrors` gives the same refusal, except for a member whose value is blank: its message is
+  the `required` message (`messages.validation.required({ field })`), since to the person filling
+  the form every rule an empty field fails says the same (ADR 0015).
+- Accepted values are output as they are: TanStack Form submits its own values, and `write` converts
+  them.
+
+Each message is computed when the validator runs, so a re-validation after a locale change renders
+in the new locale. What a validator of the declaration (7.2) or the database refuses that the
+metadata does not state is the server's to answer (8), and lands by pointer (20.4).
+
+Tests: `form/form-values.test.ts` (one case per row of the values table and of 5.1, start values on
+create from literal defaults and blanks, on update from a record with linkage and with an included
+target, a record lacking a member, a `write` member), `form/form-write.test.ts` (each step: changed
+and unchanged members on both operations, the required boolean, blank to `null` and to absent, the
+number texts, arrays, identifiers, parts present, the `TypeError` of refused values),
+`form/form-validator.test.ts` (each issue kind of 6.4 placed on its member, the first per member,
+form-level issues, `required` for blank values, a multi-column CHECK on each of its members, texts
+from closures that read a locale variable re-rendered after it changes),
+`form/resource-form.test.ts` (the options and each `TypeError`), and `form/form-values.test-d.ts`
+(`FormValues` per member type, `write`'s result assignable to the client's `create` and `update`
+inputs).
+
+### 20.4 Errors by field: `model.errors(error)`
+
+```ts
+interface FormErrors<TName extends string = string> {
+  readonly fields: Readonly<Partial<Record<TName, string>>>; // a text per member the server refused
+  readonly form: ReadonlyArray<string>; // the texts no field holds, for a banner
+}
+```
+
+- For a `ResponseError` (`isResponseError`, 15.7), each error object in order: a `source.pointer`
+  `/data/attributes/<name>` or `/data/relationships/<name>`, alone or followed by `/` and further
+  segments, names `<name>`, its segment decoded as RFC 6901 decodes one (`~1` as `/`, `~0` as `~`).
+  When the form holds `<name>` and has no text for it yet, the object's text is `<name>`'s; every
+  other object's text joins `form`, each distinct text once. An object's text is its `detail`, else
+  its `title`; an object with neither is left out.
+- The text is the server's as it sent it: the server localized it for the request's
+  `Accept-Language` (10.4, jsonapi SPEC 15.2), and the model never renders it again.
+- Anything else, a network failure or a `TypeError` among them, gives empty `fields` and `form`: the
+  model never shows an error's `message`, which is for logs (ADR 0014). A screen shows its own text
+  when both are empty, as for a 500 whose body is no error document.
+
+JSON:API lets a client ignore a pointer that names nothing in its request; the model keeps such an
+object's text for the form instead, so no refusal goes unseen. @ref
+https://jsonapi.org/format/1.1/#error-objects @ref https://www.rfc-editor.org/rfc/rfc6901#section-4
+
+Tests: `form/form-errors.test.ts` (a 422 with items on two fields and one on `/data`, a 409 on
+`email`, a relationship pointer with `/data` after it, a pointer whose segment holds `~1`, the first
+of two texts per field, `title` without `detail`, a member the form does not hold, a `ResponseError`
+without error objects, a `TypeError`, a `ResponseError` from another copy of the client).
+
+### 20.5 TanStack Form (`./form`)
+
+```ts
+const form = useForm({
+  ...resourceFormOptions(model),
+  onSubmit: async ({ value, formApi }) => {
+    try {
+      await create.mutateAsync(model.write(value));
+    } catch (error) {
+      setBanner(bindResponseErrors(formApi, model, error).form);
+    }
+  },
+});
+```
+
+- `resourceFormOptions(model)` is
+  `formOptions({ defaultValues, validationLogic: revalidateLogic(), validators: { onDynamic: model.validator } })`:
+  the form validates when it is first submitted and on every change after, so nobody sees an error
+  before submitting. It spreads into `useForm` and into the `useAppForm` of `createFormHook` alike,
+  so an application keeps its own field components.
+- `bindResponseErrors(form, model, error)` reads `model.errors(error)` and, for every member the
+  form holds, sets the field's `errorMap.onSubmit` to `{ message }` where a text landed and to
+  `undefined` elsewhere, clearing the previous refusal's, and marks a field touched where a text
+  landed, so a field that shows its errors once touched shows it. It returns the `FormErrors`.
+- TanStack Form clears a field's `onSubmit` error when the field validates again for another cause
+  without an error, which is when its value changes; until then the error blocks the next submit, so
+  a value the server refused changes before it is sent again.
+- Every error a field holds is an object with a `message`, the validator's issue and the server's
+  text alike, so a field component renders `field.state.meta.errors[0]?.message`.
+- `isSubmitSuccessful` is `true` after a refused write, since the handler resolves (ADR 0015); a
+  screen reads a refusal from what `bindResponseErrors` returned.
+
+`form` is a TanStack Form `FormApi`: the `formApi` a submit handler receives, or what `useForm` or
+`useAppForm` returned. @ref https://tanstack.com/form/v1/docs/framework/react/guides/validation @ref
+https://tanstack.com/form/v1/docs/framework/react/guides/form-composition
+
+Tests: `tanstack-form/form-options.test.ts` and `tanstack-form/bind-errors.test.ts` over a `FormApi`
+made with `new FormApi(...)`, and the component tests of 20.8.
+
+### 20.6 TanStack Query (`./query`): `resourceQueries(client)`
+
+```ts
+const contacts = resourceQueries(clients.contacts);
+const page = useQuery(contacts.list({ ...query, include: ['organization_id'] }));
+const feed = useInfiniteQuery(contacts.pages({ sort: ['-created_at'] }));
+const contact = useQuery(contacts.get(id));
+const create = useMutation(contacts.create());
+```
+
+| Member            | Made with              | Key                                       | Runs                                              |
+| ----------------- | ---------------------- | ----------------------------------------- | ------------------------------------------------- |
+| `all`             |                        | `[type]`                                  |                                                   |
+| `list(query?)`    | `queryOptions`         | `[type, 'list', <query>]`                 | `client.list(query, { signal })`                  |
+| `pages(query?)`   | `infiniteQueryOptions` | `[type, 'pages', <query>]`                | `client.list` of the query at the page's cursor   |
+| `get(id, query?)` | `queryOptions`         | `[type, 'get', id, <include and fields>]` | `client.get(id, query, { signal })`               |
+| `create()`        | `mutationOptions`      | `mutationKey: [type, 'create']`           | `client.create(input)`                            |
+| `update()`        | `mutationOptions`      | `mutationKey: [type, 'update']`           | `client.update(id, input)` for `{ id, ...input }` |
+| `remove()`        | `mutationOptions`      | `mutationKey: [type, 'remove']`           | `client.remove(id)`                               |
+
+- **A key is the request.** `<query>` is `serializeQuery(client.definition, query).toString()`
+  (jsonapi SPEC 15.5), so two queries that make one request share one cache entry, a bigint filter
+  value keys as its text, and every key is JSON. `type` is the definition's, so invalidating
+  `[type]` reaches every list, page, and record of the type, and `[type, 'list']` every list.
+  `client.definition` is the definition the client was made from (jsonapi SPEC 15.4).
+- **Reads** resolve to the client's `ReadResult` (15.4), the document's `links` and `meta` with the
+  records, which paging reads (20.7). Each passes TanStack Query's `signal`, so a cancelled query
+  aborts its request.
+- **Pages.** The page parameter is `{ after }` or `{ before }`, starting from the query's own
+  cursors, which the key holds as the list's start; the next is `{ after: pageCursors(last).next }`
+  and the previous `{ before: pageCursors(first).prev }` (jsonapi SPEC 15.8), none when the link is
+  absent or the page holds no records, since the profile lets a link point at an empty page.
+  `page[size]` stays the query's.
+- **Writes** invalidate their type and return that promise from `onSuccess`, with the `QueryClient`
+  TanStack Query passes (`context.client`), so the mutation stays pending until the lists and
+  records it touched have refetched; `remove` first removes the record's `get` entries, so a screen
+  still showing it does not refetch a 404. A write whose server behavior changes other types
+  invalidates those in the application, through a per-call `onSuccess` passed to `mutate`, which
+  runs after these: spreading the options and overriding `onSuccess` would drop the invalidation.
+- **Types.** Every option is made with TanStack Query's own `queryOptions`, `infiniteQueryOptions`,
+  and `mutationOptions`, so `queryClient.getQueryData(contacts.get(id).queryKey)` is typed; records
+  are the client's `RecordOf` for the query passed (15.6), and `update`'s variables are
+  `{ id } & UpdateInput`.
+
+@ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys @ref
+https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions @ref
+https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
+
+Tests: `tanstack-query/query-keys.test.ts` (one key per request, the canonical order, bigints),
+`tanstack-query/queries.test.ts` (each member against a fetch double through a `QueryClient`: the
+signal, the pages in both directions and the empty page, invalidation and removal after each write),
+and `tanstack-query/queries.test-d.ts` (data and variables typed by the definitions, `getQueryData`
+through the tagged keys).
+
+### 20.7 The list model: `resourceList(resource, messages)`
+
+```ts
+const contactsList = resourceList(Contacts, messages);
+
+export const Route = createFileRoute('/contacts')({
+  validateSearch: (search: Record<string, unknown>) => contactsList.query(search),
+  component: ContactsScreen,
+});
+
+function ContactsScreen() {
+  const state = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const result = useQuery(contacts.list(state)); // resourceQueries (20.6)
+  const go = (next: ListState) => void navigate({ search: next });
+  const table = useTable({
+    features: tableFeatures({ rowSortingFeature, columnFilteringFeature }),
+    columns,
+    data: result.data?.data ?? [],
+    getRowId: (record) => record.id,
+    manualSorting: true,
+    manualFiltering: true,
+    state: {
+      sorting: contactsList.sorting(state),
+      columnFilters: contactsList.columnFilters(state),
+    },
+    onSortingChange: (updater) => go(contactsList.withSorting(state, updater)),
+    onColumnFiltersChange: (updater) => go(contactsList.withColumnFilters(state, updater)),
+  });
+  // paging: go(contactsList.next(state, result.data)) where it is not undefined
+}
+```
+
+A list's state is its query: `ListState` is the `sort`, `filter`, `page`, and `search` of the
+client's `ListQuery` (15.5), held where the application keeps it, in the route's search here, and
+sent as it is. TanStack Table holds no data of its own: its sorting and column filters are read from
+the state and written back to it, the request does the sorting and filtering, and paging happens
+outside the table, by cursor, since a cursor API has no total and no page index. Rows are keyed by
+`id`, so a row selection survives paging as the ids it names.
+
+| Member                                 | Is                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `columns`                              | the descriptors (20.2) of the members a read returns, every access but `write`, in declaration order                                                                                                                                                                                                                |
+| `page`                                 | `{ default, max }`, the definition's page sizes (11.1)                                                                                                                                                                                                                                                              |
+| `searchable`                           | whether the definition has a search parameter (3.7)                                                                                                                                                                                                                                                                 |
+| `query(search)`                        | the state a route's search holds, read back leniently (below)                                                                                                                                                                                                                                                       |
+| `params(state)`                        | `serializeQuery(resource.resource, state)`, the API's own parameters                                                                                                                                                                                                                                                |
+| `sorting(state)`                       | each `sort` name as `{ id, desc }`, `desc` for a `-` name; with no `sort`, the declaration's default sort (3.7), the order the server applies                                                                                                                                                                       |
+| `withSorting(state, sorting)`          | `sort` from the entries in order; an empty list removes `sort`, so the default applies                                                                                                                                                                                                                              |
+| `columnFilters(state)`                 | each member of `filter` but `or` as `{ id, value }`, the value the member's condition as an object of operators, a bare value as `{ eq: value }`                                                                                                                                                                    |
+| `withColumnFilters(state, filters)`    | `filter` from them, keeping `or`; a filter whose value is `undefined`, or whose operators are all `undefined`, is removed                                                                                                                                                                                           |
+| `withSearch(state, text)`              | `search`, removed when `text` is empty                                                                                                                                                                                                                                                                              |
+| `withPageSize(state, size)`            | `page.size`                                                                                                                                                                                                                                                                                                         |
+| `next(state, result)`, `previous(...)` | the state at the next or previous page: `page.after` set from the result's `next` link, or `page.before` from its `prev` (jsonapi SPEC 15.8), the other cursor removed; `undefined` when there is no such link, or when the result holds no records and was reached in that direction, the first page going forward |
+| `first(state)`                         | the state without cursors                                                                                                                                                                                                                                                                                           |
+
+- Every change but paging drops `page.after` and `page.before`: a cursor names a position under the
+  sort and filter that made it. `page.size` stays.
+- `withSorting` and `withColumnFilters` take the new state or a function of the current one, as
+  Table's `onSortingChange` and `onColumnFiltersChange` pass it. A sort on a member that does not
+  sort, a filter on a member without `filter`, an operator the member does not declare, and a page
+  size that is not a positive safe integer at most `page.max` throw `TypeError` without quoting the
+  name or value: a table's columns come from `columns`, so these are the application's mistakes.
+- The functions return a new state and never change the one they are given; every member they do not
+  set is kept, `include` and `fields` among them when the application's state holds them.
+
+**Reading a route's search.** `query(search)` turns what a URL holds into a state the definition
+accepts, so a stale or edited link opens the list instead of failing the route:
+
+1. `search` is the state as JSON, what a router's JSON search holds, or the API's own parameters as
+   `URLSearchParams` or a string. In JSON, a member of another shape is dropped: `sort` is a list of
+   strings, `filter` an object of conditions with `or` a list of such objects, a condition a value
+   or an object of operators, a value a string, a finite number, a boolean, or a non-empty list of
+   them, `page` an object with a positive safe integer `size` and string cursors, `search` a string.
+2. Only `sort`, `filter`, `page`, and the search parameter are read: `include`, `fields`, and custom
+   parameters are the screen's to choose, not the URL's.
+3. `parseQuery(resource.resource, params)` (jsonapi SPEC 6) reads them. While it refuses, every
+   parameter its items name (`source.parameter`) is dropped and it reads again, at most once per
+   parameter; when an item names no parameter, the state is empty.
+4. The parsed query becomes the state: each sort name, `-` for descending; each condition under its
+   member and operator, a repeated parameter as a list; each `or` group; `page.size` when the
+   parameters held it, and the cursors; `search`.
+
+Values are not checked: a filter value keyset-core refuses (keyset SPEC 4.3), or a cursor the server
+no longer accepts, is the list request's 400, whose error object names the parameter
+(`source.parameter`), and the screen recovers with `first` or by removing the filter.
+
+@ref https://tanstack.com/table/v9/docs/framework/react/guide/sorting @ref
+https://tanstack.com/table/v9/docs/framework/react/guide/column-filtering @ref
+https://tanstack.com/table/v9/docs/framework/react/guide/pagination @ref
+https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
+
+Tests: `list/sorting.test.ts` and `list/column-filters.test.ts` (both ways, the default sort,
+updaters, every `TypeError`), `list/resource-list.test.ts` (columns, cursors dropped by every change
+but paging, `next` and `previous` from links, an empty page, `first`), `list/lenient-query.test.ts`
+(a valid search in both forms, an unknown parameter, an operator the member does not declare, a page
+size above the maximum, a range request where the definition refuses one, `include` and `fields`
+dropped, JSON of every wrong shape, a search that is not an object, the state
+`params(query(search))` gives back), and `list/resource-list.test-d.ts` (states typed by the
+definition's sort names, operators, and search).
+
+### 20.8 Test plan
+
+- Unit and type tests beside each module (20.2 to 20.7), over a fixture catalog of contacts and
+  organizations in `src/test-support/` modeled on resource-core's, with messages from
+  `defineMessages` whose texts are closures reading a locale variable, so a test switches the
+  language as Paraglide does it, by changing what the functions read.
+- Component tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, and Table v9
+  as an application uses them) against a fetch double that answers with documents jsonapi-core
+  builds from the fixture's definitions: a create form that shows no error before its first submit,
+  then a client `maxLength` refusal in German on its field and in English after the locale changes;
+  a 422 and a 409 landing on their fields with the server's detail, a field error cleared when its
+  value changes, a 500 without error objects leaving both empty; an update form sending only the
+  members the person changed; a table whose header sends `sort=-name`, whose filter sends
+  `filter[status][in]`, which pages by cursor and drops the cursor on a sort change; and a list
+  refetched after a create.
+- End to end (`e2e/resource/react/`): the built package in jsdom against the contacts application
+  over HTTP (`support/contacts-server.ts`), on PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL
+  server, with the application's Paraglide messages and nothing mocked: the German create form, its
+  client refusal and the server's 422 and its `CONTACT_EMAIL_TAKEN` 409 each on their field in the
+  server's words, an update sending the changed members only, the list's sort, filter, search, and
+  cursors over real pages, a stale link read back leniently, and the list refetched after a create.
+- Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
+  and write and a list model's `query` on Bun, Deno, and workerd, where server rendering runs.
+- Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).
+
+### 20.9 Packaging
+
+- ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
+  `platform: 'neutral'`, `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run
+  in the build. Three entries: `index`, `form`, `query`.
+- Peer dependencies: `@netvark/resource-core` (the application's declarations and messages, which
+  `localizeIssues` recognizes by the copy that made them, 10.1) and `@netvark/jsonapi-client` (the
+  application's clients, and `ResourceClient.definition`), each a `workspace:^` development
+  dependency too; `@tanstack/react-form` `^1.17.0` and `@tanstack/react-query` `^5.89.0`, optional
+  (`peerDependenciesMeta`), each needed only by its entry: `revalidateLogic` first shipped in
+  TanStack Form 1.17.0, and the `QueryClient` in a mutation's callbacks (`context.client`) in
+  TanStack Query 5.89.0, the release after 5.87.4. CI runs the package's tests on both floors, and a
+  floor that fails them is raised in the same change.
+- Dependencies: `@netvark/jsonapi-core`, for `parseQuery`.
+- React is not a peer: the package has no component and no hook of its own; TanStack's React
+  adapters bring it, and the root entry runs without it.
