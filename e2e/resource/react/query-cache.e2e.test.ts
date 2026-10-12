@@ -60,6 +60,21 @@ async function showing(
   return observer;
 }
 
+/**
+ * `records` with each cursor loosened to any string: a cursor carries the
+ * second it was issued in (keyset SPEC 8), so two answers a second apart
+ * hold different cursors for the same row.
+ */
+function anyCursor(records: ReadonlyArray<any>): Array<unknown> {
+  return records.map((record) => ({
+    ...record,
+    $meta: {
+      ...record.$meta,
+      page: { ...record.$meta.page, cursor: expect.any(String) },
+    },
+  }));
+}
+
 /** The names on each page of an infinite list. */
 function names(pages: ReadonlyArray<{ readonly data: ReadonlyArray<any> }>) {
   return pages.map(({ data }) => data.map(({ name }) => name));
@@ -152,7 +167,9 @@ describe.each(runtimeDatabases())(
       await backward.refetch();
       let behind = backward.getCurrentResult();
       expect(names(behind.data?.pages ?? [])).toEqual([['Bea']]);
-      expect(behind.data?.pages[0]?.data).toEqual(second?.data);
+      expect(behind.data?.pages[0]?.data).toEqual(
+        anyCursor(second?.data ?? []),
+      );
       while (behind.hasPreviousPage) {
         behind = await backward.fetchPreviousPage();
       }
