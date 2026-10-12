@@ -82,6 +82,7 @@ describe("a definition's client types (SPEC 5.3)", () => {
     expectTypeOf<Types['include']>().toEqualTypeOf<
       'author' | 'author.articles' | 'tags'
     >();
+    expectTypeOf<Types['fields']>().toEqualTypeOf<true>();
     expectTypeOf<Types['search']>().toEqualTypeOf<true>();
     expectTypeOf<Types['page']>().toEqualTypeOf<true>();
     expectTypeOf<Types['custom']>().toEqualTypeOf<'x-trace'>();
@@ -107,7 +108,7 @@ describe("a definition's client types (SPEC 5.3)", () => {
         id: row.id,
         attributes: { name: row.name },
       }),
-      query: { page: false },
+      query: { page: false, fields: false },
       clientIds: true,
     });
     type Bare = TypesOf<typeof Tags>;
@@ -117,6 +118,7 @@ describe("a definition's client types (SPEC 5.3)", () => {
     expectTypeOf<keyof Bare['relationships']>().toEqualTypeOf<never>();
     expectTypeOf<keyof Bare['filter']>().toEqualTypeOf<never>();
     expectTypeOf<Bare['include']>().toEqualTypeOf<never>();
+    expectTypeOf<Bare['fields']>().toEqualTypeOf<false>();
     expectTypeOf<Bare['search']>().toEqualTypeOf<false>();
     expectTypeOf<Bare['page']>().toEqualTypeOf<false>();
     expectTypeOf<Bare['create']>().toEqualTypeOf<{

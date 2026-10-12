@@ -1,10 +1,11 @@
 # Contributing to the jsonapi family
 
-`@netvark/jsonapi-core` (the framework-free core) and `@netvark/hono-jsonapi` (the Hono binding).
-The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md) covers setup, the quality gates, the shared
-conventions, commits, changesets, and releases; this guide adds what is specific to the family.
-Design intent lives in [`DESIGN.md`](DESIGN.md), the normative contract in [`SPEC.md`](SPEC.md), and
-decisions in [`adr/`](adr); read those before proposing API changes.
+`@netvark/jsonapi-core` (the framework-free core), `@netvark/hono-jsonapi` (the Hono binding), and
+`@netvark/jsonapi-client` (the typed client). The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+covers setup, the quality gates, the shared conventions, commits, changesets, and releases; this
+guide adds what is specific to the family. Design intent lives in [`DESIGN.md`](DESIGN.md), the
+normative contract in [`SPEC.md`](SPEC.md), and decisions in [`adr/`](adr); read those before
+proposing API changes.
 
 ## Conventions
 
@@ -16,6 +17,9 @@ decisions in [`adr/`](adr); read those before proposing API changes.
 - **The core knows no framework.** Everything under `packages/jsonapi-core/` is functions over plain
   values; what needs a request, a response, or a framework context goes in `packages/hono-jsonapi/`
   and calls the core (ADR 0013). A handler context is the `TContext` type parameter in the core.
+- **The client is typed by the definitions, never by hand.** What `packages/jsonapi-client/` sends
+  and reads is typed from `'~types'` (SPEC 5.3); a capability a definition can declare gets its
+  client type there first, so the server's definition stays the one source.
 - **End-to-end tests live in `e2e/jsonapi/`.** That directory is a private pnpm workspace package
   that depends on `@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*`, so its
   imports resolve through the published `exports` maps into `dist/` and its `tsc` run checks the

@@ -473,6 +473,7 @@ parameters do not record:
 | `relationships`          | by name, the declared `type` and `cardinality`                                                                                                                                                                                                                  |
 | `filter`                 | by field, the union of its operators                                                                                                                                                                                                                            |
 | `include`                | the union of the declared include paths                                                                                                                                                                                                                         |
+| `fields`                 | `false` when `query.fields` is `false`                                                                                                                                                                                                                          |
 | `search`                 | `true` when `query.search` is set                                                                                                                                                                                                                               |
 | `page`                   | `true` when the definition paginates                                                                                                                                                                                                                            |
 | `custom`                 | the union of the declared custom names                                                                                                                                                                                                                          |
@@ -1179,9 +1180,9 @@ so the same build runs in browsers, workers, Node, Bun, and Deno. The client rea
 
 ### 15.1 Surface and module map
 
-| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Query`, `ListQuery`, `GetQuery`, `FilterInput`, `FilterValue`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `PageCursors` |
+| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `PageCursors` |
 
 ```
 packages/jsonapi-client/src/
@@ -1289,9 +1290,12 @@ their definition by type (15.6). The result holds a `ResourceClient` per name:
   `create`'s `attributes` are `'~types'.create`, `update`'s `'~types'.update`; `relationships` take
   the names `creatable` and `updatable` list; `id` is accepted when `clientIds` is `true`; `list`
   takes `ListQuery` (15.5), with `page` only on a definition that paginates and `search` only on one
-  with a search parameter; `get` and `related` take `GetQuery`. The server stays the authority: the
-  client checks none of this at run time, and `parseQuery` and the request parsers answer what the
-  types would have caught (6, 9).
+  with a search parameter; `get` and `related` take `GetQuery`. Both take `fields` only where
+  `'~types'.fields` is `true`, keyed by the types 6.5 accepts: the definition's own and each type a
+  segment of its declared include paths reaches through the definitions passed. A type's names are
+  the attributes and relationships of its definition, any string when no definition passed has that
+  type. The server stays the authority: the client checks none of this at run time, and `parseQuery`
+  and the request parsers answer what the types would have caught (6, 9).
 
 ### 15.5 Query serialization (`serialize-query.ts`, `serialize-filter.ts`)
 
@@ -1311,6 +1315,10 @@ in this order, so one query always gives one URL:
 - A filter value is a string as it is, a finite number or a bigint by `String`, or a boolean as
   `true` or `false`; a list is the parameter repeated, one pair per value, never joined, since a
   comma belongs to the value (6.8). A number that is not finite throws `TypeError`.
+- A member that is `undefined` is left out, as is a fieldset or custom parameter that is
+  `undefined`. An empty list is refused with `TypeError` naming the parameter (`filter[author][in]`,
+  a custom name), since repeating a parameter zero times sends nothing; an empty `include`,
+  fieldset, or `sort` is the empty value the specification defines.
 - `page.size` MUST be a positive safe integer (the profile's `^[0-9]+$`), otherwise `TypeError`
   naming `page.size`. `search` on a definition without a search parameter, or `page` on one that
   does not paginate, throws `TypeError`; the types reject both.
@@ -1322,9 +1330,10 @@ in this order, so one query always gives one URL:
   `parseQuery` decodes before it splits `include`, `fields`, and `sort`. A list keeps its order: a
   `sort` is applied in the order given (`#fetching-sorting`).
 
-Tests: `serialize-query.test.ts` (each member, order, values, refusals) and `round-trip.test.ts`:
-every query generated from the blog's definitions is what `parseQuery` reads back from its
-serialization.
+Tests: `serialize-query.test.ts` (each member, order, values, refusals), `round-trip.test.ts`: every
+query generated from the blog's definitions is what `parseQuery` reads back from its serialization,
+and `types.test-d.ts`: what `ListQuery` and `GetQuery` take and refuse, the fieldsets 6.5 accepts
+among them.
 
 ### 15.6 Records (`deserialize.ts`, `include-tree.ts`, `record-types.ts`, ADR 0019)
 
