@@ -1,11 +1,12 @@
 /**
- * Package surface. Both packages must resolve through their published
+ * Package surface. The three packages must resolve through their published
  * `exports` maps at runtime and export exactly what the SPEC lists. Value
  * imports on purpose: a missing dist file or a wrong `exports` entry fails
  * here before any feature test runs.
  */
 import { describe, expect, it } from 'vitest';
 
+import * as drizzle from '@netvark/drizzle-keyset';
 import * as core from '@netvark/keyset-core';
 import * as kysely from '@netvark/kysely-keyset';
 
@@ -50,7 +51,7 @@ const CORE = [
 ].toSorted();
 
 /**
- * SPEC 10: the adapter's own values, on top of the core's. Its
+ * SPEC 10: the Kysely adapter's own values, on top of the core's. Its
  * `createDefineKeyset` replaces the core's export of the same name.
  */
 const ADAPTER = [
@@ -59,6 +60,9 @@ const ADAPTER = [
   'renderPredicate',
   'renderTarget',
 ].toSorted();
+
+/** SPEC 1, 14: the Drizzle adapter's own values; no standalone `paginate`. */
+const DRIZZLE = ['createDefineKeyset', 'renderPredicate', 'renderTarget'];
 
 describe('package surface', () => {
   it('@netvark/keyset-core exports the documented values', () => {
@@ -74,6 +78,15 @@ describe('package surface', () => {
     expect(kysely.InvalidCursorError).toBe(core.InvalidCursorError);
   });
 
+  it('@netvark/drizzle-keyset re-exports the core and adds the adapter', () => {
+    expect(names(drizzle)).toEqual(
+      [...new Set([...CORE, ...DRIZZLE])].toSorted(),
+    );
+    expect(drizzle.defineKeyset).toBe(core.defineKeyset);
+    expect(drizzle.createDefineKeyset).not.toBe(core.createDefineKeyset);
+    expect(drizzle.InvalidCursorError).toBe(core.InvalidCursorError);
+  });
+
   it('resolves package.json through the exports map', async () => {
     const corePkg = (await import('@netvark/keyset-core/package.json', {
       with: { type: 'json' },
@@ -85,7 +98,13 @@ describe('package surface', () => {
     })) as {
       default: { name: string };
     };
+    const drizzlePkg = (await import('@netvark/drizzle-keyset/package.json', {
+      with: { type: 'json' },
+    })) as {
+      default: { name: string };
+    };
     expect(corePkg.default.name).toBe('@netvark/keyset-core');
     expect(adapterPkg.default.name).toBe('@netvark/kysely-keyset');
+    expect(drizzlePkg.default.name).toBe('@netvark/drizzle-keyset');
   });
 });

@@ -1,16 +1,23 @@
+import type { Generated, GeneratedAlways } from 'kysely';
+
 /**
  * Database harnesses: PGlite in-process (Kysely's built-in dialect),
  * node-postgres over a pglite-socket server (the stock `pg` driver and its
  * type parsers), and a PostgreSQL server named by `KEYSET_PG_URL`. Every
  * harness creates the schema and seeds it, so each test file starts from
- * the same rows.
+ * the same rows, and opens Drizzle on the same client beside Kysely, so a
+ * file can page through either binding.
  * @ref https://kysely.dev/docs/dialects
  * @ref https://pglite.dev/docs/pglite-socket
+ * @ref https://orm.drizzle.team/docs/get-started-postgresql (an existing node-postgres pool)
+ * @ref https://orm.drizzle.team/docs/connect-pglite (an existing PGlite client)
  */
-import type { Generated, GeneratedAlways } from 'kysely';
+import type { KeysetDatabase } from '@netvark/drizzle-keyset';
 
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+import { drizzle as drizzleNodePg } from 'drizzle-orm/node-postgres';
+import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
 import { Kysely, PGliteDialect, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 
@@ -85,6 +92,8 @@ export interface CamelDB {
 
 export interface Harness {
   readonly db: Kysely<DB>;
+  /** Drizzle over the same database. */
+  readonly drizzle: KeysetDatabase;
   close(): Promise<void>;
 }
 
@@ -133,6 +142,7 @@ export async function openPglite(): Promise<Harness & { pglite: PGlite }> {
   await createSchema(db);
   return {
     db,
+    drizzle: drizzlePglite({ client: pglite }),
     pglite,
     close: async () => {
       await db.destroy();
@@ -165,6 +175,7 @@ export async function openPgOverSocket(): Promise<Harness> {
   await createSchema(db);
   return {
     db,
+    drizzle: drizzleNodePg({ client: pool }),
     close: async () => {
       await db.destroy();
       await server.stop();
@@ -191,6 +202,7 @@ export async function openPostgres(url: string): Promise<Harness> {
   await createSchema(scopedDb);
   return {
     db: scopedDb,
+    drizzle: drizzleNodePg({ client: scoped }),
     close: async () => {
       await sql.raw(`drop schema ${schema} cascade`).execute(scopedDb);
       await scopedDb.destroy();

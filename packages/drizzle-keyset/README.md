@@ -24,7 +24,8 @@ pnpm add @netvark/drizzle-keyset drizzle-orm
 `drizzle-orm >=0.45.2 <1.0.0` is the peer dependency. 0.45.2 is the release that escapes quotes
 inside identifiers (CVE-2026-39356), and 1.0 is still a release candidate. The adapter targets
 PostgreSQL 14+ and PGlite through any Drizzle PostgreSQL driver. Node 22.12+, Bun, Deno, and
-Cloudflare Workers are supported.
+Cloudflare Workers are supported. CI runs the end-to-end suite on PGlite, on node-postgres, and on
+PostgreSQL 14 and 18 servers, and a smoke test on Bun, Deno, and workerd.
 
 ## Quick start
 

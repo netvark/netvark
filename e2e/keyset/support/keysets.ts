@@ -3,10 +3,15 @@ import type { CamelDB, DB } from './db.ts';
 /**
  * The keysets under test, defined the way an application would: one
  * configured definer per database interface (the snake_case `DB` and the
- * camelCase `CamelDB`) carries the cursor secret, and each definition
- * adds only what differs.
+ * camelCase `CamelDB`) and one over the Drizzle schema carry the cursor
+ * secret, and each definition adds only what differs. Every keyset is
+ * defined through both bindings, with the same field names, so the files
+ * that run per binding (`bindings.ts`) page the same collections.
  */
+import { createDefineKeyset as createDrizzleDefineKeyset } from '@netvark/drizzle-keyset';
 import { createDefineKeyset } from '@netvark/kysely-keyset';
+
+import { schema } from './drizzle-schema.ts';
 
 export const SECRET = 'e2e-secret-with-at-least-32-bytes-in-it';
 
@@ -140,3 +145,81 @@ export const camelContacts = defineCamel({
   search: { mode: 'like', columns: ['firstName', 'lastName'] },
   page: { default: 5, max: 50, range: true },
 });
+
+const defineDrizzle = createDrizzleDefineKeyset(schema, {
+  cursor: { secret: SECRET },
+});
+
+/** `COLUMN_FIELDS` over the Drizzle schema's properties. */
+export const DRIZZLE_COLUMN_FIELDS = {
+  ...COLUMN_FIELDS,
+  firstName: { column: 'firstName', type: 'text' },
+  lastName: { ...COLUMN_FIELDS.lastName, column: 'lastName' },
+  createdAt: { column: 'createdAt', type: 'timestamptz' },
+} as const;
+
+const DRIZZLE_FIELDS = {
+  ...DRIZZLE_COLUMN_FIELDS,
+  emailCount: FIELDS.emailCount,
+  latestStart: {
+    aggregate: { relation: 'workHistory', fn: 'max', column: 'startDate' },
+    type: 'date',
+  },
+} as const;
+
+const DRIZZLE_RELATIONS = {
+  emails: {
+    table: 'contactEmails',
+    on: { contactId: 'id' },
+    fields: {
+      email: { column: 'email', type: 'text' },
+      primary: { column: 'isPrimary', type: 'boolean' },
+    },
+  },
+  workHistory: {
+    table: 'workHistory',
+    on: { contactId: 'id' },
+    fields: {
+      company: { column: 'company', type: 'text' },
+      startDate: { column: 'startDate', type: 'date' },
+    },
+  },
+} as const;
+
+/** The keysets above, through `@netvark/drizzle-keyset`. */
+export const drizzleKeysets = {
+  contacts: defineDrizzle({
+    table: 'contacts',
+    key: ['id'],
+    fields: DRIZZLE_FIELDS,
+    relations: DRIZZLE_RELATIONS,
+    search: { mode: 'like', columns: ['firstName', 'lastName'] },
+    page: { default: 5, max: 50, range: true },
+  }),
+  searchable: defineDrizzle({
+    table: 'contacts',
+    key: ['id'],
+    fields: DRIZZLE_FIELDS,
+    relations: DRIZZLE_RELATIONS,
+    search: { vector: 'searchVector', config: 'simple' },
+    page: { default: 5, max: 50 },
+  }),
+  phrased: defineDrizzle({
+    table: 'contacts',
+    key: ['id'],
+    fields: DRIZZLE_COLUMN_FIELDS,
+    search: {
+      columns: ['firstName', 'bio'],
+      mode: 'phrase',
+      config: 'english',
+    },
+  }),
+  composite: defineDrizzle({
+    table: 'contacts',
+    key: ['createdAt', 'id'],
+    fields: DRIZZLE_FIELDS,
+    relations: DRIZZLE_RELATIONS,
+    sort: { default: ['-createdAt', '-id'] },
+    page: { default: 4, max: 50, range: true },
+  }),
+};

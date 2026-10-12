@@ -1,11 +1,14 @@
 /**
  * Runtime-neutral checks (SPEC 11.4) over the built packages: define a
  * keyset, plan a request, sign and verify cursors with Web Crypto, render
- * SQL through Kysely's PostgreSQL compiler, and get the typed errors. No
- * database: the Kysely instance uses `DummyDriver`, so the same module
- * runs on Bun, Deno, and workerd.
+ * SQL through Kysely's PostgreSQL compiler, and get the typed errors; the
+ * Drizzle binding's checks come from `drizzle-checks.ts`. No database: the
+ * Kysely instance uses `DummyDriver`, so the same module runs on Bun, Deno,
+ * and workerd.
  */
 import type { QueryEvent } from '@netvark/kysely-keyset';
+
+import type { Check } from './assert.ts';
 
 import {
   DummyDriver,
@@ -21,27 +24,13 @@ import {
   isKeysetError,
 } from '@netvark/kysely-keyset';
 
+import { check, equal } from './assert.ts';
+import { DRIZZLE_CHECKS } from './drizzle-checks.ts';
+
 export interface SmokeResult {
   readonly runtime: string;
   readonly passed: number;
   readonly failures: ReadonlyArray<string>;
-}
-
-class CheckFailure extends Error {
-  override readonly name: string = 'CheckFailure';
-}
-
-function check(condition: boolean, message: string): asserts condition {
-  if (!condition) {
-    throw new CheckFailure(message);
-  }
-}
-
-function equal(actual: unknown, expected: unknown, what: string): void {
-  check(
-    actual === expected,
-    `${what}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`,
-  );
 }
 
 interface DB {
@@ -76,8 +65,6 @@ const db = new Kysely<DB>({
     createQueryCompiler: () => new PostgresQueryCompiler(),
   },
 });
-
-type Check = () => Promise<void>;
 
 const CHECKS: Readonly<Record<string, Check>> = {
   'plans a request with the key as tie-breaker': async () => {
@@ -193,6 +180,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     }
     check(false, 'expected a rejection');
   },
+  ...DRIZZLE_CHECKS,
 };
 
 /** Runs every check and collects failures so one report covers them all. */
