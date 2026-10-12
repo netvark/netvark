@@ -49,10 +49,12 @@ else, `e2e/*` included, resolves `dist/`.
 | -------------------------- | ---------------------------------------------------------------------- |
 | `pnpm check`               | Runs every `check:*` script below, in order                            |
 | `pnpm check:deps`          | `knip`: unused files, exports, dependencies                            |
+| `pnpm check:floors`        | Each peer range's floor has a CI job that tests the package on it      |
 | `pnpm check:format`        | `oxfmt --check`                                                        |
 | `pnpm check:lint`          | `oxlint` with type-aware rules                                         |
 | `pnpm check:pkg`           | `publint` and `arethetypeswrong` against each built package            |
-| `pnpm check:types`         | `tsc --noEmit` for the root configs and each package                   |
+| `pnpm check:types`         | `tsc --noEmit` for the root configs and scripts, and each package      |
+| `pnpm audit:floors`        | No published advisory affects a floor (queries GitHub; weekly in CI)   |
 | `pnpm test`                | Vitest over every package, including type tests in `*.test-d.ts`       |
 | `pnpm test:coverage`       | Vitest with V8 coverage over every package; thresholds are enforced    |
 | `pnpm test:e2e`            | Build, then type-check and run each `e2e/*` package against the builds |
@@ -126,7 +128,10 @@ CATALOG_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filte
   database affects. An advisory published later raises it, with a `minor` changeset. The package
   gets a job beside the other floor jobs in `.github/workflows/ci.yml`: it installs the floor, runs
   the typecheck and tests, and is listed in `CI passed`'s `needs`. Workspace packages that share the
-  peer go on one version per step, as an application has one copy.
+  peer go on one version per step, as an application has one copy. `pnpm check:floors` checks the
+  jobs and `pnpm audit:floors` the advisories
+  ([ADR 0008](docs/adr/0008-scripts-check-the-peer-floors.md)); write a floor step as one pnpm
+  command per line with the packages filtered by name, the form the check reads.
 - **No emojis** in code, docs, or commit messages.
 - **Lint disables carry a reason.** `// oxlint-disable-next-line rule -- reason: <why>`.
 

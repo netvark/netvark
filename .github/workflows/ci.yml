@@ -17,7 +17,7 @@ env:
 
 jobs:
   quality:
-    name: Format, lint, types, deps
+    name: Format, lint, types, deps, floors
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,6 +39,9 @@ jobs:
       - run: pnpm run check:lint
       - run: pnpm run check:types
       - run: pnpm run check:deps
+      # Every peer range's floor has its job below (root ADR 0008). The
+      # advisory half needs the network and runs in peer-floors.yml.
+      - run: pnpm run check:floors
 
   test:
     name: Test (Node ${{ matrix.node }})

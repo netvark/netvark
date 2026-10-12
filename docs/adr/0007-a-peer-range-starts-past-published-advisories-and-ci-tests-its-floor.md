@@ -1,6 +1,7 @@
 # ADR 0007: A peer range starts past its peer's published advisories, and CI tests its floor
 
-- Status: accepted
+- Status: accepted; amended by ADR-0008 (scripts check both rules: the floor jobs with every check,
+  the advisories weekly)
 - Date: 2026-10-12
 
 ## Context
