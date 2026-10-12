@@ -260,7 +260,7 @@ describe('keysetRequest: sort, search, and page (SPEC 11.2)', () => {
     expect(page.next).toBeTypeOf('string');
     const after = `page[after]=${encodeURIComponent(String(page.next))}`;
     const next = await keyset.plan(requestOf(`${query}&${after}`));
-    expect(next.seek).not.toBeNull();
+    expect(next.seek).not.toHaveLength(0);
     const other = 'filter[mood][in]=busy&sort=-count&page[size]=1';
     const elsewhere = keyset.plan(requestOf(`${other}&${after}`));
     await expect(elsewhere).rejects.toBeInstanceOf(InvalidCursorError);

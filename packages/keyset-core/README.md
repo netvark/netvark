@@ -217,17 +217,21 @@ returns a `QueryPlan` an adapter renders without re-checking anything: every nam
 validated identifier from the definition and every value a validated request value.
 
 ```ts
-plan.keys; // [{ alias: 'keyset0', field: 'emailCount', target, direction: 'desc', nulls: 'last' }, ...]
+plan.keys; // [{ alias: 'keyset0', valueAlias: 'keyset0v', field: 'emailCount', target, direction: 'desc', nulls: 'last' }, ...]
 plan.filter; // the filter and the search as one predicate tree, or null
-plan.seek; // the cursor's predicate tree, or null on a first page
+plan.seek; // the cursor's branches, each a predicate tree; none on a first page
 plan.limit; // size + 1: one extra row tells whether a next page exists
 plan.reversed; // true on a page before a cursor: run inverted, then reverse the rows
 plan.context; // the hash cursors are bound to
 ```
 
-An adapter adds the filter and the seek to `where`, selects each key cast to text under its alias
-(`cast(created_at as text) as keyset0`), orders by the keys with the stated direction and null
-placement, limits, and hands the rows to `page` with a function that reads the aliases back. The
+An adapter adds the filter and the seek's branch to `where`, selects each key cast to text under its
+alias (`cast(created_at as text) as keyset0`), orders by the keys with the stated direction and null
+placement, limits, and hands the rows to `page` with a function that reads the aliases back. A seek
+of two or more branches runs as one such select per branch, each also selecting every key's value
+under its `valueAlias` (`created_at as keyset0v`), joined with `union all`, ordered by the value
+aliases, and limited again. Each branch is a conjunction an index on the sort bounds at the cursor,
+which one disjunction is not inside a tie of the first key or after a value of a nullable one. The
 predicate tree has thirteen kinds (`and`, `or`, `not`, `literal`, `compare`, `null`, `in`,
 `between`, `like`, `array`, `exists`, `textSearch`) over three targets (a column, an aggregate
 subquery, a concatenation);

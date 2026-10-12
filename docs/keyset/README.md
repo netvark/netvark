@@ -92,12 +92,15 @@ page.total; // the rows the filter and search select, when asked for
 page.cursor(row); // the cursor that falls on a row of this page
 ```
 
-The SQL it ran, with the cursor's values bound as parameters:
+The SQL it ran after a cursor, with the cursor's values bound as parameters. The seek has a branch
+per key: the rows past the cursor's `created_at`, and the rows at its `created_at` past its `id`.
+Each runs as its own select, which an index on the sort bounds at the cursor, and the union is
+ordered again. Each select repeats the selection and the filter, shortened here to `...`:
 
 ```sql
 select "id", "name", "created_at",
-  cast("contacts"."created_at" as text) as "keyset0",
-  cast("contacts"."id" as text) as "keyset1"
+  cast("contacts"."created_at" as text) as "keyset0", "contacts"."created_at" as "keyset0v",
+  cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v"
 from "contacts"
 where (("contacts"."status" = $1
     and exists (select 1 as "one" from "contact_emails"
@@ -105,12 +108,15 @@ where (("contacts"."status" = $1
                   and "contact_emails"."email" like $2))
     and to_tsvector('simple', concat_ws(' ', "contacts"."name", "contacts"."bio"))
         @@ websearch_to_tsquery('simple', $3))
-  and ("contacts"."created_at" <= $4
-    and ("contacts"."created_at" < $5
-      or ("contacts"."created_at" = $6 and "contacts"."id" > $7)))
-order by "contacts"."created_at" desc, "contacts"."id" asc
-limit $8
--- ["customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2024-01-09 10:00:00+00", "2a1b…", 26]
+  and false
+union all (select ... where ((...)) and "contacts"."created_at" < $7
+  order by "contacts"."created_at" desc, "contacts"."id" asc limit $8)
+union all (select ... where ((...)) and ("contacts"."created_at" = $12 and "contacts"."id" > $13)
+  order by "contacts"."created_at" desc, "contacts"."id" asc limit $14)
+order by "keyset0v" desc, "keyset1v" asc
+limit $15
+-- ["customer", "%@example.com", "ada", "customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", 26,
+--  "customer", "%@example.com", "ada", "2024-01-09 10:00:00+00", "2a1b…", 26, 26]
 ```
 
 A request that sorts on `bio`, filters `age` with `contains`, asks for 500 rows, or sends a cursor
@@ -179,8 +185,8 @@ const contacts = defineKeyset({
 });
 
 const plan = await contacts.plan({ sort: ['-createdAt'], page: { size: 25, after } });
-// plan.keys: [{ alias: 'keyset0', target: { kind: 'column', column: 'created_at', ... }, direction: 'desc', nulls: null, nullable: false }, ...]
-// plan.filter, plan.seek: predicate trees to render; plan.limit: 26
+// plan.keys: [{ alias: 'keyset0', valueAlias: 'keyset0v', target: { kind: 'column', column: 'created_at', ... }, direction: 'desc', nulls: null, nullable: false }, ...]
+// plan.filter: a predicate tree to render; plan.seek: the cursor's branches, a select each; plan.limit: 26
 
 const rows = await runYourQuery(plan); // select ..., cast(created_at as text) as keyset0, cast(id as text) as keyset1
 const page = await contacts.page(plan, rows, (row) => [row.keyset0, row.keyset1]);

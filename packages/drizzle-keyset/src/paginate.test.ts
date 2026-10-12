@@ -49,7 +49,7 @@ describe('paginate (SPEC 14.3)', () => {
     expect(page.hasPrev).toBe(false);
     expect(page.cursor(page.rows[1]!)).toBe(page.next);
     const next = await contacts.plan({ page: { size: 2, after: page.next! } });
-    expect(next.seek).toMatchObject({ kind: 'compare', operator: '>' });
+    expect(next.seek).toMatchObject([{ kind: 'compare', operator: '>' }]);
   });
 
   it("puts the caller's where, the filter, and the seek each in parentheses", async () => {
@@ -86,9 +86,10 @@ describe('paginate (SPEC 14.3)', () => {
   });
 
   it("counts the caller's where and the filter, not the seek, and reports both queries", async () => {
+    const created = '2024-01-01 00:00:00+00';
     const { db, recorded } = canned([
       [['42']],
-      [row(1, '2024-01-01 00:00:00+00', `${ID}1`)],
+      [row(1, created, created, `${ID}1`, `${ID}1`)],
     ]);
     const request = { sort: ['-createdAt'], search: 'ada' } as const;
     const after = (
@@ -118,10 +119,28 @@ describe('paginate (SPEC 14.3)', () => {
       sql: `select count(*) from "contacts" where ("contacts"."active") and (concat_ws(' ', "contacts"."first_name", "contacts"."last_name") ilike $1)`,
       params: ['%ada%'],
     });
-    // The seek leads with a range on its first key (SPEC 6.2).
-    expect(recorded.statements[1]?.sql).toBe(
-      `select "id", "first_name", cast("contacts"."created_at" as text) as "keyset0", cast("contacts"."id" as text) as "keyset1" from "contacts" where ("contacts"."active") and (concat_ws(' ', "contacts"."first_name", "contacts"."last_name") ilike $1) and (("contacts"."created_at" <= $2 and ("contacts"."created_at" < $3 or ("contacts"."created_at" = $4 and "contacts"."id" > $5)))) order by "contacts"."created_at" desc, "contacts"."id" asc limit $6`,
-    );
+    // The caller's where and the filter hold in each branch of the seek (ADR 0020).
+    const select =
+      'select "id", "first_name", cast("contacts"."created_at" as text) as "keyset0", "contacts"."created_at" as "keyset0v", cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v" from "contacts"';
+    const search = `concat_ws(' ', "contacts"."first_name", "contacts"."last_name")`;
+    const order = 'order by "contacts"."created_at" desc, "contacts"."id" asc';
+    expect(recorded.statements[1]).toEqual({
+      sql: [
+        `(${select} where ("contacts"."active") and (${search} ilike $1) and ("contacts"."created_at" < $2) ${order} limit $3)`,
+        `union all (${select} where ("contacts"."active") and (${search} ilike $4) and (("contacts"."created_at" = $5 and "contacts"."id" > $6)) ${order} limit $7)`,
+        'order by "keyset0v" desc, "keyset1v" asc  limit $8',
+      ].join(' '),
+      params: [
+        '%ada%',
+        '2025-01-01 00:00:00+00',
+        11,
+        '%ada%',
+        '2025-01-01 00:00:00+00',
+        `${ID}9`,
+        11,
+        11,
+      ],
+    });
     expect(events.map((event) => event.kind)).toEqual(['total', 'page']);
     expect(events.map((event) => event.rowCount)).toEqual([1, 1]);
     expect(events.map((event) => event.sql)).toEqual(
@@ -167,7 +186,7 @@ describe('paginate (SPEC 14.3)', () => {
 
   it('refuses a selection member named like a key alias before planning or querying', async () => {
     const { db, recorded } = canned([[]]);
-    for (const name of [keyAlias(0), keyAlias(12)]) {
+    for (const name of [keyAlias(0), keyAlias(12), `${keyAlias(3)}v`]) {
       await expect(
         paginate(
           contacts,
@@ -178,7 +197,7 @@ describe('paginate (SPEC 14.3)', () => {
         ),
       ).rejects.toThrow(
         new TypeError(
-          `select has a member named ${name}: paginate reserves the names keyset0, keyset1, ... for the sort keys`,
+          `select has a member named ${name}: paginate reserves the names keyset0, keyset0v, keyset1, keyset1v, ... for the sort keys`,
         ),
       );
     }

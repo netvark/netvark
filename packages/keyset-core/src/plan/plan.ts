@@ -26,7 +26,7 @@ import { escapeLike } from '../internal/like';
 import { resolvePage } from '../page/page-request';
 import { resolveSort, sortSignature } from '../sort/resolve-sort';
 import { bindingContext } from './context';
-import { seekPredicate } from './seek';
+import { pageSeek } from './seek';
 
 export interface KeysetRequest<
   TSort extends string = string,
@@ -43,6 +43,11 @@ export interface KeysetRequest<
 /** The selection alias of the n-th sort key; invariant under Kysely's CamelCasePlugin. */
 export function keyAlias(index: number): string {
   return `keyset${String(index)}`;
+}
+
+/** The alias of the n-th sort key's value in a union of the seek's branches (ADR 0020). */
+function valueAlias(index: number): string {
+  return `${keyAlias(index)}v`;
 }
 
 function searchPredicate(
@@ -170,16 +175,10 @@ export function createPlanner(
       context,
       sort.length,
     );
-    const seeks: Array<Predicate> = [];
-    if (afterValues !== null) {
-      seeks.push(seekPredicate(requested, afterValues, 'after'));
-    }
-    if (beforeValues !== null) {
-      seeks.push(seekPredicate(requested, beforeValues, 'before'));
-    }
     const reversed = beforeValues !== null && afterValues === null;
     const keys: Array<PlanKey> = requested.map((key, index) => ({
       alias: keyAlias(index),
+      valueAlias: valueAlias(index),
       field: key.field,
       target: key.target,
       direction: reversed ? invert(key.direction) : key.direction,
@@ -191,7 +190,7 @@ export function createPlanner(
       keys,
       reversed,
       filter,
-      seek: conjunction(seeks),
+      seek: pageSeek(requested, afterValues, beforeValues),
       limit: page.size + 1,
       size: page.size,
       range: page.range,

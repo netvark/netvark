@@ -142,11 +142,17 @@ describe('cursors across bindings (SPEC 14.3)', () => {
       ...request,
       page: { after: theirs.cursors[0] },
     });
+    // One select per branch (ADR 0020): the values past 25, the nulls, the rest of 25's tie.
     expect(recorded.statements[1]?.params).toEqual([
       '%@x.io',
       '25',
+      21,
+      '%@x.io',
+      21,
+      '%@x.io',
       '25',
       `${ID}7`,
+      21,
       21,
     ]);
   });

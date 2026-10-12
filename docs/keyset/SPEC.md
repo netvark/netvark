@@ -84,7 +84,7 @@ packages/keyset-core/src/
     types.ts                   QueryPlan, PlanKey, Predicate, Target, CursorValue (6)
     plan.ts                    createPlanner(), keyAlias(), KeysetRequest (6.1)
     context.ts                 PlanOptions, CursorContext, bindingContext() (6.1)
-    seek.ts                    seekPredicate() (6.2)
+    seek.ts                    seekPredicate(), seekBranches(), pageSeek() (6.2)
   page/
     page-request.ts            resolvePage(), PageInput, ResolvedPage (7.1)
     finish.ts                  finishPage(), Page, FinishOptions (7.2)
@@ -96,6 +96,7 @@ packages/kysely-keyset/src/
   define-keyset.ts             createDefineKeyset(), the Typed*Init types, DefaultedTypedKeysetInit, RelationsOf (10.1)
   render/target.ts             renderTarget(), concat() (10.2)
   render/predicate.ts          renderPredicate() (10.2)
+  page-query.ts                pageQuery(): the page statement, one select or a union of the seek's branches (10.3)
   paginate.ts                  paginate() (10.3)
   test-support/                a compile-only Kysely and a canned-rows driver; not published
 packages/drizzle-keyset/src/
@@ -107,6 +108,7 @@ packages/drizzle-keyset/src/
   define-keyset.ts             createDefineKeyset(), DefineKeyset, DefineDefaultedKeyset (14.1)
   render/target.ts             renderTarget(), concat() (14.2)
   render/predicate.ts          renderPredicate() (14.2)
+  page-query.ts                pageQuery(), conjunction(): the page statement, one select or a union of the seek's branches (14.3)
   paginate.ts                  paginate() (14.3)
   test-support/                a Drizzle schema, a recording pg-proxy database, and canned rows; not published
 ```
@@ -444,19 +446,19 @@ Tests: `resolve-sort.test.ts`.
 identifier from the definition and every value a validated request value, so an adapter renders it
 without re-checking anything.
 
-| Member            | Meaning                                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `table`           | The definition's table                                                                                   |
-| `keys`            | The sort keys in order, the tie-breaker included: `{ alias, field, target, direction, nulls, nullable }` |
-| `reversed`        | `true` on a backward page: the query runs inverted and `finishPage` reverses the rows                    |
-| `filter`          | The request's filter and search as one predicate, or `null`; what a total counts                         |
-| `seek`            | The cursor predicate(s), or `null` on a first page; never counted                                        |
-| `limit`           | `size + 1`                                                                                               |
-| `size`            | The used page size                                                                                       |
-| `range`           | Whether both cursors were given                                                                          |
-| `after`, `before` | The cursors as given, or `null`                                                                          |
-| `sort`            | The resolved sort in the request's directions                                                            |
-| `context`         | The hash cursors are bound to (8)                                                                        |
+| Member            | Meaning                                                                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `table`           | The definition's table                                                                                                              |
+| `keys`            | The sort keys in order, the tie-breaker included: `{ alias, valueAlias, field, target, direction, nulls, nullable }`                |
+| `reversed`        | `true` on a backward page: the query runs inverted and `finishPage` reverses the rows                                               |
+| `filter`          | The request's filter and search as one predicate, or `null`; what a total counts                                                    |
+| `seek`            | The seek's branches (6.2): none on a first page; one is added with `where`, two or more run under `union all` (10.3); never counted |
+| `limit`           | `size + 1`                                                                                                                          |
+| `size`            | The used page size                                                                                                                  |
+| `range`           | Whether both cursors were given                                                                                                     |
+| `after`, `before` | The cursors as given, or `null`                                                                                                     |
+| `sort`            | The resolved sort in the request's directions                                                                                       |
+| `context`         | The hash cursors are bound to (8)                                                                                                   |
 
 A `PlanKey`'s `alias` is `keyset<index>` (`keyAlias`), `direction` is the effective direction of the
 query (inverted on a backward page), `nullable` is the field's declaration (3.1, 3.2), and `nulls`
@@ -512,21 +514,23 @@ members binds nothing. Then validation runs in the order a client would want to 
    before contexts existed, and a bigint binds as its decimal text (2.4);
 6. the cursors, `after` then `before`, decoded with the codec against the context and the number of
    sort keys (8); a rejection is `InvalidCursorError(parameter, reason)`;
-7. the seek: `seekPredicate` for `after`, for `before`, both joined with `and` when both are present
-   (6.2);
-8. the keys: for each sort item, its alias, its target (`targetOf`), its field's `nullable`, and its
-   direction and null placement: the request's direction with `nulls: 'last'`, or, when `reversed`
-   (`before` without `after`), the inverted direction with `nulls: 'first'`; `nulls` is `null` on a
-   key that is not nullable (ADR 0016).
+7. the seek: `pageSeek` (6.2), the branches of `after`, or of `before` without `after`; with both,
+   each branch of `after` also holds `seekPredicate` for `before`;
+8. the keys: for each sort item, its alias (`keyAlias`), its value alias (`keyset<i>v`, the alias a
+   union selects the key's value under, uncast, ADR 0020), its target (`targetOf`), its field's
+   `nullable`, and its direction and null placement: the request's direction with `nulls: 'last'`,
+   or, when `reversed` (`before` without `after`), the inverted direction with `nulls: 'first'`;
+   `nulls` is `null` on a key that is not nullable (ADR 0016).
 
 `limit` is `size + 1`.
 
-Tests: `plan.test.ts`, `plan-cursors.test.ts` (including the caller context: resuming under the same
-context in any member order, rejection under another or none, the unchanged binding without a
-context, bigint and number binding, the context checked before the request), `context.test.ts`
-(every accepted and rejected context).
+Tests: `plan.test.ts`, `plan-seek.test.ts` (the seek after a value and after a null of a nullable
+first key, an aggregate first key, a range request, the value aliases), `plan-cursors.test.ts`
+(including the caller context: resuming under the same context in any member order, rejection under
+another or none, the unchanged binding without a context, bigint and number binding, the context
+checked before the request), `context.test.ts` (every accepted and rejected context).
 
-### 6.2 The seek predicate (`seek.ts`, ADR 0008, ADR 0016)
+### 6.2 The seek predicate and its branches (`seek.ts`, ADR 0008, ADR 0016, ADR 0020)
 
 `seekPredicate(keys, values, side)` takes the keys with the request's directions (not the inverted
 ones) and their fields' `nullable`, the cursor's value per key, and `after` or `before`, and returns
@@ -555,7 +559,27 @@ yields its `beyond` term alone, which is its own range. A null value on a key th
 cannot reach the seek: `finishPage` never signs one (7.2). @ref
 https://use-the-index-luke.com/sql/partial-results/fetch-next-page
 
-Tests: `seek.test.ts`.
+The range bounds the first key only. Inside a tie of the first key every entry before the cursor
+lies in it, and after a value of a nullable first key there is none, so an index scan would read
+from the start of the tie, or of the index, and filter. `seekBranches(keys, values, side)` returns
+the disjuncts as branches instead, each a conjunction an index on the sort holds as a range (ADR
+0020): for each key in order, `equal` on every earlier key and one bound on that key. The bounds are
+those of `beyond`, one branch each: after a value, `key > v` (`key < v` descending) and, on a
+nullable key, `key is null` as a branch of its own; after a null, none; before a value, `key < v`
+(`key > v` descending); before a null, `key is not null`. The branches are disjoint and together
+select the rows `seekPredicate` selects; a cursor no row follows gives the one branch `false`.
+
+`pageSeek(keys, after, before)` is the plan's seek: no branch without cursors; the branches of
+`after`, or of `before` without `after`; with both, each branch of `after` joined with `and` to
+`seekPredicate(keys, before, 'before')`, whose range bounds where each branch's scan ends. When the
+first key is an aggregate, which no index holds, each side is one branch, its `seekPredicate`, so
+the aggregate is computed once per row rather than once per branch. @ref
+https://docs.gitlab.com/development/database/keyset_pagination/ ("We generally advise using `UNION`
+queries instead")
+
+Tests: `seek.test.ts`, `seek-branches.test.ts` (the branches disjoint and selecting exactly the rows
+past the cursor, as `seekPredicate` does, evaluated in SQL's three-valued logic over grids of values
+and nulls, for nullable and mixed-direction keys, after and before).
 
 ---
 
@@ -722,19 +746,26 @@ inner predicate rendered in the relation's scope; `textSearch` emits the configu
 
 Tests: `target.test.ts`, `predicate.test.ts` (exact SQL and parameters).
 
-### 10.3 `paginate(keyset, query, request, options?)` (`paginate.ts`, ADR 0007, ADR 0012)
+### 10.3 `paginate(keyset, query, request, options?)` (`paginate.ts`, `page-query.ts`, ADR 0007, ADR 0012, ADR 0020)
 
 1. `plan = await keyset.plan(request, { context: options.context })`.
 2. The filter: `query.where(renderPredicate(plan.filter))` when there is one.
 3. The total, when `options.total` is `true`: the filtered query with its selection, `order by`,
    `limit`, and `offset` cleared and `count(*) as "total"` selected, run first; the result is
    `Number(total)`, `0` without a row.
-4. The page query: the seek added with `where` when there is one; `order by` and `offset` cleared;
-   for each key in order, `cast(<target> as text) as "<alias>"` added to the selection and
+4. The page query: the seek's branch added with `where` when it has one; `order by` and `offset`
+   cleared; for each key in order, `cast(<target> as text) as "<alias>"` added to the selection and
    `order by <target> <direction>` appended, with `nulls <first|last>` when the key's `nulls` is not
-   `null`; `limit plan.limit`.
+   `null`; `limit plan.limit`. A seek of two or more branches runs as one statement instead (ADR
+   0020): each branch is that query with the branch added with `where` and each key's
+   `<target> as "<valueAlias>"` selected after its text, in parentheses; the branches are joined
+   with `union all`, and the union is ordered by `"<valueAlias>" <direction>` per key, with the
+   key's null placement, and limited to `plan.limit`. Kysely does not parenthesize the query a set
+   operation starts from, so the union starts from the filtered query where `false` holds, with the
+   same selection: an operand that names the union's columns and holds no row.
 5. Rows: each fetched row MUST be an object (`TypeError` otherwise); the alias members are read (a
-   non-string is `null`) and removed, and the remaining members are the caller's row.
+   non-string is `null`) and removed with the value aliases, and the remaining members are the
+   caller's row.
 6. `keyset.page(plan, rows, values, { total })`.
 
 `PaginateOptions` is `{ total?, onQuery?, context? }`; `context` binds the cursors as in 6.1, and a
@@ -743,18 +774,37 @@ called after each statement with `QueryEvent`
 `{ kind: 'page' | 'total', sql, parameters, durationMs, rowCount }` (the statement is compiled only
 when `onQuery` is set). `query` MUST be a plain selection of the definition's table as ADR 0012
 states: its `order by`, `limit`, and `offset` are replaced, its `where` is kept, and the alias names
-`keyset0`, `keyset1`, ... are reserved. The SQL of a first page over `selectAll()` with the key
-`id`:
+`keyset0`, `keyset1`, ... and `keyset0v`, `keyset1v`, ... are reserved. The SQL of a first page over
+`selectAll()` with the key `id`:
 
 ```sql
 select *, cast("contacts"."id" as text) as "keyset0" from "contacts"
 order by "contacts"."id" asc limit $1
 ```
 
+The page of two after a cursor at `(30, <id>)` on the nullable `age`, whose seek has three branches
+(`paginate-order.test.ts`):
+
+```sql
+select *, cast("contacts"."age" as text) as "keyset0", "contacts"."age" as "keyset0v",
+  cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v"
+from "contacts" where false
+union all (select *, <the keys> from "contacts" where "contacts"."age" > $1
+  order by "contacts"."age" asc nulls last, "contacts"."id" asc limit $2)
+union all (select *, <the keys> from "contacts" where "contacts"."age" is null
+  order by "contacts"."age" asc nulls last, "contacts"."id" asc limit $3)
+union all (select *, <the keys> from "contacts"
+  where ("contacts"."age" = $4 and "contacts"."id" > $5)
+  order by "contacts"."age" asc nulls last, "contacts"."id" asc limit $6)
+order by "keyset0v" asc nulls last, "keyset1v" asc limit $7
+-- ['30', 3, 3, '30', <id>, 3, 3]
+```
+
 Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, and camelCase pages; the base
 query's clauses; row splitting; the context rejecting a foreign cursor before querying; the dummy
-driver), `paginate-order.test.ts` (the seek after the filter, the inverted backward page, and nulls
-placed on nullable keys only).
+driver), `paginate-order.test.ts` (the seek after the filter, the inverted backward page, nulls
+placed on nullable keys only, and a seek of three branches run under `union all` and its rows
+stripped of both aliases).
 
 ---
 
@@ -773,7 +823,7 @@ answers canned rows while recording the compiled queries, the Drizzle adapter's 
 | Internal                            | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                                                                                                 | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                                                                         |
 | Definition                          | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`, `create-define-keyset.test.ts`, `create-define-keyset.test-d.ts` | every definition-time rejection and default, definer defaults and their merge, inference                                                               |
 | Filter                              | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                                                                         |
-| Sort, plan, page, cursor            | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks                   |
+| Sort, plan, page, cursor            | `resolve-sort.test.ts`, `plan.test.ts`, `plan-seek.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `seek-branches.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                   | tie-breaking, the context and the caller's context, inversion, every seek case and its branches, page bounds, links, the cursor format and its checks  |
 | Errors                              | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                                        |
 | Adapter (`@netvark/kysely-keyset`)  | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                      | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                                            |
 | Adapter (`@netvark/drizzle-keyset`) | `schema.test.ts`, `target.test.ts`, `predicate.test.ts`, `check-names.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `paginate.test-d.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                       | exact SQL and parameters for every target and predicate kind and every page shape; name checks against the schema, in the types and at definition time |
@@ -813,6 +863,7 @@ it came from.
 | `pg-driver.e2e.test.ts`         | section 11.2                                                                                                                                                                                                                                                                                             |
 | `postgres.e2e.test.ts`          | section 11.3                                                                                                                                                                                                                                                                                             |
 | `index-seek.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
+| `index-seek-ties.e2e.test.ts`   | section 11.3                                                                                                                                                                                                                                                                                             |
 | `drizzle.e2e.test.ts`           | section 14.4                                                                                                                                                                                                                                                                                             |
 | `drizzle-pg-schema.e2e.test.ts` | section 14.4                                                                                                                                                                                                                                                                                             |
 
@@ -832,11 +883,22 @@ when `KEYSET_PG_URL` names a server and skips itself otherwise; it creates a thr
 scopes its connections to it with `search_path`, and drops it. CI provides PostgreSQL 14 and 18.
 
 `index-seek.e2e.test.ts` reads the planner's choice with `EXPLAIN (ANALYZE, FORMAT JSON)` on 10 000
-rows with an index on `(name, id)` (ADR 0016): the page after, and the page before, a cursor halfway
-down a `name` sort is an index scan whose index condition bounds `name` from the cursor and that
-reads at most a page, the row that tells whether another follows, and the cursor's own row; `-name`
-reads the same index backward with an incremental sort of the ties; and a nullable sort walks every
-row with its nulls last. It runs only against a server.
+rows with an index on `(name, id)` (ADRs 0016 and 0020; `support/explain.ts` runs the page statement
+under `EXPLAIN` and sums what its scans read): the page after, and the page before, a cursor halfway
+down a `name` sort runs a scan per seek branch, each an index scan whose index condition bounds
+`name` at the cursor, and reads at most a page and the row that tells whether another follows;
+`-name` reads the same index backward with an incremental sort of the ties; and a nullable sort
+walks every row with its nulls last.
+
+`index-seek-ties.e2e.test.ts` runs through both bindings over 10 000 rows that share one `joined`
+time, three in four with a nickname, and an index per sort in its own order, `(joined desc, id)` and
+`(nickname desc nulls last, id)` (ADR 0020). Halfway down `-joined`, inside the tie, the pages after
+and before the cursor bound the key at the cursor, through the sort's index or the key's own, and
+read at most a page and one row, where ADR 0016's seek read the 5 000 rows before the cursor. After
+a nickname, one branch bounds the nicknames at the cursor and another reads the nulls, at most two
+pages and two rows in all, where ADR 0016's seek read 5 000 rows; after a null, the one branch
+bounds the key among the nulls. Each page holds the ids an `offset` over the same order gives, and a
+walk of `-nickname` meets every row in that order. Both files run only against a server.
 
 ### 11.4 Runtime smoke test (`e2e/keyset/smoke/`)
 
@@ -884,6 +946,7 @@ request and every push to `main`.
 | `DEFAULT_MAX_PAGE_SIZE` | 100                                                         | yes                           |
 | `OPERATORS`             | the nineteen operators of 4.2, in table order               | yes                           |
 | `keyAlias(i)`           | `keyset<i>`                                                 | yes                           |
+| value alias             | `keyset<i>v`, each key's `valueAlias` (ADR 0020)            | no, the plan carries it       |
 | `PROTO_KEYS`            | `__proto__`, `constructor`, `prototype`                     | no                            |
 | name grammar            | `^[A-Za-z0-9][A-Za-z0-9_-]*$` (field and relation names)    | no, `isFieldName` tests it    |
 | `SEARCH_CONFIG`         | `^[a-z_][a-z0-9_]{0,62}$` (text search configuration names) | no, `isSearchConfig` tests it |
@@ -966,7 +1029,7 @@ Tests: `schema.test.ts`, `target.test.ts`, `predicate.test.ts` (exact SQL and pa
 from 0.45.2 on, CVE-2026-39356), `casing: 'snake_case'`, a correlated aggregate selected beside a
 table's columns, an unresolved name, a configuration `isSearchConfig` refuses).
 
-### 14.3 `keyset.paginate(db, request, options?)` (`paginate.ts`, ADR 0007, ADR 0012, ADR 0017)
+### 14.3 `keyset.paginate(db, request, options?)` (`paginate.ts`, `page-query.ts`, ADR 0007, ADR 0012, ADR 0017, ADR 0020)
 
 `db` is a `KeysetDatabase`, `Pick<PgDatabase<PgQueryResultHKT>, 'select'>`: a Drizzle PostgreSQL
 database of any driver, a transaction, or a `withReplicas` database. `PaginateOptions<TSelection>`
@@ -976,34 +1039,51 @@ is the caller's condition, an `SQL` such as `eq(contacts.orgId, org.id)`; `total
 `context` are those of 10.3.
 
 1. A member of `select` named like a key alias (`keyset` followed by digits, the names `keyAlias`
-   gives) is a `TypeError`, raised before the request is planned: the names are reserved as in 10.3,
-   whatever the request's sort, so a selection either always works or never does.
+   gives, or by digits and `v`, the value aliases) is a `TypeError`, raised before the request is
+   planned: the names are reserved as in 10.3, whatever the request's sort, so a selection either
+   always works or never does.
 2. `plan = await keyset.plan(request, { context: options.context })`.
 3. The total, when `options.total` is `true`: `select count(*) from <table>` with the caller's
    `where` and the filter joined as in step 4, run first. It selects Drizzle's `count()`, which
    reads the count as a number; `0` without a row.
 4. The page: `db.select({ ...select, <alias>: cast(<target> as text), ... }).from(<table>)`, with
-   those of the caller's `where`, the filter, and the seek that are present, each in parentheses and
-   joined with `and`; `order by <target> <direction>` per key, with `nulls <first|last>` when the
-   key's `nulls` is not `null`; `limit plan.limit`.
-5. Rows: the alias members are read (a non-string is `null`) and removed, as in 10.3.
+   those of the caller's `where`, the filter, and the seek's branch that are present, each in
+   parentheses and joined with `and`; `order by <target> <direction>` per key, with
+   `nulls <first|last>` when the key's `nulls` is not `null`; `limit plan.limit`. A seek of two or
+   more branches runs as Drizzle's `unionAll` of one such select per branch, each also selecting
+   `<valueAlias>: <target>` after the key's text, ordered by `"<valueAlias>"` per key with its
+   direction and null placement, and limited to `plan.limit` (ADR 0020). Drizzle parenthesizes every
+   operand, and nests the operands from the third on, so the first branch leads.
+5. Rows: the alias and value alias members are read (a non-string key text is `null`) and removed,
+   as in 10.3.
 6. `keyset.page(plan, rows, values, { total })`.
 
 `onQuery` receives the `QueryEvent`s of 10.3 with `toSQL()`'s `sql` and `params`, compiled only when
 `onQuery` is set. The rows are `SelectResultFields<TSelection>`, the table's `$inferSelect` row
 without a `select`. The page after a cursor on `-createdAt`, with a `startsWith` filter and a caller
 `where` written as `sql` with an `or`, over the default selection under `casing: 'snake_case'`
-(captured on drizzle-orm 0.45.4 over PGlite 0.5.8):
+(captured on drizzle-orm 0.45.4 over PGlite 0.5.8), whose seek has two branches:
 
 ```sql
-select "id", "name", "created_at", cast("contacts"."created_at" as text) as "keyset0",
-  cast("contacts"."id" as text) as "keyset1"
-from "contacts"
-where ("contacts"."name" = $1 or "contacts"."name" like $2) and ("contacts"."name" like $3)
-  and (("contacts"."created_at" <= $4 and ("contacts"."created_at" < $5
-    or ("contacts"."created_at" = $6 and "contacts"."id" > $7))))
-order by "contacts"."created_at" desc, "contacts"."id" asc
-limit $8
+(select "id", "name", "created_at",
+   cast("contacts"."created_at" as text) as "keyset0", "contacts"."created_at" as "keyset0v",
+   cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v"
+ from "contacts"
+ where ("contacts"."name" = $1 or "contacts"."name" like $2) and ("contacts"."name" like $3)
+   and ("contacts"."created_at" < $4)
+ order by "contacts"."created_at" desc, "contacts"."id" asc
+ limit $5)
+union all
+(select "id", "name", "created_at",
+   cast("contacts"."created_at" as text) as "keyset0", "contacts"."created_at" as "keyset0v",
+   cast("contacts"."id" as text) as "keyset1", "contacts"."id" as "keyset1v"
+ from "contacts"
+ where ("contacts"."name" = $6 or "contacts"."name" like $7) and ("contacts"."name" like $8)
+   and (("contacts"."created_at" = $9 and "contacts"."id" > $10))
+ order by "contacts"."created_at" desc, "contacts"."id" asc
+ limit $11)
+order by "keyset0v" desc, "keyset1v" asc
+limit $12
 ```
 
 The cursors are those of 10.3: neither the key text nor the context (6.1) depends on the binding, so
@@ -1013,10 +1093,11 @@ secret, and the reverse.
 Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, scoped, and `casing` pages; the
 default selection and a caller's; the reserved aliases; row splitting; the context rejecting a
 foreign cursor before querying), `paginate-order.test.ts` (the seek after the filter, the inverted
-backward page, nulls placed on nullable keys only, a correlated aggregate key, a `pgSchema` table).
-Both run over Drizzle's `pg-proxy` driver, whose callback records each statement and answers canned
-rows. `paginate.test-d.ts` pins the row types of the default selection and of a caller's, the
-request types, and a database, a transaction, and a `withReplicas` database as `KeysetDatabase`.
+backward page, nulls placed on nullable keys only, a seek of three branches under nested `union all`
+operands, a correlated aggregate key, a `pgSchema` table). Both run over Drizzle's `pg-proxy`
+driver, whose callback records each statement and answers canned rows. `paginate.test-d.ts` pins the
+row types of the default selection and of a caller's, the request types, and a database, a
+transaction, and a `withReplicas` database as `KeysetDatabase`.
 
 ### 14.4 End-to-end and smoke tests
 

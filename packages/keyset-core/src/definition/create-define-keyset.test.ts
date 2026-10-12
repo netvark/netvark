@@ -33,7 +33,7 @@ async function seekAfter(
   cursor: string,
 ) {
   const plan = await keyset.plan({ page: { size: 1, after: cursor } });
-  return { after: plan.after, seeks: plan.seek !== null };
+  return { after: plan.after, seeks: plan.seek.length > 0 };
 }
 
 /** The `next` cursor of a first page of one row out of two. */

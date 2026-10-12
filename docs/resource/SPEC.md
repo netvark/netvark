@@ -2076,14 +2076,15 @@ which holds the cursor secret the declaration leaves out, and pages with it as
 `@netvark/kysely-keyset` does for Kysely (keyset SPEC 6): `plan(request, { context })` with the
 scope values (obligation 12); one statement over the schema-qualified table with the scope's
 predicate, the plan's `filter` and `seek`, each key selected as text under its alias, the keys
-ordered with their directions and null placement, and the plan's `limit`; then
-`page(plan, rows, values)` over the rows read. Every value of the plan is a parameter of its
-column's type, a cursor's included: its values are the text each key was selected as, so a
-`timestamptz` keeps its microseconds and an `int8` its digits. The plan orders a nullable key's
-nulls last on a forward page, where PostgreSQL's default puts them first when descending, and gives
-a key that is not nullable no placement (`nulls` is `null`), so the order is that of an index
+ordered with their directions and null placement, and the plan's `limit` (a seek of two or more
+branches runs as one such select per branch under `union all`, ordered again by each key's value,
+keyset ADR 0020); then `page(plan, rows, values)` over the rows read. Every value of the plan is a
+parameter of its column's type, a cursor's included: its values are the text each key was selected
+as, so a `timestamptz` keeps its microseconds and an `int8` its digits. The plan orders a nullable
+key's nulls last on a forward page, where PostgreSQL's default puts them first when descending, and
+gives a key that is not nullable no placement (`nulls` is `null`), so the order is that of an index
 declared in the sort's directions; the keyset definition takes each field's nullability from the
-catalog, which the seek's leading range depends on (keyset ADR 0016). @ref
+catalog, which the seek's leading range and its branches depend on (keyset ADRs 0016 and 0020). @ref
 https://www.postgresql.org/docs/18/queries-order.html (NULLS FIRST is the default for DESC order)
 
 An adapter MUST:
@@ -3425,11 +3426,15 @@ whether one was deleted.
    `cast(<target> as text)` under its alias behind a `.`, `".keyset0"`, which no public name holds
    (4.2), so no member's alias meets it, from `"schema"."name" as "<plan.table>"`, where the scope
    predicate, the plan's `filter`, and its `seek` hold, each in parentheses, ordered by each key
-   with its direction and null placement, limited to the plan's `limit`. Targets and predicates are
-   kysely-keyset's `renderTarget` and `renderPredicate` with `{ table: plan.table }` (keyset SPEC
-   10.2), which bind the plan's values as keyset-core validated them, strings for every temporal and
-   arbitrary-precision value, so PostgreSQL types each from the column it is compared with (keyset
-   SPEC 4.3);
+   with its direction and null placement, limited to the plan's `limit`. A seek of two or more
+   branches runs as one such select per branch, each holding its branch and also selecting each
+   key's value, uncast, under its value alias behind a `.`, `".keyset0v"`, each in parentheses; the
+   selects are joined with `union all`, ordered by the value aliases with each key's direction and
+   null placement, and limited to the plan's `limit` again (keyset ADR 0020). Targets and predicates
+   are kysely-keyset's `renderTarget` and `renderPredicate` with `{ table: plan.table }` (keyset
+   SPEC 10.2), which bind the plan's values as keyset-core validated them, strings for every
+   temporal and arbitrary-precision value, so PostgreSQL types each from the column it is compared
+   with (keyset SPEC 4.3);
 3. pages: `keyset.page(plan, rows, values, { total })` over the public rows read from the result,
    with each row's key texts as its values, a null key as `null`. With `total: true` a second
    statement counts the rows of the scope that the filter selects, without the seek, so every page

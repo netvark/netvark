@@ -54,7 +54,8 @@ Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `kn
   (`values.ts`), one condition to one predicate (`condition.ts`), the tree to a predicate
   (`normalize.ts`)
 - `sort/` sort resolution with the key appended, and the sort signature cursors bind to
-- `plan/` the query plan types (`types.ts`), the planner (`plan.ts`), the seek predicate (`seek.ts`)
+- `plan/` the query plan types (`types.ts`), the planner (`plan.ts`), the seek predicate and its
+  branches (`seek.ts`)
 - `page/` page request resolution (`page-request.ts`) and page assembly (`finish.ts`)
 - `cursor/` the cursor codec: signing, verification, rotation, expiry, context binding
 - `errors.ts` the request-time error classes
@@ -67,6 +68,8 @@ Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `kn
   Kysely `DB` interface and whose keysets carry `paginate`
 - `paginate.ts` the plan rendered onto the caller's select query: filter, total, seek, key
   selections, ordering, limit; rows split from the private aliases
+- `page-query.ts` the page statement: one select, or a select per seek branch under `union all`
+  (ADR 0020)
 - `render/` `renderTarget` (columns, correlated aggregates, `concat_ws`) and `renderPredicate`
   (every predicate kind as a Kysely expression)
 - `test-support/` a compile-only Kysely, a canned-rows driver, and the rows it answers, for the unit
@@ -82,6 +85,8 @@ Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `kn
 - `schema.ts` `tableOf` and `columnOf`: prototype-safe lookups of tables and columns
 - `paginate.ts` the select the binding builds: the caller's selection and condition, the filter, the
   total, the seek, the key selections, the ordering, the limit; rows split from the private aliases
+- `page-query.ts` the page statement: one select, or a select per seek branch under `unionAll`
+  (ADR 0020)
 - `render/` `renderTarget` (columns, correlated aggregates, `concat_ws`) and `renderPredicate`
   (every predicate kind as Drizzle `sql`)
 - `test-support/` a Drizzle schema, a `pg-proxy` database that records statements and answers canned
@@ -91,9 +96,9 @@ Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`, `kn
 through `workspace:*`; never imports from `src/`. `e2e/keyset/support/` holds the schema and seed
 (`schema.ts`, `seed.ts`), the Drizzle schema of the same tables (`drizzle-schema.ts`), the harnesses
 (`db.ts`: PGlite, node-postgres over pglite-socket, a PostgreSQL server), the keysets under test
-(`keysets.ts`, each through both adapters), a pager per adapter (`bindings.ts`), and the invariants
-every harness and adapter must satisfy (`invariants.ts`). `e2e/keyset/smoke/` is the runtime smoke
-test (Bun, Deno, workerd).
+(`keysets.ts`, each through both adapters), a pager per adapter (`bindings.ts`), the invariants
+every harness and adapter must satisfy (`invariants.ts`), and the `EXPLAIN` runner the server plan
+tests share (`explain.ts`). `e2e/keyset/smoke/` is the runtime smoke test (Bun, Deno, workerd).
 
 - `docs/keyset/DESIGN.md` what we are building and why; `docs/keyset/SPEC.md` the normative
   contract; `docs/keyset/adr/` decisions

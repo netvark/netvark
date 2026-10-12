@@ -58,7 +58,8 @@ export interface PaginateOptions<
   /**
    * The caller's selection, as `db.select(fields)` takes it; the table's
    * columns by default. A member may not be named like a key alias
-   * (`keyset0`, `keyset1`, ...), which `paginate` adds and strips.
+   * (`keyset0`, `keyset1`, ...) or a value alias (`keyset0v`, `keyset1v`,
+   * ...), which `paginate` adds and strips.
    */
   readonly select?: TSelection | undefined;
   /**

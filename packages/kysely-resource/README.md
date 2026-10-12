@@ -368,10 +368,11 @@ quota's.
 `(organization_id, ...)` serves both the predicate and the policy.
 
 **Index the sorts you page by behind the scope column.** A page orders by its sort keys and then by
-the key, and its seek leads with a range on the first sort key (keyset ADR 0016), so an index of the
-scope column, the sort keys in their directions, and the key lets PostgreSQL start at the cursor,
-read one page in order, and stop, however deep the page. Boot warns about each sortable field no
-index serves:
+the key, and runs its seek as one select per branch, each a range from the cursor (keyset ADRs 0016
+and 0020), so an index of the scope column, the sort keys in their directions, and the key lets
+PostgreSQL start each at the cursor, read at most one page in order, and stop, however deep the
+page, inside a tie of the first sort key or after a value of a nullable one included. Boot warns
+about each sortable field no index serves:
 
 ```sql
 create index contacts_organization_name on contacts (organization_id, name, id);

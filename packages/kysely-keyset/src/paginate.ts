@@ -3,11 +3,10 @@ import type { SelectQueryBuilder } from 'kysely';
 /**
  * `paginate` (SPEC 10): the plan rendered onto the caller's select query.
  * The filter goes into `where`; the total (when asked for) counts that
- * much; the seek, the text-cast key selections, the `order by` with its
- * null placement, and `limit size + 1` complete the page query. The key
- * selections come back under private aliases and are stripped before the
- * rows reach the caller.
- * @ref https://www.postgresql.org/docs/current/queries-order.html (NULLS FIRST / LAST)
+ * much; the page statement (`page-query.ts`) adds the seek, the text-cast
+ * key selections, the `order by` with its null placement, and
+ * `limit size + 1`. The key selections come back under private aliases
+ * and are stripped before the rows reach the caller.
  * @ref https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-TYPE-CASTS
  * @packageDocumentation
  */
@@ -17,7 +16,6 @@ import type {
   Keyset,
   KeysetRequestOf,
   Page,
-  PlanKey,
   QueryPlan,
   RelationsInit,
 } from '@netvark/keyset-core';
@@ -29,8 +27,8 @@ import type {
   RenderContext,
 } from './types';
 
+import { pageQuery } from './page-query';
 import { renderPredicate } from './render/predicate';
-import { renderTarget } from './render/target';
 
 type Reporter = (event: QueryEvent) => void;
 
@@ -69,49 +67,6 @@ async function countTotal<TRow>(
   return row === undefined ? 0 : Number(row.total);
 }
 
-function orderAndSelect<TRow>(
-  query: AnyQuery<TRow>,
-  key: PlanKey,
-  context: RenderContext,
-): AnyQuery<TRow> {
-  return query
-    .select((eb) =>
-      eb
-        .cast<string | null>(renderTarget(eb, key.target, context), 'text')
-        .as(key.alias),
-    )
-    .orderBy(
-      (eb) => renderTarget(eb, key.target, context),
-      (ob) => {
-        const directed = key.direction === 'asc' ? ob.asc() : ob.desc();
-        if (key.nulls === null) {
-          return directed;
-        }
-        return key.nulls === 'first'
-          ? directed.nullsFirst()
-          : directed.nullsLast();
-      },
-    );
-}
-
-function pageQuery<TRow>(
-  filtered: AnyQuery<TRow>,
-  plan: QueryPlan,
-  context: RenderContext,
-): AnyQuery<TRow> {
-  const { seek } = plan;
-  const sought =
-    seek === null
-      ? filtered
-      : filtered.where((eb) => renderPredicate(eb, seek, context));
-  return plan.keys
-    .reduce(
-      (query, key) => orderAndSelect(query, key, context),
-      sought.clearOrderBy().clearOffset(),
-    )
-    .limit(plan.limit);
-}
-
 function isRow(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -124,7 +79,9 @@ function splitRow<TRow>(
   if (!isRow(fetched)) {
     throw new TypeError('paginate expects object rows');
   }
-  const aliases = new Set(plan.keys.map((key) => key.alias));
+  const aliases = new Set(
+    plan.keys.flatMap((key) => [key.alias, key.valueAlias]),
+  );
   const values = plan.keys.map((key) => {
     const value = fetched[key.alias];
     return typeof value === 'string' ? value : null;
@@ -133,7 +90,8 @@ function splitRow<TRow>(
     Object.entries(fetched).filter(([name]) => !aliases.has(name)),
   );
   // The fetched row is the caller's row type plus the alias columns the
-  // query added; removing exactly those gives the caller's row back.
+  // query added, values included in a union of the seek's branches;
+  // removing exactly those gives the caller's row back.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: the plan's aliases are the only columns paginate added to the caller's selection
   return { row: cleaned as TRow, values };
 }

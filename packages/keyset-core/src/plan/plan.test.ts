@@ -26,7 +26,7 @@ describe('createPlanner', () => {
       table: 'contacts',
       reversed: false,
       filter: null,
-      seek: null,
+      seek: [],
       limit: 21,
       size: 20,
       range: false,
@@ -37,6 +37,7 @@ describe('createPlanner', () => {
     expect(result.keys).toEqual([
       {
         alias: 'keyset0',
+        valueAlias: 'keyset0v',
         field: 'id',
         target: {
           kind: 'column',
