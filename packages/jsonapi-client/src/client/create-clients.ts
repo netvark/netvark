@@ -10,7 +10,6 @@
 import type { AnyResource } from '@netvark/jsonapi-core';
 
 import type { Clients } from './types';
-import type { WideClient } from './wide-client';
 
 import { resourcePaths } from '@netvark/jsonapi-core';
 
@@ -29,7 +28,9 @@ export function createClients<
 >(definitions: TDefinitions, transport: Transport): Clients<TDefinitions> {
   const state = Transport.stateOf(transport);
   const names = new Map<string, string>();
-  const clients: Record<string, WideClient> = {};
+  // Each value is a `WideClient`, held as `unknown`: its `definition` is any
+  // definition, which the assertion below types as the one passed.
+  const clients: Record<string, unknown> = {};
   for (const [name, definition] of Object.entries(definitions)) {
     const other = names.get(definition.type);
     if (other !== undefined) {

@@ -4,6 +4,8 @@
  * time. `createClients` gives them the types of `ResourceClient`.
  * @packageDocumentation
  */
+import type { AnyResource } from '@netvark/jsonapi-core';
+
 import type { Query } from '../query/types';
 import type { CallOptions } from '../transport/send';
 import type { WriteInput } from './request-documents';
@@ -14,6 +16,7 @@ export type IncludeAndFields = Pick<Query, 'include' | 'fields'>;
 
 /** The calls typed wide. */
 export interface WideClient {
+  readonly definition: AnyResource;
   readonly list: (
     query?: Query,
     options?: CallOptions,
