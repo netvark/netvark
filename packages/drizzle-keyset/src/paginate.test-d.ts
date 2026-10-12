@@ -74,6 +74,34 @@ describe('paginate types (SPEC 14.3)', () => {
     expectTypeOf(narrow).resolves.toEqualTypeOf<Page<{ id: string }>>();
   });
 
+  it('keeps the row type of a page reassigned in a loop', async () => {
+    const statements: Array<string> = [];
+    let page = await keyset.paginate(db, {});
+    while (page.next !== null) {
+      page = await keyset.paginate(db, { page: { after: page.next } });
+      page = await keyset.paginate(
+        db,
+        { page: { after: page.next ?? '' } },
+        {
+          total: true,
+          onQuery: (event) => {
+            statements.push(event.sql);
+          },
+        },
+      );
+    }
+    expectTypeOf(page.rows).toEqualTypeOf<
+      Array<typeof contacts.$inferSelect>
+    >();
+    let narrow = await keyset.paginate(db, {}, { select: { id: contacts.id } });
+    narrow = await keyset.paginate(
+      db,
+      { page: { after: narrow.next ?? '' } },
+      { select: { id: contacts.id } },
+    );
+    expectTypeOf(narrow.rows).toEqualTypeOf<Array<{ id: string }>>();
+  });
+
   it('types the request', () => {
     // @ts-expect-error tags is not sortable
     void keyset.paginate(db, { sort: ['tags'] });
