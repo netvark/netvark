@@ -1,10 +1,9 @@
-import type { AnyResource } from '@netvark/jsonapi-core';
+import type { AnyResource } from './types';
 
 import { describe, expect, it } from 'vitest';
 
-import { defineResource } from '@netvark/jsonapi-core';
-
-import { readPaths, resourcePaths } from './paths';
+import { defineResource } from './define-resource';
+import { resourcePaths } from './paths';
 
 const serialize = (row: { readonly id: string }) => ({
   id: row.id,
@@ -120,13 +119,13 @@ describe('resourcePaths', () => {
     },
   );
 
-  it('starts each message with its caller, so openapi names itself', () => {
+  it('starts each message with its caller, so the function called names itself', () => {
     expect(() => resourcePaths(articles({}))).toThrow(
       new TypeError(
         'resourcePaths: articles has no links.self, so its paths are unknown; give the definer links.base',
       ),
     );
-    expect(() => readPaths('openapi', articles({}))).toThrow(
+    expect(() => resourcePaths(articles({}), { caller: 'openapi' })).toThrow(
       new TypeError(
         'openapi: articles has no links.self, so its paths are unknown; give the definer links.base',
       ),

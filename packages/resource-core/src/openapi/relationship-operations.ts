@@ -9,10 +9,11 @@
  * @ref https://jsonapi.org/format/1.1/#crud-updating-to-one-relationships
  * @packageDocumentation
  */
+import type { ResourcePaths } from '@netvark/jsonapi-core';
+
 import type { DeclaredInternals } from '../declare/declared-resource';
 import type { RelationshipSpec } from '../schema/relationship-specs';
 import type { OperationContext, PathItem } from './operation-object';
-import type { ResourcePaths } from './paths';
 
 import { relatedDocumentSchema, relationshipDocumentSchema } from './documents';
 import { content, operationObject, success } from './operation-object';

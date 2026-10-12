@@ -1,8 +1,9 @@
 /**
  * Where the routes sit (resource SPEC 19.2): each resource's paths, read
- * from its JSON:API links by `resourcePaths` (SPEC 13.1), the function the
- * OpenAPI document reads, so the routes, the links, and the document name
- * the same URLs. Every resource shares one origin and one base, the
+ * from its JSON:API links by `resourcePaths` (jsonapi SPEC 5.4), the
+ * function the OpenAPI document reads and a client calls through, so the
+ * routes, the links, the document, and the client name the same URLs.
+ * Every resource shares one origin and one base, the
  * collection path without its last segment, and no two name one path.
  * A route is written as Hono's router reads a request's path: `{id}` as
  * `:id`, and decoded by `decodeURI` but for `%25`, as Hono's `getPath`
@@ -11,12 +12,12 @@
  * @ref https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath: `path.replace(/%25/g, '%2525')`, then `tryDecodeURI`)
  * @packageDocumentation
  */
+import type { ResourcePaths } from '@netvark/hono-jsonapi';
 import type { DeclaredResource } from '@netvark/resource-core';
-import type { ResourcePaths } from '@netvark/resource-core/openapi';
 
 import { tryDecodeURI } from 'hono/utils/url';
 
-import { resourcePaths } from '@netvark/resource-core/openapi';
+import { resourcePaths } from '@netvark/hono-jsonapi';
 
 /** A relationship's routes: its relationship link's and its related link's, where the definition builds them. */
 interface RelationshipRoutes {

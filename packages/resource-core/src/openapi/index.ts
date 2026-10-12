@@ -2,8 +2,9 @@
  * `@netvark/resource-core/openapi` (SPEC 13): the OpenAPI document of a
  * registry of declared resources, and the surface clients depend on with
  * the diff that tells a breaking change from a safe one and the parse
- * that reads a committed surface back, and the paths a resource's links
- * name, where a host mounts its routes.
+ * that reads a committed surface back. The paths come from
+ * `@netvark/jsonapi-core`'s `resourcePaths`, the function a host mounts
+ * its routes by and a client calls through.
  * @packageDocumentation
  */
 export type { SurfaceChange } from './diff';
@@ -14,7 +15,6 @@ export type {
   ResourceExamples,
 } from './examples';
 export type { OperationCodes } from './operation-codes';
-export type { ResourcePaths } from './paths';
 export type {
   FieldSurface,
   PageSurface,
@@ -27,5 +27,4 @@ export type {
 export { diffSurfaces } from './diff';
 export { openapi } from './document';
 export { parseSurface } from './parse-surface';
-export { resourcePaths } from './paths';
 export { SURFACE_FORMAT, surfaceOf } from './surface';

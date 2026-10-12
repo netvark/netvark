@@ -113,8 +113,9 @@ Each route exists only when the declaration declares its operation:
 | `GET /api/contacts/:id/organization`               | `get(id)`, then the target's `get` of the linked id       | 200, the target's resource document, or `data: null` when nothing is linked |
 
 - **The paths are the links'.** `resourcePaths` reads them from each resource's JSON:API links, the
-  function the OpenAPI document reads, so the routes, the links, and the document name the same
-  URLs. A type outside ASCII is served at the percent-encoded path its links spell.
+  function the OpenAPI document reads and a client calls through, so the routes, the links, the
+  document, and the client name the same URLs. A type outside ASCII is served at the percent-encoded
+  path its links spell.
 - **Every other method answers 405** with an `Allow` header listing the path's methods, `HEAD`
   beside `GET`, since Hono answers `HEAD` with the `GET` route.
 - **The query and the document are validated before the runtime runs**: an undeclared sort is a 400,

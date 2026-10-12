@@ -125,6 +125,7 @@ export type {
   ResourceLinks,
   ResourceLinksInit,
 } from './resource/links';
+export type { ResourcePaths, ResourcePathsOptions } from './resource/paths';
 export type {
   AnyResource,
   Cardinality,
@@ -220,3 +221,4 @@ export {
 } from './request/resource-document';
 export { createDefineResource } from './resource/create-define-resource';
 export { defineResource, relatedResource } from './resource/define-resource';
+export { resourcePaths } from './resource/paths';
