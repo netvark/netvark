@@ -5,7 +5,7 @@ import { scopeValues } from '../../server/scope';
 import { serverValueColumns } from '../../server/server-values';
 import { contractFixture } from './fixture';
 
-const { workspaces, tasks, logs } = contractFixture.resources;
+const { workspaces, tasks, logs, labels } = contractFixture.resources;
 
 /** The server values of a fixture resource. */
 function serverValues(resource: unknown): ReadonlyArray<string> {
@@ -16,7 +16,7 @@ function serverValues(resource: unknown): ReadonlyArray<string> {
 describe('the storage contract fixture', () => {
   it('is frozen, with the migrations as SQL text and a seed that empties first', () => {
     expect(Object.isFrozen(contractFixture)).toBe(true);
-    expect(contractFixture.migrations).toHaveLength(4);
+    expect(contractFixture.migrations).toHaveLength(5);
     expect(contractFixture.migrations[0]).toContain('create table tasks');
     expect(contractFixture.migrations[1]).toContain(
       'alter table logs attach partition contract_archive.logs_high',
@@ -27,8 +27,11 @@ describe('the storage contract fixture', () => {
     expect(contractFixture.migrations[3]).toContain(
       'add column checklist boolean[]',
     );
+    expect(contractFixture.migrations[4]).toContain('code char(4) primary key');
     expect(
-      contractFixture.seed.startsWith('truncate table logs, tasks, workspaces'),
+      contractFixture.seed.startsWith(
+        'truncate table logs, tasks, labels, workspaces',
+      ),
     ).toBe(true);
   });
 
@@ -51,13 +54,17 @@ describe('the storage contract fixture', () => {
       'priority',
       'rank',
       'checklist',
+      'code',
       'workspace',
       'parent',
+      'label',
     ]);
     expect(tasks.declaration.scope).toBe('workspace');
     expect(tasks.fields['location']?.codec).toBe('point');
     expect(Object.keys(workspaces.fields)).toEqual(['name', 'createdIn']);
     expect(workspaces.declaration.scope).toBeUndefined();
+    expect(Object.keys(labels.fields)).toEqual(['name']);
+    expect(labels.names.id).toBe('code');
   });
 
   it('declares logs on the partitioned table with the codes obligation 11 expects', () => {

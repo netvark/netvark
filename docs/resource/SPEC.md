@@ -2132,27 +2132,29 @@ interface ContractHarness<TTransaction> {
 
 `contractFixture` is the suite's own fixture: `migrations` as SQL text, the `seed`, the public
 `catalog` `pg-catalog extract` reads from the migrations, the `point` codec, the `workspace` scope
-(session parameter `contract.workspace_id`), and three declarations: `workspaces`, unscoped with an
+(session parameter `contract.workspace_id`), and four declarations: `workspaces`, unscoped with an
 identity key; `tasks`, scoped to a workspace, with client ids, the server value `created_by`, a
 field of every wire form, an array, JSON, a codec field, generated columns, a `write` field, and a
-self-reference; and `logs`, partitioned by its id with client ids, whose ids below 1000 go to
-`logs_low` and the rest to `contract_archive.logs_high_rest`, a partition of a table attached with
-its own primary key. A third migration adds to tasks what `list` filters and sorts besides: an enum,
-which sorts in the order of its labels, an `int4`, and a `tsvector` generated from the title with
-`simple`, and a fourth adds a `boolean` array. `tasks` filters with operators of every keyset type,
-sorts by its scalars, searches that column, sorts by `['-priority', 'due_on']` by default, and pages
-two to three rows at a time; `logs` lists, filtered by its owner. A column default reads
-`current_setting('contract.workspace_id', true)`, so a case reads back what the transaction set, and
-the schema has no row security, so only the adapter's predicate keeps a row in its scope. The values
-are the ones drivers get wrong by default: an `int8` past 2^53, a `numeric` read as a float, a
-`timestamptz` at millisecond precision or in the local zone, array elements that need quoting,
-`NULL` and the empty string among them, and the elements of a `boolean` array, which PostgreSQL
-prints as `t` and `f` where a `boolean` cast to text prints `true` and `false`. A harness gives its
-adapter the catalog, a storage codec for `point`, and a keyset definer with a cursor secret; on a
-server, it gives the adapter at least two connections, so the concurrent cases of obligations 8 and
-10 run two transactions at once: the first takes its lock, the second starts, and the first finishes
-only after the second had time to reach the database. An adapter that serializes its transactions,
-as PGlite's does, passes them without a lock.
+self-reference; `logs`, partitioned by its id with client ids, whose ids below 1000 go to `logs_low`
+and the rest to `contract_archive.logs_high_rest`, a partition of a table attached with its own
+primary key; and `labels`, unscoped with a `char(4)` client id. A third migration adds to tasks what
+`list` filters and sorts besides: an enum, which sorts in the order of its labels, an `int4`, and a
+`tsvector` generated from the title with `simple`; a fourth adds a `boolean` array; and a fifth adds
+`labels` and gives tasks a `char(4)` code and a relationship to a label. `tasks` filters with
+operators of every keyset type, sorts by its scalars, searches that column, sorts by
+`['-priority', 'due_on']` by default, and pages two to three rows at a time; `logs` lists, filtered
+by its owner. A column default reads `current_setting('contract.workspace_id', true)`, so a case
+reads back what the transaction set, and the schema has no row security, so only the adapter's
+predicate keeps a row in its scope. The values are the ones drivers get wrong by default: an `int8`
+past 2^53, a `numeric` read as a float, a `timestamptz` at millisecond precision or in the local
+zone, array elements that need quoting, `NULL` and the empty string among them, the elements of a
+`boolean` array, which PostgreSQL prints as `t` and `f` where a `boolean` cast to text prints `true`
+and `false`, and a `char(n)` member, key, and relationship, which PostgreSQL pads to n and a cast to
+text strips. A harness gives its adapter the catalog, a storage codec for `point`, and a keyset
+definer with a cursor secret; on a server, it gives the adapter at least two connections, so the
+concurrent cases of obligations 8 and 10 run two transactions at once: the first takes its lock, the
+second starts, and the first finishes only after the second had time to reach the database. An
+adapter that serializes its transactions, as PGlite's does, passes them without a lock.
 
 The cases of obligation 5 list five tasks of workspace 1, created between two of workspace 2, two
 rows a page, each request walked forward with `next` from the first page and back with `prev` from
@@ -2177,9 +2179,9 @@ contract is shown implementable before `@netvark/kysely-resource` exists.
 `contract-faults.e2e.test.ts` gives the reference adapter one defect at a time, from parameters set
 for the session to a missing quota or row lock, a partition resolved to its own names, pages counted
 by offset, filters and sorts named by column, PostgreSQL's default null placement, sort keys
-selected as a driver reads them by default, and cursors bound to no context, and checks that the
-cases about it fail, and `extract.e2e.test.ts` checks that the fixture's catalog is what extraction
-gives for its migrations.
+selected as a driver reads them by default, a `char(n)` cast to text, and cursors bound to no
+context, and checks that the cases about it fail, and `extract.e2e.test.ts` checks that the
+fixture's catalog is what extraction gives for its migrations.
 
 ---
 
@@ -3354,10 +3356,15 @@ string and cast to its column's type, `$n::text::<type>`: a domain by its schema
 type by its reference name split at its first dot, each part quoted, with `[]` for an array column,
 so the type's input function reads it as it would read a literal. A type of the default schema is
 named without its schema, as the catalog names it (catalog SPEC 2.1), so it resolves through the
-connection's `search_path`. Every selected value is cast to text,
-`"column"::text as "<public name>"`, and the key as `"id"`. A statement on a scoped table carries
-`"column" = $n::text::<type>` for the transaction's value of the resource's scope. A resource
-without a scope gets no predicate, and runs only when boot allowed it (18.3).
+connection's `search_path`. A statement on a scoped table carries `"column" = $n::text::<type>` for
+the transaction's value of the resource's scope. A resource without a scope gets no predicate, and
+runs only when boot allowed it (18.3). Every selected value is read as text under its public name,
+and the key as `"id"`: cast, `"column"::text as "<public name>"`, except a `bpchar`, whose cast to
+text strips the trailing spaces its read form keeps (5.1). `format('%s')` prints it by its type's
+output rules instead, `case when "column" is null then null else format('%s', "column") end`, since
+`format` prints `NULL` as the empty string. An array of `bpchar` prints its elements padded either
+way. @ref https://www.postgresql.org/docs/18/datatype-character.html @ref
+https://www.postgresql.org/docs/18/functions-string.html#FUNCTIONS-STRING-FORMAT
 
 **Read forms** (obligation 3). A selected text becomes the read form of 5.1 by its column's type, as
 5.4 reads it. A value outside the read form fails the read with

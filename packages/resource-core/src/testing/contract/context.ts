@@ -35,6 +35,7 @@ export interface Contract<TTransaction> {
   readonly workspaces: DeclaredResource;
   readonly tasks: DeclaredResource;
   readonly logs: DeclaredResource;
+  readonly labels: DeclaredResource;
   /** Runs `run` in one transaction of an actor working in `workspace`. */
   readonly within: <TResult>(
     workspace: string,
@@ -94,8 +95,10 @@ export function defaultTask(
     priority: 'normal',
     rank: null,
     checklist: null,
+    code: null,
     workspace,
     parent: null,
+    label: null,
   };
 }
 
@@ -112,7 +115,7 @@ export function contractOf<TTransaction>(
   harness: ContractHarness<TTransaction>,
 ): Contract<TTransaction> {
   const { adapter } = harness;
-  const { workspaces, tasks, logs } = contractFixture.resources;
+  const { workspaces, tasks, logs, labels } = contractFixture.resources;
   const within = async <TResult>(
     workspace: string,
     run: (tx: TTransaction) => Promise<TResult>,
@@ -126,6 +129,7 @@ export function contractOf<TTransaction>(
     workspaces,
     tasks,
     logs,
+    labels,
     within,
     createTask: async (workspace, write) =>
       within(workspace, async (tx) =>

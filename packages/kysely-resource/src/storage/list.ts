@@ -118,7 +118,7 @@ export async function listRows(
     return key.nulls === null ? directed : sql`${directed} ${NULLS[key.nulls]}`;
   });
   const fetched = await tx.execute((db) =>
-    sql<Row>`select ${selectList(resource)}, ${sql.join(keys)} from ${from} where ${conjunction(sought)} order by ${sql.join(order)} limit ${plan.limit}`.compile(
+    sql<Row>`select ${selectList(context, table, resource)}, ${sql.join(keys)} from ${from} where ${conjunction(sought)} order by ${sql.join(order)} limit ${plan.limit}`.compile(
       db,
     ),
   );
