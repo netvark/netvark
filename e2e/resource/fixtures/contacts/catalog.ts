@@ -598,6 +598,147 @@ const value = {
         "policies": {}
       }
     },
+    "badge_awards": {
+      "schema": "public",
+      "name": "badge_awards",
+      "comment": null,
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": {
+            "expression": "gen_random_uuid()",
+            "literal": null
+          },
+          "identity": null,
+          "generated": null,
+          "comment": null
+        },
+        "badge_id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "badge_awards_badge_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "badge_id"
+          ],
+          "references": {
+            "table": "badges",
+            "columns": [
+              "code"
+            ]
+          },
+          "onUpdate": "noAction",
+          "onDelete": "noAction",
+          "validated": true,
+          "enforced": true,
+          "definition": "FOREIGN KEY (badge_id) REFERENCES badges(code)"
+        },
+        "badge_awards_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)"
+        }
+      },
+      "indexes": {
+        "badge_awards_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "id"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX badge_awards_pkey ON public.badge_awards USING btree (id)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
+    "badges": {
+      "schema": "public",
+      "name": "badges",
+      "comment": null,
+      "primaryKey": [
+        "code"
+      ],
+      "columns": {
+        "code": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(6)",
+          "maxLength": 6,
+          "precision": null,
+          "scale": null,
+          "collation": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null,
+          "comment": null
+        }
+      },
+      "constraints": {
+        "badges_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "code"
+          ],
+          "definition": "PRIMARY KEY (code)"
+        }
+      },
+      "indexes": {
+        "badges_pkey": {
+          "method": "btree",
+          "unique": true,
+          "primary": true,
+          "nullsDistinct": true,
+          "columns": [
+            "code"
+          ],
+          "include": [],
+          "predicate": null,
+          "definition": "CREATE UNIQUE INDEX badges_pkey ON public.badges USING btree (code)"
+        }
+      },
+      "rowSecurity": {
+        "enabled": false,
+        "forced": false,
+        "policies": {}
+      }
+    },
     "calls": {
       "schema": "public",
       "name": "calls",

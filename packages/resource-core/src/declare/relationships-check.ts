@@ -2,13 +2,19 @@
  * The type-level check of `relationships` (SPEC 3.1, 3.2, 3.4, 11.3). A key
  * must be a single-column foreign key, other than the id, to the primary
  * key of a public table, and that column must be able to carry a resource
- * id; its `filter` is checked as a field's. Nothing here reads the target
- * (SPEC 3.8). The runtime twins are `checkRelationship` in
- * `check-columns.ts` and `checkFilters` in `check-filters.ts`.
+ * id and spell ids as that key does; its `filter` is checked as a field's.
+ * Nothing here reads the target's declaration (SPEC 3.8). The runtime twins
+ * are `checkRelationship` in `check-columns.ts` and `checkFilters` in
+ * `check-filters.ts`.
  * @packageDocumentation
  */
-import type { PublicColumn, PublicTable } from '@netvark/catalog-core';
+import type {
+  PublicCatalog,
+  PublicColumn,
+  PublicTable,
+} from '@netvark/catalog-core';
 
+import type { IdSpelling } from '../catalog/id-spelling';
 import type {
   CodecTypeName,
   IsIdentifierColumn,
@@ -40,6 +46,51 @@ type IdentifierRequirement<
   IsIdentifierColumn<TContext['catalog'], TColumn> extends true
     ? unknown
     : Requirement<`type ${CodecTypeName<TColumn>} cannot carry a resource id`>;
+
+/**
+ * Whether two spellings may be one: a catalog typed without literal
+ * modifiers spells `bpchar(${number})`, which only the runtime check
+ * tells apart.
+ */
+type MaySpellAlike<TColumn, TKey> = [TColumn] extends [TKey]
+  ? true
+  : [TKey] extends [TColumn]
+    ? true
+    : false;
+
+/** The requirement on a column whose key is `TKeyDef`, the column `TKeyName`. */
+type SpellingAgainst<
+  TCatalog extends PublicCatalog,
+  TColumnDef extends PublicColumn,
+  TKeyDef extends PublicColumn,
+  TKeyName extends string,
+> =
+  MaySpellAlike<
+    IdSpelling<TCatalog, TColumnDef>,
+    IdSpelling<TCatalog, TKeyDef>
+  > extends true
+    ? unknown
+    : Requirement<`type ${TColumnDef['sqlType']} spells ids unlike ${TKeyDef['sqlType']}, the type of ${TKeyName}`>;
+
+/** The column must spell ids as the key it references (SPEC 3.1). */
+type SpellingRequirement<
+  TContext extends DeclareContext,
+  TTableDef extends PublicTable,
+  TColumn extends keyof TTableDef['columns'] & string,
+> =
+  ForeignKeyReference<TTableDef, TColumn> extends {
+    readonly table: infer TTarget extends TableName<TContext['catalog']>;
+    readonly column: infer TKey extends string;
+  }
+    ? TKey extends keyof TContext['catalog']['tables'][TTarget]['columns']
+      ? SpellingAgainst<
+          TContext['catalog'],
+          TTableDef['columns'][TColumn],
+          TContext['catalog']['tables'][TTarget]['columns'][TKey],
+          `${TTarget}.${TKey}`
+        >
+      : unknown
+    : unknown;
 
 /** The foreign key must reference the primary key of a public table (SPEC 3.1). */
 type ReferenceError<
@@ -87,6 +138,7 @@ type RelationshipRequirements<
   'a relationship declaration'
 > &
   IdentifierRequirement<TContext, TTableDef['columns'][TColumn]> &
+  SpellingRequirement<TContext, TTableDef, TColumn> &
   (TScope extends true
     ? RequireWhen<
         MemberOf<TRelationship, 'access'> extends 'read' ? false : true,

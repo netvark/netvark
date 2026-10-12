@@ -14,6 +14,8 @@ export default defineExtraction({
       file: 'public-catalog.ts',
       interface: 'ContactsPublicCatalog',
       tables: [
+        'badge_awards',
+        'badges',
         'calls',
         'contacts',
         'contact_phones',

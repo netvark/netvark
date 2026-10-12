@@ -128,6 +128,94 @@ const value = {
     }
   },
   "tables": {
+    "badge_awards": {
+      "schema": "public",
+      "name": "badge_awards",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "uuid",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": {
+            "literal": null
+          },
+          "identity": null,
+          "generated": null
+        },
+        "badge_id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "badge_awards_badge_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "badge_id"
+          ],
+          "references": {
+            "table": "badges",
+            "columns": [
+              "code"
+            ]
+          },
+          "enforced": true
+        },
+        "badge_awards_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "id"
+          ]
+        }
+      }
+    },
+    "badges": {
+      "schema": "public",
+      "name": "badges",
+      "primaryKey": [
+        "code"
+      ],
+      "columns": {
+        "code": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(6)",
+          "maxLength": 6,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "badges_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "code"
+          ]
+        }
+      }
+    },
     "calls": {
       "schema": "public",
       "name": "calls",

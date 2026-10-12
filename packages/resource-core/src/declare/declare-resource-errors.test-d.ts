@@ -157,6 +157,17 @@ describe('declareResource: columns declared against SPEC 3.1', () => {
     });
   });
 
+  it('rejects a foreign key that spells ids unlike the key it references', () => {
+    declareResource('badge_awards', {
+      operations: ['get'],
+      fields: {},
+      relationships: {
+        // @ts-expect-error badge_id is a character(4), which spells ids unlike badges.code, a character(6)
+        badge_id: { target: () => null, access: 'read' },
+      },
+    });
+  });
+
   it('rejects a foreign key a relationship cannot carry, and a written scope column', () => {
     declareResource('people', {
       operations: ['get'],
