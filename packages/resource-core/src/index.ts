@@ -43,6 +43,7 @@ export type {
   ErrorTransform,
   LocalizeErrorsOptions,
 } from './messages/localize-errors';
+export type { IssueText } from './messages/localize-issues';
 export type { MessagesFor } from './messages/messages-for';
 export type {
   CodeInputs,
@@ -72,4 +73,5 @@ export { errorCatalog } from './errors/error-catalog';
 export { defaultMessages } from './messages/default-messages';
 export { defineMessages } from './messages/define-messages';
 export { localizeErrors } from './messages/localize-errors';
+export { localizeIssues } from './messages/localize-issues';
 export { ISSUE_KINDS } from './schema/issue-kinds';

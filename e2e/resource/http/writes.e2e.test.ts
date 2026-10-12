@@ -18,9 +18,14 @@ import type { ContactsServer } from '../support/contacts-server.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { localizeIssues } from '@netvark/resource-core';
+
+import { contactMessages } from '../localization/contact-messages.ts';
+import { Contacts } from '../resources/contacts.ts';
 import { runtimeDatabases } from '../runtime/database.ts';
 import { ADA } from '../runtime/seed.ts';
 import { openContactsServer } from '../support/contacts-server.ts';
+import { inLocale } from '../support/in-locale.ts';
 import { attributesOf, idOf, problemsOf } from '../support/slice-answers.ts';
 
 const CREATED = 201;
@@ -219,6 +224,36 @@ describe.each(runtimeDatabases())(
         ],
       ]);
       expect(await database.contacts(1)).toBe(2);
+    });
+
+    it("gives a client that validates the same body first the server's words for each refusal, in either language", async () => {
+      const attributes = {
+        name: '',
+        website: 'http://engines.example',
+        priority: 9,
+      };
+      const issues =
+        Contacts.write.create['~standard'].validate({
+          attributes,
+          relationships: {},
+        }).issues ?? [];
+      const textOf = localizeIssues(contactMessages);
+      for (const language of ['de', 'en']) {
+        const served = await server.exchange(
+          'post',
+          '/api/contacts',
+          '/api/contacts',
+          { actor: 'editor', language, body: contact(attributes) },
+        );
+        const details = problemsOf(served)
+          .slice(1)
+          .map((problem) => (problem as ReadonlyArray<unknown>)[4]);
+        const texts = await inLocale(language, () =>
+          issues.map((issue) => textOf('contacts', issue)),
+        );
+        expect(texts).toEqual(details);
+        expect(texts).toHaveLength(3);
+      }
     });
 
     it('answers a unique violation 409 in German, and in English for an English client', async () => {
