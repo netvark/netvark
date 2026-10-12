@@ -18,8 +18,8 @@ affected package with a GitHub Security Advisory; reporters are credited unless 
 The packages parse untrusted requests and render responses: `@netvark/ban-core` and
 `@netvark/hono-ban` render error responses; `@netvark/jsonapi-core` and `@netvark/hono-jsonapi`
 parse request documents and query strings; `@netvark/keyset-core` turns sort, filter, search, page
-parameters, and cursors into query plans, and `@netvark/kysely-keyset` renders those plans as SQL.
-Reports we care about most:
+parameters, and cursors into query plans, and `@netvark/kysely-keyset` and `@netvark/drizzle-keyset`
+render those plans as SQL. Reports we care about most:
 
 - server internals (stack traces, database detail, file paths, column values, driver detail)
   reaching a client response or an error message by default

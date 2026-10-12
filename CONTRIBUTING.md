@@ -3,9 +3,10 @@
 Thanks for helping. This repository holds every `@netvark` package, grouped in families: ban
 (`@netvark/ban-core`, `@netvark/hono-ban`), catalog (`@netvark/catalog-core`,
 `@netvark/pg-catalog`), jsonapi (`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`), and keyset
-(`@netvark/keyset-core`, `@netvark/kysely-keyset`). This guide covers what every family shares:
-setup, the quality gates, the conventions, commits, changesets, and releases. Each family adds its
-own guide with its layout, extension points, constraints, and checklist:
+(`@netvark/keyset-core`, `@netvark/kysely-keyset`, `@netvark/drizzle-keyset`). This guide covers
+what every family shares: setup, the quality gates, the conventions, commits, changesets, and
+releases. Each family adds its own guide with its layout, extension points, constraints, and
+checklist:
 
 - [`docs/ban/CONTRIBUTING.md`](docs/ban/CONTRIBUTING.md)
 - [`docs/catalog/CONTRIBUTING.md`](docs/catalog/CONTRIBUTING.md)

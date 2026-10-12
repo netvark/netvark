@@ -23,6 +23,7 @@ packages:
 catalog:
   ajv: 8.20.0
   ajv-formats: 3.0.1
+  drizzle-orm: 0.45.4
   '@electric-sql/pglite': 0.5.8
   '@electric-sql/pglite-socket': 0.2.11
   hono: 4.13.13
