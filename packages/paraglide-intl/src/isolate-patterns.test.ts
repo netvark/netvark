@@ -5,44 +5,11 @@ import {
   POP_DIRECTIONAL_ISOLATE,
 } from '@netvark/intl-core';
 
-import { isBundle, isolateBundle, isolatePattern } from './isolate-patterns';
+import { isolateBundle, isolatePattern } from './isolate-patterns';
+import { bundle, text, variable } from './test-support/bundles';
 
 const OPEN = { type: 'text', value: FIRST_STRONG_ISOLATE };
 const CLOSE = { type: 'text', value: POP_DIRECTIONAL_ISOLATE };
-
-const text = (value: string) => ({ type: 'text', value });
-const variable = (name: string) => ({
-  type: 'expression',
-  arg: { type: 'variable-reference', name },
-});
-
-/** A bundle as SDK 4's `selectBundleNested()` returns it, frozen throughout. */
-function bundle(locales: ReadonlyArray<string>) {
-  return structuredClone({
-    id: 'shared_by',
-    declarations: [{ type: 'input-variable', name: 'name' }],
-    lixcol_entity_id: 'shared_by',
-    messages: locales.map((locale) => ({
-      id: `message-${locale}`,
-      bundle_id: 'shared_by',
-      locale,
-      selectors: [],
-      variants: [
-        {
-          id: `variant-${locale}`,
-          message_id: `message-${locale}`,
-          matches: [],
-          pattern: [text('Shared by '), variable('name')],
-        },
-      ],
-    })),
-  });
-}
-
-/** A bundle of one message whose one variant has `pattern`. */
-function withPattern(pattern: unknown) {
-  return { id: 'b', messages: [{ locale: 'en', variants: [{ pattern }] }] };
-}
 
 function deepFreeze<TValue>(value: TValue): TValue {
   if (typeof value === 'object' && value !== null) {
@@ -122,44 +89,7 @@ describe('isolateBundle (SPEC 6.2)', () => {
 
   it('returns undefined when no pattern of an isolated locale changes', () => {
     expect(isolateBundle(bundle(['en']), new Set(['ar']))).toBeUndefined();
-    const bare = bundle(['en']);
-    bare.messages[0]!.variants[0]!.pattern = [variable('name')];
+    const bare = bundle(['en'], [variable('name')]);
     expect(isolateBundle(bare, new Set(['en']))).toBeUndefined();
-  });
-});
-
-describe('isBundle', () => {
-  it('reads the bundles of SDK 4 and of SDK 2 and 3', () => {
-    const sdk4 = bundle(['en']);
-    const sdk3 = {
-      id: 'b',
-      declarations: [],
-      messages: [
-        {
-          id: 'm',
-          bundleId: 'b',
-          locale: 'en',
-          selectors: [],
-          variants: [{ id: 'v', messageId: 'm', matches: [], pattern: [] }],
-        },
-      ],
-    };
-    expect(isBundle(sdk4)).toBe(true);
-    expect(isBundle(sdk3)).toBe(true);
-  });
-
-  it('refuses a bundle without messages, locales, variants, or typed parts', () => {
-    expect(isBundle(null)).toBe(false);
-    expect(isBundle({ id: 'b' })).toBe(false);
-    expect(isBundle({ id: 'b', messages: [null] })).toBe(false);
-    expect(
-      isBundle({ id: 'b', messages: [{ locale: 'en', variants: [null] }] }),
-    ).toBe(false);
-    expect(isBundle({ id: 1, messages: [] })).toBe(false);
-    expect(isBundle({ id: 'b', messages: [{ variants: [] }] })).toBe(false);
-    expect(isBundle({ id: 'b', messages: [{ locale: 'en' }] })).toBe(false);
-    expect(isBundle(withPattern('Hello'))).toBe(false);
-    expect(isBundle(withPattern([{ value: 'Hello' }]))).toBe(false);
-    expect(isBundle(withPattern([text('Hello')]))).toBe(true);
   });
 });

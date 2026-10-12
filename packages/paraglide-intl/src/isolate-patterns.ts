@@ -10,62 +10,12 @@
  * @ref https://github.com/opral/inlang/blob/main/packages/sdk/src/json-schema/pattern.ts (Pattern: text, expression, and markup parts)
  * @packageDocumentation
  */
+import type { Bundle, PatternPart } from './bundle';
+
 import {
   FIRST_STRONG_ISOLATE,
   POP_DIRECTIONAL_ISOLATE,
 } from '@netvark/intl-core';
-
-import { isRecord } from './internal/is-record';
-
-/** A part of an inlang pattern: `text`, `expression`, or markup. */
-export interface PatternPart {
-  readonly type: string;
-}
-
-interface Variant {
-  readonly pattern: ReadonlyArray<PatternPart>;
-}
-
-interface Message {
-  readonly locale: string;
-  readonly variants: ReadonlyArray<Variant>;
-}
-
-/** The fields of an SDK bundle the rewrite reads; the SDK's other fields are kept. */
-export interface Bundle {
-  readonly id: string;
-  readonly messages: ReadonlyArray<Message>;
-}
-
-function isPart(value: unknown): value is PatternPart {
-  return isRecord(value) && typeof value['type'] === 'string';
-}
-
-function isVariant(value: unknown): value is Variant {
-  const pattern = isRecord(value) ? value['pattern'] : undefined;
-  return Array.isArray(pattern) && pattern.every((part) => isPart(part));
-}
-
-function isMessage(value: unknown): value is Message {
-  const variants = isRecord(value) ? value['variants'] : undefined;
-  return (
-    isRecord(value) &&
-    typeof value['locale'] === 'string' &&
-    Array.isArray(variants) &&
-    variants.every((variant) => isVariant(variant))
-  );
-}
-
-/** Whether `value` is a bundle with its messages and variants, as `selectBundleNested()` returns one. */
-export function isBundle(value: unknown): value is Bundle {
-  const messages = isRecord(value) ? value['messages'] : undefined;
-  return (
-    isRecord(value) &&
-    typeof value['id'] === 'string' &&
-    Array.isArray(messages) &&
-    messages.every((message) => isMessage(message))
-  );
-}
 
 function text(value: string): PatternPart & { readonly value: string } {
   return { type: 'text', value };
@@ -87,6 +37,8 @@ export function isolatePattern(
       : [part],
   );
 }
+
+type Message = Bundle['messages'][number];
 
 function isolateMessage(message: Message): Message {
   const variants = message.variants.map((variant) => {

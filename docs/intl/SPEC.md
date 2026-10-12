@@ -58,6 +58,7 @@ packages/paraglide-intl/src/
   compile.ts                  compile (6.1)
   compile-options.ts          the options and their checks (6.1)
   paraglide-sdk.ts            the inlang SDK that Paraglide depends on (6.1)
+  bundle.ts                   the bundle shape the binding reads, and its checks (6.1)
   isolate-patterns.ts         the pattern rewrite (6.2)
   formatting-annotations.ts   the annotations a message formats with (6.3)
   escape-bidi-controls.ts     the bidi controls of the compiled code as escapes (6.4)
@@ -297,9 +298,12 @@ of Paraglide's `compile()`. `compile()` MUST:
 5. Load the project with `loadProjectFromDirectory({ path: project, fs })`, where `fs` is the `fs`
    option or `node:fs`.
 6. Throw a `TypeError` when `isolate` lists a locale the project's settings do not declare.
-7. Read every bundle with its messages and variants (`selectBundleNested(project.db)`), and throw a
-   `TypeError` for one without an `id`, `messages`, each with a `locale` and `variants`, each with a
-   `pattern` of parts that have a `type`.
+7. When `formatters` is `'refuse'` or a locale is isolated, read every bundle with its messages and
+   variants (`selectBundleNested(project.db)`), and throw a `TypeError` for one without an `id`,
+   `declarations`, each with a `type` and a `name`, and `messages`, each with a `locale` and
+   `variants`, each with a `pattern` of parts that have a `type`; an expression part, and the value
+   of a `local-variable` declaration, must have an `arg` that is a variable reference or a literal
+   and, if any, an `annotation` that is a function reference with a `name`.
 8. When `formatters` is `'refuse'` (the default), throw a `MessageFormattingError` carrying every
    finding (6.3) when there is any. Nothing has been written at that point.
 9. Rewrite the patterns (6.2) and write each changed bundle back with `upsertBundleNested()`, one at
@@ -333,19 +337,28 @@ Paraglide's `compile()` (measured on Paraglide 2.27.0 with inlang SDK 4.0.1, ADR
 ### 6.3 Formatting annotations (`formatting-annotations.ts`, ADR 0008)
 
 - The formatting annotations are `number`, `datetime`, `date`, `time`, `relativetime`, and
-  `icu:pound`, the function references Paraglide compiles to a `registry` call that formats.
-  `plural` selects and is not one.
-- A finding is an expression part of a variant's pattern, or a local declaration, whose annotation
-  is a formatting annotation. Local declarations are read wherever the SDK holds them (on the bundle
-  in SDK 4, on each message before it).
+  `icu:pound`, the function references Paraglide 2.27 compiles to a `registry` call that formats
+  ([`compile-annotation.ts`](https://github.com/opral/paraglide-js/blob/0c6cf2c971b667cedf133dea471101897c8c0ade/src/compiler/compile-annotation.ts)).
+  `plural` selects and is not one; any other name Paraglide interpolates unformatted.
+- A finding is an expression part of a variant's pattern, or a `local-variable` declaration, whose
+  annotation is a formatting annotation. Declarations live on the bundle in every SDK the peer range
+  reaches: SDK 2.7.0, the lowest Paraglide 2.11 accepts, 2.10.2, 3.1.0, and 4.0.0 all declare them
+  on the bundle table and none on the message table (measured 2026-10-12).
+- The findings are the same on every Paraglide version, so a catalog is refused on each or on none,
+  though what Paraglide formats differs (measured 2026-10-12 with the message-format plugin 4.5.1):
+  2.11.0 formats an annotated declaration and interpolates an annotated expression unformatted,
+  without a warning; 2.20.2, 2.25.2, and 2.26.0 format both, but interpolate `date`, `time`, and
+  `icu:pound` unformatted, with a warning; 2.27.0 formats all six. A declaration is a finding
+  whether or not a pattern or a selector reads it: up to 2.26.0 Paraglide compiles every local
+  declaration into every locale's function, and 2.27.0 only the ones the locale reads.
 - `FormattingFinding` is `{ bundleId, locale, variable, annotation }`: `locale` is `undefined` for a
-  declaration on the bundle, `variable` is the name the expression refers to or declares,
-  `undefined` for a literal.
+  declaration, which every locale shares; `variable` is the name the expression refers to or the
+  declaration declares, `undefined` for a literal.
 - `MessageFormattingError` extends `Error`, has the name `MessageFormattingError`, and carries the
-  findings sorted by bundle id, locale, and variable, with each listed once. Its message names the
-  count and lists one finding per line as
-  `<bundleId> (<locale or "every locale">): <variable>: <annotation>`; bundle ids are the
-  application's own message keys.
+  findings, frozen, sorted by bundle id, locale, variable, and annotation in code-unit order with
+  `undefined` first, each listed once. Its message names the count and lists one finding per line as
+  `<bundleId> (<locale or "every locale">): <variable or "a literal">: <annotation>`; bundle ids are
+  the application's own message keys.
 
 ### 6.4 Bidi controls in the compiled code (`escape-bidi-controls.ts`, ADR 0007)
 
@@ -382,11 +395,12 @@ release of each SDK major between the floor and the current release. Section 8 l
   other values, the least recently used eviction and the bound.
 - `to-time-zone.test.ts`, `cookie.test.ts`, `create-time-zone.test.ts`: every rule of section 4,
   including a scope given by an `AsyncLocalStorage` in the type tests and the tests.
-- `isolate-patterns.test.ts`, `formatting-annotations.test.ts`: the rules of 6.2 and 6.3 over
-  patterns and bundles written as data.
-- `compile.test.ts`: fixture projects in `mkdtemp` directories compiled with Paraglide, the emitted
-  functions called in each locale, the catalogs compared byte for byte before and after, the refusal
-  raised before any output exists.
+- `bundle.test.ts`, `isolate-patterns.test.ts`, `formatting-annotations.test.ts`: the checks of 6.1
+  and the rules of 6.2 and 6.3 over patterns and bundles written as data.
+- `compile.test.ts`, `compile-run.test.ts`, `compile-formatters.test.ts`: fixture projects in
+  `mkdtemp` directories compiled with Paraglide, the emitted functions called in each locale, the
+  catalogs compared byte for byte before and after, the refusal raised before any output exists, and
+  `formatters: 'allow'` rendering the same project as Paraglide does, each value isolated.
 
 ### 7.2 End-to-end suite (`e2e/intl/`)
 
@@ -397,7 +411,8 @@ A private package that consumes the built packages through `workspace:*` and nev
   cookie `timeZoneCookie` writes read back by the next request, and a browser resolver keeping the
   zone its document had when it was created.
 - `compile.e2e.test.ts`: a fixture project compiled with the built binding, its messages called in
-  English and Arabic.
+  English and Arabic, and a project whose messages format refused with the built
+  `MessageFormattingError`.
 - `hydration.e2e.test.ts`: a server render inside a request scope and a jsdom document render from
   the same cookie produce the same strings; without the cookie both use the fallback.
 - `visual-order.e2e.test.ts`: bidi-js (UAX #9 C1) resolves the compiled messages' visual order with

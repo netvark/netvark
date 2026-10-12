@@ -74,6 +74,50 @@ Paraglide's own compile. The compiled code writes U+2068 and U+2069, and any oth
 catalog holds, as `\u` escapes, so the generated files show them instead of hiding them; the
 messages return the same strings.
 
+### A message never formats
+
+Paraglide formats a value annotated in a message, such as `{amount: number}` and `{when: datetime}`,
+or `{amount, number}`, `{when, date}`, and `#` in an ICU catalog, with the message's bare locale
+code and, for a date, the runtime's time zone: the digits and the calendar depend on the engine, and
+a date can render one way on the server and another in the browser. `compile()` refuses such a
+message before it writes anything, with a `MessageFormattingError` that lists each one and holds
+them in `findings`:
+
+```text
+compile: 2 values are formatted inside messages, with the engine's defaults; format each with @netvark/intl-core and interpolate the string, or pass formatters: 'allow'
+  total (ar): amount: number
+  total (en): amount: number
+```
+
+Format the value with `@netvark/intl-core` and interpolate the string. A plural still selects its
+variant on the raw count, so pass the count and its text:
+
+```json
+{
+  "total": "Total: {amount}",
+  "items": [
+    {
+      "declarations": ["input count", "input countText", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{countText} item",
+        "countPlural=other": "{countText} items"
+      }
+    }
+  ]
+}
+```
+
+```ts
+// intl: createIntl() from @netvark/intl-core, created once at module scope
+m.total({ amount: intl.number(1234.5, { style: 'currency', currency: 'SAR' }) });
+m.items({ count, countText: intl.number(count) });
+```
+
+In an ICU catalog, write `{countText}` where `#` was:
+`{count, plural, one {{countText} item} other {{countText} items}}`. `formatters: 'allow'` turns the
+refusal off, for a project that accepts the engine's defaults.
+
 ### In place of Paraglide's CLI and bundler plugin
 
 Paraglide's bundler plugins and its CLI call Paraglide's own `compile()`, which writes the messages
@@ -93,6 +137,8 @@ bundler configuration, since it would overwrite the output. Run the script befor
   `value.replace(/\p{Bidi_Control}/gu, '')`. A value with an unmatched U+2069 of its own closes the
   isolate early
   ([ADR 0006](https://github.com/netvark/netvark/blob/main/docs/intl/adr/0006-every-interpolated-value-is-isolated-in-every-locale.md)).
+- **Format in code, not in the message**: dates and numbers through `@netvark/intl-core`, so a value
+  reads the same in a sentence as in a table cell, and the plural on the raw count.
 - **Never interpolate into a message that is not displayed as text**: a URL, an `href`, an
   identifier. The isolates are characters and travel with the string.
 - **Check catalogs with `inlang check`** in CI: Paraglide renders the base locale for a missing
