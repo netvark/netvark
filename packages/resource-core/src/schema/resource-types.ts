@@ -211,7 +211,7 @@ type ShapeOf<TValue> = {
 };
 
 /** What a schema of output `TValue` takes: an optional member may also be `undefined`. */
-type InputOf<TValue> = {
+export type InputOf<TValue> = {
   [K in keyof TValue]: IsOptional<TValue, K> extends true
     ? TValue[K] | undefined
     : TValue[K];

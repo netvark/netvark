@@ -121,6 +121,11 @@ describe('resource (SPEC 11.1)', () => {
     );
   });
 
+  it('carries its client types in types only', () => {
+    expect(Object.hasOwn(Contacts.resource, '~types')).toBe(false);
+    expect('~types' in Organizations.resource).toBe(false);
+  });
+
   it('writes nothing to a resource whose members are all read-only', () => {
     expect(Organizations.resource.writable).toEqual({
       create: new Set(),

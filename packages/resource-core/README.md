@@ -689,6 +689,23 @@ member, `createdAt` on a create or `kind` on an update, is refused where the rou
 pointer, before any validator, policy, or statement runs; the relationship route and atomic
 operations refuse it the same way, so no route repeats the check.
 
+`Contacts.resource` also carries, in types only, what a client reads and writes (jsonapi SPEC 5.3),
+so [`@netvark/jsonapi-client`](../jsonapi-client#readme) types its calls from the declaration with
+nothing generated:
+
+```ts
+import type { TypesOf } from '@netvark/jsonapi-core';
+
+type Contact = TypesOf<typeof Contacts.resource>;
+// Contact['attributes']: { readonly kind: 'person' | 'company'; readonly name: string; ... }
+// Contact['create']: the create validator's input; never when the declaration serves no create
+// Contact['filter']: { readonly kind: 'eq' | 'in'; ... }, Contact['include']: 'organization'
+```
+
+The attributes are the read types as JSON, so a `write` field never appears, and each write is its
+validator's input under public names. Keep declaration modules free of database code, as a client
+imports them for their types.
+
 What `parseQuery` accepts, the keyset plans under the same names, and what it refuses the keyset
 refuses too, except a sort by `id`. The page bounds are resolved once for both, so a page size one
 accepts, the other accepts.
