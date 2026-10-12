@@ -22,13 +22,15 @@ localized errors.
 pnpm add @netvark/hono-resource @netvark/hono-jsonapi @netvark/hono-ban @netvark/resource-core hono zod
 ```
 
-`hono >= 4.12.34`, `@netvark/hono-jsonapi`, and `@netvark/resource-core` are peer dependencies: your
+`hono >= 4.13.0`, `@netvark/hono-jsonapi`, and `@netvark/resource-core` are peer dependencies: your
 application declares the resources and mounts `jsonApi()` with its own copies, and the routes must
 work with those same copies
 ([ADR 0006](https://github.com/netvark/netvark/blob/main/docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
 The routes import no runtime: any runtime of the contract runs behind them, such as
 [`@netvark/kysely-resource`](https://github.com/netvark/netvark/tree/main/packages/kysely-resource)'s.
-They run wherever Hono runs: Node 22.12+, Bun, Deno, and Cloudflare Workers.
+They run wherever Hono runs: Node 22.12+, Bun, Deno, and Cloudflare Workers. Hono 4.13.0 is the
+floor: the operations endpoint decodes an `href` with Hono's own `tryDecodeURIComponent`, so it
+names what your router would, and `hono/utils/url` exports it from that release on.
 
 ## Quick start
 

@@ -4071,12 +4071,16 @@ related route and the failing operation's on the operations endpoint, or `undefi
 - ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
   `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run in the build. One
   entry, `index`.
-- Peer dependencies: `hono`, `@netvark/hono-jsonapi` (`resourcePaths` among its re-exports of
-  `@netvark/jsonapi-core`), and `@netvark/resource-core` (the contract, `keysetRequest`, `openapi`),
-  each a `workspace:^` development dependency too. The application declares the resources and mounts
-  `jsonApi()` with its own copies, and the routes must work with those same copies: a declaration is
-  recognized by the copy that made it, and a `BanError` by `instanceof` (root ADR 0006). It imports
-  no runtime: any runtime of the contract runs behind it.
+- Peer dependencies: `hono` `>=4.13.0`, `@netvark/hono-jsonapi` (`resourcePaths` among its
+  re-exports of `@netvark/jsonapi-core`), and `@netvark/resource-core` (the contract,
+  `keysetRequest`, `openapi`), the two packages each a `workspace:^` development dependency too.
+  4.13.0 is the first `hono` whose `hono/utils/url` exports `tryDecodeURIComponent`, the function
+  Hono decodes a path parameter with; `hrefs.ts` decodes an `href`'s id with it, so the id is the
+  one the router would see (19.4). It also carries the fixes that make 4.12.34 the floor of hono-ban
+  and hono-jsonapi. The application declares the resources and mounts `jsonApi()` with its own
+  copies, and the routes must work with those same copies: a declaration is recognized by the copy
+  that made it, and a `BanError` by `instanceof` (root ADR 0006). It imports no runtime: any runtime
+  of the contract runs behind it.
 - Runs wherever Hono runs: Node.js 22.12 and later, Bun, Deno, and Cloudflare Workers.
 
 ---

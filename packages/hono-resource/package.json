@@ -61,7 +61,7 @@
   "peerDependencies": {
     "@netvark/hono-jsonapi": "^0.1.0",
     "@netvark/resource-core": "^0.1.0",
-    "hono": ">=4.12.34"
+    "hono": ">=4.13.0"
   },
   "engines": {
     "node": ">=22.12.0"
