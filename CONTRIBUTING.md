@@ -2,16 +2,20 @@
 
 Thanks for helping. This repository holds every `@netvark` package, grouped in families: ban
 (`@netvark/ban-core`, `@netvark/hono-ban`), catalog (`@netvark/catalog-core`,
-`@netvark/pg-catalog`), jsonapi (`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`), and keyset
-(`@netvark/keyset-core`, `@netvark/kysely-keyset`, `@netvark/drizzle-keyset`). This guide covers
-what every family shares: setup, the quality gates, the conventions, commits, changesets, and
-releases. Each family adds its own guide with its layout, extension points, constraints, and
-checklist:
+`@netvark/pg-catalog`), intl (`@netvark/intl-core`, `@netvark/paraglide-intl`), jsonapi
+(`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, `@netvark/jsonapi-client`), keyset
+(`@netvark/keyset-core`, `@netvark/kysely-keyset`, `@netvark/drizzle-keyset`), and resource
+(`@netvark/resource-core`, `@netvark/kysely-resource`, `@netvark/hono-resource`,
+`@netvark/react-resource`). This guide covers what every family shares: setup, the quality gates,
+the conventions, commits, changesets, and releases. Each family adds its own guide with its layout,
+extension points, constraints, and checklist:
 
 - [`docs/ban/CONTRIBUTING.md`](docs/ban/CONTRIBUTING.md)
 - [`docs/catalog/CONTRIBUTING.md`](docs/catalog/CONTRIBUTING.md)
+- [`docs/intl/CONTRIBUTING.md`](docs/intl/CONTRIBUTING.md)
 - [`docs/jsonapi/CONTRIBUTING.md`](docs/jsonapi/CONTRIBUTING.md)
 - [`docs/keyset/CONTRIBUTING.md`](docs/keyset/CONTRIBUTING.md)
+- [`docs/resource/CONTRIBUTING.md`](docs/resource/CONTRIBUTING.md)
 
 Design intent lives in each family's `DESIGN.md`, the normative contract in its `SPEC.md`, and
 decisions in its `adr/`; read those before proposing API changes. Decisions about the repository
@@ -149,6 +153,8 @@ first so the scope is settled before code exists, then:
    package the application hands it values from, is a peer too, and a `workspace:^` development
    dependency
    ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)).
+   A package whose values the binding makes and hands its host is a peer as well
+   ([ADR 0009](docs/adr/0009-a-binding-takes-as-peers-the-packages-whose-values-it-hands-its-host.md)).
 2. Keep `tsdown.config.ts` as the one source of the subpaths: `pnpm build` writes the `exports` maps
    into `package.json`, and CI fails on a diff. Name the Vitest project after the package.
 3. Add the package's re-export-only files, if any, to the coverage `exclude` list in the root

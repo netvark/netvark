@@ -1,6 +1,8 @@
 # ADR 0003: Package naming
 
-- Status: accepted
+- Status: accepted; amended by ADR-0006 (a binding takes as peers the workspace packages whose
+  values the application hands it) and ADR-0009 (a binding takes as peers the packages whose values
+  it hands its host)
 - Date: 2026-10-10
 
 ## Context
