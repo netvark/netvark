@@ -66,6 +66,8 @@ export interface ContractFixture {
     readonly tasks: DeclaredResource;
     /** Partitioned by its id, with client ids and an owner workspace it filters by. */
     readonly logs: DeclaredResource;
+    /** Unscoped, keyed by a `char(4)` client id, which a task relates to. */
+    readonly labels: DeclaredResource;
   };
 }
 
@@ -87,6 +89,12 @@ const declareResource = createDeclareResource({
 const workspaces: DeclaredResource = declareResource('workspaces', {
   operations: ['get', 'create', 'update'],
   fields: { name: { access: 'readWrite' }, created_in: { access: 'read' } },
+});
+
+const labels: DeclaredResource = declareResource('labels', {
+  operations: ['get', 'create'],
+  clientIds: true,
+  fields: { name: { access: 'readWrite' } },
 });
 
 const tasks: DeclaredResource = declareResource('tasks', {
@@ -118,6 +126,7 @@ const tasks: DeclaredResource = declareResource('tasks', {
     priority: { access: 'readWrite', filter: ['eq', 'in', 'nin'], sort: true },
     rank: { access: 'readWrite', filter: ['gte', 'between'], sort: true },
     checklist: { access: 'readWrite' },
+    code: { access: 'readWrite' },
   },
   relationships: {
     workspace_id: { target: () => workspaces, access: 'read' },
@@ -126,6 +135,7 @@ const tasks: DeclaredResource = declareResource('tasks', {
       access: 'readWrite',
       filter: ['eq', 'in', 'isNull'],
     },
+    label_id: { target: () => labels, access: 'readWrite' },
   },
   search: { column: 'search' },
   sort: { default: ['-priority', 'due_on'] },
@@ -158,5 +168,5 @@ export const contractFixture: ContractFixture = Object.freeze({
       session: 'contract.workspace_id',
     }),
   },
-  resources: { workspaces, tasks, logs },
+  resources: { workspaces, tasks, logs, labels },
 });

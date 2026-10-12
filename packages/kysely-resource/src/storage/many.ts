@@ -35,7 +35,7 @@ export async function manyRows(
   const key = resource.names.id;
   const keys = sql`${arrayLiteral(ids)}::text::${castType(context.catalog, columnOf(table, key))}[]`;
   const rows = await tx.execute((db) =>
-    sql<Row>`select ${selectList(resource)} from ${tableName(table)} where ${sql.id(key)} = any(${keys}) and ${scopePredicate(context.catalog, table, resource, tx)}`.compile(
+    sql<Row>`select ${selectList(context, table, resource)} from ${tableName(table)} where ${sql.id(key)} = any(${keys}) and ${scopePredicate(context.catalog, table, resource, tx)}`.compile(
       db,
     ),
   );

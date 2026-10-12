@@ -111,7 +111,7 @@ export function referenceAdapter(
   ): Promise<PublicRow | undefined> => {
     const statement = new Statement(context, resource, tx);
     const where = statement.row(id);
-    const sql = `select ${selectList(resource)} from ${statement.name} where ${where}${locking}`;
+    const sql = `select ${selectList(context, resource)} from ${statement.name} where ${where}${locking}`;
     return one(tx, resource, sql, statement);
   };
   const get = async (
@@ -149,7 +149,7 @@ export function referenceAdapter(
         pairs.length === 0
           ? 'default values'
           : `(${pairs.map(([column]) => column).join(', ')}) values (${pairs.map(([, value]) => value).join(', ')})`;
-      const sql = `insert into ${statement.name} ${values} returning ${selectList(resource)}`;
+      const sql = `insert into ${statement.name} ${values} returning ${selectList(context, resource)}`;
       const row = await one(tx, resource, sql, statement);
       if (row === undefined) {
         throw new Error(`${resource.names.type}: the insert returned no row`);
@@ -166,7 +166,7 @@ export function referenceAdapter(
         .map(([column, value]) => `${column} = ${value}`)
         .join(', ');
       const where = statement.row(id);
-      const sql = `update ${statement.name} set ${set} where ${where} returning ${selectList(resource)}`;
+      const sql = `update ${statement.name} set ${set} where ${where} returning ${selectList(context, resource)}`;
       return one(tx, resource, sql, statement);
     },
     remove: async (tx, resource, id) => {

@@ -45,7 +45,7 @@ export async function selectRow(
   const table = tableOf(context.catalog, resource);
   const lock = write === undefined ? sql`` : sql` ${ROW_LOCKS[write]}`;
   const [row] = await tx.execute((db) =>
-    sql<Row>`select ${selectList(resource)} from ${tableName(table)} where ${keyPredicate(context, table, resource, id)} and ${scopePredicate(context.catalog, table, resource, tx)}${lock}`.compile(
+    sql<Row>`select ${selectList(context, table, resource)} from ${tableName(table)} where ${keyPredicate(context, table, resource, id)} and ${scopePredicate(context.catalog, table, resource, tx)}${lock}`.compile(
       db,
     ),
   );
@@ -90,7 +90,7 @@ export async function insertRow(
       ? sql`default values`
       : sql`(${sql.join(pairs.map((pair) => pair.column))}) values (${sql.join(pairs.map((pair) => pair.value))})`;
   const [row] = await tx.execute((db) =>
-    sql<Row>`insert into ${tableName(table)} ${values} returning ${selectList(resource)}`.compile(
+    sql<Row>`insert into ${tableName(table)} ${values} returning ${selectList(context, table, resource)}`.compile(
       db,
     ),
   );
@@ -117,7 +117,7 @@ export async function updateRow(
     pairs.map((pair) => sql`${pair.column} = ${pair.value}`),
   );
   const [row] = await tx.execute((db) =>
-    sql<Row>`update ${tableName(table)} set ${set} where ${keyPredicate(context, table, resource, id)} and ${scopePredicate(context.catalog, table, resource, tx)} returning ${selectList(resource)}`.compile(
+    sql<Row>`update ${tableName(table)} set ${set} where ${keyPredicate(context, table, resource, id)} and ${scopePredicate(context.catalog, table, resource, tx)} returning ${selectList(context, table, resource)}`.compile(
       db,
     ),
   );

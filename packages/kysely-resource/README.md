@@ -216,11 +216,13 @@ runtime calls it, and you rarely do. What it does to your rows:
   exactly the members present, and `null` clears a member. An absent member is never written as
   `NULL`.
 - **Text both ways.** Every value goes out as a text parameter cast to its column's type,
-  `$1::text::"int8"`, so PostgreSQL parses it as it parses a literal, and every value comes back
-  cast to text, so no driver type parser changes it.
-- **Exact read forms.** `int8` and `numeric` read as strings, timestamps as ISO 8601 text, `json`
-  and `jsonb` as parsed values. A stored value no read form holds, such as `'infinity'`, `NaN`, a BC
-  date, or an array with a `NULL` element, fails the read instead of turning into something else.
+  `$1::text::"int8"`, so PostgreSQL parses it as it parses a literal, and every value comes back as
+  text, so no driver type parser changes it: cast to text, or a `char(n)` printed by `format('%s')`,
+  since the cast strips its padding.
+- **Exact read forms.** `int8` and `numeric` read as strings, timestamps as ISO 8601 text, a
+  `char(n)` padded to n, `json` and `jsonb` as parsed values. A stored value no read form holds,
+  such as `'infinity'`, `NaN`, a BC date, or an array with a `NULL` element, fails the read instead
+  of turning into something else.
 - **Codecs.** A codec field is stored through its storage codec over PostgreSQL's text, the same
   object `resources.storage` names in `netvark.config`:
 

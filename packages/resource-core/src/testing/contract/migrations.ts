@@ -14,6 +14,9 @@
  * generated from the title with the `simple` configuration, which search
  * reads. The fourth adds a boolean array, whose elements PostgreSQL prints
  * as `t` and `f` where a boolean cast to text prints `true` and `false`.
+ * The fifth adds `char(4)` values, which PostgreSQL pads to four
+ * characters and a cast to text strips of the padding: a task's code, and
+ * labels keyed by one, which a task relates to.
  * `public-catalog.ts` is what `pg-catalog extract` writes for these
  * migrations; `e2e/resource` proves it current. The schema has no row
  * security, so only the adapter's scope predicate keeps a row in its scope.
@@ -22,6 +25,7 @@
  * @ref https://www.postgresql.org/docs/18/datatype-enum.html#DATATYPE-ENUM-ORDERING
  * @ref https://www.postgresql.org/docs/18/textsearch-tables.html#TEXTSEARCH-TABLES-INDEX (a generated tsvector column)
  * @ref https://www.postgresql.org/docs/18/datatype-boolean.html ("The datatype output function for type boolean always emits either t or f")
+ * @ref https://www.postgresql.org/docs/18/datatype-character.html ("Trailing spaces are removed when converting a character value to one of the other string types")
  * @packageDocumentation
  */
 
@@ -85,6 +89,15 @@ alter table tasks
 `,
   `alter table tasks add column checklist boolean[];
 `,
+  `create table labels (
+  code char(4) primary key,
+  name text not null
+);
+
+alter table tasks
+  add column code char(4),
+  add column label_id char(4) references labels (code);
+`,
 ];
 
 /**
@@ -93,7 +106,7 @@ alter table tasks
  * with no read form. Identities restart, and the next workspace is 10.
  * `reset()` runs it before every case.
  */
-export const CONTRACT_SEED: string = `truncate table logs, tasks, workspaces restart identity;
+export const CONTRACT_SEED: string = `truncate table logs, tasks, labels, workspaces restart identity;
 insert into workspaces (id, name) values (1, 'One'), (2, 'Two'), (9, 'Unreadable');
 insert into tasks (id, workspace_id, title, starts_at, created_by)
   values ('00000000-0000-4000-8000-000000000009', 9, 'Forever', 'infinity', '00000000-0000-4000-8000-0000000000aa');

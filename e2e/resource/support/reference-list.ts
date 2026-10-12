@@ -202,7 +202,7 @@ export async function keysetPage(
     (key) =>
       `${render.target(key.target)} ${key.direction}${key.nulls === null ? '' : ` nulls ${key.nulls}`}`,
   );
-  const sql = `select ${[selectList(resource), ...keys].join(', ')} from ${statement.name} where ${where} order by ${order.join(', ')} limit ${String(plan.limit)}`;
+  const sql = `select ${[selectList(context, resource), ...keys].join(', ')} from ${statement.name} where ${where} order by ${order.join(', ')} limit ${String(plan.limit)}`;
   const rows = await tx.client.query(sql, statement.parameters.values);
   const values = new Map<PublicRow, ReadonlyArray<CursorValue>>();
   const read = rows.map((row) => {

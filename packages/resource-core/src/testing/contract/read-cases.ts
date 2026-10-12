@@ -6,8 +6,10 @@
  * read as a float, a `timestamptz` read at millisecond precision or in the
  * local zone, a `date` read as a local midnight, a key in upper case,
  * array elements that need quoting, `NULL` and the empty string among them,
- * and the elements of a boolean array, which PostgreSQL prints as `t` and
- * `f`.
+ * the elements of a boolean array, which PostgreSQL prints as `t` and `f`,
+ * and a `char(n)` member, key, and relationship, which PostgreSQL pads to n
+ * and a cast to text strips.
+ * @ref https://www.postgresql.org/docs/18/datatype-character.html ("Trailing spaces are removed when converting a character value to one of the other string types")
  * @packageDocumentation
  */
 import type { PublicRow } from '../../server/storage';
@@ -31,6 +33,8 @@ const TAGS = [
   'ünïcödé ✓',
 ];
 const DETAILS = { b: 1, a: [true, null, 'x'], nested: { ratio: 1.5, s: 'ü' } };
+/** A label's `char(4)` key as the id and linkage schemas give it, padded to four. */
+const LABEL = 'ab  ';
 
 /** Every writable field of a task, in its write form. */
 const EVERY_FORM = {
@@ -47,6 +51,7 @@ const EVERY_FORM = {
   priority: 'high',
   rank: -7,
   checklist: [true, false, true],
+  code: 'ab',
 };
 
 /** The row of `EVERY_FORM` created in workspace 1 under `parent`. */
@@ -69,8 +74,10 @@ function everyForm(parent: string): PublicRow {
     priority: 'high',
     rank: -7,
     checklist: [true, false, true],
+    code: 'ab  ',
     workspace: '1',
     parent,
+    label: null,
   };
 }
 
@@ -78,7 +85,7 @@ function everyForm(parent: string): PublicRow {
 export function readCases<TTransaction>(
   contract: Contract<TTransaction>,
 ): ReadonlyArray<ContractCase> {
-  const { harness, tasks, within } = contract;
+  const { harness, tasks, labels, within } = contract;
   const { adapter } = harness;
   return [
     {
@@ -98,6 +105,34 @@ export function readCases<TTransaction>(
           await contract.getTask('1', expected.id),
           expected,
           'the row get returns',
+        );
+      },
+    },
+    {
+      name: 'obligation 3: reads a char(n) key, and a relationship to one, padded to n',
+      run: async () => {
+        const expected = { id: LABEL, name: 'Two letters' };
+        const created = await within('1', async (tx) =>
+          adapter.create(tx, labels, {
+            id: LABEL,
+            attributes: { name: 'Two letters' },
+            relationships: {},
+          }),
+        );
+        assertEqual(created, expected, 'the label create returns');
+        assertEqual(
+          await within('1', async (tx) => adapter.get(tx, labels, LABEL)),
+          expected,
+          'the label get returns',
+        );
+        const task = await contract.createTask('1', {
+          attributes: { title: 'Labelled' },
+          relationships: { label: LABEL },
+        });
+        assertEqual(
+          task['label'],
+          LABEL,
+          'the label of the task create returns',
         );
       },
     },

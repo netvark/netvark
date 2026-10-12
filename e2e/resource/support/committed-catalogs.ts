@@ -43,7 +43,7 @@ export const COMMITTED_CATALOGS: Readonly<Record<string, CommittedCatalog>> = {
       ),
     ),
     migrations: contractFixture.migrations,
-    tables: ['workspaces', 'tasks', 'logs'],
+    tables: ['workspaces', 'tasks', 'labels', 'logs'],
     interface: 'ContractPublicCatalog',
   },
   "@netvark/react-resource's fixture": {

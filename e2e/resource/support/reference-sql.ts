@@ -121,15 +121,39 @@ function readable(resource: DeclaredResource): ReadonlyArray<FieldMeta> {
   );
 }
 
+/**
+ * A column as PostgreSQL prints it, under `alias`: cast to text, but a
+ * `bpchar` through `format('%s')`, which prints it padded where the cast
+ * drops its trailing spaces, and prints `NULL` as the empty string, so a
+ * null stays null by a `case`.
+ * @ref https://www.postgresql.org/docs/18/datatype-character.html ("Trailing spaces are removed when converting a character value to one of the other string types")
+ * @ref https://www.postgresql.org/docs/18/functions-string.html#FUNCTIONS-STRING-FORMAT ("A null value is treated as an empty string")
+ */
+function printed(
+  context: SqlContext,
+  table: PublicTable,
+  column: string,
+  alias: string,
+): string {
+  const name = quoted(column);
+  const { base, array } = columnType(context.catalog, columnOf(table, column));
+  const text =
+    base === 'bpchar' && !array
+      ? `case when ${name} is null then null else format('%s', ${name}) end`
+      : `${name}::text`;
+  return `${text} as ${quoted(alias)}`;
+}
+
 /** The select list of a resource's public row, each value as PostgreSQL prints it. */
 export function selectList(
+  context: SqlContext,
   resource: DeclaredResource,
-  members: ReadonlyArray<FieldMeta> = readable(resource),
 ): string {
+  const table = tableOf(context, resource);
   return [
-    `${quoted(resource.names.id)}::text as "id"`,
-    ...members.map(
-      (meta) => `${quoted(meta.column)}::text as ${quoted(meta.name)}`,
+    printed(context, table, resource.names.id, 'id'),
+    ...readable(resource).map((meta) =>
+      printed(context, table, meta.column, meta.name),
     ),
   ].join(', ');
 }

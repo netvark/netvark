@@ -10,6 +10,49 @@ const value = {
   },
   "domains": {},
   "tables": {
+    "labels": {
+      "schema": "public",
+      "name": "labels",
+      "primaryKey": [
+        "code"
+      ],
+      "columns": {
+        "code": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "name": {
+          "type": "text",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "nullable": false,
+          "default": null,
+          "identity": null,
+          "generated": null
+        }
+      },
+      "constraints": {
+        "labels_pkey": {
+          "kind": "primaryKey",
+          "columns": [
+            "code"
+          ]
+        }
+      }
+    },
     "logs": {
       "schema": "public",
       "name": "logs",
@@ -389,9 +432,48 @@ const value = {
           "default": null,
           "identity": null,
           "generated": null
+        },
+        "code": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
+        },
+        "label_id": {
+          "type": "bpchar",
+          "typeKind": "base",
+          "array": false,
+          "sqlType": "character(4)",
+          "maxLength": 4,
+          "precision": null,
+          "scale": null,
+          "nullable": true,
+          "default": null,
+          "identity": null,
+          "generated": null
         }
       },
       "constraints": {
+        "tasks_label_id_fkey": {
+          "kind": "foreignKey",
+          "columns": [
+            "label_id"
+          ],
+          "references": {
+            "table": "labels",
+            "columns": [
+              "code"
+            ]
+          },
+          "enforced": true
+        },
         "tasks_parent_id_fkey": {
           "kind": "foreignKey",
           "columns": [
