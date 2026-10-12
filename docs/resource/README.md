@@ -10,8 +10,9 @@ document, all typed by the catalog `@netvark/pg-catalog` extracts from your migr
 | [`@netvark/kysely-resource`](../../packages/kysely-resource) | The runtime over Kysely on PostgreSQL: the storage adapter, which runs each operation in one transaction scoped to the actor's tenant, for row security policies and its own scope predicate alike.                                                                                                                                            |
 | [`@netvark/hono-resource`](../../packages/hono-resource)     | The routes on Hono: every operation a runtime runs, each relationship's links, the Atomic Operations endpoint over `runtime.transaction`, and the OpenAPI document, served where the declarations' links point, with the request's actor resolved once, any other method answered 405 with `Allow`, and `resourceTypeOf` for localized errors. |
 
-`@netvark/react-resource` (queries and forms) joins the family next. Status: the 0.x line is in
-development and unreleased. Every choice is written down in [`SPEC.md`](SPEC.md).
+`@netvark/react-resource` (forms, lists, and query keys over TanStack Form, Query, and Table v9) is
+in development under SPEC section 20. Status: the 0.x line is in development and unreleased. Every
+choice is written down in [`SPEC.md`](SPEC.md).
 
 ## Install
 

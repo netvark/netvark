@@ -1296,6 +1296,10 @@ their definition by type (15.6). The result holds a `ResourceClient` per name:
 | `removeFromRelationship(id, name, ids, o?)` | `DELETE <relationship link>` with `{ data }`, to-many only                      | `WriteResult` of the linkage                                                 |
 | `next(result, options?)`, `prev(...)`       | `GET` of `result.links.next` or `links.prev` (15.8)                             | `ReadResult` like `result`, or `undefined` when the link is `null` or absent |
 
+- `definition` is the definition the client was made from, as it was passed: a binding that keys a
+  cache by the request reads its query capabilities and serializes with it (`serializeQuery`, 15.5;
+  resource SPEC 20.6) without being handed the definition a second time. It is typed as the
+  definition passed.
 - An id fills the path's `{id}` percent-encoded (`encodeURIComponent`), as the links convention
   encodes it (5.1). An id that is empty, `.`, or `..` throws `TypeError` before anything is sent:
   the URL parser removes a dot segment, percent-encoded or not (URL Standard, single-dot and

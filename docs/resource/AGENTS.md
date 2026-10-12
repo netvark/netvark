@@ -65,6 +65,17 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   are peers, since the application hands the routes values made with its own copies (root ADR 0006):
   never move them to `dependencies`. Its tests drive the routes with `app.request()` over a runtime
   held in memory; a real runtime behind real HTTP runs in `e2e/resource`.
+- The React bindings are a model first (ADR 0015): the root of `packages/react-resource/` imports
+  neither React nor TanStack, `./form` imports `@tanstack/react-form` and `./query`
+  `@tanstack/react-query`, each an optional peer, and a table is driven by state TanStack Table v9
+  reads, with no Table import. Every text comes from the application's messages object, passed in,
+  and is computed when it is asked for: no provider, no `useMessages`, no text built when a module
+  loads (ADR 0014). Never render an error's `message`; a response's error objects are shown by their
+  `detail` as the server localized it. `@netvark/resource-core` and `@netvark/jsonapi-client` are
+  peers, since the application hands the bindings declarations, messages, and clients made with its
+  own copies. Component tests run TanStack Form, Query, and Table v9 as an application does, in
+  jsdom with Testing Library, against a fetch double that answers with documents jsonapi-core
+  builds; the real server over HTTP runs in `e2e/resource/react/`.
 
 ## Repository map
 
@@ -101,6 +112,13 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   where each operation's failure points; `hrefs.ts` the targets an `href` names
 - `openapi.ts` the document's route; `resource-type.ts` `resourceTypeOf`, which every route records
   first; `operation-type.ts` the type of the operation an operations request failed in
+
+`packages/react-resource/src/` (SPEC 20.1):
+
+- `fields/` `fieldsOf` and each member's filter kind; `form/` the form model: values, the write, the
+  validator, and a refusal's errors by field; `list/` the list model: sorting, column filters, and
+  the lenient read of a route's search
+- `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry and its keys
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted

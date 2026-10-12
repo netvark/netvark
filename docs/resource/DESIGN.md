@@ -50,7 +50,8 @@ plain data plus Zod schemas: anything can read it.
   code (`reject`), and the library only gives them a typed place to live.
 - Hiding SQL. Storage is Kysely through `@netvark/kysely-resource`; a custom query is still a Kysely
   query.
-- UI components. `@netvark/react-resource` provides hooks and metadata, not widgets.
+- UI components. `@netvark/react-resource` provides a model and TanStack bindings, not widgets: an
+  application keeps its own field components, table markup, and router (ADR-0015).
 
 ## 2. Principles
 
@@ -273,7 +274,7 @@ fixtures then run against the new CHECK in CI.
 | `@netvark/resource-core`   | declarations, derivations, messages, the `server` contracts, OpenAPI, the storage contract suite       | E1   |
 | `@netvark/kysely-resource` | the runtime: the storage adapter over Kysely, boot checks against the full catalog, quotas, the outbox | E3   |
 | `@netvark/hono-resource`   | routes for every declared operation on Hono, localized errors, the OpenAPI route                       | E4   |
-| `@netvark/react-resource`  | TanStack Query keys, form hooks over the schemas and metadata, typed messages                          | E6   |
+| `@netvark/react-resource`  | a framework-free model of forms and lists, bound to TanStack Form, Query, and Table v9                 | E6   |
 
 Companions in other families: `@netvark/pg-catalog` extracts the catalog and runs the oracle
 (`rules --check`); `@netvark/jsonapi-client` is the typed fetch client over the JSON:API
@@ -317,6 +318,19 @@ alone would map it. Effects write events to an outbox table in the operation's t
 `relayOutbox` delivers them after commit, at least once. Cursors are bound to the scope values, so a
 cursor from one tenant is refused in another. ADR 0012 records why.
 
+### 4.5 The React bindings
+
+`@netvark/react-resource` is a model of a declared resource under thin TanStack bindings. The model
+knows no framework: field descriptors whose labels are the application's message functions, a form
+model whose values are what inputs edit and whose write carries only what the person changed,
+validation by the declaration's own write validators with the server's words for each refusal, a
+refused write's error objects placed by pointer, and a list model whose state is the JSON:API query,
+read back leniently from a URL. `./form` turns the form model into TanStack Form options and binds a
+refusal onto the fields; `./query` keys TanStack Query by the request and invalidates a type after a
+write; TanStack Table v9 reads and writes the list's sorting and filters as state, with paging by
+cursor outside it. An application keeps its field components, its table markup, and its router. ADRs
+0014 and 0015 record why.
+
 ## 5. Decisions
 
 | ADR  | Decision                                                                                                       |
@@ -334,6 +348,8 @@ cursor from one tenant is refused in another. ADR 0012 records why.
 | 0011 | An id takes what its key's write form takes and is sent in the spelling the server reads back                  |
 | 0012 | The runtime runs declared resources over the storage contract, in text, inside row security                    |
 | 0013 | Hosts take the runtime contract, mount where the links point, and run an operations request in one transaction |
+| 0014 | The React bindings render the application's one messages object                                                |
+| 0015 | The React bindings are a framework-free model under TanStack Query, Form, and Table                            |
 
 ## 6. Later
 
