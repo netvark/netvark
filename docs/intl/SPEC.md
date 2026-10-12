@@ -62,12 +62,17 @@ Every module with behavior has a sibling `*.test.ts`; contract types have `*.tes
 
 ## 2. Isolation (`isolate.ts`, ADR 0006)
 
-- `FIRST_STRONG_ISOLATE` is U+2068 and `POP_DIRECTIONAL_ISOLATE` is U+2069, typed as their literal
-  strings.
+- `FIRST_STRONG_ISOLATE` is U+2068 and `POP_DIRECTIONAL_ISOLATE` is U+2069, typed `string`: a
+  literal type would print the invisible character itself in declarations and editor hovers. The
+  published code writes both as escapes.
 - `isolate(value)` MUST return `FIRST_STRONG_ISOLATE + value + POP_DIRECTIONAL_ISOLATE` for every
   string, the empty string and an already isolated one included. Outside the isolate the value
   counts as one neutral character, and inside it takes its direction from its first strong character
   (UAX #9, 2.4, and rule X5c).
+- `isolate` MUST NOT rewrite the value. A value whose own isolate controls are unbalanced escapes:
+  an unmatched U+2069 in it closes the isolate, and an unmatched U+2066, U+2067, or U+2068 takes the
+  closing U+2069 (UAX #9, BD9), as inside a `<bdi>` element (CSS Writing Modes 3, 2.4.2).
+  Applications remove `\p{Bidi_Control}` from text they accept from users (ADR 0006).
 
 ## 3. Formatters (`intl/`, ADR 0003, ADR 0004)
 
@@ -359,8 +364,8 @@ files through the `fs` it is given (ADR 0002). Peer ranges are recorded here whe
 
 | Name                       | Value      | Why                                                                    |
 | -------------------------- | ---------- | ---------------------------------------------------------------------- |
-| `FIRST_STRONG_ISOLATE`     | `'⁨'`       | UAX #9, 2.4                                                            |
-| `POP_DIRECTIONAL_ISOLATE`  | `'⁩'`       | UAX #9, 2.4                                                            |
+| `FIRST_STRONG_ISOLATE`     | `'\u2068'` | UAX #9, 2.4                                                            |
+| `POP_DIRECTIONAL_ISOLATE`  | `'\u2069'` | UAX #9, 2.4                                                            |
 | `DEFAULT_CACHE_SIZE`       | `256`      | ADR 0003: a few locales, a few styles, the zones of concurrent readers |
 | `DEFAULT_TIME_ZONE`        | `'UTC'`    | ADR 0005: the same answer on every host                                |
 | `TIME_ZONE_COOKIE_MAX_AGE` | `34560000` | 400 days, Paraglide's locale cookie and RFC 6265bis-22, 5.5            |

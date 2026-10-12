@@ -68,8 +68,8 @@ const { warnings } = await compile({ project: './project.inlang', outdir: './src
 for (const warning of warnings) console.warn(warning);
 ```
 
-`m.shared_by({ name: 'محمد', count: 2 })` now returns `Shared by ⁨محمد⁩ (⁨2⁩)`, which every browser
-displays in order.
+`m.shared_by({ name: 'محمد', count: 2 })` now returns
+`'Shared by \u2068محمد\u2069 (\u20682\u2069)'`, which every browser displays in order.
 
 ## Best practices
 
@@ -84,8 +84,12 @@ displays in order.
 - **Format outside the message, interpolate the string.** `compile()` refuses `{x: number}` and
   `{x: datetime}`; pass `intl.number(x)` instead, and keep `plural` selecting on the raw count (ADR
   0008).
-- **Expect the isolates in tests** that compare a message with a value: `'⁨'` and `'⁩'` around it.
-  Strip U+2066 to U+2069 from text a user pastes into a search field (ADR 0006).
+- **Expect the isolates in tests** that compare a message with a value: `'\u2068'` and `'\u2069'`
+  around it. Strip U+2066 to U+2069 from text a user pastes into a search field (ADR 0006).
+- **Remove bidi controls from names and other text you accept from users**, where you accept it:
+  `value.replace(/\p{Bidi_Control}/gu, '')`. An isolate holds any value whose own controls are
+  balanced; a value that carries an unmatched U+2069 closes it early, and an override after that
+  reverses the rest of the sentence (ADR 0006).
 - **Check catalogs with `inlang check`** in CI and before a push, with
   `@inlang/plugin-m-function-matcher` 2.3+ in the project's modules so unused messages are found:
   Paraglide renders the base locale for a missing translation and the message key for a missing

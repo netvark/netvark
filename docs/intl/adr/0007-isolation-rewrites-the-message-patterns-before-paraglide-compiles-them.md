@@ -24,9 +24,10 @@ There are three places to add the isolates:
    bundle with its messages and variants across the SDK's table renames.
 
 Measured on Paraglide 2.27.0 with inlang SDK 4.0.0 (2026-10-12): wrapping each expression of a
-loaded project in two text parts and compiling it emits `` `Shared by ⁨${i?.name}⁩ (⁨${i?.count}⁩)` ``,
-the catalogs on disk are byte-identical afterwards, and `loadProjectFromDirectory()` without a
-`syncInterval` writes nothing back after the load.
+loaded project in two text parts and compiling it emits
+`` `Shared by \u2068${i?.name}\u2069 (\u2068${i?.count}\u2069)` ``, the catalogs on disk are
+byte-identical afterwards, and `loadProjectFromDirectory()` without a `syncInterval` writes nothing
+back after the load.
 
 ## Decision
 

@@ -13,8 +13,8 @@ from the message's locale code and the options written in the message
 That is the bare code ADR 0004 replaces with a formatting tag, and, for a date, the runtime's zone
 ADR 0005 replaces with the reader's. Measured with one compiled message,
 `خصم {amount: number style=percent}`, called with `0.25` in `ar` (2026-10-12): Node 24.20 renders
-the amount as `25‎%‎` and Node 18.14 as `٢٥٪؜`. `plural` is different: it selects a variant on the raw
-number and prints nothing.
+the amount as `25\u200E%\u200E` and Node 18.14 as `٢٥٪\u061C`. `plural` is different: it selects a
+variant on the raw number and prints nothing.
 
 ## Decision
 

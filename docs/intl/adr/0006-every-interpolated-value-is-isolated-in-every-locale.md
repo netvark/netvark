@@ -40,7 +40,20 @@ attribute
 ## Consequences
 
 A compiled string carries two invisible characters per value; a test that compares a message with a
-value expects them (`⁨`, `⁩`). Text copied from the page carries them too, so a search box that
-receives pasted text should strip U+2066 to U+2069; the docs say so. A message used as a URL or an
-attribute that is not text (an `href` built from a message) must not interpolate, or must opt its
+value expects them (`\u2068`, `\u2069`). Text copied from the page carries them too, so a search box
+that receives pasted text should strip U+2066 to U+2069; the docs say so. A message used as a URL or
+an attribute that is not text (an `href` built from a message) must not interpolate, or must opt its
 locale out.
+
+The isolate holds any value whose own isolate controls are balanced. A value that carries an
+unmatched U+2069 closes it early, and one that carries an unmatched U+2066, U+2067, or U+2068 takes
+the closing U+2069 for itself ([UAX #9, BD9](https://www.unicode.org/reports/tr9/#BD9)), exactly as
+inside a `<bdi>` element, where "bidi control codes in the source text are still honored"
+([CSS Writing Modes 3, 2.4.2](https://www.w3.org/TR/css-writing-modes-3/#bidi-control-codes)).
+Measured with bidi-js 1.1.0, `Shared by {a\u2069\u202Exyz} (2) files` displays everything after the
+name reversed. The MessageFormat 2 Default Bidi Strategy
+([LDML, Message Format](https://www.unicode.org/reports/tr35/tr35-messageFormat.html#default-bidi-strategy))
+and Fluent append the controls around the value as it is, and `isolate` does the same: rewriting the
+value would hide data from the application and could not reach the compiled messages, which
+interpolate the raw value. Names and other text accepted from users have `\p{Bidi_Control}` removed
+where they are accepted; the docs say so.

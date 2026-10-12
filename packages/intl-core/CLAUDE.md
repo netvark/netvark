@@ -1,0 +1,1 @@
+@../../docs/intl/AGENTS.md
