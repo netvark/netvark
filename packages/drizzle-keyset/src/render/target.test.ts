@@ -1,6 +1,6 @@
 import type { AggregateTarget, ColumnTarget } from '@netvark/keyset-core';
 
-import { QueryBuilder } from 'drizzle-orm/pg-core';
+import { pgTable, QueryBuilder, uuid } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 
 import { relation } from '../test-support/keysets';
@@ -81,6 +81,16 @@ describe('renderTarget (SPEC 14.2)', () => {
     expect(compile(renderTarget(target, context)).sql).toBe(
       '(select count(*) as "value" from "audit"."events" where "audit"."events"."contact_id" = "contacts"."id")',
     );
+  });
+
+  it('doubles a quote inside a table or column name (CVE-2026-39356)', () => {
+    // drizzle-orm 0.45.1 and older print "we"ird"."i"d": 0.45.2 is the peer
+    // range's floor for this escaping, and CI runs this test on it.
+    const weird = pgTable('we"ird', { id: uuid('i"d').primaryKey() });
+    const target = columnTarget('weird', 'id');
+    expect(
+      compile(renderTarget(target, { schema: { weird }, table: 'weird' })).sql,
+    ).toBe('"we""ird"."i""d"');
   });
 
   it("names a column declared without a name by the database's casing", () => {
