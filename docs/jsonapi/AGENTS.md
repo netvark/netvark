@@ -73,8 +73,14 @@ typed client, published as `@netvark/jsonapi-client`, depends on the core alone)
 - `query/` the query types (`types.ts`) and `serializeQuery` (`serialize-query.ts`,
   `serialize-filter.ts`)
 - `pagination/cursors.ts` `pageCursors` and `cursorOf`
+- `document/` `deserialize` (`deserialize.ts`), the include tree it resolves along
+  (`include-tree.ts`), the shape-checked readers of links, relationship objects, and identifiers
+  (`members.ts`), and the record types (`types.ts`)
+- `errors/response-error.ts` `ResponseError` and `isResponseError`
+- `client/record-types.ts` `RecordOf`: the record a query returns, derived from the definitions
 - `internal/object.ts` prototype-safe reads of response JSON; never exported
-- `test-support/blog.ts` the blog's definitions for the package's own tests; not published
+- `test-support/` the blog's definitions (`blog.ts`) and a compound document (`compound.ts`) for the
+  package's own tests; not published
 
 `e2e/jsonapi/`: end-to-end suite, a private workspace package that consumes the built
 `@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*` and drives a blog API over

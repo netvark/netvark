@@ -1,11 +1,12 @@
 # @netvark/jsonapi-client
 
 A typed client for [JSON:API 1.1](https://jsonapi.org/format/1.1/) servers built with
-[`@netvark/jsonapi-core`](../jsonapi-core#readme). The queries it sends are typed by the definitions
-the server is built from, so an include path, sort, filter, or fieldset the server would refuse with
-a 400 fails `tsc` first. Nothing is generated: the client imports the definitions. It uses web
-standards only (`URL`, `URLSearchParams`), so one build runs in browsers, workers, Node, Bun, and
-Deno. The contract is section 15 of
+[`@netvark/jsonapi-core`](../jsonapi-core#readme). The queries it sends and the records it reads are
+typed by the definitions the server is built from, so an include path, sort, filter, or fieldset the
+server would refuse with a 400 fails `tsc` first, and a record holds exactly what the query asked
+for. Error documents become a `ResponseError` that keeps each error's code. Nothing is generated:
+the client imports the definitions. It uses web standards only (`URL`, `URLSearchParams`), so one
+build runs in browsers, workers, Node, Bun, and Deno. The contract is section 15 of
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
 ## Install
@@ -91,6 +92,66 @@ what no parameter can carry: a `page.size` that is not a positive safe integer, 
 finite, an empty list, and `page` or `search` on a definition without them. Values are the server's
 to judge: a date it cannot read or a page size above its maximum is a 400 that names the parameter.
 
+## Records
+
+`deserialize(document, { include })` turns a document into records: plain objects holding `type`,
+`id`, each attribute, and each relationship, with the resource object's `links`, `meta`, and
+relationship objects as `$links`, `$meta`, and `$relationships` (`$` is a character no member name
+may contain, so nothing collides with them). A relationship on a path the request included is the
+included record, or records in linkage order; every other one is its linkage, `{ type, id }`.
+
+```ts
+import { deserialize, type RecordOf } from '@netvark/jsonapi-client';
+
+const { data, included, links, meta } = deserialize(await response.json(), {
+  include: ['author'],
+});
+// data: [{ type: 'articles', id: '1', title: 'JSON:API', author: { type: 'people', id: '9', name: 'Ada', ... },
+//          tags: [{ type: 'tags', id: 't1' }], $links: { self: '...' } }]
+
+type Article = RecordOf<typeof definitions, typeof Articles, { include: ['author'] }>;
+// author: the people record | null | undefined; tags: identifiers
+```
+
+Records follow the include paths only, so they form a tree: an article's author never points back at
+the article object, and every result survives `JSON.stringify`, `structuredClone`, and a query
+cache's structural sharing. A resource linked on an included path that the document leaves out is
+left out (a to-one is `undefined`); its identifier stays in `$relationships`.
+
+`RecordOf<TDefinitions, TDefinition, TQuery>` types a record as `deserialize` builds it: the
+attributes as JSON (a `Date` arrives as a string), narrowed to `fields[type]`, each relationship
+resolved or linkage as the query says. A query whose `include` or fieldset is a literal tuple says
+what the response holds; one typed as a list (`ReadonlyArray<...>`) says only what it may hold, so
+its relationships are a record or linkage and its fields optional. A related type no definition
+passed has is `AnyRecord`, its fields `unknown`.
+
+## Errors
+
+A response that is not 2xx is a `ResponseError`: `status`, `errors` (the error document's error
+objects, each with its own `code`; none when the body is not an error document, such as a proxy's
+HTML page), `document`, and `headers` (`allow`, `retryAfter`). Its message names the resource type,
+the call, and the status, never the URL or the body, so it is safe to log.
+
+```ts
+import { isResponseError } from '@netvark/jsonapi-client';
+
+type AppCode = 'CONTACT_EMAIL_TAKEN' | 'QUOTA_EXCEEDED';
+
+try {
+  await save(contact);
+} catch (error) {
+  if (isResponseError<AppCode>(error, 'CONTACT_EMAIL_TAKEN')) {
+    const field = error.errors[0]?.source?.pointer; // '/data/attributes/email'
+  } else {
+    throw error;
+  }
+}
+```
+
+`isResponseError(error, code)` is `true` for a `ResponseError` whose error objects carry `code`;
+given the application's catalog as its type parameter, it refuses a code the catalog does not have.
+It recognizes an error from another copy of the package, where `instanceof` would not.
+
 ## Pagination
 
 `pageCursors(document)` reads the cursors of a page's links: `next` is `page[after]` of `links.next`
@@ -122,6 +183,14 @@ carries as `$meta.page.cursor`; list with `page: { after }` set to it to start a
 - **Leave `page.size` out for the server's default,** and stay within the definition's `max`
   otherwise.
 - **Use the URL as a cache key.** One query always serializes to one URL.
+- **Pass the include paths you sent to `deserialize`.** The records resolve exactly those; a
+  relationship off them is its linkage.
+- **Branch on `code`, never on `title` or `detail`.** Titles and details are the server's text in
+  the request's language; codes are its catalog, stable across languages.
+- **Map `source.pointer` to a form field** (`/data/attributes/email` is `email`), and show anything
+  without a pointer as a form-level error.
+- **Read `retryAfter` before retrying** a 429 or a 503, and let every other `ResponseError` reach
+  the caller.
 
 ## Documentation
 

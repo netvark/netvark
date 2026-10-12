@@ -4,6 +4,18 @@
  * from (SPEC 15).
  * @packageDocumentation
  */
+export type { RecordOf } from './client/record-types';
+export type {
+  AnyRecord,
+  Deserialized,
+  DeserializeOptions,
+  Identifier,
+  RecordMembers,
+} from './document/types';
+export type {
+  ResponseErrorHeaders,
+  ResponseErrorInit,
+} from './errors/response-error';
 export type { PageCursors } from './pagination/cursors';
 export type {
   Condition,
@@ -21,5 +33,7 @@ export type {
   WideFilterInput,
 } from './query/types';
 
+export { deserialize } from './document/deserialize';
+export { isResponseError, ResponseError } from './errors/response-error';
 export { cursorOf, pageCursors } from './pagination/cursors';
 export { serializeQuery } from './query/serialize-query';
