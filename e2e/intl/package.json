@@ -4,11 +4,17 @@
   "private": true,
   "description": "End-to-end tests: a consumer of the built @netvark/intl-core and @netvark/paraglide-intl packages that compiles Paraglide projects, lays text out with a conforming implementation of the Unicode Bidirectional Algorithm, and runs on Bun, Deno, and workerd.",
   "type": "module",
+  "imports": {
+    "#compiled-messages": {
+      "types": "./smoke/compiled-messages.d.ts",
+      "default": "./.tmp/smoke/messages.js"
+    }
+  },
   "scripts": {
     "test": "vitest run",
-    "smoke:bun": "bun run smoke/run.ts",
-    "smoke:deno": "deno run --allow-read smoke/run.ts",
-    "smoke:workerd": "node --experimental-strip-types smoke/workerd.ts",
+    "smoke:bun": "bun run smoke/compile.ts && bun run smoke/run.ts",
+    "smoke:deno": "deno run --allow-read --allow-write --allow-env smoke/compile.ts && deno run --allow-read smoke/run.ts",
+    "smoke:workerd": "node --experimental-strip-types smoke/compile.ts && node --experimental-strip-types smoke/workerd.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
@@ -17,8 +23,10 @@
     "@inlang/plugin-message-format": "catalog:",
     "@netvark/intl-core": "workspace:*",
     "@netvark/paraglide-intl": "workspace:*",
+    "@types/jsdom": "30.0.0",
     "@types/node": "catalog:",
     "bidi-js": "1.1.0",
+    "jsdom": "catalog:",
     "miniflare": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

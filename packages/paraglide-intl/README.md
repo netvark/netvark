@@ -25,7 +25,9 @@ also loads Paraglide's compiler.
 On an older Deno, a compile with inlang SDK 3.1 or 4 finishes but the process does not exit, as with
 Paraglide's own compile: the SDK runs its database in a `node:worker_threads` worker, and Deno
 before 2.6.10 did not unref a worker reliably
-([denoland/deno#32161](https://github.com/denoland/deno/pull/32161)).
+([denoland/deno#32161](https://github.com/denoland/deno/pull/32161)). Run a compile script on Deno
+with `--allow-read --allow-write --allow-env`: it reads the project and its plugins, writes the
+output, and Paraglide's logger reads `TERM` and the variables that name a CI provider.
 
 ## Compile
 

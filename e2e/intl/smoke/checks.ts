@@ -1,7 +1,8 @@
 /**
  * Runtime-neutral checks (SPEC 7.3) over the built core: the isolates, the
  * formatters on the runtime's own `Intl`, with the calendar and digits a
- * formatting tag names, and the time zone checks of `time-zone-checks.ts`.
+ * formatting tag names, the time zone checks of `time-zone-checks.ts`, and
+ * the compiled messages of `message-checks.ts`.
  * No file system and no environment: the same module runs on Bun, Deno,
  * and workerd.
  */
@@ -15,6 +16,7 @@ import {
 } from '@netvark/intl-core';
 
 import { check, equal } from './assert.ts';
+import { MESSAGE_CHECKS } from './message-checks.ts';
 import { TIME_ZONE_CHECKS } from './time-zone-checks.ts';
 
 export interface SmokeResult {
@@ -78,6 +80,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     );
   },
   ...TIME_ZONE_CHECKS,
+  ...MESSAGE_CHECKS,
 };
 
 export async function runChecks(runtime: string): Promise<SmokeResult> {
@@ -101,7 +104,7 @@ export function report(result: SmokeResult): void {
   const total = result.passed + result.failures.length;
   if (result.failures.length === 0) {
     console.log(
-      `@netvark/intl-core smoke: ${total} checks passed on ${result.runtime}`,
+      `@netvark/intl smoke: ${total} checks passed on ${result.runtime}`,
     );
     return;
   }
@@ -109,6 +112,6 @@ export function report(result: SmokeResult): void {
     console.error(`FAIL ${failure}`);
   }
   throw new Error(
-    `@netvark/intl-core smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
+    `@netvark/intl smoke: ${result.failures.length} of ${total} checks failed on ${result.runtime}`,
   );
 }

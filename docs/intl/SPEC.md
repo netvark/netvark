@@ -414,16 +414,26 @@ A private package that consumes the built packages through `workspace:*` and nev
   English and Arabic, and a project whose messages format refused with the built
   `MessageFormattingError`.
 - `hydration.e2e.test.ts`: a server render inside a request scope and a jsdom document render from
-  the same cookie produce the same strings; without the cookie both use the fallback.
+  the same cookie produce the same strings; without the cookie both use the fallback. Each side
+  loads its own copy of the compiled output, as its bundle would: Paraglide's runtime decides when
+  it loads whether it runs on a server.
 - `visual-order.e2e.test.ts`: bidi-js (UAX #9 C1) resolves the compiled messages' visual order with
   each value in place, where the plain interpolation reorders it.
+- `support/catalogs.ts` and `support/project.ts`: the fixture catalogs, and projects written into
+  `mkdtemp` directories by their real path. The temporary directory is a symlink on macOS, and
+  Vitest loads a module imported through it and through its target twice, where Node loads it once.
 
 ### 7.3 Runtime smoke test (`e2e/intl/smoke/`)
 
 The core's formatters and time zone resolver, and the compiled fixture messages, on Bun, Deno, and
-workerd. The resolver's request scope is an `AsyncLocalStorage` from `node:async_hooks` on each;
-workerd runs with the `nodejs_als` compatibility flag, which compatibility dates before 2026-08-04
-need.
+workerd. Each smoke script first compiles `support/catalogs.ts` with the built binding into
+`.tmp/smoke/` on the runtime under test, or on Node for workerd, which runs compiled messages but
+does not compile them. The checks import the output as `#compiled-messages`, a `package.json`
+subpath import whose `types` condition is `smoke/compiled-messages.d.ts`, so the smoke type-checks
+before any compile; Bun, Deno, Node, and the workerd bundle resolve it to the output. The smoke
+compile refuses Deno before 2.6.10 (section 8) instead of never exiting. The resolver's request
+scope is an `AsyncLocalStorage` from `node:async_hooks` on each; workerd runs with the `nodejs_als`
+compatibility flag, which compatibility dates before 2026-08-04 need.
 
 ## 8. Packaging and support
 
@@ -433,7 +443,9 @@ ESM only, TypeScript declarations emitted with isolated declarations, `sideEffec
 writes files through the `fs` it is given (ADR 0002). inlang SDK 3.1 and 4 run their database in a
 `node:worker_threads` worker that Deno before 2.6.10 does not unref reliably
 ([denoland/deno#32161](https://github.com/denoland/deno/pull/32161)): there the compile finishes, as
-Paraglide's own does, but the process does not exit (measured on Deno 2.1.4 and 2.6.9).
+Paraglide's own does, but the process does not exit (measured on Deno 2.1.4 and 2.6.9). On Deno a
+compile needs `--allow-read`, `--allow-write`, and `--allow-env`: Paraglide's logger, consola, reads
+`TERM` and about forty variables that name a CI provider (measured on Deno 2.9.7).
 
 | Peer                   | Range             | Floor                                                                                                                                                                                                           |
 | ---------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
