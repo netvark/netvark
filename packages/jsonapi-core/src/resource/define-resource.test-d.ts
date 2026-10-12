@@ -49,6 +49,8 @@ const Article = defineResource({
   validate: { create: createSchema },
 });
 
+const serialize = (row: { readonly id: string }) => ({ id: row.id });
+
 describe('defineResource types', () => {
   it('infers literal unions for type, fields, sort, and filter', () => {
     expectTypeOf(Article.type).toEqualTypeOf<'articles'>();
@@ -68,6 +70,19 @@ describe('defineResource types', () => {
     expectTypeOf<UpdateAttributesOf<typeof Article>>().toEqualTypeOf<
       Readonly<Record<string, unknown>>
     >();
+  });
+
+  it('types the sort names of a query that declares none as never, so no sort is accepted', () => {
+    const Tag = defineResource({ type: 'tags', attributes: [], serialize });
+    const Filtered = defineResource({
+      type: 'tags',
+      attributes: [],
+      serialize,
+      query: { filter: { name: ['eq'] } },
+    });
+
+    expectTypeOf(Tag.query.sort).toEqualTypeOf<ReadonlyArray<never>>();
+    expectTypeOf(Filtered.query.sort).toEqualTypeOf<ReadonlyArray<never>>();
   });
 
   it('rejects undeclared attributes and relationships in serialize', () => {

@@ -83,9 +83,13 @@ export interface ResourceDefinitionInit<
   readonly clientIds?: TClientIds | undefined;
 }
 
-/** The sort names an init's query declares. */
+/**
+ * The sort names an init's query declares; `never` without a `sort`. The
+ * fallback is the empty tuple, whose element type is `never`: inferring
+ * from `never` itself would give the constraint, `string`.
+ */
 type SortOf<TQuery> =
-  MemberOf<TQuery, 'sort', never> extends ReadonlyArray<
+  MemberOf<TQuery, 'sort', readonly []> extends ReadonlyArray<
     infer TName extends string
   >
     ? TName
