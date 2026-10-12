@@ -311,8 +311,11 @@ of Paraglide's `compile()`. `compile()` MUST:
    reads its own fields back.
 10. Compile with `compileProject({ project, projectPath: project, compilerOptions })`, write the
     bidi controls of the output as escapes (6.4), and write it with `writeOutput()` into `outdir`
-    resolved against the working directory, cleaning it when `cleanOutdir` is set and passing
-    `previousCompilation.outputHashes` so unchanged files are not rewritten.
+    resolved against the working directory, passing `previousCompilation.outputHashes` so unchanged
+    files are not rewritten and the files the previous compile wrote and this one does not are
+    deleted. It is cleaned first when `cleanOutdir` is set and no previous output hashes are given:
+    `writeOutput()` cleans before writing only the changed files, so a clean under a previous
+    compilation would leave nothing else, as Paraglide 2.27's own `compile()` does (measured).
 11. Return the output hashes and `await project.errors.get()` as `warnings` (a plugin that failed to
     import, a file that failed to parse), and close the project whether or not a step threw.
 

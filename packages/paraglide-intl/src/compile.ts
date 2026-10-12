@@ -125,8 +125,12 @@ export async function compileWith(
     const outputHashes = await writeOutput({
       directory: resolve(process.cwd(), config.outdir),
       output,
-      // As Paraglide's compile(): writeOutput() cleans when the option is truthy.
-      cleanDirectory: Boolean(config.compilerOptions.cleanOutdir),
+      // As Paraglide's compile(), writeOutput() cleans when the option is
+      // truthy; but not over a previous compilation, whose unchanged files it
+      // skips and would leave deleted (SPEC 6.1, #170).
+      cleanDirectory:
+        Boolean(config.compilerOptions.cleanOutdir) &&
+        config.previousOutputHashes === undefined,
       fs: config.fs.promises,
       ...(config.previousOutputHashes === undefined
         ? {}

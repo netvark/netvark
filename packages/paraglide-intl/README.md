@@ -53,9 +53,10 @@ for (const warning of warnings) console.warn(warning);
 
 `compile()` takes Paraglide's compiler options, the same ones its `compile()`, CLI, and bundler
 plugins take, and returns `{ outputHashes, warnings }`: pass the result back as
-`previousCompilation` and files whose content did not change are not rewritten. `warnings` are the
-project's errors that did not stop the compile, such as a plugin that failed to import. Compiles run
-one at a time, as Paraglide's do.
+`previousCompilation` and only the files whose content changed are written, the directory is not
+cleaned first, and files the previous compile wrote and this one does not are deleted. `warnings`
+are the project's errors that did not stop the compile, such as a plugin that failed to import.
+Compiles run one at a time, as Paraglide's do.
 
 With the message `"Shared by {name} ({count})"`, `m.shared_by({ name: 'محمد', count: 2 })` returns
 `'Shared by \u2068محمد\u2069 (\u20682\u2069)'`. In a sentence, the name and the count are each a
