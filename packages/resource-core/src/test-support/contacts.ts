@@ -7,6 +7,7 @@ import { AUDIT_CHANGES_TABLE } from './catalog/audit-changes-table';
  * `isolatedDeclarations`. Not published with the package.
  * @packageDocumentation
  */
+import { BADGE_AWARDS_TABLE, BADGES_TABLE } from './catalog/badges-tables';
 import { CONTACTS_TABLE } from './catalog/contacts-table';
 import {
   DOCUMENT_NOTES_TABLE,
@@ -27,6 +28,8 @@ export interface ContactsCatalog {
   readonly domains: typeof DOMAINS;
   readonly tables: {
     readonly 'audit.changes': typeof AUDIT_CHANGES_TABLE;
+    readonly badge_awards: typeof BADGE_AWARDS_TABLE;
+    readonly badges: typeof BADGES_TABLE;
     readonly contact_phones: typeof CONTACT_PHONES_TABLE;
     readonly contacts: typeof CONTACTS_TABLE;
     readonly document_notes: typeof DOCUMENT_NOTES_TABLE;
@@ -45,6 +48,8 @@ export const contactsCatalog: ContactsCatalog = {
   domains: DOMAINS,
   tables: {
     'audit.changes': AUDIT_CHANGES_TABLE,
+    badge_awards: BADGE_AWARDS_TABLE,
+    badges: BADGES_TABLE,
     contact_phones: CONTACT_PHONES_TABLE,
     contacts: CONTACTS_TABLE,
     document_notes: DOCUMENT_NOTES_TABLE,

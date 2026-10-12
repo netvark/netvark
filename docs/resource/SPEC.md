@@ -256,9 +256,16 @@ The column decides which modes are allowed; anything else fails `tsc` and throws
 A relationship's foreign key MUST reference the primary key of a table of the public catalog,
 because the linkage it produces is that table's resource id (3.4); a foreign key to a unique column
 or to a table outside the public catalog is refused. Its column's type MUST be able to carry a
-resource id (3.4). A NOT ENFORCED foreign key (`enforced: false`, catalog ADR 0010) declares a
-relationship too, since it still relates the two tables; the database lets its column hold an id
-that no row of the target has, so a linkage may name a resource that does not exist.
+resource id (3.4), and MUST spell each id as the key it references does (`catalog/id-spelling.ts`),
+since a relationship reads as its column's text (18.2): through the domains of each, the same base
+type, with the same length for a `bpchar` and the same scale for a `numeric`, except that `int2`,
+`int4`, and `int8` spell alike, as do `text` and `varchar`. PostgreSQL takes a foreign key that
+prints its key's value otherwise: a `char(4)` to a `char(6)` pads `ab` to four characters where the
+key pads it to six, a `numeric(10,3)` to a `numeric(10,2)` prints `1.500` where the key prints
+`1.50`, and a `float8` to a `real` prints `1.100000023841858` where the key prints `1.1`. A NOT
+ENFORCED foreign key (`enforced: false`, catalog ADR 0010) declares a relationship too, since it
+still relates the two tables; the database lets its column hold an id that no row of the target has,
+so a linkage may name a resource that does not exist.
 
 @ref https://jsonapi.org/format/1.1/#document-resource-object-attributes
 
@@ -427,11 +434,12 @@ is where a wrong target fails, and a failed read throws again on the next.
 
 Tests: `declare-resource.test.ts`, `declare-fields.test.ts`, `declare-relationships.test.ts`, and
 `declare-options.test.ts` (every `TypeError` of 14 a declaration can throw), with
-`not-enforced.test.ts` and `not-enforced.test-d.ts` for NOT ENFORCED constraints (3.5, 6.1, 9.1);
-`declare-resource.test-d.ts` (the valid forms, two declarations that reference each other among
-them); `declare-resource-errors.test-d.ts` and `declare-options-errors.test-d.ts` (every compile
-error above, each as a `@ts-expect-error` on the offending option); and `e2e/resource/fails/`, which
-pins the compiler's message for each.
+`declare-relationship-spelling.test.ts` and `catalog/id-spelling.test.ts` and `.test-d.ts` for the
+spelling of a relationship's ids, `not-enforced.test.ts` and `not-enforced.test-d.ts` for NOT
+ENFORCED constraints (3.5, 6.1, 9.1); `declare-resource.test-d.ts` (the valid forms, two
+declarations that reference each other among them); `declare-resource-errors.test-d.ts` and
+`declare-options-errors.test-d.ts` (every compile error above, each as a `@ts-expect-error` on the
+offending option); and `e2e/resource/fails/`, which pins the compiler's message for each.
 
 ---
 
@@ -2518,6 +2526,7 @@ option, in the two forms of 3; its message names the option relative to the decl
 | an access no declared operation writes (3.3)                                                     | `contacts.fields.kind.access: immutable needs the create operation`                                                                                         |
 | a foreign key to anything but the primary key of a public table (3.1)                            | `people.relationships.team_slug: the foreign key references teams.slug, which is not its primary key`                                                       |
 | a foreign-key column whose type cannot carry a resource id (3.4)                                 | `import_rows.relationships.batch: type jsonb cannot carry a resource id`                                                                                    |
+| a foreign-key column that spells ids unlike the key it references (3.1)                          | `badge_awards.relationships.badge_id: type character(4) spells ids unlike character(6), the type of badges.code`                                            |
 | a `target` that is not a function (3.8)                                                          | `meetings.relationships.organization_id.target: must be a function returning the target's declared resource`                                                |
 | a `target` that returns no declared resource, or the resource of another table, on first read    | `contacts.relationships.organization_id.target: must return the declared resource of organizations`                                                         |
 | a scope whose column the table does not have (3.2)                                               | `audit.changes.scope: scope organization names column organization_id, which audit.changes does not have`                                                   |
@@ -2681,28 +2690,28 @@ A private workspace package, `@netvark/resource-e2e`, that consumes the built pa
 `workspace:*` and never imports from `src/`. It holds its own fixture migrations (the contacts
 application of `e2e/catalog`, extended with a multi-column CHECK, a CHECK the rule translator does
 not cover, a domain CHECK without a rule, a codec column, an exclusion constraint, two tables keyed
-by `jsonb`, a `notes` table whose columns need `as` and `code`, and a partial unique index), a
-PostgreSQL 18 schema of NOT ENFORCED constraints (`fixtures/postgres18`, run on PGlite and on a
-server of major 18 or later), the catalogs `@netvark/pg-catalog` extracts from them (checked with
-`extract --check`), and declarations over them. It proves: the declarations type-check, and a
-`fails/` directory of declarations fails `tsc` with the expected errors, and each one a derived
-definition would refuse (`fails/definitions.ts`) throws the same reason from JavaScript
-(`definitions.e2e.test.ts`); the derived names, recorded in a reviewed snapshot
-(`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the derived schemas,
-metadata, and definitions, and that the two definitions agree: each filter, sort, search, page, and
-include request `parseQuery` accepts on a resource's `resource`, keyset-core plans with its
-`keyset`, its filters mapped by `keysetRequest`, alone and all at once, and what `parseQuery`
-refuses keyset-core refuses too, but a sort by the key (`derived-definitions.e2e.test.ts`, 11.2);
-that a client that follows `fields` alone sends values PostgreSQL stores as sent, while each value
-one step past a stated bound, outside the stated options or form, or with a fraction digit too many
-is refused or changed, and the schemas give the metadata's verdict on each (`fields.e2e.test.ts`,
-over every column type of the oracle and the ids of each key type); that the `required` members of
-the contacts application are exactly the ones an insert needs, and a member left out holds its
-stated `default` (`fields-create.e2e.test.ts`); that each `default.literal` is the constant as
-PostgreSQL prints it and each `default.value` the read form of what it stores, over a table with a
-constant default for every type with a wire form, added by one more migration
-(`field-defaults.e2e.test.ts`, `support/defaults-table.ts`); the derived error codes, recorded in a
-reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
+by `jsonb`, a `char(4)` foreign key to a `char(6)` key, a `notes` table whose columns need `as` and
+`code`, and a partial unique index), a PostgreSQL 18 schema of NOT ENFORCED constraints
+(`fixtures/postgres18`, run on PGlite and on a server of major 18 or later), the catalogs
+`@netvark/pg-catalog` extracts from them (checked with `extract --check`), and declarations over
+them. It proves: the declarations type-check, and a `fails/` directory of declarations fails `tsc`
+with the expected errors, and each one a derived definition would refuse (`fails/definitions.ts`)
+throws the same reason from JavaScript (`definitions.e2e.test.ts`); the derived names, recorded in a
+reviewed snapshot (`snapshots/names.json`), and a derived code TypeScript leaves to the runtime; the
+derived schemas, metadata, and definitions, and that the two definitions agree: each filter, sort,
+search, page, and include request `parseQuery` accepts on a resource's `resource`, keyset-core plans
+with its `keyset`, its filters mapped by `keysetRequest`, alone and all at once, and what
+`parseQuery` refuses keyset-core refuses too, but a sort by the key
+(`derived-definitions.e2e.test.ts`, 11.2); that a client that follows `fields` alone sends values
+PostgreSQL stores as sent, while each value one step past a stated bound, outside the stated options
+or form, or with a fraction digit too many is refused or changed, and the schemas give the
+metadata's verdict on each (`fields.e2e.test.ts`, over every column type of the oracle and the ids
+of each key type); that the `required` members of the contacts application are exactly the ones an
+insert needs, and a member left out holds its stated `default` (`fields-create.e2e.test.ts`); that
+each `default.literal` is the constant as PostgreSQL prints it and each `default.value` the read
+form of what it stores, over a table with a constant default for every type with a wire form, added
+by one more migration (`field-defaults.e2e.test.ts`, `support/defaults-table.ts`); the derived error
+codes, recorded in a reviewed snapshot (`snapshots/errors.json`), each raised by a real violation
 (`support/violations.ts`) on PGlite and both servers with the SQLSTATE and fields of 9.5, and the
 catalog `errorCatalog` assembles from them, rendered by `createBan`; `constraintError` against the
 same violations, each mapped to its code's error; a domain CHECK with a rule given a code in the

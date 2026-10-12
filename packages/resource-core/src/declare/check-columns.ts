@@ -25,6 +25,7 @@ import {
   primaryKeyColumn,
   resolveColumnType,
 } from '../catalog/columns';
+import { idSpelling } from '../catalog/id-spelling';
 import { ownValue } from '../internal/object';
 
 /** What every member check needs: the definer, the table, and the declaration's facts. */
@@ -179,6 +180,33 @@ function checkField(
   }
 }
 
+/**
+ * Refuses a column that spells ids unlike the key it references (SPEC
+ * 3.1), since a relationship's text is its linkage, which must name the
+ * target's resource id as the target spells it (SPEC 3.4).
+ */
+function checkSpelling(
+  scope: MemberScope,
+  path: string,
+  columnDef: PublicColumn,
+  target: string,
+  targetDef: PublicTable,
+  key: string,
+): void {
+  const keyDef = ownValue(targetDef.columns, key);
+  if (keyDef === undefined) {
+    throw new TypeError(`${path}: ${key} is not a column of ${target}`);
+  }
+  const { catalog } = scope.context;
+  if (
+    idSpelling(catalog, columnDef, path) !== idSpelling(catalog, keyDef, path)
+  ) {
+    throw new TypeError(
+      `${path}: type ${columnDef.sqlType} spells ids unlike ${keyDef.sqlType}, the type of ${target}.${key}`,
+    );
+  }
+}
+
 function checkRelationship(
   scope: MemberScope,
   column: string,
@@ -209,6 +237,7 @@ function checkRelationship(
       `${path}: type ${codecTypeName(columnDef)} cannot carry a resource id`,
     );
   }
+  checkSpelling(scope, path, columnDef, target, targetDef, String(columns[0]));
   if (column === scope.scopeColumn && relationship.access !== 'read') {
     throw new TypeError(`${path}.access: the scope column is read-only`);
   }

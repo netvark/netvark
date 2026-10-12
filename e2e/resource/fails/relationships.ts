@@ -28,6 +28,15 @@ declareResource('import_rows', {
   },
 });
 
+declareResource('badge_awards', {
+  operations: ['get'],
+  fields: {},
+  relationships: {
+    // error: type character(4) spells ids unlike character(6), the type of badges.code
+    badge_id: { target: () => Organizations, access: 'read' },
+  },
+});
+
 declareResource('meetings', {
   operations: ['get'],
   fields: {},

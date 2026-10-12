@@ -96,6 +96,17 @@ const DECLARATION_ERRORS: ReadonlyArray<readonly [string, object, string]> = [
     'import_rows.relationships.batch: type jsonb cannot carry a resource id',
   ],
   [
+    'badge_awards',
+    {
+      operations: ['get'],
+      fields: {},
+      relationships: {
+        badge_id: { target: () => Organizations, access: 'read' },
+      },
+    },
+    'badge_awards.relationships.badge_id: type character(4) spells ids unlike character(6), the type of badges.code',
+  ],
+  [
     'audit.changes',
     { operations: ['get'], fields: {} },
     'declareResource: "audit.changes" is not a table of the public catalog',
