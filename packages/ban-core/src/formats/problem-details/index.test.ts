@@ -227,7 +227,7 @@ describe('problemDetails().renderErrors', () => {
 });
 
 describe('problemDetails() schemas', () => {
-  it('describe the constant members and stay open for extensions', () => {
+  it('pin the identifying members, document a localizable title, and stay open', () => {
     const ban = createBan();
     const schema = problemDetails().schema(ban.catalog.NOT_FOUND, {
       docsBaseUrl: undefined,
@@ -237,7 +237,7 @@ describe('problemDetails() schemas', () => {
       required: ['type', 'status', 'title'],
       properties: {
         status: { const: 404 },
-        title: { const: 'Not Found' },
+        title: { type: 'string', examples: ['Not Found'] },
         code: { const: 'NOT_FOUND' },
       },
       additionalProperties: true,

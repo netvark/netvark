@@ -462,6 +462,11 @@ app.onError(
 );
 ```
 
+The published schemas document `title` as any string, with the catalog's title as the example, and
+keep `status` and `code` pinned, so a localized body still matches the response its route documents.
+Under `jsonApi()` the titles sit in each object of `errors`, and the document is closed, so localize
+them there rather than adding a top-level `title`.
+
 ### Without Hono
 
 The instance `@netvark/hono-ban` builds is a `@netvark/ban-core` instance with `onError` added.

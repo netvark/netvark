@@ -32,7 +32,7 @@ const rejectAll = (): SchemaValidator => () => ['rejected'];
 describe('published schemas (SPEC 7.1.4)', () => {
   const ban = createBan();
 
-  it('describes a catalog entry with constant members and stays open', () => {
+  it('pins the identifying members, documents a localizable title, and stays open', () => {
     const schema = ban.format.schema(ban.catalog.NOT_FOUND, SCHEMA_CTX);
     expect(schema).toEqual({
       type: 'object',
@@ -40,7 +40,7 @@ describe('published schemas (SPEC 7.1.4)', () => {
       properties: {
         type: { type: 'string', format: 'uri-reference' },
         status: { const: 404 },
-        title: { const: 'Not Found' },
+        title: { type: 'string', examples: ['Not Found'] },
         detail: { type: 'string' },
         instance: { type: 'string', format: 'uri-reference' },
         code: { const: 'NOT_FOUND' },
