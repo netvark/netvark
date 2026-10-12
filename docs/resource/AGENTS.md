@@ -77,13 +77,18 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   `onServer` errors (ADR 0017): never bind every text into `onSubmit`, which keeps a joint refusal
   on a member after the person answered it through another. A write's invalidations live in its
   options, the other types it changes named in `invalidates`, never in a callback passed to
-  `mutate`, which TanStack Query skips once the component that called it unmounts. The query tests
-  read through TanStack Query's observers: from 5.102 `fetchQuery` and its kin are deprecated for
-  `queryClient.query`, which the 5.89 floor lacks. `@netvark/resource-core` and
-  `@netvark/jsonapi-client` are peers, since the application hands the bindings declarations,
-  messages, and clients made with its own copies. Component tests run TanStack Form, Query, and
-  Table v9 as an application does, in jsdom with Testing Library, against a fetch double that
-  answers with documents jsonapi-core builds; the real server over HTTP runs in
+  `mutate`, which TanStack Query skips once the component that called it unmounts. A list's state is
+  its query, kept where the application keeps it, such as a route's search: Table renders it through
+  `manualSorting` and `manualFiltering`, every change but paging drops the cursors, and paging
+  follows the result's links, never Table's pagination feature, which counts pages a cursor API has
+  not. `query` reads a search back leniently and keeps JSON in its own forms, since a router
+  validates its search after every navigation; it checks names and shapes, never values, which the
+  server words when it refuses them. The query tests read through TanStack Query's observers: from
+  5.102 `fetchQuery` and its kin are deprecated for `queryClient.query`, which the 5.89 floor lacks.
+  `@netvark/resource-core` and `@netvark/jsonapi-client` are peers, since the application hands the
+  bindings declarations, messages, and clients made with its own copies. Component tests run
+  TanStack Form, Query, and Table v9 as an application does, in jsdom with Testing Library, against
+  a fetch double that answers with documents jsonapi-core builds; the real server over HTTP runs in
   `e2e/resource/react/`.
 
 ## Repository map
@@ -125,8 +130,9 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 `packages/react-resource/src/` (SPEC 20.1):
 
 - `fields/` `fieldsOf` and each member's filter kind; `form/` the form model: values, the write, the
-  validator, and a refusal's errors by field; `list/` the list model: sorting, column filters, and
-  the lenient read of a route's search
+  validator, and a refusal's errors by field; `list/` the list model: its types, reading a state and
+  a result, sorting, column filters, and the lenient read of a route's search, JSON shaped member by
+  member
 - `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry, its keys, and an
   infinite list's pages
 - `internal/` reading a declared resource and the labels of its type in the messages, with the

@@ -3,7 +3,8 @@
  * root entry, which imports neither React nor TanStack, describes the
  * contacts application's members and runs a form model, its start values,
  * its validator, its write, and the error mapping of a refused write, and
- * a mistake throws the documented `TypeError`. The messages are
+ * a list model, which reads a stale link back leniently and pages by a
+ * page's links, and a mistake throws the documented `TypeError`. The messages are
  * `defaultMessages`', constant in every runtime, since no request sets a
  * locale here. No Node.js API, so the same module runs on Bun, Deno, and
  * workerd, where server rendering runs.
@@ -11,7 +12,7 @@
 import type { Checks } from './report.ts';
 
 import { ResponseError } from '@netvark/jsonapi-client';
-import { fieldsOf, resourceForm } from '@netvark/react-resource';
+import { fieldsOf, resourceForm, resourceList } from '@netvark/react-resource';
 import { defaultMessages } from '@netvark/resource-core';
 
 import { Contacts } from '../resources/contacts.ts';
@@ -95,6 +96,29 @@ export const reactChecks: Checks = {
       fields.email === 'Email already belongs to another contact.' &&
         form.length === 0,
       JSON.stringify(fields),
+    );
+  },
+  'reads a stale link back leniently and pages by the links': () => {
+    const list = resourceList(Contacts, messages);
+    const state = list.query(
+      'sort=nickname&filter[status][in]=active&page[size]=500&page[after]=c1&include=organization',
+    );
+    check(
+      JSON.stringify(state) ===
+        JSON.stringify({
+          filter: { status: { in: 'active' } },
+          page: { after: 'c1' },
+        }),
+      JSON.stringify(state),
+    );
+    const next = list.next(list.withPageSize(state, 2), {
+      data: [{ id: '1' }],
+      links: { next: '/api/contacts?page%5Bsize%5D=2&page%5Bafter%5D=c3' },
+    });
+    check(
+      list.params(next ?? {}).toString() ===
+        'page%5Bsize%5D=2&page%5Bafter%5D=c3&filter%5Bstatus%5D%5Bin%5D=active',
+      list.params(next ?? {}).toString(),
     );
   },
   'refuses an operation it does not write': () => {

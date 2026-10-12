@@ -93,7 +93,11 @@ describe('package surface (SPEC 1, 18.1, 19.1, 20.1)', () => {
   });
 
   it('@netvark/react-resource exports the documented values', () => {
-    expect(Object.keys(react).toSorted()).toEqual(['fieldsOf', 'resourceForm']);
+    expect(Object.keys(react).toSorted()).toEqual([
+      'fieldsOf',
+      'resourceForm',
+      'resourceList',
+    ]);
   });
 
   it('@netvark/react-resource/form exports the documented values', () => {

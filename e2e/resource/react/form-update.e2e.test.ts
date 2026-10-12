@@ -86,6 +86,7 @@ describe.each(runtimeDatabases())(
       expect(departures.at(-1)).toEqual({
         method: 'PATCH',
         path: `/api/contacts/${ADA}`,
+        query: '',
         body: {
           data: {
             type: 'contacts',

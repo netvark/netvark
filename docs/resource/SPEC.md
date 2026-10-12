@@ -4108,8 +4108,11 @@ the model renders comes from the application's one messages object, computed whe
 | `form/form-errors.ts`           | a refused write's error objects by field                                            |
 | `form/form-options.ts`          | the operation and options, and the `TypeError`s of ones a caller got wrong          |
 | `form/resource-form.ts`         | `resourceForm`                                                                      |
+| `list/list-types.ts`            | the types of the list model                                                         |
+| `list/list-state.ts`            | reading a state and a result, and the pages they lead to                            |
 | `list/sorting.ts`               | `sort` and Table's sorting state                                                    |
 | `list/column-filters.ts`        | `filter` and Table's column filters                                                 |
+| `list/search-shape.ts`          | a JSON search shaped member by member, and the members a refusal names dropped      |
 | `list/lenient-query.ts`         | a route's search read back against the definition                                   |
 | `list/resource-list.ts`         | `resourceList`                                                                      |
 | `tanstack-form/form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one            |
@@ -4123,10 +4126,10 @@ the model renders comes from the application's one messages object, computed whe
 Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
 `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`, `FormResource`,
 `FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`, `FormErrors`, `ListModel`,
-`ListState`, `ListSorting`, `ListColumnFilters`. Types exported from `./form`: `BindableForm`,
-`ResourceFormOptions`. Types exported from `./query`: `ResourceQueries`, `ReadOptions`,
-`PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`, `PageParam`,
-`KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey`.
+`ListResource`, `ListState`, `ListSorting`, `ListColumnFilters`. Types exported from `./form`:
+`BindableForm`, `ResourceFormOptions`. Types exported from `./query`: `ResourceQueries`,
+`ReadOptions`, `PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`,
+`PageParam`, `KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
@@ -4501,6 +4504,9 @@ for `queryClient.query`, which the 5.89 floor (20.9) does not have.
 
 ```ts
 const contactsList = resourceList(Contacts, messages);
+// Module scope: Table rebuilds its row models when its features, columns, or data are new.
+const features = tableFeatures({ rowSortingFeature, columnFilteringFeature });
+const noContacts: ReadonlyArray<Contact> = [];
 
 export const Route = createFileRoute('/contacts')({
   validateSearch: (search: Record<string, unknown>) => contactsList.query(search),
@@ -4510,12 +4516,13 @@ export const Route = createFileRoute('/contacts')({
 function ContactsScreen() {
   const state = Route.useSearch();
   const navigate = Route.useNavigate();
-  const result = useQuery(contacts.list(state)); // resourceQueries (20.6)
-  const go = (next: ListState) => void navigate({ search: next });
+  // resourceQueries (20.6); the previous page stays on screen while the next one loads
+  const result = useQuery({ ...contacts.list(state), placeholderData: keepPreviousData });
+  const go = (next: ListState<typeof Contacts>) => void navigate({ search: next });
   const table = useTable({
-    features: tableFeatures({ rowSortingFeature, columnFilteringFeature }),
+    features,
     columns,
-    data: result.data?.data ?? [],
+    data: result.data?.data ?? noContacts,
     getRowId: (record) => record.id,
     manualSorting: true,
     manualFiltering: true,
@@ -4547,8 +4554,8 @@ outside the table, by cursor, since a cursor API has no total and no page index.
 | `sorting(state)`                       | each `sort` name as `{ id, desc }`, `desc` for a `-` name; with no `sort`, the declaration's default sort (3.7), the order the server applies                                                                                                                                                                       |
 | `withSorting(state, sorting)`          | `sort` from the entries in order; an empty list removes `sort`, so the default applies                                                                                                                                                                                                                              |
 | `columnFilters(state)`                 | each member of `filter` but `or` as `{ id, value }`, the value the member's condition as an object of operators, a bare value as `{ eq: value }`                                                                                                                                                                    |
-| `withColumnFilters(state, filters)`    | `filter` from them, keeping `or`; a filter whose value is `undefined`, or whose operators are all `undefined`, is removed                                                                                                                                                                                           |
-| `withSearch(state, text)`              | `search`, removed when `text` is empty                                                                                                                                                                                                                                                                              |
+| `withColumnFilters(state, filters)`    | `filter` from them, keeping `or`; an operator set to `undefined` or to an empty list, which no parameter can carry (jsonapi SPEC 15.5), is left out, as Table removes a list filter set to an empty list, and a filter whose value is `undefined`, or left without operators, is removed                            |
+| `withSearch(state, text)`              | `search`, removed when `text` is empty; `never` in the types of a definition without a search parameter                                                                                                                                                                                                             |
 | `withPageSize(state, size)`            | `page.size`                                                                                                                                                                                                                                                                                                         |
 | `next(state, result)`, `previous(...)` | the state at the next or previous page: `page.after` set from the result's `next` link, or `page.before` from its `prev` (jsonapi SPEC 15.8), the other cursor removed; `undefined` when there is no such link, or when the result holds no records and was reached in that direction, the first page going forward |
 | `first(state)`                         | the state without cursors                                                                                                                                                                                                                                                                                           |
@@ -4557,9 +4564,13 @@ outside the table, by cursor, since a cursor API has no total and no page index.
   sort and filter that made it. `page.size` stays.
 - `withSorting` and `withColumnFilters` take the new state or a function of the current one, as
   Table's `onSortingChange` and `onColumnFiltersChange` pass it. A sort on a member that does not
-  sort, a filter on a member without `filter`, an operator the member does not declare, and a page
-  size that is not a positive safe integer at most `page.max` throw `TypeError` without quoting the
-  name or value: a table's columns come from `columns`, so these are the application's mistakes.
+  sort or on one member twice, a filter on a member without `filter`, a filter value that is not an
+  object of operators, an operator the member does not declare, a page size that is not a positive
+  safe integer at most `page.max`, a search text that is not a string, `withSearch` on a definition
+  without a search parameter, a state of another shape, and a result no `list` returned throw
+  `TypeError` naming the function and at most the type, never a member's name or a value: a table's
+  columns come from `columns`, so these are the application's mistakes. `resourceList` itself throws
+  for a resource no `declareResource` returned and for messages as `fieldsOf` does (20.1).
 - The functions return a new state and never change the one they are given; every member they do not
   set is kept, `include` and `fields` among them when the application's state holds them.
 
@@ -4567,18 +4578,26 @@ outside the table, by cursor, since a cursor API has no total and no page index.
 accepts, so a stale or edited link opens the list instead of failing the route:
 
 1. `search` is the state as JSON, what a router's JSON search holds, or the API's own parameters as
-   `URLSearchParams` or a string. In JSON, a member of another shape is dropped: `sort` is a list of
-   strings, `filter` an object of conditions with `or` a list of such objects, a condition a value
-   or an object of operators, a value a string, a finite number, a boolean, or a non-empty list of
-   them, `page` an object with a positive safe integer `size` and string cursors, `search` a string.
+   `URLSearchParams` (of any realm) or a string. In JSON, a member of another shape is dropped,
+   member by member: `sort` is a list of strings, `filter` an object of conditions with `or` a list
+   of such objects, a condition a value or an object of operators, a value a string, a finite
+   number, a boolean, or a non-empty list of them, `page` an object with a positive safe integer
+   `size` and string cursors, `search` a string; a condition or a group left with nothing is dropped
+   too, and so are `page` where the definition does not paginate and `search` where it has no search
+   parameter. A search that is not an object is the empty state.
 2. Only `sort`, `filter`, `page`, and the search parameter are read: `include`, `fields`, and custom
    parameters are the screen's to choose, not the URL's.
-3. `parseQuery(resource.resource, params)` (jsonapi SPEC 6) reads them. While it refuses, every
-   parameter its items name (`source.parameter`) is dropped and it reads again, at most once per
-   parameter; when an item names no parameter, the state is empty.
-4. The parsed query becomes the state: each sort name, `-` for descending; each condition under its
-   member and operator, a repeated parameter as a list; each `or` group; `page.size` when the
-   parameters held it, and the cursors; `search`.
+3. `parseQuery(resource.resource, params)` (jsonapi SPEC 6) checks them, JSON as `serializeQuery`
+   writes it (15.5). While it refuses, every parameter its items name (`source.parameter`) is
+   dropped, in JSON with the member or operator that wrote it, and it reads again; when an item
+   names no parameter, or none that is there to drop, the state is empty. An error that is no
+   refusal is thrown.
+4. Parameters become the parsed query's state: each sort name, `-` for descending; each condition
+   under its member and operator, one value as text and a repeated parameter as a list; each `or`
+   group; `page.size` when the parameters held it, and the cursors; `search`. JSON keeps the members
+   `parseQuery` accepted in the forms they came in, a list of one value, a number, and a boolean
+   among them, so a router that validates its search after every navigation reads back the state it
+   wrote.
 
 Values are not checked: a filter value keyset-core refuses (keyset SPEC 4.3), or a cursor the server
 no longer accepts, is the list request's 400, whose error object names the parameter
@@ -4590,13 +4609,17 @@ https://tanstack.com/table/v9/docs/framework/react/guide/pagination @ref
 https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
 
 Tests: `list/sorting.test.ts` and `list/column-filters.test.ts` (both ways, the default sort,
-updaters, every `TypeError`), `list/resource-list.test.ts` (columns, cursors dropped by every change
-but paging, `next` and `previous` from links, an empty page, `first`), `list/lenient-query.test.ts`
-(a valid search in both forms, an unknown parameter, an operator the member does not declare, a page
-size above the maximum, a range request where the definition refuses one, `include` and `fields`
-dropped, JSON of every wrong shape, a search that is not an object, the state
-`params(query(search))` gives back), and `list/resource-list.test-d.ts` (states typed by the
-definition's sort names, operators, and search).
+updaters, an operator emptied by `undefined` or an empty list, every `TypeError`),
+`list/resource-list.test.ts` (columns, cursors dropped by every change but paging, `next` and
+`previous` from links, an empty page, `first`), `list/lenient-query.test.ts` (a valid search in both
+forms, an unknown parameter, an operator the member does not declare, a page size above the maximum,
+a range request where the definition refuses one, `include` and `fields` dropped, JSON of every
+wrong shape, JSON kept in its own forms through a JSON round trip, a search that is not an object,
+the state `params(query(search))` gives back), `list/lenient-query-faults.test.ts` (a refusal naming
+no parameter or none that was sent, an error that is no refusal, and each re-read, over a recorded
+`parseQuery`), and `list/resource-list.test-d.ts` (states typed by the definition's sort names,
+operators, and search, `withSearch` as `never` without one, and Table v9's `SortingState`,
+`ColumnFiltersState`, and `OnChangeFn` assigning to and from the model's).
 
 ### 20.8 Test plan
 
@@ -4633,9 +4656,16 @@ definition's sort names, operators, and search).
   and write: an infinite list paging both ways by the server's links from the query's own cursors, a
   create and an update settling once the list and the record shown have refetched, a contact's
   removal that removes their record's entries and refetches the meetings the database set to no
-  contact, and a refused write that leaves the cache as it was (`query-cache.e2e.test.ts`).
+  contact, and a refused write that leaves the cache as it was (`query-cache.e2e.test.ts`). The list
+  model over the contacts client, each request checked to carry the state's own parameters
+  (`list-model.e2e.test.ts`): its columns labeled in German and in English by a model built once,
+  the default sort the order the server applies, a sort, a filter, and a search, an emptied choice
+  removing its filter, cursors over real pages to the end and back, a stale or edited link read back
+  as parameters, as JSON, and through a router's JSON round trip, and the recovery from the 400 of
+  an expired cursor and of a filter value the server refuses.
 - Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
-  and write and a list model's `query` on Bun, Deno, and workerd, where server rendering runs.
+  and write and a list model's `query`, `withPageSize`, and `next` on Bun, Deno, and workerd, where
+  server rendering runs.
 - Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).
 
 ### 20.9 Packaging
@@ -4652,5 +4682,8 @@ definition's sort names, operators, and search).
   TanStack Query 5.89.0, the release after 5.87.4. CI runs the package's tests on both floors, and a
   floor that fails them is raised in the same change.
 - Dependencies: `@netvark/jsonapi-core`, for `parseQuery`.
+- TanStack Table is not a peer: the list model imports nothing of it and reads and writes its
+  sorting and column filters as plain values. `@tanstack/react-table` 9 is a development dependency,
+  for the type tests that assign Table's state to and from the model's.
 - React is not a peer: the package has no component and no hook of its own; TanStack's React
   adapters bring it, and the root entry runs without it.
