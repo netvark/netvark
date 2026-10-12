@@ -14,16 +14,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { jsonApiError, parseQuery } from '@netvark/jsonapi-core';
 
-import { messages } from '../test-support/messages';
 import { Contacts } from '../test-support/resources';
-import { resourceList } from './resource-list';
+import { lenientQuery } from './lenient-query';
 
 vi.mock('@netvark/jsonapi-core', async (importOriginal) => {
   const actual = await importOriginal<typeof JsonApiCore>();
   return { ...actual, parseQuery: vi.fn(actual.parseQuery) };
 });
 
-const contacts = resourceList(Contacts, messages);
+/** What `query` reads, before it names every member (resource-list.test.ts). */
+function read(search: unknown) {
+  return lenientQuery(Contacts.resource, search);
+}
 
 const SEARCHES = [
   ['parameters', 'sort=name&page[size]=5'],
@@ -44,7 +46,7 @@ describe.each(SEARCHES)(
       vi.mocked(parseQuery).mockImplementationOnce(() => {
         throw jsonApiError('INVALID_QUERY_PARAMETER', { detail: 'Refused' });
       });
-      expect(contacts.query(search)).toStrictEqual({});
+      expect(read(search)).toStrictEqual({});
       expect(readings()).toHaveLength(1);
     });
 
@@ -55,7 +57,7 @@ describe.each(SEARCHES)(
           source: { parameter: 'page[before]' },
         });
       });
-      expect(contacts.query(search)).toStrictEqual({});
+      expect(read(search)).toStrictEqual({});
       expect(readings()).toHaveLength(1);
     });
 
@@ -64,7 +66,7 @@ describe.each(SEARCHES)(
       vi.mocked(parseQuery).mockImplementationOnce(() => {
         throw fault;
       });
-      expect(() => contacts.query(search)).toThrow(fault);
+      expect(() => read(search)).toThrow(fault);
     });
   },
 );
@@ -77,7 +79,7 @@ describe('query: each refusal read again without what it named (resource SPEC 20
         source: { parameter: 'filter[q]' },
       });
     });
-    expect(contacts.query({ sort: ['name'], search: 'ada' })).toStrictEqual({
+    expect(read({ sort: ['name'], search: 'ada' })).toStrictEqual({
       sort: ['name'],
     });
     expect(readings()).toEqual(['sort=name&filter%5Bq%5D=ada', 'sort=name']);
@@ -97,7 +99,7 @@ describe('query: each refusal read again without what it named (resource SPEC 20
   ] as const)(
     'reads %s again with the refused parameters dropped',
     (_form, search, state) => {
-      expect(contacts.query(search)).toStrictEqual(state);
+      expect(read(search)).toStrictEqual(state);
       expect(readings()).toEqual([
         'sort=nickname&filter%5Bvip%5D=true',
         'filter%5Bvip%5D=true',

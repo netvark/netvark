@@ -28,6 +28,25 @@ import { sortedState, sortingOf } from './sorting';
 
 const CALLER = 'resourceList';
 
+/**
+ * Every member of a list query, unset. A state `query` returns names each
+ * one, so a router that hands a route the URL's search with the validated
+ * one spread over it, as TanStack Router does, keeps nothing the URL held
+ * that the state does not: neither a member the definition refused nor an
+ * `include` or `fields` the URL chose. A router leaves an `undefined`
+ * member out of the URL it writes.
+ * @ref https://tanstack.com/router/v1/docs/framework/react/guide/search-params#search-params-are-inherited-from-parent-routes
+ */
+const UNSET: Query = Object.freeze({
+  include: undefined,
+  fields: undefined,
+  sort: undefined,
+  filter: undefined,
+  page: undefined,
+  search: undefined,
+  custom: undefined,
+});
+
 /** The name of a member function in its `TypeError`s. */
 function caller(member: string): string {
   return `${CALLER}.${member}`;
@@ -97,7 +116,10 @@ export function resourceList<TResource extends ListResource>(
     columns: Object.freeze(columns),
     page: Object.freeze({ default: page.default, max: page.max }),
     searchable: definition.query.search !== undefined,
-    query: (search: unknown) => lenientQuery(definition, search),
+    query: (search: unknown) => ({
+      ...UNSET,
+      ...lenientQuery(definition, search),
+    }),
     params: (state: unknown) =>
       serializeQuery(definition, readState(caller('params'), state)),
     sorting: (state: unknown) =>

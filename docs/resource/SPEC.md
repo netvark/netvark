@@ -4598,11 +4598,19 @@ accepts, so a stale or edited link opens the list instead of failing the route:
    `parseQuery` accepted in the forms they came in, a list of one value, a number, and a boolean
    among them, so a router that validates its search after every navigation reads back the state it
    wrote.
+5. The state names every member of the list query, `include`, `fields`, `sort`, `filter`, `page`,
+   `search`, and `custom`, `undefined` where it holds none. TanStack Router hands a route the URL's
+   search with the validated one spread over it (router-core's `matchRoutes`), so a member left out
+   would pass through as the URL holds it: a refused sort, which the request would send and the
+   server refuse, or an `include` the URL chose. A router leaves an `undefined` member out of the
+   URL it writes.
 
 Values are not checked: a filter value keyset-core refuses (keyset SPEC 4.3), or a cursor the server
 no longer accepts, is the list request's 400, whose error object names the parameter
 (`source.parameter`), and the screen recovers with `first` or by removing the filter.
 
+@ref
+https://tanstack.com/router/v1/docs/framework/react/guide/search-params#search-params-are-inherited-from-parent-routes
 @ref https://tanstack.com/table/v9/docs/framework/react/guide/sorting @ref
 https://tanstack.com/table/v9/docs/framework/react/guide/column-filtering @ref
 https://tanstack.com/table/v9/docs/framework/react/guide/pagination @ref
@@ -4611,12 +4619,13 @@ https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
 Tests: `list/sorting.test.ts` and `list/column-filters.test.ts` (both ways, the default sort,
 updaters, an operator emptied by `undefined` or an empty list, every `TypeError`),
 `list/resource-list.test.ts` (columns, cursors dropped by every change but paging, `next` and
-`previous` from links, an empty page, `first`), `list/lenient-query.test.ts` (a valid search in both
-forms, an unknown parameter, an operator the member does not declare, a page size above the maximum,
-a range request where the definition refuses one, `include` and `fields` dropped, JSON of every
-wrong shape, JSON kept in its own forms through a JSON round trip, a search that is not an object,
-the state `params(query(search))` gives back), `list/lenient-query-faults.test.ts` (a refusal naming
-no parameter or none that was sent, an error that is no refusal, and each re-read, over a recorded
+`previous` from links, an empty page, `first`, a state `query` returns spread over the URL's search
+as TanStack Router spreads it), `list/lenient-query.test.ts` (a valid search in both forms, an
+unknown parameter, an operator the member does not declare, a page size above the maximum, a range
+request where the definition refuses one, `include` and `fields` dropped, JSON of every wrong shape,
+JSON kept in its own forms through a JSON round trip, a search that is not an object, the state
+`params(query(search))` gives back), `list/lenient-query-faults.test.ts` (a refusal naming no
+parameter or none that was sent, an error that is no refusal, and each re-read, over a recorded
 `parseQuery`), and `list/resource-list.test-d.ts` (states typed by the definition's sort names,
 operators, and search, `withSearch` as `never` without one, and Table v9's `SortingState`,
 `ColumnFiltersState`, and `OnChangeFn` assigning to and from the model's).
