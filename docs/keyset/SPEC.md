@@ -1,7 +1,7 @@
 # @netvark/keyset-core: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/keyset-core` and `@netvark/kysely-keyset`;
-  `docs/keyset/DESIGN.md` explains the why
+- Status: normative for the 0.x line of `@netvark/keyset-core`, `@netvark/kysely-keyset`, and
+  `@netvark/drizzle-keyset`; `docs/keyset/DESIGN.md` explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. When this document and the code
@@ -24,32 +24,36 @@ Contents
 11. Test plan
 12. Packaging
 13. Constants
+14. Drizzle adapter (`@netvark/drizzle-keyset`)
 
 ---
 
 ## 1. Public surface and module map
 
-Two packages, one repository (ADR 0004). `@netvark/keyset-core` is the database-free core: every
-module is a function over plain values and none imports a query builder, a driver, or a runtime API
-beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter: it depends on
-`@netvark/keyset-core`, re-exports all of it (one import for a Kysely application), and adds the
-typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its only
-peer dependency.
+Three packages, one repository (ADR 0004, ADR 0017). `@netvark/keyset-core` is the database-free
+core: every module is a function over plain values and none imports a query builder, a driver, or a
+runtime API beyond web standards (ADR 0002). `@netvark/kysely-keyset` is the Kysely adapter: it
+depends on `@netvark/keyset-core`, re-exports all of it (one import for a Kysely application), and
+adds the typed definer, `paginate`, and the render functions (section 10). `kysely >= 0.28.0` is its
+only peer dependency. `@netvark/drizzle-keyset` is the Drizzle adapter, built the same way: the
+definer over the application's schema object, whose keysets carry `paginate`, and the render
+functions (section 14). `drizzle-orm >=0.45.2 <1.0.0` is its only peer dependency.
 
-| Package                  | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/keyset-core`   | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `isFieldName`, `isSearchConfig`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `OperatorsOf`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PlanOptions`, `CursorContext`, `CursorContextValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
-| `@netvark/kysely-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Package                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/keyset-core`    | Values: `defineKeyset`, `createDefineKeyset`, `createPlanner`, `finishPage`, `createCursorCodec`, `resolveSort`, `sortSignature`, `resolvePage`, `seekPredicate`, `keyAlias`, `checkScalar`, `operatorsFor`, `isOperator`, `isFieldName`, `isSearchConfig`, `escapeLike`, `isKeysetError`, the error classes `KeysetError`, `InvalidCursorError`, `UnsupportedSortError`, `UnsupportedFilterError`, `InvalidFilterError`, `InvalidFilterValueError`, `UnsupportedSearchError`, `InvalidPageSizeError`, `PageSizeExceededError`, `RangeNotSupportedError`, and the constants `OPERATORS`, `CURSOR_VERSION`, `MIN_SECRET_BYTES`, `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_PAGE_SIZE`; and every type in sections 3 to 9 (`KeysetInit`, `KeysetDefaults`, `DefaultedKeysetInit`, `DefineKeyset`, `DefineDefaultedKeyset`, `KeysetDefinition`, `Keyset`, `KeysetRequest`, `KeysetRequestOf`, `NoRelations`, the field and relation init and normalized types, `Filter` and its node types, `Operator`, `OperatorsOf`, `ScalarValue`, `ScalarCheck`, `SortInput`, `SortField`, `QueryPlan`, `PlanKey`, `Predicate`, `Target` and its kinds, `CursorValue`, `PlanOptions`, `CursorContext`, `CursorContextValue`, `PageInput`, `ResolvedPage`, `Page`, `FinishOptions`, `CursorCodec`, `CursorCodecOptions`, `CursorDecodeResult`, `InvalidCursorReason`, `KeysetErrorCode`) |
+| `@netvark/kysely-keyset`  | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 10.1), `paginate`, `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `KyselyKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `AnyDatabase`, `AnyExpressionBuilder`, `AnyQuery`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `@netvark/drizzle-keyset` | Everything of `@netvark/keyset-core` (the same bindings), plus its own `createDefineKeyset` (replacing the core's, 14.1), `renderPredicate`, `renderTarget`; and the types `DefineKeyset`, `DefineDefaultedKeyset` (replacing the core's), `DrizzleKeyset`, `TypedKeysetInit`, `DefaultedTypedKeysetInit`, `TypedFieldsInit`, `TypedColumnFieldInit`, `TypedAggregateFieldInit`, `TypedRelationsInit`, `TypedRelationInit`, `TypedSearchInit`, `RelationsOf`, `PaginateOptions`, `QueryEvent`, `RenderContext`, `KeysetDatabase`, `KeysetSchema`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
-`e2e/keyset/package-surface.e2e.test.ts` asserts the exact value export list of both packages
-against the built packages, that the adapter's re-exports are the core's own bindings, and that its
-`createDefineKeyset` is its own.
+`e2e/keyset/package-surface.e2e.test.ts` asserts the exact value export list of the three packages
+against the built packages, that each adapter's re-exports are the core's own bindings, and that
+each adapter's `createDefineKeyset` is its own.
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
 `*.test-d.ts`. Type-only modules (`types.ts` files) are covered through their consumers; coverage
 thresholds apply to all of `packages/*/src/`. Imports form a DAG (`import/no-cycle` is enforced,
-type-only imports included); nothing under `packages/keyset-core` imports `kysely`, and
-`packages/kysely-keyset` imports the core only through its package name.
+type-only imports included); nothing under `packages/keyset-core` imports `kysely` or `drizzle-orm`,
+and each adapter imports the core only through its package name.
 
 ```
 packages/keyset-core/src/
@@ -93,6 +97,17 @@ packages/kysely-keyset/src/
   render/predicate.ts          renderPredicate() (10.2)
   paginate.ts                  paginate() (10.3)
   test-support/                a compile-only Kysely and a canned-rows driver; not published
+packages/drizzle-keyset/src/
+  index.ts                     root entry: re-exports @netvark/keyset-core, adds section 14
+  types.ts                     DrizzleKeyset, PaginateOptions, QueryEvent, RenderContext, KeysetDatabase, KeysetSchema (14)
+  schema.ts                    tableOf(), columnOf(): the plan's names resolved in the schema object (14.2)
+  typed-init.ts                the Typed*Init types, DefaultedTypedKeysetInit, RelationsOf (14.1)
+  check-names.ts               checkNames(): every name of a definition resolved at definition time (14.1)
+  define-keyset.ts             createDefineKeyset(), DefineKeyset, DefineDefaultedKeyset (14.1)
+  render/target.ts             renderTarget(), concat() (14.2)
+  render/predicate.ts          renderPredicate() (14.2)
+  paginate.ts                  paginate() (14.3)
+  test-support/                a Drizzle schema, a recording pg-proxy database, and canned rows; not published
 ```
 
 ---
@@ -732,34 +747,36 @@ placed on nullable keys only).
 
 ## 11. Test plan
 
-One Vitest run over two projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled for
-its `*.test-d.ts`; `@netvark/kysely-keyset`'s project resolves `@netvark/keyset-core` from source
-(section 12). V8 coverage thresholds of 90% for statements, branches, functions, and lines over
+One Vitest run over three projects (`packages/*/vitest.config.ts`), each with `typecheck` enabled
+for its `*.test-d.ts`; each adapter's project resolves `@netvark/keyset-core` from source (section
+12). V8 coverage thresholds of 90% for statements, branches, functions, and lines over
 `packages/*/src/` combined (the `index.ts` barrels excluded). Every test names the rule or choice it
-pins. The adapter's tests run against a compile-only Kysely (`DummyDriver`) and a driver that
-answers canned rows while recording the compiled queries; no module of the packages is mocked.
+pins. The Kysely adapter's tests run against a compile-only Kysely (`DummyDriver`) and a driver that
+answers canned rows while recording the compiled queries, the Drizzle adapter's against Drizzle's
+`pg-proxy` driver doing the same (14.3); no module of the packages is mocked.
 
-| Area                               | Files                                                                                                                                                                                                                                        | What is pinned                                                                                                                       |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Internal                           | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                                                                                                 | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                                                       |
-| Definition                         | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`, `create-define-keyset.test.ts`, `create-define-keyset.test-d.ts` | every definition-time rejection and default, definer defaults and their merge, inference                                             |
-| Filter                             | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                                                       |
-| Sort, plan, page, cursor           | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks |
-| Errors                             | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                      |
-| Adapter (`@netvark/kysely-keyset`) | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                      | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                          |
+| Area                                | Files                                                                                                                                                                                                                                        | What is pinned                                                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal                            | `base64url.test.ts`, `crypto.test.ts`, `object.test.ts`, `canonical.test.ts`, `like.test.ts`                                                                                                                                                 | RFC 4648, RFC 4231 vectors, prototype safety, RFC 8785 ordering, LIKE escaping                                                                         |
+| Definition                          | `field-types.test.ts`, `normalize-fields.test.ts`, `normalize-fields.aggregate.test.ts`, `normalize-relations.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`, `create-define-keyset.test.ts`, `create-define-keyset.test-d.ts` | every definition-time rejection and default, definer defaults and their merge, inference                                                               |
+| Filter                              | `operators.test.ts`, `values.test.ts`, `condition.test.ts`, `condition-values.test.ts`, `condition-patterns.test.ts`, `normalize.test.ts`                                                                                                    | the operator table, value forms, each predicate mapping, tree shapes and paths                                                                         |
+| Sort, plan, page, cursor            | `resolve-sort.test.ts`, `plan.test.ts`, `plan-cursors.test.ts`, `context.test.ts`, `seek.test.ts`, `page-request.test.ts`, `finish.test.ts`, `codec.test.ts`                                                                                 | tie-breaking, the context and the caller's context, inversion, every seek case, page bounds, links, the cursor format and its checks                   |
+| Errors                              | `errors.test.ts`                                                                                                                                                                                                                             | constant messages, structured fields, the guard                                                                                                        |
+| Adapter (`@netvark/kysely-keyset`)  | `target.test.ts`, `predicate.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                                                                      | exact SQL and parameters for every target and predicate kind and every page shape; name checks against `DB`                                            |
+| Adapter (`@netvark/drizzle-keyset`) | `schema.test.ts`, `target.test.ts`, `predicate.test.ts`, `check-names.test.ts`, `paginate.test.ts`, `paginate-order.test.ts`, `define-keyset.test.ts`, `define-keyset.test-d.ts`                                                             | exact SQL and parameters for every target and predicate kind and every page shape; name checks against the schema, in the types and at definition time |
 
 ### 11.1 End-to-end suite and invariants (`e2e/keyset/`)
 
-A private workspace package that depends on `@netvark/keyset-core` and `@netvark/kysely-keyset`
-through `workspace:*`, so imports resolve through the published `exports` maps into each `dist/`
-(never the `source` condition) and `tsc` checks the emitted declarations. `e2e/keyset/support/`
-holds the schema (three tables: `contacts` with every field type and a generated `tsvector`,
-`contact_emails`, `work_history`) and a twelve-row seed with the cases keyset pagination must
-survive: equal sort values, nulls in sortable columns, mixed-case text, a microsecond timestamp,
-enums, arrays, and relations with zero, one, or several rows. `expectedIds(sort)` orders the seed in
-JavaScript (nulls last, the key breaking ties), so no test trusts the SQL under test for its
-expectation. `support/keysets.ts` defines the shared keysets as an application would: one configured
-definer per database interface carries the cursor secret (3.6).
+A private workspace package that depends on `@netvark/keyset-core`, `@netvark/kysely-keyset`, and
+`@netvark/drizzle-keyset` through `workspace:*`, so imports resolve through the published `exports`
+maps into each `dist/` (never the `source` condition) and `tsc` checks the emitted declarations.
+`e2e/keyset/support/` holds the schema (three tables: `contacts` with every field type and a
+generated `tsvector`, `contact_emails`, `work_history`) and a twelve-row seed with the cases keyset
+pagination must survive: equal sort values, nulls in sortable columns, mixed-case text, a
+microsecond timestamp, enums, arrays, and relations with zero, one, or several rows.
+`expectedIds(sort)` orders the seed in JavaScript (nulls last, the key breaking ties), so no test
+trusts the SQL under test for its expectation. `support/keysets.ts` defines the shared keysets as an
+application would: one configured definer per database interface carries the cursor secret (3.6).
 
 `runInvariants(label, open)` runs, for eight sorts (single and composite, ascending and descending,
 over ties, nulls, an insensitive column, and both aggregates) and page sizes 1, 3, and 5: walking
@@ -770,7 +787,7 @@ it came from.
 
 | File                          | Covers                                                                                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package-surface.e2e.test.ts` | the exact export lists of both packages, and that `@netvark/kysely-keyset` re-exports the core's own bindings                                                                                                                                                                                            |
+| `package-surface.e2e.test.ts` | the exact export lists of the three packages, and that each adapter re-exports the core's own bindings                                                                                                                                                                                                   |
 | `paginate.e2e.test.ts`        | the invariants on PGlite; defaults, alias stripping, totals, `onQuery`, a composite key through equal timestamps                                                                                                                                                                                         |
 | `filters.e2e.test.ts`         | every operator of every type against real rows, combinators, rejections before querying, totals                                                                                                                                                                                                          |
 | `relations.e2e.test.ts`       | relation paths, `some`, negation, aggregate sorts with nulls in both directions, aggregate filters, aggregate paging                                                                                                                                                                                     |
@@ -783,6 +800,7 @@ it came from.
 | `pg-driver.e2e.test.ts`       | section 11.2                                                                                                                                                                                                                                                                                             |
 | `postgres.e2e.test.ts`        | section 11.3                                                                                                                                                                                                                                                                                             |
 | `index-seek.e2e.test.ts`      | section 11.3                                                                                                                                                                                                                                                                                             |
+| `drizzle.e2e.test.ts`         | section 14.4                                                                                                                                                                                                                                                                                             |
 
 ### 11.2 node-postgres (`pg-driver.e2e.test.ts`)
 
@@ -810,10 +828,11 @@ row with its nulls last. It runs only against a server.
 
 `checks.ts` holds runtime-neutral checks over the built packages: define a keyset through a
 configured definer, plan a request, bind cursors to a caller context, sign and verify cursors with
-the runtime's Web Crypto, render SQL through Kysely's PostgreSQL compiler over `DummyDriver`, and
-get the typed errors. `run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers
-module and `workerd.ts` bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's
-workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
+the runtime's Web Crypto, render SQL through Kysely's PostgreSQL compiler over `DummyDriver`,
+paginate a Drizzle keyset over Drizzle's `pg-proxy` driver (14.4), and get the typed errors.
+`run.ts` drives it in-process on Bun and Deno; `worker.ts` is the Workers module and `workerd.ts`
+bundles it with tsdown (`platform: 'neutral'`) and runs it in Miniflare's workerd.
+`pnpm test:runtimes` runs all three; CI runs them on every push.
 
 ---
 
@@ -824,12 +843,14 @@ workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
   run in the build and in `check:pkg`.
 - Each package's `exports` map has one entry (`.`) plus `./package.json`. In the repository the
   entry carries a `source` condition pointing at `src/index.ts` (tsdown `devExports`), enabled only
-  by `packages/kysely-keyset/tsconfig.json` (`customConditions`) and its Vitest project
+  by each adapter's `tsconfig.json` (`customConditions`) and Vitest project
   (`ssr.resolve.conditions`); `publishConfig.exports` is the dist-only map `pnpm publish` and
   `pnpm pack` apply. CI fails when the build changes the committed maps.
 - `@netvark/keyset-core` has no dependencies. `@netvark/kysely-keyset` depends on
   `@netvark/keyset-core` (`workspace:^`, written as a caret range on publish) and has
   `kysely >= 0.28.0` as its only peer dependency; CI runs its unit tests on 0.28.17.
+  `@netvark/drizzle-keyset` depends on the core the same way and has `drizzle-orm >=0.45.2 <1.0.0`
+  as its only peer dependency; CI runs its unit tests on 0.45.2 (ADR 0017).
 - `files` is `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`. `sideEffects: false`.
 - Releases go through Changesets: a "Version Packages" PR, then `changeset publish` under npm
   trusted publishing with provenance, one GitHub release per package.
@@ -850,3 +871,143 @@ workerd. `pnpm test:runtimes` runs all three; CI runs them on every push.
 | name grammar            | `^[A-Za-z0-9][A-Za-z0-9_-]*$` (field and relation names)    | no, `isFieldName` tests it    |
 | `SEARCH_CONFIG`         | `^[a-z_][a-z0-9_]{0,62}$` (text search configuration names) | no, `isSearchConfig` tests it |
 | `TAG_BYTES`             | 32 (the HMAC-SHA256 tag)                                    | no                            |
+
+---
+
+## 14. Drizzle adapter (`@netvark/drizzle-keyset`, `packages/drizzle-keyset/src/`)
+
+The second adapter (ADR 0017). It renders the plan as Drizzle `sql` and runs a select it builds
+itself. Names are the application's Drizzle schema's, resolved to Drizzle's own table and column
+objects, so the database's `casing` option and `pgSchema` tables apply as in the application's own
+queries. Drizzle behavior cited here was measured on drizzle-orm 0.45.4.
+
+### 14.1 `createDefineKeyset(schema, defaults?)` (`define-keyset.ts`, `typed-init.ts`, `check-names.ts`)
+
+`schema` is a `KeysetSchema`: the object the application hands `drizzle()`
+(`import * as schema from './schema'`). Its own members that are Drizzle PostgreSQL tables
+(`is(member, PgTable)`) are the tables a definition names, by key; its other members (relations,
+enums, views) are ignored. The result is a `DefineKeyset<TSchema>`: `defineKeyset` with
+`TypedKeysetInit<TSchema, TTable, TFields, TRelations>` as its argument, which checks at compile
+time that `table` is the key of a table of `TSchema`, every column field's `column` a key of that
+table's columns, every relation's `table` the key of a table and each `on` key a column of it with a
+column of the main table as value, every aggregate's `column` a column of its relation's table, and
+the search `columns` or `vector` columns of the main table. A column field whose column's
+`$inferSelect` type includes `null` MUST declare `nullable: true` (ADR 0016). With a `cursor` in the
+defaults the result is a `DefineDefaultedKeyset<TSchema>`, whose `DefaultedTypedKeysetInit` makes
+`cursor` optional and partial and keeps every name check, as in 10.1.
+
+At definition time the definer runs the core's definer (3.5, 3.6) unchanged, then resolves every
+name of the validated definition in `schema` and throws `TypeError` naming the option at fault.
+Every lookup is of an own member (`Object.hasOwn`), so a prototype key never resolves.
+
+| Option                                                                                                       | Must name                                      |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `table`, `relations.<relation>.table`                                                                        | a member of `schema` that is a table           |
+| `fields.<field>.column`, `search.columns`, `search.vector`, the values of `relations.<relation>.on`          | a column of the main table (`getTableColumns`) |
+| the keys of `relations.<relation>.on`, `relations.<relation>.fields.<field>.column`, an aggregate's `column` | a column of the relation's table               |
+
+A column field, of the main table or of a relation, over a column that is not `notNull` MUST declare
+`nullable: true`, which the definer checks again at runtime. Messages name the option and the
+declared names. This `createDefineKeyset` replaces the core's export of the same name. The result is
+a `DrizzleKeyset`: the core's `Keyset` plus `paginate(db, request, options?)` (14.3).
+
+Tests: `define-keyset.test.ts` (the core's merge and validation running first, the defaults, a
+missing secret), `check-names.test.ts` (every row of the table, a prototype key, a member that is
+not a table, the runtime nullability check), `define-keyset.test-d.ts` (name checks,
+`nullable: true` for a nullable column, `cursor` optional only with a cursor default, the row types
+of `paginate`).
+
+### 14.2 Rendering (`schema.ts`, `render/target.ts`, `render/predicate.ts`)
+
+`renderTarget(target, context)` and `renderPredicate(node, context)` return Drizzle `SQL`.
+`RenderContext` is `{ schema, table }`: the schema the plan's names resolve in, and the main table's
+key, the correlation side of aggregates and `exists`. A name that does not resolve is a `TypeError`;
+a plan from a definition checked against the same schema never has one.
+
+Every column reference is its own nested `sql` chunk around Drizzle's column object (ADR 0017). In a
+query over one table, Drizzle prints a column directly inside a selected expression without its
+table, and a column nested one level deeper with it, so a correlated aggregate selected as a key
+reads `"contact_emails"."contact_id" = "contacts"."id"`.
+
+The targets: a column is `<column>`, wrapped in `lower()` when `lower`; an aggregate is the
+correlated scalar subquery
+`(select <fn>(<column>) as "value" from <relation table> where <related> = <main> [and ...])`, with
+`count(*)` for `count`; a concat is `concat_ws(' ', <c1>, <c2>, ...)`. The predicates: `and` and
+`or` are their items joined inside parentheses, or `true` and `false` when empty; `not (<item>)`;
+`true` or `false` for a literal; `<target> <operator> $n`; `<target> is [not] null`;
+`<target> [not] in ($n, ...)`; `<target> between $n and $m`; `<target> [i]like $n`;
+`<target> @> $n`, `<@`, or `&&` with the array bound as one parameter;
+`exists (select 1 as "one" from <relation table> where <related> = <main> [and ...] [and <inner>])`,
+with the inner predicate rendered over the relation's table; and `textSearch` as in 10.2. Every
+value is `sql.param(value)`, since a JavaScript array interpolated into `sql` prints as a parameter
+list. `sql.raw` emits only the constant fragments of lookup tables over the plan's closed
+vocabularies (comparison and array operators, aggregate and `tsquery` functions) and the text search
+configuration, which `isSearchConfig` must accept again first (a `TypeError` otherwise). An unknown
+kind is a `TypeError`.
+
+Tests: `schema.test.ts`, `target.test.ts`, `predicate.test.ts` (exact SQL and parameters through
+`PgDialect` for every kind, a `pgSchema` table, `casing: 'snake_case'`, a correlated aggregate
+selected beside a table's columns, an unresolved name, a configuration `isSearchConfig` refuses).
+
+### 14.3 `keyset.paginate(db, request, options?)` (`paginate.ts`, ADR 0007, ADR 0012, ADR 0017)
+
+`db` is a `KeysetDatabase`, `Pick<PgDatabase<PgQueryResultHKT>, 'select'>`: a Drizzle PostgreSQL
+database of any driver, a transaction, or a `withReplicas` database. `PaginateOptions<TSelection>`
+is `{ select?, where?, total?, onQuery?, context? }`. `select` is the caller's selection (Drizzle's
+`SelectedFields`), by default the table's columns as `db.select().from(table)` reads them; `where`
+is the caller's condition, an `SQL` such as `eq(contacts.orgId, org.id)`; `total`, `onQuery`, and
+`context` are those of 10.3.
+
+1. `plan = await keyset.plan(request, { context: options.context })`.
+2. A member of `select` named like one of the plan's aliases is a `TypeError`, raised before any
+   statement runs.
+3. The total, when `options.total` is `true`: `select count(*) from <table>` with the caller's
+   `where` and the filter joined as in step 4, run first; the result is `Number(total)`, `0` without
+   a row.
+4. The page: `db.select({ ...select, <alias>: cast(<target> as text), ... }).from(<table>)`, with
+   those of the caller's `where`, the filter, and the seek that are present, each in parentheses and
+   joined with `and`; `order by <target> <direction>` per key, with `nulls <first|last>` when the
+   key's `nulls` is not `null`; `limit plan.limit`.
+5. Rows: the alias members are read (a non-string is `null`) and removed, as in 10.3.
+6. `keyset.page(plan, rows, values, { total })`.
+
+`onQuery` receives the `QueryEvent`s of 10.3 with `toSQL()`'s `sql` and `params`, compiled only when
+`onQuery` is set. The rows are `SelectResultFields<TSelection>`, the table's `$inferSelect` row
+without a `select`. The page after a cursor on `-createdAt`, with a `startsWith` filter and a caller
+`where` written as `sql` with an `or`, over the default selection under `casing: 'snake_case'`
+(captured on drizzle-orm 0.45.4 over PGlite 0.5.8):
+
+```sql
+select "id", "name", "created_at", cast("contacts"."created_at" as text) as "keyset0",
+  cast("contacts"."id" as text) as "keyset1"
+from "contacts"
+where ("contacts"."name" = $1 or "contacts"."name" like $2) and ("contacts"."name" like $3)
+  and (("contacts"."created_at" <= $4 and ("contacts"."created_at" < $5
+    or ("contacts"."created_at" = $6 and "contacts"."id" > $7))))
+order by "contacts"."created_at" desc, "contacts"."id" asc
+limit $8
+```
+
+The cursors are those of 10.3: neither the key text nor the context (6.1) depends on the binding, so
+a cursor issued by a Drizzle keyset resumes in a Kysely keyset with the same fields, sort, and
+secret, and the reverse.
+
+Tests: `paginate.test.ts` (exact SQL for first, filtered, counted, scoped, and `casing` pages; the
+default selection and a caller's; the reserved aliases; row splitting; the context rejecting a
+foreign cursor before querying), `paginate-order.test.ts` (the seek after the filter, the inverted
+backward page, nulls placed on nullable keys only). Both run over Drizzle's `pg-proxy` driver, whose
+callback records each statement and answers canned rows.
+
+### 14.4 End-to-end and smoke tests
+
+`e2e/keyset/` depends on `@netvark/drizzle-keyset` as well. `support/keysets.ts` defines each shared
+keyset a second time through a Drizzle definer over a Drizzle schema of the same tables
+(`support/drizzle-schema.ts`), with the same field names, and `support/bindings.ts` gives each
+binding a pager over a harness. The files that run plans against rows (`paginate`, `filters`,
+`relations`, `search`, `range`, `context`, `defaults`, `pg-driver`, `postgres`) run once per
+binding, so every expectation of 11.1 to 11.3 holds for Drizzle's SQL on PGlite, node-postgres, and
+PostgreSQL 14 and 18. `drizzle.e2e.test.ts` adds what only the Drizzle binding has:
+`casing: 'snake_case'` over a schema without SQL names, a `pgSchema` table, a caller's `where`
+written as `sql` with an `or`, a caller's selection, a transaction, and cursors interchanged with
+the Kysely keysets in both directions. The smoke test (11.4) defines a Drizzle keyset and paginates
+it over `pg-proxy` on Bun, Deno, and workerd.
