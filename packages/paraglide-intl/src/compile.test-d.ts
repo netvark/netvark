@@ -1,6 +1,11 @@
 import type { compile as paraglideCompile } from '@inlang/paraglide-js';
 
-import type { CompileOptions, CompileResult } from './index';
+import type {
+  CompileOptions,
+  CompileResult,
+  FormattingFinding,
+  MessageFormattingError,
+} from './index';
 
 import { describe, expectTypeOf, it } from 'vitest';
 
@@ -26,6 +31,29 @@ describe('compile types (SPEC 6.1)', () => {
     expectTypeOf(options.isolate).toEqualTypeOf<
       boolean | ReadonlyArray<string> | undefined
     >();
+  });
+
+  it("takes formatters: 'refuse' or 'allow'", () => {
+    expectTypeOf(options.formatters).toEqualTypeOf<
+      'refuse' | 'allow' | undefined
+    >();
+    expectTypeOf<{
+      project: string;
+      outdir: string;
+      formatters: 'warn';
+    }>().not.toExtend<CompileOptions>();
+  });
+
+  it('describes each finding of the refusal', () => {
+    expectTypeOf<MessageFormattingError['findings']>().toEqualTypeOf<
+      ReadonlyArray<FormattingFinding>
+    >();
+    expectTypeOf<FormattingFinding>().toEqualTypeOf<{
+      readonly bundleId: string;
+      readonly locale: string | undefined;
+      readonly variable: string | undefined;
+      readonly annotation: string;
+    }>();
   });
 
   it("takes its own result or Paraglide's as the previous compilation", () => {

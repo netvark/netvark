@@ -13,6 +13,7 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
       ...BASE,
       strategy: ['url', 'baseLocale'],
       isolate: ['ar'],
+      formatters: 'allow',
       previousCompilation: { outputHashes: { 'runtime.js': 'abc' } },
     });
     expect(config).toEqual({
@@ -20,6 +21,7 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
       outdir: BASE.outdir,
       fs,
       isolate: ['ar'],
+      formatters: 'allow',
       previousOutputHashes: { 'runtime.js': 'abc' },
       compilerOptions: {
         ...defaultCompilerOptions,
@@ -28,6 +30,7 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
       },
     });
     expect(config.compilerOptions).not.toHaveProperty('isolate');
+    expect(config.compilerOptions).not.toHaveProperty('formatters');
     expect(config.compilerOptions).not.toHaveProperty('previousCompilation');
   });
 
@@ -36,6 +39,16 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
     expect(compileConfig({ ...BASE, isolate: false }).isolate).toBe(false);
     expect(compileConfig({ ...BASE, isolate: [] }).isolate).toEqual([]);
     expect(compileConfig(BASE).previousOutputHashes).toBeUndefined();
+  });
+
+  it('refuses a message that formats by default, unless formatters is allow', () => {
+    expect(compileConfig(BASE).formatters).toBe('refuse');
+    expect(compileConfig({ ...BASE, formatters: 'refuse' }).formatters).toBe(
+      'refuse',
+    );
+    expect(compileConfig({ ...BASE, formatters: 'allow' }).formatters).toBe(
+      'allow',
+    );
   });
 
   it('takes the file system it is given, as Paraglide does', () => {
@@ -61,6 +74,14 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
         'compile: isolate is not a boolean or a list of locales',
       ],
       [{ ...BASE, fs: {} }, 'compile: fs is not a file system module'],
+      [
+        { ...BASE, formatters: 'warn' },
+        "compile: formatters is not 'refuse' or 'allow'",
+      ],
+      [
+        { ...BASE, formatters: false },
+        "compile: formatters is not 'refuse' or 'allow'",
+      ],
     ];
     for (const [options, message] of cases) {
       expect(() => compileConfig(options as never)).toThrow(

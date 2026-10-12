@@ -1,8 +1,8 @@
 /**
  * The options of `compile()` (SPEC 6.1): Paraglide's compiler options plus
- * the locales whose interpolated values are isolated, checked before
- * anything is read, and Paraglide's defaults merged under them as
- * Paraglide's own `compile()` merges them.
+ * the locales whose interpolated values are isolated and whether a message
+ * may format, checked before anything is read, and Paraglide's defaults
+ * merged under them as Paraglide's own `compile()` merges them.
  * @ref https://github.com/opral/paraglide-js/blob/0c6cf2c971b667cedf133dea471101897c8c0ade/src/compiler/compile.ts
  * @packageDocumentation
  */
@@ -14,7 +14,7 @@ import { defaultCompilerOptions } from '@inlang/paraglide-js';
 
 import { isRecord } from './internal/is-record';
 
-/** Paraglide's compiler options, plus the locales to isolate. */
+/** Paraglide's compiler options, plus the locales to isolate and the formatting rule. */
 export type CompileOptions = CompilerOptions & {
   /** The previous compile's result: a file whose content is unchanged is not rewritten. */
   readonly previousCompilation?:
@@ -26,7 +26,16 @@ export type CompileOptions = CompilerOptions & {
    * listed, which the project must declare.
    */
   readonly isolate?: boolean | ReadonlyArray<string> | undefined;
+  /**
+   * `'refuse'` (the default) fails the compile when a message formats a
+   * value with `number`, `datetime`, `date`, `time`, `relativetime`, or
+   * `#`; `'allow'` compiles it with the engine's defaults.
+   */
+  readonly formatters?: Formatters | undefined;
 };
+
+/** Whether a message may format a value (ADR 0008). */
+type Formatters = 'refuse' | 'allow';
 
 /** What a compile returns. */
 export interface CompileResult {
@@ -42,6 +51,7 @@ export interface CompileConfig {
   readonly outdir: string;
   readonly fs: typeof fs;
   readonly isolate: boolean | ReadonlyArray<string>;
+  readonly formatters: Formatters;
   readonly previousOutputHashes: Record<string, string> | undefined;
   /** Paraglide's options with its defaults under them, as its `compile()` passes them on. */
   readonly compilerOptions: CompilerOptions;
@@ -72,6 +82,16 @@ function isolateOption(value: unknown): boolean | ReadonlyArray<string> {
   );
 }
 
+function formattersOption(value: unknown): Formatters {
+  if (value === undefined) {
+    return 'refuse';
+  }
+  if (value === 'refuse' || value === 'allow') {
+    return value;
+  }
+  throw new TypeError(`${CALLER}: formatters is not 'refuse' or 'allow'`);
+}
+
 function fileSystem(value: unknown): typeof fs {
   if (value === undefined) {
     return fs;
@@ -93,12 +113,14 @@ export function compileConfig(options: CompileOptions): CompileConfig {
       throw new TypeError(`${CALLER}: ${name} is not a string`);
     }
   }
-  const { isolate, previousCompilation, ...paraglideOptions } = options;
+  const { isolate, formatters, previousCompilation, ...paraglideOptions } =
+    options;
   return {
     project: options.project,
     outdir: options.outdir,
     fs: fileSystem(value['fs']),
     isolate: isolateOption(isolate),
+    formatters: formattersOption(formatters),
     previousOutputHashes: previousCompilation?.outputHashes,
     compilerOptions: { ...defaultCompilerOptions, ...paraglideOptions },
   };

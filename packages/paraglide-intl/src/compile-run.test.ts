@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { compile, compileWith } from './compile';
 import { compileConfig } from './compile-options';
+import { paraglideSdk } from './paraglide-sdk';
 import {
   filesUnder,
   fixtureProject,
@@ -124,9 +125,28 @@ describe('compileWith', () => {
       compileWith(unreadable.sdk, compileConfig(options)),
     ).rejects.toThrow(
       new TypeError(
-        'compile: @inlang/sdk returned a bundle without messages, variants, and patterns',
+        'compile: @inlang/sdk returned a bundle without declarations, messages, variants, and patterns',
       ),
     );
     expect(unreadable.project.close).toHaveBeenCalledOnce();
+  });
+
+  it('reads no bundle when it neither refuses nor isolates', async () => {
+    const { project, outdir } = await fixtureProject(MESSAGES);
+    const sdk = await paraglideSdk();
+    const reading = {
+      ...sdk,
+      selectBundleNested: vi.fn(sdk.selectBundleNested),
+    };
+    await compileWith(
+      reading,
+      compileConfig({ project, outdir, isolate: false, formatters: 'allow' }),
+    );
+    expect(reading.selectBundleNested).not.toHaveBeenCalled();
+    await compileWith(
+      reading,
+      compileConfig({ project, outdir, isolate: false }),
+    );
+    expect(reading.selectBundleNested).toHaveBeenCalledOnce();
   });
 });
