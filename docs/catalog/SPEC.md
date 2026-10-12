@@ -1389,10 +1389,10 @@ where `server.e2e.test.ts`, `kysely.e2e.test.ts`, and `drift.e2e.test.ts` reach 
 - `@netvark/catalog-core`: `platform: 'neutral'`, no dependencies, `sideEffects: false`.
 - `@netvark/pg-catalog`: `platform: 'node'`, two entries (`index` and `cli`), `bin` `pg-catalog`
   pointing at `dist/cli.mjs` with a `#!/usr/bin/env node` line, dependencies `@netvark/catalog-core`
-  (`workspace:^`) and `pg`, `@electric-sql/pglite` `^0.5.0` and `@netvark/resource-core` `^0.1.0` as
-  optional peer dependencies (`rules --check` imports the latter's `testing` entry and `surface` its
-  `openapi` entry on demand, so `extract` and `drift` never load it), and `sideEffects` listing only
-  the bin.
+  (`workspace:^`) and `pg`, `@electric-sql/pglite` `^0.5.0` (CI runs the package's tests on 0.5.0)
+  and `@netvark/resource-core` `^0.1.0` as optional peer dependencies (`rules --check` imports the
+  latter's `testing` entry and `surface` its `openapi` entry on demand, so `extract` and `drift`
+  never load it), and `sideEffects` listing only the bin.
 - The `exports` maps, `source` conditions, `publishConfig`, `files`, and release flow follow the
   keyset family (its SPEC 12).
 
