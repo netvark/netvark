@@ -94,5 +94,5 @@ export interface DrizzleKeyset<
     db: KeysetDatabase,
     request: KeysetRequestOf<TFields, TRelations>,
     options?: PaginateOptions<TSelection>,
-  ): Promise<Page<SelectResultFields<TSelection>>>;
+  ): Promise<Page<SelectResultFields<NoInfer<TSelection>>>>;
 }
