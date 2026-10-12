@@ -70,6 +70,12 @@ typed client, published as `@netvark/jsonapi-client`, depends on the core alone)
 
 `packages/jsonapi-client/src/` (SPEC 15.1):
 
+- `transport/` `createTransport` and the opaque `Transport` (`transport.ts`), the origin and the
+  links the client follows (`origin.ts`), and `send`, one request and its response (`send.ts`)
+- `client/` `createClients` (`create-clients.ts`), the calls of one resource (`resource-client.ts`,
+  typed wide in `wide-client.ts`), their URLs (`urls.ts`), the documents writes send
+  (`request-documents.ts`), the results the calls read (`results.ts`), `next` and `prev`
+  (`follow.ts`), and the types of the clients (`types.ts`)
 - `query/` the query types (`types.ts`) and `serializeQuery` (`serialize-query.ts`,
   `serialize-filter.ts`)
 - `pagination/cursors.ts` `pageCursors` and `cursorOf`
@@ -78,9 +84,10 @@ typed client, published as `@netvark/jsonapi-client`, depends on the core alone)
   (`members.ts`), and the record types (`types.ts`)
 - `errors/response-error.ts` `ResponseError` and `isResponseError`
 - `client/record-types.ts` `RecordOf`: the record a query returns, derived from the definitions
-- `internal/object.ts` prototype-safe reads of response JSON; never exported
-- `test-support/` the blog's definitions (`blog.ts`) and a compound document (`compound.ts`) for the
-  package's own tests; not published
+- `internal/object.ts` prototype-safe reads of response JSON, and `internal/definition-types.ts` the
+  type helpers over definitions; never exported
+- `test-support/` the blog's definitions (`blog.ts`), a compound document (`compound.ts`), and a
+  fetch double (`fetch-double.ts`) for the package's own tests; not published
 
 `e2e/jsonapi/`: end-to-end suite, a private workspace package that consumes the built
 `@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*` and drives a blog API over

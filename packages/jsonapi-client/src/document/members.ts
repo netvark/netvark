@@ -105,16 +105,27 @@ export function jsonApiObjectOf(object: JsonRecord): JsonApiObject {
   };
 }
 
-/** A resource identifier object, its `meta` kept. */
-export function resourceIdentifierOf(value: unknown): ResourceIdentifier {
-  if (isRecord(value)) {
-    const type = ownMember(value, 'type');
-    const id = ownMember(value, 'id');
-    if (typeof type === 'string' && typeof id === 'string') {
-      return { type, id, ...metaMember(value) };
-    }
+/** A resource identifier object, its `meta` kept; `undefined` without a string `type` and `id`. */
+export function identifierObjectOf(
+  value: unknown,
+): ResourceIdentifier | undefined {
+  if (!isRecord(value)) {
+    return undefined;
   }
-  throw new TypeError(NOT_AN_IDENTIFIER);
+  const type = ownMember(value, 'type');
+  const id = ownMember(value, 'id');
+  return typeof type === 'string' && typeof id === 'string'
+    ? { type, id, ...metaMember(value) }
+    : undefined;
+}
+
+/** A resource identifier object, its `meta` kept; throws `TypeError` without a string `type` and `id`. */
+export function resourceIdentifierOf(value: unknown): ResourceIdentifier {
+  const identifier = identifierObjectOf(value);
+  if (identifier === undefined) {
+    throw new TypeError(NOT_AN_IDENTIFIER);
+  }
+  return identifier;
 }
 
 function resourceLinkageOf(data: unknown): ResourceLinkage {

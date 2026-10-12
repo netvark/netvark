@@ -8,6 +8,12 @@
  */
 import type { TypesOf } from '@netvark/jsonapi-core';
 
+import type {
+  FieldNameOf,
+  KnownDefinition,
+  TypeOf,
+} from '../internal/definition-types';
+
 /** A filter value: a string as it is, a number, bigint, or boolean as `String` writes it. */
 export type FilterValue = string | number | bigint | boolean;
 
@@ -81,20 +87,6 @@ type SortNameOf<TDefinition> = TDefinition extends {
 }
   ? TSort
   : never;
-
-/** The fields of a type a client reads: its attributes and relationships. */
-type FieldNameOf<TDefinition> =
-  | (keyof TypesOf<TDefinition>['attributes'] & string)
-  | (keyof TypesOf<TDefinition>['relationships'] & string);
-
-type TypeOf<TDefinition> = TDefinition extends {
-  readonly type: infer TType extends string;
-}
-  ? TType
-  : never;
-
-/** The definition the client knows for a type; `never` when it knows none. */
-type KnownDefinition<TKnown, TType> = Extract<TKnown, { readonly type: TType }>;
 
 /** The type a relationship of `TDefinition` holds; `never` for no definition. */
 type RelatedType<TDefinition, TName extends string> = [TDefinition] extends [

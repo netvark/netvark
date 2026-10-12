@@ -1180,14 +1180,15 @@ so the same build runs in browsers, workers, Node, Bun, and Deno. The client rea
 
 ### 15.1 Surface and module map
 
-| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Identifier`, `RecordMembers`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `ResponseErrorInit`, `ResponseErrorHeaders`, `PageCursors` |
+| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Identifier`, `IdentifierObject`, `RecordMembers`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `ResponseErrorInit`, `ResponseErrorHeaders`, `PageCursors` |
 
 ```
 packages/jsonapi-client/src/
   index.ts                     root entry
-  internal/object.ts           isRecord(), ownMember(): prototype-safe reads of response JSON
+  internal/object.ts           isRecord(), ownMember(), defineMember(): prototype-safe reads of response JSON
+  internal/definition-types.ts the type helpers over definitions the query, record, and client types share
   transport/
     origin.ts                  assertOrigin(), atOrigin(): the origin and the links the client follows (15.2, 15.8)
     transport.ts               createTransport() (15.2)
@@ -1207,7 +1208,11 @@ packages/jsonapi-client/src/
     record-types.ts            RecordOf: records typed by the definitions and the query (15.6)
     create-clients.ts          createClients() (15.4)
     resource-client.ts         the methods of one resource (15.4)
+    wide-client.ts             the methods as the implementation types them, before createClients types them (15.4)
+    urls.ts                    the URLs the calls reach: paths, ids, the origin (15.4)
     request-documents.ts       the documents a write sends (15.4)
+    results.ts                 the results the calls read, each held to the call's shape (15.4)
+    follow.ts                  next() and prev() (15.8)
   pagination/cursors.ts        pageCursors(), cursorOf() (15.8)
 ```
 
@@ -1216,18 +1221,24 @@ packages/jsonapi-client/src/
 `TransportOptions = { origin, headers?, language?, fetch? }`; the result is a `Transport`, an opaque
 object the clients send through.
 
-- `origin`: an absolute `http:` or `https:` URL without user information, a path other than `/`, a
-  query, or a fragment, kept as its origin (`URL#origin`); otherwise `TypeError` naming `origin`. It
-  is where the client reaches the server. A definition's links may name another origin (an absolute
-  `links.base`, ADR 0015); the client takes only their paths, so one set of definitions serves
-  development, staging, production, and tests.
+- `origin`: an absolute `http:` or `https:` URL that is its origin followed by `/` alone (its `href`
+  is `` `${origin}/` ``), kept as its origin (`URL#origin`); user information, a path, a query, or a
+  fragment, which every request would drop, throw `TypeError` naming `origin` and quoting nothing of
+  it. It is where the client reaches the server. A definition's links may name another origin (an
+  absolute `links.base`, ADR 0015); the client takes only their paths, so one set of definitions
+  serves development, staging, production, and tests.
 - `headers`: a `HeadersInit`, or a function returning one or a promise of one, called on every
   request so a rotating session token is current. They are applied first; the client's own `Accept`
   and `Content-Type` replace any they set (15.3).
 - `language`: a function called on every request; a non-empty result is sent as `Accept-Language`
   (RFC 9110 12.5.4), replacing one `headers` set. An application on Paraglide passes `getLocale`.
-- `fetch`: `(request: Request) => Promise<Response>`; by default the global `fetch`, looked up at
-  request time, so a polyfill or a test double installed later is used.
+- `fetch`: takes a `Request` and resolves to an object with `status`, `headers.get`, and `text()`,
+  which a `Response` of any realm or library has; by default the global `fetch`, looked up at
+  request time, so a polyfill or a test double installed later is used. It is called as a plain
+  function, never as a method of the options, since a browser's `fetch` called on another object
+  throws "Illegal invocation".
+- A `Transport` has no public members. `createClients` reads it through an ES private field, so a
+  value `createTransport` did not make throws `TypeError` there.
 
 ### 15.3 Requests and responses (`send.ts`)
 
@@ -1241,15 +1252,17 @@ object the clients send through.
   document carries no `Content-Type`, which would make a cross-origin `GET` preflighted (Fetch,
   CORS-safelisted request headers).
 - Each call takes `CallOptions = { signal?, headers? }`; `headers` are applied after the transport's
-  and before the client's own.
+  `headers` and `language`, so a call may set its own `Accept-Language`, and before the client's
+  own. A `Content-Type` either set is removed from a request without a document.
 - A response is read once, as text, and only through `status`, `headers`, and `text()`: the client
   never clones it and never tests it with `instanceof Response`, so a `fetch` that returns another
   realm's or library's response works.
 - A 2xx response other than 204 is read as a document when its `Content-Type` is the JSON:API media
   type, parameters other than `ext` and `profile` ignored (`#content-negotiation-clients`), and its
-  body is a JSON object with `data`, `errors`, or `meta` (`#document-top-level`). A 202 or 204 may
-  have no document. Any other 2xx is a `TypeError` naming the resource type and the call, never the
-  body: the server broke the protocol, which no application handles.
+  body is a JSON object with `data`, `errors`, or `meta` (`#document-top-level`). A 204 has no
+  document, and a 202 has one only when its response is one. Any other 2xx is a `TypeError`
+  (`<type> <call> answered <status> without a JSON:API document`), never quoting the body: the
+  server broke the protocol, which no application handles.
 - Any other status is a `ResponseError` (15.7). Redirects are fetch's (`redirect: 'follow'`); a
   rejected `fetch` (a network failure, an abort) reaches the caller as it is.
 
@@ -1275,28 +1288,51 @@ their definition by type (15.6). The result holds a `ResourceClient` per name:
 | `next(result, options?)`, `prev(...)`       | `GET` of `result.links.next` or `links.prev` (15.8)                             | `ReadResult` like `result`, or `undefined` when the link is `null` or absent |
 
 - An id fills the path's `{id}` percent-encoded (`encodeURIComponent`), as the links convention
-  encodes it (5.1). A relationship method for a relationship whose links give no path throws
-  `TypeError` naming it.
+  encodes it (5.1). An id that is empty, `.`, or `..` throws `TypeError` before anything is sent:
+  the URL parser removes a dot segment, percent-encoded or not (URL Standard, single-dot and
+  double-dot path segments), and an empty segment names the collection, so the request would reach
+  another path with the transport's headers. A relationship method, or a write, naming a
+  relationship the definition does not declare throws `TypeError` naming it, and so does a
+  relationship method for one whose links give no path.
+- Each call reads `data` of one shape: a list for `list`, a to-many `related`, `next`, and `prev`; a
+  resource object for `get`, `create`, and `update`; a resource object or `null` for a to-one
+  `related`; and linkage of the relationship's cardinality for the relationship calls. A document
+  whose `data` has another shape throws `TypeError`
+  (`<type> <call> answered <status> with data that is not <shape>`), never quoting the document, so
+  a result's type is true; a read whose response holds no document throws the `TypeError` of 15.3.
 - `ReadResult<TData> = { status, data, links, meta, jsonapi }` and
   `WriteResult<TData> = { status, data: TData | undefined, links, meta, jsonapi }`: a write's `data`
-  is present when the server answered with a document holding it (201, 200) and `undefined` for 202
-  and 204 (`#crud-creating-responses-204`, `#crud-updating-responses-204`,
-  `#crud-deleting-responses-204`). A create carries no document back when the server stored it
-  unchanged; the input then is the resource.
+  is the document's `data` when the response holds it (201, 200), and `undefined` for a 204
+  (`#crud-creating-responses-204`, `#crud-updating-responses-204`, `#crud-deleting-responses-204`),
+  a 200 with `meta` alone (`#crud-updating-responses-200`, `#crud-deleting-responses-200`), and a
+  202, whose document describes the processing rather than the resource
+  (`#crud-creating-responses-202`); `remove`'s is always `undefined`. The document's `links`,
+  `meta`, and `jsonapi` are kept in each case. A create carries no document back when the server
+  stored it unchanged; the input then is the resource.
+- The linkage a relationship call reads keeps each identifier's `meta` (`IdentifierObject`), as the
+  relationship document holds it; a record keeps it in `$relationships` (15.6). `next` and `prev`
+  page records: their argument is a `ReadResult` of records, a `list`'s, a to-many `related`'s, or
+  an earlier page's, never linkage.
 - `CreateInput = { id?, attributes?, relationships? }` and `UpdateInput` the same without `id`. A
   relationship's value is an id, an identifier object, `null` (to-one), or a list of ids or
   identifiers (to-many); an id becomes an identifier of the relationship's declared type
-  (`#document-resource-identifier-objects`).
+  (`#document-resource-identifier-objects`). An identifier object gives its `type` and `id` and
+  nothing else, so a record passed as one sends only what identifies it.
 - Types: the records are `RecordOf` (15.6) over the definitions passed, which resolve related types;
-  `create`'s `attributes` are `'~types'.create`, `update`'s `'~types'.update`; `relationships` take
-  the names `creatable` and `updatable` list; `id` is accepted when `clientIds` is `true`; `list`
-  takes `ListQuery` (15.5), with `page` only on a definition that paginates and `search` only on one
-  with a search parameter; `get` and `related` take `GetQuery`. Both take `fields` only where
-  `'~types'.fields` is `true`, keyed by the types 6.5 accepts: the definition's own and each type a
-  segment of its declared include paths reaches through the definitions passed. A type's names are
-  the attributes and relationships of its definition, any string when no definition passed has that
-  type. The server stays the authority: the client checks none of this at run time, and `parseQuery`
-  and the request parsers answer what the types would have caught (6, 9).
+  a literal query passed to `list`, `get`, or `related` is read through a `const` type parameter, so
+  its include paths and fieldsets are tuples, and a call without a query reads every field and each
+  relationship's linkage. `create`'s `attributes` are `'~types'.create`, `update`'s
+  `'~types'.update`, required when that input has a required member and `never` for an operation the
+  definition does not serve, so no input compiles; `relationships` take the names `creatable` and
+  `updatable` list, and are `never` when they list none, since an object type without members
+  accepts any member; `id` is accepted when `clientIds` is `true`; `list` takes `ListQuery` (15.5),
+  with `page` only on a definition that paginates and `search` only on one with a search parameter;
+  `get` and `related` take `GetQuery`. Both take `fields` only where `'~types'.fields` is `true`,
+  keyed by the types 6.5 accepts: the definition's own and each type a segment of its declared
+  include paths reaches through the definitions passed. A type's names are the attributes and
+  relationships of its definition, any string when no definition passed has that type. The server
+  stays the authority: the client checks none of this at run time, and `parseQuery` and the request
+  parsers answer what the types would have caught (6, 9).
 
 ### 15.5 Query serialization (`serialize-query.ts`, `serialize-filter.ts`)
 
@@ -1433,9 +1469,13 @@ ESM only, as the other packages (12): `dependencies` holds `@netvark/jsonapi-cor
 caret range when published); no peer dependencies; one subpath, `.`. Built with
 `platform: 'neutral'`, `@netvark/jsonapi-core` external.
 
-Unit tests sit beside each module; `record-types.test-d.ts` and `client.test-d.ts` pin the
-inference. `e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client:
-list and walk pages, compound documents into records, sparse fieldsets, each write and relationship
-call, every error status into a `ResponseError`, and `Accept-Language` from `language`.
+Unit tests sit beside each module: `origin.test.ts`, `send.test.ts` and `responses.test.ts` (the
+request, the fetch called, each response), `request-documents.test.ts` (each write's document, read
+back by jsonapi-core's own request parsers), `reads.test.ts`, `writes.test.ts`,
+`relationships.test.ts`, `follow.test.ts`, and `create-clients.test.ts`, through a fetch double;
+`record-types.test-d.ts` and `client.test-d.ts` pin the inference.
+`e2e/jsonapi/client-*.e2e.test.ts` drives the blog API over HTTP with the built client: list and
+walk pages, compound documents into records, sparse fieldsets, each write and relationship call,
+every error status into a `ResponseError`, and `Accept-Language` from `language`.
 `e2e/jsonapi/smoke/client-checks.ts` runs the client against the blog app in-process on Bun, Deno,
 and workerd.
