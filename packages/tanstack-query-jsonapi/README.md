@@ -5,9 +5,10 @@
 calls, which the hooks of every adapter take as they are: React's, Vue's, Solid's, Svelte's, and
 Angular's. Each read is keyed by the request it sends, so two queries that send one request share
 one cache entry; a read passes the query's signal, so a cancelled query aborts its request; an
-infinite list pages by the server's links; and a write stays pending until the reads it changed have
-refetched. The options are plain objects typed with `@tanstack/query-core`, the core every adapter
-is built on, and the package imports no framework and no adapter. The contract is section 16 of
+infinite list pages by the server's links; a write stays pending until the reads it changed have
+refetched; and writes that must commit together go in one Atomic Operations mutation. The options
+are plain objects typed with `@tanstack/query-core`, the core every adapter is built on, and the
+package imports no framework and no adapter. The contract is sections 16 and 17.4 of
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md), and the
 decision behind it
 [ADR 0020](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0020-tanstack-query-options-are-the-clients-binding-typed-through-query-core.md).
@@ -116,6 +117,59 @@ and `remove` drops the record's own entries first, so a screen still showing it 
 server for it again. A refused write rejects with the client's `ResponseError` and invalidates
 nothing.
 
+## Atomic Operations
+
+`operationsMutation(transport)` sends the operations
+[`operationsOf`](https://github.com/netvark/netvark/tree/main/packages/jsonapi-client#atomic-operations)
+builds in one request, which the server stores whole or not at all: a bulk action over a selection,
+or a record created with another linked to it by its `lid`. Make it once, beside the transport:
+
+```ts
+// src/api/queries.ts
+import { operationsMutation } from '@netvark/tanstack-query-jsonapi';
+
+import { transport } from './clients';
+
+export const operations = operationsMutation(transport);
+```
+
+```tsx
+// src/contacts/archive-selected.tsx
+import { Contacts } from '@acme/api/definitions';
+import { useMutation } from '@tanstack/react-query';
+
+import { operationsOf } from '@netvark/jsonapi-client';
+
+import { operations } from '../api/queries';
+
+const contacts = operationsOf(Contacts);
+
+export function ArchiveSelected({ ids }: { readonly ids: ReadonlyArray<string> }) {
+  const archive = useMutation(operations);
+  const archiving = ids.map((id) => contacts.update(id, { attributes: { status: 'archived' } }));
+  return (
+    <button
+      disabled={archive.isPending || ids.length === 0 || ids.length > Contacts.atomic.max}
+      onClick={() => archive.mutate(archiving)}
+    >
+      Archive {ids.length}
+    </button>
+  );
+}
+```
+
+On success it removes the `get` entries of every record a removal removed, invalidates every type
+the operations write, `['contacts']` here, and each key `invalidates` names, and resolves once the
+reads shown have refetched, as a single write does. A refused request rejects with the client's
+`ResponseError` and invalidates nothing; `operationOf` from `@netvark/jsonapi-client` reads which
+operation each error points at. The `mutationKey` is `['operations']`, and the data the client's
+`OperationsResult`, a result per operation, each result's data `unknown` until a type argument
+narrows the operations: `operationsMutation<ReturnType<typeof contacts.update>>(transport)` takes
+contact updates alone, and their results hold contact records. Every adapter takes the options as it
+takes a write's: `useMutation(operations)` in React and Vue, `useMutation(() => operations)` in
+Solid, `createMutation(() => operations)` in Svelte, and `injectMutation(() => operations)` in
+Angular.
+
 ## Types
 
 The options hold only the members `resourceQueries` sets, so a hook infers everything from them: the
@@ -161,16 +215,24 @@ what that helper returns for a key it was handed tagged
 - **Pass a list of keys to `invalidates`:** `[meetings.all]`, not `meetings.all`. `resourceQueries`
   throws `TypeError` for a value `createClients` did not return, a write for `invalidates` that is
   not a list of keys, and `pages` for a resource that does not paginate, which TypeScript types
-  `never`.
+  `never`; `operationsMutation` throws it for `invalidates` that is not a list of keys.
+- **Send a bulk action as one `operationsMutation`,** never as a loop of single writes: the request
+  commits whole or not at all, and the lists shown refetch once, after it.
+- **Keep a selection within the definition's `atomic.max`** (`Contacts.atomic.max`, 10 unless the
+  server's definitions say otherwise): the server refuses a request over it with a 400.
+- **Name in `invalidates` what a request changes beyond the types it writes,** as for a single
+  write; the types the operations write are invalidated already.
 
 ## Documentation
 
 - [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md),
-  section 16: the binding's contract, with the tests that prove it
+  sections 16 and 17.4: the binding's contract, with the tests that prove it
 - [ADR 0020](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0020-tanstack-query-options-are-the-clients-binding-typed-through-query-core.md):
   TanStack Query options are the clients' binding, typed through query-core, and
   [ADR 0021](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0021-a-lists-pages-key-is-tagged-as-the-adapters-tag-an-infinite-key.md):
   a list's pages key is tagged as the adapters tag an infinite key
+- [ADR 0022](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0022-atomic-operations-are-values-built-from-definitions-and-sent-in-one-request.md):
+  Atomic Operations are values built from definitions and sent in one request
 - [ADR 0010](https://github.com/netvark/netvark/blob/main/docs/adr/0010-a-binding-to-a-library-with-a-framework-free-core-binds-the-core.md)
   and
   [ADR 0011](https://github.com/netvark/netvark/blob/main/docs/adr/0011-a-binding-takes-the-core-an-adapter-brings-as-an-optional-peer.md):

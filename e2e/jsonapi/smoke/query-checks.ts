@@ -1,13 +1,17 @@
 /**
- * The TanStack Query binding's runtime checks (SPEC 16.7):
- * `@netvark/tanstack-query-jsonapi`'s options read and write a blog of
- * their own through a query-core `QueryClient`, inside the runtime under
- * test, where server rendering prefetches. `app.ts` answers
- * `GET /query-checks` with the outcome, which each harness reports beside
- * the app's checks. Web standards only, as the binding itself.
+ * The TanStack Query binding's runtime checks (SPEC 16.7, 17.5):
+ * `@netvark/tanstack-query-jsonapi`'s options read and write a blog of their
+ * own through a query-core `QueryClient`, Atomic Operations among the
+ * writes, inside the runtime under test, where server rendering prefetches.
+ * `app.ts` answers `GET /query-checks` with the outcome, which each harness
+ * reports beside the app's checks. Web standards only, as the binding
+ * itself.
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/ssr
  */
 import type { DehydratedState } from '@tanstack/query-core';
+
+import type { Transport } from '@netvark/jsonapi-client';
+import type { ResourceQueries } from '@netvark/tanstack-query-jsonapi';
 
 import type { InRuntimeCheck, SmokeResult } from './checks.ts';
 
@@ -24,8 +28,12 @@ import {
   createClients,
   createTransport,
   isResponseError,
+  operationsOf,
 } from '@netvark/jsonapi-client';
-import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
+import {
+  operationsMutation,
+  resourceQueries,
+} from '@netvark/tanstack-query-jsonapi';
 
 import { createBlog } from '../support/blog.ts';
 import { Articles, People, Tags } from '../support/resources.ts';
@@ -61,19 +69,25 @@ async function rejection(call: Promise<unknown>): Promise<unknown> {
   throw new TypeError('the write resolved');
 }
 
-/** The articles' options over a fresh blog. */
-function openBlog() {
+interface QueryBlog {
+  readonly articles: ResourceQueries<typeof DEFINITIONS, typeof Articles>;
+  readonly transport: Transport;
+}
+
+/** The articles' options over a fresh blog, and the transport they send through. */
+function openBlog(): QueryBlog {
   const { app } = createBlog();
   const transport = createTransport({
     origin: ORIGIN,
     fetch: async (request) => app.fetch(request),
   });
-  return resourceQueries(createClients(DEFINITIONS, transport).articles);
+  const { articles } = createClients(DEFINITIONS, transport);
+  return { articles: resourceQueries(articles), transport };
 }
 
 const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
   'prefetched reads dehydrate as JSON and hydrate typed': async () => {
-    const articles = openBlog();
+    const { articles } = openBlog();
     const server = cache();
     const list = articles.list({ sort: ['title'] });
     const record = articles.get('1', { include: ['author'] });
@@ -94,7 +108,7 @@ const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
     const queryClient = cache();
     const observer = new InfiniteQueryObserver(
       queryClient,
-      openBlog().pages({ sort: ['title'] }),
+      openBlog().articles.pages({ sort: ['title'] }),
     );
     await observer.refetch();
     let result = observer.getCurrentResult();
@@ -108,7 +122,7 @@ const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
     queryClient.clear();
   },
   'a write settles once the list shown has refetched': async () => {
-    const articles = openBlog();
+    const { articles } = openBlog();
     const queryClient = cache();
     const list = new QueryObserver(queryClient, {
       ...articles.list({ sort: ['-createdAt'] }),
@@ -123,8 +137,41 @@ const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
     unsubscribe();
     queryClient.clear();
   },
+  'operations settle once the list shown has refetched, the removed record dropped':
+    async () => {
+      const { articles, transport } = openBlog();
+      const queryClient = cache();
+      const list = new QueryObserver(queryClient, {
+        ...articles.list({ sort: ['title'] }),
+        staleTime: Infinity,
+      });
+      await list.refetch();
+      await new QueryObserver(queryClient, articles.get('3')).refetch();
+      const unsubscribe = list.subscribe(() => {});
+      const { results } = await new MutationObserver(
+        queryClient,
+        operationsMutation(transport),
+      ).mutate([
+        operationsOf(Articles).create({ attributes: { title: 'Babbage' } }),
+        operationsOf(Articles).remove('3'),
+      ]);
+      equal(results.length, 2, 'a result per operation');
+      const titles = list
+        .getCurrentResult()
+        .data?.data.map(({ title }) => title);
+      equal(titles?.join(), 'Babbage,Compilers', 'list');
+      equal(
+        queryClient
+          .getQueryCache()
+          .findAll({ queryKey: ['articles', 'get', '3'] }).length,
+        0,
+        'removed record dropped',
+      );
+      unsubscribe();
+      queryClient.clear();
+    },
   'a refused write rejects and leaves the cache as it was': async () => {
-    const articles = openBlog();
+    const { articles } = openBlog();
     const queryClient = cache();
     await new QueryObserver(queryClient, articles.list()).refetch();
     const refusal = await rejection(

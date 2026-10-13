@@ -1,25 +1,46 @@
 /**
- * What the adapter checks give each adapter's hooks (SPEC 16.5): the
- * options `resourceQueries` of the built `@netvark/tanstack-query-jsonapi`
- * makes over clients of the blog's definitions, the queries the checks
- * pass, and, as the oracle, what the client's own calls resolve to for
- * the same queries. Read by the type check only: nothing here runs.
+ * What the adapter checks give each adapter's hooks (SPEC 16.5, 17.4): the
+ * options `resourceQueries` and `operationsMutation` of the built
+ * `@netvark/tanstack-query-jsonapi` make over clients of the blog's
+ * definitions and their transport, the queries the checks pass, and, as
+ * the oracle, what the client's own calls resolve to for the same queries
+ * and operations. Read by the type check only: nothing here runs.
  */
-import type { CreateInput } from '@netvark/jsonapi-client';
+import type { CreateInput, Operation } from '@netvark/jsonapi-client';
 import type { UpdateVariables } from '@netvark/tanstack-query-jsonapi';
 
-import { createClients, createTransport } from '@netvark/jsonapi-client';
-import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
+import {
+  createClients,
+  createTransport,
+  operationsOf,
+  sendOperations,
+} from '@netvark/jsonapi-client';
+import {
+  operationsMutation,
+  resourceQueries,
+} from '@netvark/tanstack-query-jsonapi';
 
 import { Articles, People, Tags } from '../../support/resources.ts';
 
+const transport = createTransport({ origin: 'https://blog.example' });
 const clients = createClients(
   { articles: Articles, people: People, tags: Tags },
-  createTransport({ origin: 'https://blog.example' }),
+  transport,
 );
+const articleOperations = operationsOf(Articles);
 
 export const articles = resourceQueries(clients.articles);
 export const people = resourceQueries(clients.people);
+
+/** An article's update as an operation. */
+type Retitle = ReturnType<typeof articleOperations.update>;
+
+/** Any operations in one request, people's lists invalidated with the types written. */
+export const operations = operationsMutation(transport, {
+  invalidates: [people.all],
+});
+/** Article updates in one request, their results typed by the definition. */
+export const retitling = operationsMutation<Retitle>(transport);
 
 /** A list's query: the author of each article included. */
 export const LISTED = { include: ['author'] } as const;
@@ -44,6 +65,10 @@ async function created() {
   return clients.articles.create({ attributes: { title: 'Adapters' } });
 }
 
+async function retitled(retitles: ReadonlyArray<Retitle>) {
+  return sendOperations(transport, retitles);
+}
+
 /** What `clients.articles.list(LISTED)` resolves to. */
 export type Listed = Awaited<ReturnType<typeof listed>>;
 /** What `clients.articles.get('1', SPARSE)` resolves to. */
@@ -52,6 +77,10 @@ export type Sparse = Awaited<ReturnType<typeof sparse>>;
 export type Page = Awaited<ReturnType<typeof newest>>;
 /** What `clients.articles.create(input)` resolves to. */
 export type Created = Awaited<ReturnType<typeof created>>;
+/** What `sendOperations` resolves to for article updates. */
+export type Retitled = Awaited<ReturnType<typeof retitled>>;
+/** What a mutation of any operations takes. */
+export type Operations = ReadonlyArray<Operation>;
 /** What a create of an article takes. */
 export type ArticleInput = CreateInput<typeof Articles>;
 /** What an update of an article takes. */

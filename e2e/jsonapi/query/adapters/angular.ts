@@ -16,7 +16,9 @@ import type {
   ArticleInput,
   ArticleUpdate,
   Listed,
+  Operations,
   Page,
+  Retitled,
   Sparse,
 } from './blog-queries.ts';
 
@@ -30,7 +32,15 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { expectTypeOf } from 'vitest';
 
-import { articles, LISTED, NEWEST, people, SPARSE } from './blog-queries.ts';
+import {
+  articles,
+  LISTED,
+  NEWEST,
+  operations,
+  people,
+  retitling,
+  SPARSE,
+} from './blog-queries.ts';
 
 /** A component's reads and writes, typed as Angular Query gives them. */
 export function angularComponent(queryClient: QueryClient): void {
@@ -55,6 +65,14 @@ export function angularComponent(queryClient: QueryClient): void {
   expectTypeOf<typeof update.mutate>()
     .parameter(0)
     .toEqualTypeOf<ArticleUpdate>();
+  const bulk = injectMutation(() => operations);
+  expectTypeOf<typeof bulk.mutateAsync>()
+    .parameter(0)
+    .toEqualTypeOf<Operations>();
+  const retitle = injectMutation(() => retitling);
+  expectTypeOf<
+    typeof retitle.mutateAsync
+  >().returns.resolves.toEqualTypeOf<Retitled>();
   expectTypeOf(
     queryClient.getQueryData(articles.list(LISTED).queryKey),
   ).toEqualTypeOf<Listed | undefined>();

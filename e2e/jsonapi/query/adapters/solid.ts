@@ -13,7 +13,9 @@ import type {
   ArticleInput,
   ArticleUpdate,
   Listed,
+  Operations,
   Page,
+  Retitled,
   Sparse,
 } from './blog-queries.ts';
 
@@ -27,7 +29,15 @@ import {
 } from '@tanstack/solid-query';
 import { expectTypeOf } from 'vitest';
 
-import { articles, LISTED, NEWEST, people, SPARSE } from './blog-queries.ts';
+import {
+  articles,
+  LISTED,
+  NEWEST,
+  operations,
+  people,
+  retitling,
+  SPARSE,
+} from './blog-queries.ts';
 
 /** A component's reads and writes, typed as Solid Query gives them. */
 export function solidComponent(queryClient: QueryClient): void {
@@ -52,6 +62,14 @@ export function solidComponent(queryClient: QueryClient): void {
   expectTypeOf<typeof update.mutate>()
     .parameter(0)
     .toEqualTypeOf<ArticleUpdate>();
+  const bulk = useMutation(() => operations);
+  expectTypeOf<typeof bulk.mutateAsync>()
+    .parameter(0)
+    .toEqualTypeOf<Operations>();
+  const retitle = useMutation(() => retitling);
+  expectTypeOf<
+    typeof retitle.mutateAsync
+  >().returns.resolves.toEqualTypeOf<Retitled>();
   expectTypeOf(
     queryClient.getQueryData(articles.list(LISTED).queryKey),
   ).toEqualTypeOf<Listed | undefined>();

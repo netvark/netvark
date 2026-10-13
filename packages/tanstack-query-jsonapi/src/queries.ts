@@ -21,11 +21,7 @@
  * @ref https://tanstack.com/query/v5/docs/reference/QueryClient#queryclientremovequeries
  * @packageDocumentation
  */
-import type {
-  MutationFunctionContext,
-  QueryClient,
-  QueryKey,
-} from '@tanstack/query-core';
+import type { MutationFunctionContext, QueryKey } from '@tanstack/query-core';
 
 import type {
   CallOptions,
@@ -39,6 +35,7 @@ import type { PageParam } from './pages';
 import type { AllKey, KeyedDefinition } from './query-keys';
 import type { ResourceQueries, WriteSettings } from './query-types';
 
+import { invalidate, settingsKeys } from './invalidation';
 import { firstPage, nextPage, pageQuery, previousPage } from './pages';
 import { queryText, recordText } from './query-keys';
 
@@ -87,36 +84,12 @@ function isClient(value: unknown): value is WideClient {
   );
 }
 
-/** Whether `value` is a list of query keys, each an array. */
-function isKeyList(value: unknown): value is ReadonlyArray<QueryKey> {
-  return (
-    Array.isArray(value) && value.every((key: unknown) => Array.isArray(key))
-  );
-}
-
 /** The keys a write invalidates: its type's, then each of `settings.invalidates`. */
 function invalidatedBy(
   all: AllKey<string>,
   settings: WriteSettings | undefined,
 ): ReadonlyArray<QueryKey> {
-  const others: unknown = settings?.invalidates;
-  if (others === undefined) {
-    return [all];
-  }
-  if (!isKeyList(others)) {
-    throw new TypeError(`${CALLER}: invalidates must be a list of query keys`);
-  }
-  return [all, ...others];
-}
-
-/** Invalidates `keys` together, settling once every read they reach has refetched. */
-async function invalidate(
-  queryClient: QueryClient,
-  keys: ReadonlyArray<QueryKey>,
-): Promise<void> {
-  await Promise.all(
-    keys.map(async (queryKey) => queryClient.invalidateQueries({ queryKey })),
-  );
+  return [all, ...settingsKeys(CALLER, settings)];
 }
 
 /** `onSuccess` of a write: the invalidation of `keys`, which the mutation awaits. */

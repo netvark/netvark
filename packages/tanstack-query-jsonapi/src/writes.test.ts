@@ -1,11 +1,3 @@
-import type {
-  QueryClient,
-  QueryObserverOptions,
-  QueryObserverResult,
-} from '@tanstack/query-core';
-
-import type { Arrival } from './test-support/fetch-double';
-
 import { MutationObserver, QueryObserver } from '@tanstack/query-core';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -13,33 +5,11 @@ import { isResponseError } from '@netvark/jsonapi-client';
 
 import { resourceQueries } from './queries';
 import { article, blogApi, held, ok } from './test-support/fetch-double';
+import { sent, showing, titles } from './test-support/screens';
 
 const ARRAYS = article('1', 'Arrays');
 const BYTES = article('2', 'Bytes');
 const NOT_FOUND = { status: 404, document: { errors: [{ status: '404' }] } };
-
-/** Each request as its method and target. */
-function sent(arrivals: ReadonlyArray<Arrival>): Array<string> {
-  return arrivals.map(({ method, target }) => `${method} ${target}`);
-}
-
-/** The titles of the records a list result holds. */
-function titles(result: QueryObserverResult<any>): Array<string> {
-  return result.data.data.map(({ title }: { title: string }) => title);
-}
-
-/** A screen showing what `options` reads: an observer subscribed, as a mounted `useQuery` is. */
-async function showing(
-  queryClient: QueryClient,
-  options: QueryObserverOptions<any, any, any, any, any>,
-) {
-  const observer = new QueryObserver(queryClient, options);
-  observer.subscribe(() => {});
-  await vi.waitFor(() => {
-    expect(observer.getCurrentResult().isSuccess).toBe(true);
-  });
-  return observer;
-}
 
 describe('the writes of resourceQueries (SPEC 16.4)', () => {
   it('creates, pending until the list a screen shows has refetched, and leaves an unshown record stale', async () => {

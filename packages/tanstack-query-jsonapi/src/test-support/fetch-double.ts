@@ -12,7 +12,7 @@
  * @ref https://fetch.spec.whatwg.org/#abort-fetch
  * @packageDocumentation
  */
-import type { Clients } from '@netvark/jsonapi-client';
+import type { Clients, Transport } from '@netvark/jsonapi-client';
 import type { AnyResource } from '@netvark/jsonapi-core';
 
 import { QueryClient } from '@tanstack/query-core';
@@ -64,9 +64,10 @@ export interface ArticleObject {
   readonly meta?: { readonly page: { readonly cursor: string } };
 }
 
-/** The clients, the requests they sent, and the cache the tests read through. */
+/** The clients, the transport they send through, the requests sent, and the cache the tests read through. */
 export interface BlogApi {
   readonly clients: Clients<BlogDefinitions>;
+  readonly transport: Transport;
   readonly arrivals: ReadonlyArray<Arrival>;
   readonly queryClient: QueryClient;
 }
@@ -99,7 +100,7 @@ export async function untilAborted({ signal }: Arrival): Promise<Answer> {
   throw new DOMException('This operation was aborted', 'AbortError');
 }
 
-/** The blog's clients over the handler, and a cache that does not retry. */
+/** The blog's clients and their transport over the handler, and a cache that does not retry. */
 export function blogApi(handler: Handler): BlogApi {
   const arrivals: Array<Arrival> = [];
   const transport = createTransport({
@@ -128,6 +129,7 @@ export function blogApi(handler: Handler): BlogApi {
   });
   return {
     clients: createClients(DEFINITIONS, transport),
+    transport,
     arrivals,
     queryClient,
   };
