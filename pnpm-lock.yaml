@@ -989,6 +989,12 @@ importers:
       '@netvark/resource-core':
         specifier: workspace:^
         version: link:../resource-core
+      '@netvark/tanstack-query-jsonapi':
+        specifier: workspace:^
+        version: link:../tanstack-query-jsonapi
+      '@tanstack/query-core':
+        specifier: 'catalog:'
+        version: 5.104.1
       '@tanstack/table-core':
         specifier: 9.2.8
         version: 9.2.8

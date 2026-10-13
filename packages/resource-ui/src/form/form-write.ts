@@ -96,7 +96,7 @@ export function writeOf(
       changed(member, value) ||
       (operation === 'create' && member.meta.required)
     ) {
-      parts[partOf(member)][member.meta.name] = wireOf(member, value);
+      parts[partOf(member.meta)][member.meta.name] = wireOf(member, value);
     }
   }
   const { attributes, relationships } = parts;

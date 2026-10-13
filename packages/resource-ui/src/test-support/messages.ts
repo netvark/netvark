@@ -1,9 +1,10 @@
 /**
  * The unit tests' messages (resource SPEC 20.8): `defaultMessages`' English
  * texts, with every label, every issue kind's message, and the `check`
- * constraint's texts a closure that reads `locale`, so a test switches the language as Paraglide does it, by
- * changing what the message functions read, and never by building other
- * messages. Not published with the package.
+ * constraint's texts a closure that reads `locale`, so a test switches the
+ * language as Paraglide does it, by changing what the message functions
+ * read, and never by building other messages; an action's texts are made the
+ * same way. Not published with the package.
  * @ref https://paraglidejs.com/basics#dynamic-messages
  * @packageDocumentation
  */
@@ -22,13 +23,13 @@ export function setLocale(next: Locale): void {
   locale = next;
 }
 
-/** A label that reads the locale at each call. */
-function text(german: string, english: string): Label {
+/** A text without inputs that reads the locale at each call: a label, or an action's text. */
+export function text(german: string, english: string): Label {
   return () => (locale === 'de' ? german : english);
 }
 
-/** A message that reads the locale at each call. */
-function message<TInputs extends object>(
+/** A message of `TInputs` that reads the locale at each call, as a Paraglide message with inputs does. */
+export function message<TInputs extends object>(
   german: (inputs: TInputs) => string,
   english: (inputs: TInputs) => string,
 ): Message<TInputs> {

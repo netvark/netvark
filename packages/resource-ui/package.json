@@ -1,8 +1,10 @@
 {
   "name": "@netvark/resource-ui",
   "version": "0.0.0",
-  "description": "Forms and lists from @netvark/resource-core declarations, for any framework: labels and options from the application's messages, validation in the server's words, the write a form sends, refusals on their fields, and list state as TanStack Table v9 holds it.",
+  "description": "Forms, lists, and record and bulk actions from @netvark/resource-core declarations, for any framework: labels and options from the application's messages, validation in the server's words, the write a form sends, refusals on their fields, list state as TanStack Table v9 holds it, and actions held to the writes the declaration serves, a selection's sent in one Atomic Operations request.",
   "keywords": [
+    "atomic-operations",
+    "bulk-actions",
     "forms",
     "json-api",
     "jsonapi",
@@ -55,6 +57,8 @@
   "devDependencies": {
     "@netvark/jsonapi-client": "workspace:^",
     "@netvark/resource-core": "workspace:^",
+    "@netvark/tanstack-query-jsonapi": "workspace:^",
+    "@tanstack/query-core": "catalog:",
     "@tanstack/table-core": "9.2.8",
     "zod": "catalog:"
   },
