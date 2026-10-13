@@ -4,8 +4,9 @@
   `@netvark/hono-resource`, `@netvark/resource-ui`, and `@netvark/tanstack-form-resource`;
   `docs/resource/DESIGN.md` explains the why. Each binding adds its sections after the core's when
   its epic starts, from 18 on, so the core's numbering stays stable: `@netvark/kysely-resource`
-  holds 18, `@netvark/hono-resource` 19, and `@netvark/resource-ui` and
-  `@netvark/tanstack-form-resource` 20.
+  holds 18, `@netvark/hono-resource` 19, `@netvark/resource-ui` and
+  `@netvark/tanstack-form-resource` 20, and the record and bulk actions of
+  `@netvark/resource-ui` 21.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source files that implement it and the tests that prove it. When this document and the code
@@ -36,6 +37,7 @@ Contents
 18. The Kysely runtime
 19. Hono routes
 20. Forms and lists
+21. Record and bulk actions
 
 ---
 
@@ -99,6 +101,7 @@ interface DeclareResourceConfig<TCatalog, TCodecs, TValidators, TScopes, TDomain
   readonly domains?: TDomains | undefined; // { domain: { constraint: { validator } } } (3.6)
   readonly links?: ResourceLinksInit | undefined; // @netvark/jsonapi-core
   readonly page?: PageCapabilitiesInit | undefined; // @netvark/jsonapi-core
+  readonly atomic?: AtomicCapabilitiesInit | undefined; // @netvark/jsonapi-core
 }
 ```
 
@@ -134,6 +137,10 @@ type-level check reads.
   and `createDefineKeyset` merge theirs (jsonapi ADR 0015, keyset ADR 0014). A message from those
   rules gains the definer's prefix (`createDeclareResource.links.base must not end with "/"`). They
   live in the module that exports the configured definer, never in module-level state.
+- `atomic` is the cap on one Atomic Operations request (jsonapi SPEC 5.1, jsonapi ADR 0023), checked
+  with jsonapi-core's rule (`atomic.max` a positive safe integer) and set on every declaration's
+  definition. A declaration has no `atomic` of its own: one endpoint serves every resource of a
+  runtime (19.4), and a screen reads the cap from the definition it imports (21.3).
 
 The result is `declareResource(table, declaration)`, typed by the catalog and the registries. Tests:
 `create-declare-resource.test.ts`, `create-declare-resource.test-d.ts`.
@@ -2321,8 +2328,9 @@ resources, after the checks of every list of resources (4.2). The options:
   there (jsonapi SPEC 15.4); its `TypeError`s start with `resourcePaths:`, and with `openapi:` when
   `openapi` reads the paths.
 - **The Atomic Operations endpoint**, `POST <base>/operations`, is listed when a listed resource
-  declares `create`, `update`, or `remove`, as a host serves it (19.4), `<base>` being the path the
-  collections share. Collections under different bases throw `TypeError`
+  declares `create`, `update`, or `remove`, as a host serves it (19.4), at the operations path
+  `resourcePaths` gives (jsonapi SPEC 5.4), `<base>` being the path the collections share.
+  Collections under different bases throw `TypeError`
   (`openapi: the resources' links have different bases (/api, /v2); the operations endpoint sits under one`),
   and so does a collection at the endpoint's path, listed or not, since a host routes every
   collection (19.2):
@@ -2330,21 +2338,21 @@ resources, after the checks of every list of resources (4.2). The options:
   Its operation id and tag are `atomic:operations`, which no other operation takes: a type is a
   member name, which holds no `:`. Its request and its 200 use the extension's media type,
   `application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"` (jsonapi SPEC 11.1). The request
-  is an operations document of 1 to `DEFAULT_MAX_OPERATIONS` (10) operations, the processor's
-  default limit, with top-level `jsonapi`, `links`, `meta`, and `@`-members. Each operation is one
-  of the closed variants the processor runs (jsonapi SPEC 11.2, 11.4): an `add` of
-  `<type>.atomic-add`, without a target or by `href`; an `update` of `<type>.atomic-update` by
-  `ref`, by `href`, or by its data alone; a `remove` by `ref` or by `href`; and, for each
-  `readWrite` relationship of a resource that declares `update`, an `update` by a `ref` that names
-  the relationship or by `href`, with the target's linkage. A `ref` names a resource by `id`, or by
-  `lid` when an `add` can create its type; a variant two resources share, such as a `remove` by
-  `href`, is listed once. The 200 answers `atomic:results`, each result empty or carrying the
-  `<type>.resource` of a resource that declares `create` or `update`, and is listed only when one
-  does; the 204 is listed when a result can be empty, for a `remove` or a relationship's `update`.
-  The error responses list the processor's codes, the document's, `FORBIDDEN` for an operation its
-  resource does not declare, and `NOT_FOUND` for a target that does not exist, with every code of
-  each declared write and `options.codes`. What an `href` names, and whether an earlier `add`
-  defined a `lid`, are the server's to judge.
+  is an operations document of 1 to `atomic.max` operations, the cap the resources' definitions
+  share and the processor enforces (jsonapi SPEC 11.1, jsonapi ADR 0023), with top-level `jsonapi`,
+  `links`, `meta`, and `@`-members. Each operation is one of the closed variants the processor runs
+  (jsonapi SPEC 11.2, 11.4): an `add` of `<type>.atomic-add`, without a target or by `href`; an
+  `update` of `<type>.atomic-update` by `ref`, by `href`, or by its data alone; a `remove` by `ref`
+  or by `href`; and, for each `readWrite` relationship of a resource that declares `update`, an
+  `update` by a `ref` that names the relationship or by `href`, with the target's linkage. A `ref`
+  names a resource by `id`, or by `lid` when an `add` can create its type; a variant two resources
+  share, such as a `remove` by `href`, is listed once. The 200 answers `atomic:results`, each result
+  empty or carrying the `<type>.resource` of a resource that declares `create` or `update`, and is
+  listed only when one does; the 204 is listed when a result can be empty, for a `remove` or a
+  relationship's `update`. The error responses list the processor's codes, the document's,
+  `FORBIDDEN` for an operation its resource does not declare, and `NOT_FOUND` for a target that does
+  not exist, with every code of each declared write and `options.codes`. What an `href` names, and
+  whether an earlier `add` defined a `lid`, are the server's to judge.
 - **Bodies** use `application/vnd.api+json` without parameters, which matches the media type with
   the Cursor Pagination profile a page carries (RFC 9110 media ranges). Documents are those
   `@netvark/jsonapi-core` builds and parses (11.1): a resource document with the includable targets'
@@ -3971,8 +3979,9 @@ linkage the server holds. @ref https://jsonapi.org/format/1.1/#crud-updating-rel
 
 ### 19.4 Atomic Operations: `POST <base>/operations`
 
-Served at `<base>/operations` when a resource of the runtime declares `create`, `update`, or
-`remove`, through `atomicOperations` (jsonapi SPEC 11.1) with:
+Served at the operations path of the resources' links, `<base>/operations` (`resourcePaths`, jsonapi
+SPEC 5.4), when a resource of the runtime declares `create`, `update`, or `remove`, through
+`atomicOperations` (jsonapi SPEC 11.1) with:
 
 - `transaction`: `runtime.transaction(actor, run)`, the actor resolved once for the request, so the
   operations run in one transaction and the hook after commit runs once (12.10);
@@ -3989,7 +3998,10 @@ Served at `<base>/operations` when a resource of the runtime declares `create`, 
   related link among them, is the processor's 400 at `.../href` (jsonapi SPEC 11.4). When the links
   are root-relative, an absolute `href` names nothing, since the resolver does not see the request's
   origin;
-- `maxOperations`: the processor's default.
+- the cap the processor reads from the resources' definitions, their `atomic.max` (jsonapi SPEC
+  11.1, jsonapi ADR 0023), which the definer sets for every declaration (2); definitions that
+  disagree fail `jsonApiRoutes` with the processor's `TypeError` before it serves anything, so a
+  request over the cap a screen reads is the processor's 400 (jsonapi SPEC 11.2).
 
 The runtime's refusals point at `/data...` (12.10), and the endpoint moves each item to the
 operation that failed: `/data...` becomes `/atomic:operations/<index>/data...`, and a relationship
@@ -4120,7 +4132,8 @@ that imports no framework and no TanStack package. `@netvark/tanstack-form-resou
 core, `@tanstack/form-core`, so the form of every TanStack Form adapter takes it (root ADR 0010). A
 table reads the list model's state as TanStack Table v9 holds it, and the reads and writes are the
 jsonapi family's TanStack Query binding (20.6). Every text the model renders comes from the
-application's one messages object, computed when it is asked for (ADR 0014).
+application's one messages object, computed when it is asked for (ADR 0014). The model's record and
+bulk actions are section 21.
 
 ### 20.1 Public surface and module map
 
@@ -4128,7 +4141,9 @@ application's one messages object, computed when it is asked for (ADR 0014).
 @netvark/resource-ui                       the model: no framework, no TanStack
 ├── fieldsOf(resource, messages)           fields/fields-of.ts           field descriptors (20.2)
 ├── resourceForm(resource, operation, o)   form/resource-form.ts         the form model (20.3, 20.4)
-└── resourceList(resource, messages)       list/resource-list.ts         the list model (20.7)
+├── resourceList(resource, messages)       list/resource-list.ts         the list model (20.7)
+├── recordActions(resource, options)       actions/record-actions.ts     a record's actions (21.2)
+└── bulkActions(resource, options)         actions/bulk-actions.ts       a selection's actions (21.3)
 
 @netvark/tanstack-form-resource            TanStack Form, through @tanstack/form-core
 ├── resourceFormOptions(model)             form-options.ts               (20.5)
@@ -4174,8 +4189,9 @@ application's one messages object, computed when it is asked for (ADR 0014).
 Types exported from `@netvark/resource-ui`: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`,
 `FilterKind`, `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`,
 `FormResource`, `FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`,
-`FormErrors`, `ListModel`, `ListResource`, `ListState`, `ListSorting`, `ListColumnFilters`. Types
-exported from `@netvark/tanstack-form-resource`: `BindableForm`, `ResourceFormOptions`.
+`FormErrors`, `ListModel`, `ListResource`, `ListState`, `ListSorting`, `ListColumnFilters`, and the
+actions' types (21.1). Types exported from `@netvark/tanstack-form-resource`: `BindableForm`,
+`ResourceFormOptions`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
@@ -4710,12 +4726,13 @@ operators, and search, `withSearch` as `never` without one, and `@tanstack/table
   `attw --profile esm-only` run in the build.
 - `@netvark/resource-ui` takes `@netvark/resource-core` (the application's declarations and
   messages, which `localizeIssues` recognizes by the copy that made them, 10.1) and
-  `@netvark/jsonapi-client` (the `ResponseError`s `isResponseError` recognizes, and the results a
-  list reads its pages from) as peers, each a `workspace:^` development dependency too, and depends
-  on `@netvark/jsonapi-core`, for `parseQuery`. TanStack Table is not a peer: the list model imports
-  nothing of it and reads and writes its sorting and column filters as plain values;
-  `@tanstack/table-core` 9 is a development dependency, for the type tests that assign Table's state
-  to and from the model's. No framework is a dependency of any kind.
+  `@netvark/jsonapi-client` (the `ResponseError`s `isResponseError` recognizes, the results a list
+  reads its pages from, and `operationsOf` and `operationOf`, with which a bulk action builds a
+  selection's operations and reads their refusals, 21.3) as peers, each a `workspace:^` development
+  dependency too, and depends on `@netvark/jsonapi-core`, for `parseQuery`. TanStack Table is not a
+  peer: the list model imports nothing of it and reads and writes its sorting and column filters as
+  plain values; `@tanstack/table-core` 9 is a development dependency, for the type tests that assign
+  Table's state to and from the model's. No framework is a dependency of any kind.
 - `@netvark/tanstack-form-resource` takes `@netvark/resource-ui` (the application's form models) as
   a peer, a `workspace:^` development dependency too, and `@tanstack/form-core` `^1.17.0` as an
   optional peer (`peerDependenciesMeta`, root ADR 0011), from which it imports `revalidateLogic` and
@@ -4725,3 +4742,217 @@ operators, and search, `withSearch` as `never` without one, and `@tanstack/table
   add form-core at the catalog's release, and `@netvark/resource-core` and `@netvark/jsonapi-client`
   for its tests' declarations and refusals. CI runs its tests on form-core 1.17.0, and a floor that
   fails them is raised in the same change.
+
+## 21. Record and bulk actions (`@netvark/resource-ui`, ADR 0019)
+
+A record's actions in its row and a selection's in a bar, built from the declaration: what each
+writes, whether the person may run it now, the texts it shows, and where a refusal lands. A record
+action makes the client's own call; a bulk action writes the selection in one Atomic Operations
+request (jsonapi SPEC 17), which commits whole or not at all. The models import no framework and no
+TanStack package and hold no state: the screen's mutations hold each request's.
+
+```ts
+const rowActions = recordActions(Contacts, {
+  can: (name) => session.may('contacts', name),
+  actions: {
+    archive: {
+      label: m.contact_archive,
+      update: { attributes: { status: 'archived' } },
+      hidden: (contact) => contact.status === 'archived',
+    },
+    remove: {
+      label: m.contact_remove,
+      tone: 'danger',
+      remove: true,
+      confirm: { title: (contact) => m.contact_remove_title({ name: contact.name }) },
+    },
+  },
+});
+const selectionActions = bulkActions(Contacts, {
+  tooMany: m.selection_too_many, // ({ max }) => string
+  actions: {
+    restore: {
+      label: m.contact_restore,
+      update: { attributes: { status: 'active' } },
+      done: m.contacts_restored, // ({ count }) => string
+    },
+    remove: {
+      label: m.contact_remove,
+      tone: 'danger',
+      remove: true,
+      confirm: { title: m.contacts_remove_title }, // ({ count }) => string
+    },
+  },
+});
+
+// A row: the client's own calls (20.6).
+const update = useMutation(contacts.update());
+const remove = useMutation(contacts.remove());
+const run = (action: RowAction, contact: Contact) =>
+  action.call === 'remove'
+    ? remove.mutateAsync(action.variables(contact))
+    : update.mutateAsync(action.variables(contact));
+
+// The bar: one request for the selection.
+const operations = useMutation(operationsMutation(transport));
+const runOnSelection = (action: SelectionAction, ids: ReadonlyArray<string>) =>
+  operations.mutateAsync(action.operations(ids));
+```
+
+### 21.1 Public surface and module map
+
+```
+@netvark/resource-ui
+├── recordActions(resource, options)   actions/record-actions.ts   a record's actions (21.2)
+└── bulkActions(resource, options)     actions/bulk-actions.ts     a selection's actions (21.3)
+```
+
+| Module                      | Holds                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `actions/action-types.ts`   | the types of both models                                                                                |
+| `actions/action-init.ts`    | reading an action the application describes, and the `TypeError`s of one it got wrong                   |
+| `actions/action-values.ts`  | an update's fixed values held to the declaration: the members the update writes and its write validator |
+| `actions/action-state.ts`   | `state(target)`: whether the action shows, whether it runs, and why not                                 |
+| `actions/action-errors.ts`  | a refusal by field, and a selection's by operation                                                      |
+| `actions/record-actions.ts` | `recordActions`                                                                                         |
+| `actions/bulk-actions.ts`   | `bulkActions`                                                                                           |
+
+Types exported: `RecordActions`, `RecordAction`, `RecordActionInit`, `BulkActions`, `BulkAction`,
+`BulkActionInit`, `ActionTone`, `ActionConfirm`, `ActionState`, `ActionValues`, `ActionRecord`,
+`SelectionErrors`.
+
+### 21.2 Record actions: `recordActions(resource, options)`
+
+| Option    | Meaning                                                                                                                                                                                             |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `actions` | The actions by name, in the order a menu shows them.                                                                                                                                                |
+| `can`     | `(name) => boolean`, whether the person may run the action, as the application knows it; anything but `true` hides it. Without `can`, every action shows: the server authorizes every write (12.2). |
+
+An action, `RecordActionInit`, is one write and its texts:
+
+| Member         | Meaning                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remove: true` | Removes the record; the declaration must declare `remove` (3.3).                                                                                                                                                                                                                                                                                                           |
+| `update`       | `ActionValues`, the fixed values an update writes, `{ attributes?, relationships? }` as the client's `update` takes them (jsonapi SPEC 15.4); the declaration must declare `update`, each member must be one the update writes (9.4), and the values must pass `write.update` (6.2), a relationship's id as its target's identifier, as a form's write converts it (20.3). |
+| `label`        | `() => string`.                                                                                                                                                                                                                                                                                                                                                            |
+| `tone`         | `'neutral'`, the default, or `'danger'`.                                                                                                                                                                                                                                                                                                                                   |
+| `confirm`      | `{ title, body?, confirm? }`: the confirmation's title and body, each `(record) => string`, and its confirming button's label, `() => string`, the action's `label` when absent. Without `confirm` the action runs at once.                                                                                                                                                |
+| `done`         | `(record) => string`, what a screen shows once the write committed.                                                                                                                                                                                                                                                                                                        |
+| `hidden`       | `(record) => boolean`, `true` where the action does not apply to the record.                                                                                                                                                                                                                                                                                               |
+| `disabled`     | `(record) => boolean \| string`, `true` or a reason where the action applies but cannot run now.                                                                                                                                                                                                                                                                           |
+
+Exactly one of `remove` and `update` is given. The record is the client's record of the definition
+(`ActionRecord`, jsonapi SPEC 15.6), as a list reads it; a record read with includes has the members
+it needs. `recordActions` returns `RecordActions`, a frozen record of `RecordAction`s by name, in
+the order of `actions`:
+
+| Member                     | Is                                                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                     | the action's name                                                                                                                                     |
+| `call`                     | `'update'` or `'remove'`, the client call it makes                                                                                                    |
+| `tone`                     | its tone                                                                                                                                              |
+| `label`, `confirm`, `done` | the application's functions as given; `confirm` is `null` without one, its absent `body` and `confirm` are `null`, and so is an absent `done`         |
+| `state(record)`            | `ActionState = { visible, disabled, reason }`, below                                                                                                  |
+| `variables(record)`        | the variables of the mutation `call` names (jsonapi SPEC 16.2): `{ id, ...values }` for `resourceQueries`' `update`, the record's id for its `remove` |
+| `errors(error)`            | `FormErrors` (20.4), the refusal by member, below                                                                                                     |
+
+**State.** `visible` is `false` when `can` returns anything but `true` for the action's name, or
+`hidden(record)` returns `true`; an action that does not show is also `disabled`, without a reason,
+so a screen that shows it anyway cannot run it. Otherwise `disabled(record)` decides: `false` or no
+`disabled` enables it, `true` disables it without a reason, and a string disables it with that
+string as `reason`, for a tooltip. `state` calls the functions each time it is called, so a reason
+renders in the language of that render (ADR 0014).
+
+**The write.** `variables(record)` reads the record's `id` and throws `TypeError` for a record whose
+`id` is not a string. An update's values are the same for every record; the write validator ran over
+them when the model was made.
+
+**Refusals.** `errors(error)` reads a `ResponseError`'s error objects in order (20.4): one at
+`/data/attributes/<name>` or `/data/relationships/<name>`, alone or followed by further segments,
+names `<name>`, and when `<name>` is a member of the resource its text is that member's, the first
+it gets; every other object's text joins `form`, each distinct text once. A row shows every member a
+read returns, so a refusal lands on any of them, not only on what the action writes: a unique
+constraint across `name` and the organization refuses a restore on both. An object's text is its
+`detail`, else its `title`, the server's. Anything but a `ResponseError` gives empty `fields` and
+`form`, as for a form (20.4).
+
+### 21.3 Bulk actions: `bulkActions(resource, options)`
+
+| Option    | Meaning                                                                                            |
+| --------- | -------------------------------------------------------------------------------------------------- |
+| `actions` | The actions by name, as for a record, their texts taking `{ count }`.                              |
+| `tooMany` | `({ max }) => string`, the reason a selection holds more records than one request takes. Required. |
+| `can`     | As for a record.                                                                                   |
+
+An action, `BulkActionInit`, has `remove: true` or `update`, `label`, and `tone` as a record action
+has them, and:
+
+| Member     | Meaning                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| `confirm`  | `{ title, body?, confirm? }`, each `({ count }) => string`, `confirm` the action's `label` when absent. |
+| `done`     | `({ count }) => string`.                                                                                |
+| `disabled` | `(ids) => boolean \| string`, over the selection.                                                       |
+
+A Paraglide message with a `count` variable fills each slot as it stands, and one whose variants
+choose a plural form by `count` words the count in every locale. `bulkActions` returns
+`BulkActions`, a frozen record of `BulkAction`s by name:
+
+| Member                                             | Is                                                                                                                                                                                      |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`, `call`, `tone`, `label`, `confirm`, `done` | as for a record action                                                                                                                                                                  |
+| `max`                                              | the most records one request takes: the definition's `atomic.max` (jsonapi SPEC 5.1, ADR 0023)                                                                                          |
+| `state(ids)`                                       | `ActionState`: hidden by `can` as a record action is; disabled without a reason for an empty selection, with `tooMany({ max })` for one of more than `max` ids, else by `disabled(ids)` |
+| `operations(ids)`                                  | one operation per id, in order, built with `operationsOf(resource.resource)` (jsonapi SPEC 17.1), `update(id, values)` or `remove(id)`: the variables of `operationsMutation` (17.4)    |
+| `errors(error, ids)`                               | `SelectionErrors`, below                                                                                                                                                                |
+
+A selection is the ids of its records, as a table's row selection keyed by `id` holds them (20.7),
+so it survives paging; every member reads ids, never records. `operations(ids)` throws `TypeError`
+for a list that is not of strings, an empty one, one that names an id twice, and one of more than
+`max` ids: `state` reports each of them, so a screen that calls it anyway has ignored the state.
+
+**Refusals.** `SelectionErrors = { records, form }`: `records` maps an id to its `FormErrors`, and
+`form` holds the texts no record holds. `errors(error, ids)` reads each error object of a
+`ResponseError` in order with `operationOf` (jsonapi SPEC 17.3): an object whose operation's index
+is a position of `ids` belongs to the record at that position, and the rest of its pointer places it
+on the record's members as 21.2 places a record action's; every other object's text joins `form`,
+each distinct text once. A refused request commits nothing, so every record of the selection is as
+it was, and a screen marks the rows `records` names. Anything but a `ResponseError` gives empty
+`records` and `form`.
+
+### 21.4 Arguments
+
+Both functions throw `TypeError` before they return for a resource no `declareResource` returned
+(20.1); for `actions` that is not an object of actions; and for an action that gives both writes or
+neither, removes on a declaration without `remove`, updates on one without `update`, sets a member
+the update does not write, or holds values `write.update` refuses, naming each issue's path; for a
+text, `can`, `hidden`, or `disabled` that is not a function, and a `tone` that is neither tone;
+`bulkActions` also for a `tooMany` that is not a function. Messages name the function, the action,
+and the member, never a value (resource AGENTS). The types refuse the same: an action whose write
+the declaration does not serve is `never`, and `update`'s values are typed by the definition's
+update input (jsonapi SPEC 15.4).
+
+### 21.5 Test plan
+
+- Unit tests beside each module, over the fixture of 20.8: `actions/action-init.test.ts` (each
+  action shape, texts held as given, each `TypeError`), `actions/action-values.test.ts` (members the
+  update writes, a relationship by id, values the validator refuses, a CHECK across a field and a
+  relationship that the values leave out), `actions/action-state.test.ts` (`can` and only `true`,
+  `hidden`, `disabled` with and without a reason, a reason in the locale of each call, an empty
+  selection, one over `max`), `actions/action-errors.test.ts` (a record's refusal by member, a
+  selection's by operation index and member, an index outside the selection, an object that names no
+  operation, a `TypeError`, a `ResponseError` from another copy of the client),
+  `actions/record-actions.test.ts` and `actions/bulk-actions.test.ts` (the variables, the operations
+  read back by jsonapi-core's `parseOperationsDocument`, each `TypeError` of `variables` and
+  `operations`), and `actions/actions.test-d.ts` (writes the declaration does not serve as `never`,
+  values typed by the update input, `variables` taken by the mutations of `resourceQueries`, and
+  `operations` by `operationsMutation`'s).
+- End to end, `e2e/resource/react/contact-actions.e2e.test.tsx`: the contacts list with a row menu
+  and a selection bar, built with the React adapters as the screens of 20.8 are, against the server
+  in one process on PGlite and, with `RESOURCE_PG_URL`, PostgreSQL: a removal from a row after its
+  confirmation; an archive from a row; a bulk restore and a bulk removal, each one request that
+  refetches the list; a bulk restore that the index on active names refuses with
+  `CONTACT_NAME_TAKEN`, shown on the record and the members it names, every selected contact still
+  archived; and a selection over the cap refused before anything is sent. The Vue screen (20.8) runs
+  a bulk action through Vue Query.
+- Smoke (`e2e/resource/smoke/ui-checks.ts`): the built package's `bulkActions` builds a selection's
+  operations and maps a refusal, on Bun, Deno, and workerd.

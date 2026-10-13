@@ -27,6 +27,7 @@ Contents
 14. Test plan
 15. The client (`@netvark/jsonapi-client`)
 16. TanStack Query (`@netvark/tanstack-query-jsonapi`)
+17. Atomic Operations from the client
 
 ---
 
@@ -404,10 +405,10 @@ relationship whose `type` is not a member name or whose `cardinality` is not `on
 `serialize` that is not a function; a validator that is not a Standard Schema V1 object (`~standard`
 read with `in`, since zod 4, Valibot, and ArkType expose it as a prototype getter; `version` 1 and a
 `validate` function); a `writable.create` or `writable.update` name that is not a declared field or
-is listed twice. Fills `links`, `query`, `validate`, `clientIds`, and `writable` (each operation
-without a list accepts every field) with defaults. The literal types of `type`, the field names, and
-the sort and filter names are inferred (`const` type parameters) and `NoInfer` keeps names flowing
-from the declarations into `serialize` and `writable`, never the other way.
+is listed twice. Fills `links`, `query`, `validate`, `clientIds`, `writable` (each operation without
+a list accepts every field), and `atomic` with defaults. The literal types of `type`, the field
+names, and the sort and filter names are inferred (`const` type parameters) and `NoInfer` keeps
+names flowing from the declarations into `serialize` and `writable`, never the other way.
 
 Writable fields. `writable: WritableFieldsInit = { create?, update? }` lists, typed as the declared
 names, the fields each operation accepts, so a read-only field (`createdAt`, a counter) or one set
@@ -429,11 +430,19 @@ derived one. `base` MUST be `''`, a path starting with `/`, or an absolute URL (
 link is a URI-reference (`#document-links-link`), so root-relative links are valid; `respond`
 derives the 201 `Location` from `self` (10.2).
 
+Atomic Operations (ADR 0023). `atomic` is `AtomicCapabilitiesInit = { max? }`, resolved to
+`{ max }`: the most operations one request at the definition's base takes (11.1), a positive safe
+integer, `DEFAULT_MAX_OPERATIONS` (10) by default; anything else throws `TypeError` naming
+`atomic.max`. The processor reads it from the definitions it runs (11.1), and a screen reads the
+same value to refuse a selection one request cannot hold (resource SPEC 21).
+
 `createDefineResource(defaults)` (`create-define-resource.ts`) returns a function with
 `defineResource`'s signature (`DefineResource`) that defines every resource with
-`links: { ...defaults.links, ...init.links }`: a member the definition sets, even to `undefined`,
-replaces the default. A default `links.base` the convention rejects throws when the definer is
-created. `ResourceDefaults = { links?: ResourceLinksInit }`.
+`links: { ...defaults.links, ...init.links }` and `atomic: { ...defaults.atomic, ...init.atomic }`:
+a member the definition sets, even to `undefined`, replaces the default. A default `links.base` the
+convention rejects, and a default `atomic.max` that is not a positive safe integer, throw when the
+definer is created.
+`ResourceDefaults = { links?: ResourceLinksInit; atomic?: AtomicCapabilitiesInit }`.
 
 `relatedResource(resource, name)` follows a relationship to its definition and throws when the
 relationship is undeclared, declares no `resource`, or the definition's `type` differs from the
@@ -494,14 +503,16 @@ reads it: TypeScript computes a member's type when it is read.
 links: the resource at `links.self(id)`, built for a marker id of unreserved characters, which
 `encodeURIComponent` keeps, and the marker becomes the template `{id}`; the collection at that path
 without its last segment; and each relationship's `self` and `related` links. It returns
-`ResourcePaths = { origin, collection, resource, relationships }`, `origin` being an absolute link's
-origin and `undefined` for a root-relative one. It throws `TypeError`, starting with `caller`
+`ResourcePaths = { origin, collection, resource, relationships, operations }`, `origin` being an
+absolute link's origin and `undefined` for a root-relative one, and `operations` the collection's
+path without its last segment followed by `/operations`, where a host serves the Atomic Operations
+of the definitions sharing that base (ADR 0023). It throws `TypeError`, starting with `caller`
 (default `resourcePaths`), when `links.self` is absent, a link is neither an absolute URL nor a path
 starting with `/`, a link holds the id other than once or has a query or a fragment, `links.self`
 does not end with the id after the collection's path, or a relationship link has another origin than
 `links.self`. `@netvark/resource-core`'s OpenAPI document (resource SPEC 13.1),
-`@netvark/hono-resource`'s routes (resource SPEC 19.2), and the client (15.4) read paths only
-through it, so the three name the same URLs.
+`@netvark/hono-resource`'s routes (resource SPEC 19.2, 19.4), and the client (15.4, 17.2) read paths
+only through it, so the three name the same URLs.
 
 Tests: `paths.test.ts`.
 
@@ -964,7 +975,7 @@ Types (`types.ts`):
   `{ update?, add?, remove? }` over linkage. Handlers MAY be synchronous (`MaybePromise`).
 - `AnyResourceHandlers` is the erased form the processor stores; its handler members are declared
   through method signatures so typed handlers are assignable (bivariant parameters).
-- `AtomicOptions<TTransaction, TContext> = { resources; transaction(ctx, run); resolveHref?; maxOperations? }`.
+- `AtomicOptions<TTransaction, TContext> = { resources; transaction(ctx, run); resolveHref? }`.
   `transaction` MUST call `run` once and MUST roll back whatever `run` did when it rejects.
 - `OperationsOutcome = { results, document }` and `OperationsProcessor<TContext>` (11.1);
   `OperationsResultDocument` is the `atomic:results` document.
@@ -974,10 +985,11 @@ Types (`types.ts`):
 The core processes; the host (an HTTP adapter) does what needs the request and the response.
 `operationsProcessor(options)` returns
 `OperationsProcessor<TContext> = (body, ctx) => Promise<OperationsOutcome>`; listing a resource type
-twice throws `TypeError` at setup. Per call, in order:
+twice throws `TypeError` at setup, and so do resources whose definitions' `atomic.max` differ (5.1,
+ADR 0023), since one endpoint takes one cap. Per call, in order:
 
-1. `parseOperationsDocument(body, { maxOperations, resolveHref })` (11.2), `maxOperations`
-   defaulting to 10.
+1. `parseOperationsDocument(body, { maxOperations, resolveHref })` (11.2), `maxOperations` the
+   `atomic.max` the resources' definitions share, `DEFAULT_MAX_OPERATIONS` when there are none.
 2. `options.transaction(ctx, run)`; `run` executes every operation in document order (11.4) with one
    `Lids` registry (11.3) and `OperationContext = { ctx, tx, index, pointer, meta }`. A `BanError`
    from an operation is rebuilt by `errorAtOperation(error, pointer)` with the operation's pointer
@@ -1117,7 +1129,7 @@ of `dist`, `CHANGELOG.md`, `LICENSE`, `README.md`, `engines.node >= 22.12.0`, an
 | `CURSOR_PAGE_MEMBERS`                 | `size`, `after`, `before`                                                                    | no       |
 | `DEFAULT_PAGE_SIZE`                   | 20                                                                                           | no       |
 | `DEFAULT_MAX_PAGE_SIZE`               | 100                                                                                          | no       |
-| `DEFAULT_MAX_OPERATIONS`              | 10, the processor's default `maxOperations` (11.1)                                           | `atomic` |
+| `DEFAULT_MAX_OPERATIONS`              | 10, a definition's `atomic.max` when it gives none (5.1, 11.1)                               | `atomic` |
 
 ---
 
@@ -1198,9 +1210,9 @@ so the same build runs in browsers, workers, Node, Bun, and Deno. The client rea
 
 ### 15.1 Surface and module map
 
-| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Identifier`, `IdentifierObject`, `RecordMembers`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `ResponseErrorInit`, `ResponseErrorHeaders`, `PageCursors` |
+| Subpath                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@netvark/jsonapi-client` | Values: `createTransport`, `createClients`, `serializeQuery`, `deserialize`, `ResponseError`, `isResponseError`, `pageCursors`, `cursorOf`, `operationsOf`, `sendOperations`, `operationOf`; types: `Transport`, `TransportOptions`, `CallOptions`, `Clients`, `ResourceClient`, `RecordOf`, `AnyRecord`, `Identifier`, `IdentifierObject`, `RecordMembers`, `Query`, `ListQuery`, `GetQuery`, `FieldsInput`, `FilterInput`, `TypedFilterInput`, `WideFilterInput`, `Conditions`, `Condition`, `FilterValue`, `FilterValues`, `PageInput`, `CustomValues`, `CreateInput`, `UpdateInput`, `LinkageInput`, `ReadResult`, `WriteResult`, `Deserialized`, `DeserializeOptions`, `ResponseErrorInit`, `ResponseErrorHeaders`, `PageCursors`, `Operation`, `OperationBuilders`, `CreateOperationInput`, `UpdateOperationInput`, `LocalIdentifier`, `OperationsResult`, `OperationResult`, `OperationPointer` |
 
 ```
 packages/jsonapi-client/src/
@@ -1232,6 +1244,12 @@ packages/jsonapi-client/src/
     results.ts                 the results the calls read, each held to the call's shape (15.4)
     follow.ts                  next() and prev() (15.8)
   pagination/cursors.ts        pageCursors(), cursorOf() (15.8)
+  operations/
+    types.ts                   Operation, the builders' inputs, and the results (17)
+    operations-of.ts           operationsOf(): the operations of one definition (17.1)
+    send-operations.ts         sendOperations(): one request for every operation (17.2)
+    operation-results.ts       the results, each held to its operation's shape (17.2)
+    operation-of.ts            operationOf(): the operation an error object points at (17.3)
 ```
 
 ### 15.2 `createTransport(options)` (`transport.ts`, `origin.ts`)
@@ -1264,11 +1282,12 @@ object the clients send through.
   `Content-Type: application/vnd.api+json` and the document as `JSON.stringify` writes it, so a
   member set to `undefined` is left out and an attribute a create leaves out keeps the server's
   default (`#content-negotiation-all`: "Clients and servers MUST send all JSON:API payloads using
-  the JSON:API media type in the Content-Type header"). Neither carries `ext` or `profile`: the
-  client applies no extension, and the Cursor Pagination profile needs no request parameter (8.1).
-  The bare media type in `Accept` is also what a JSON:API 1.0 server requires. A request without a
-  document carries no `Content-Type`, which would make a cross-origin `GET` preflighted (Fetch,
-  CORS-safelisted request headers).
+  the JSON:API media type in the Content-Type header"). Neither carries `profile`, since the Cursor
+  Pagination profile needs no request parameter (8.1), and neither carries `ext` but an Atomic
+  Operations request, which applies the extension and names it on both (17.2). The bare media type
+  in `Accept` is also what a JSON:API 1.0 server requires. A request without a document carries no
+  `Content-Type`, which would make a cross-origin `GET` preflighted (Fetch, CORS-safelisted request
+  headers).
 - Each call takes `CallOptions = { signal?, headers? }`; `headers` are applied after the transport's
   `headers` and `language`, so a call may set its own `Accept-Language`, and before the client's
   own. A `Content-Type` either set is removed from a request without a document.
@@ -1277,8 +1296,9 @@ object the clients send through.
   realm's or library's response works.
 - A 2xx response other than 204 is read as a document when its `Content-Type` is the JSON:API media
   type, parameters other than `ext` and `profile` ignored (`#content-negotiation-clients`), and its
-  body is a JSON object with `data`, `errors`, or `meta` (`#document-top-level`). A 204 has no
-  document, and a 202 has one only when its response is one. Any other 2xx is a `TypeError`
+  body is a JSON object with `data`, `errors`, or `meta`, or, answering a request that applies an
+  extension, a member the extension defines (`#document-top-level`). A 204 has no document, and a
+  202 has one only when its response is one. Any other 2xx is a `TypeError`
   (`<type> <call> answered <status> without a JSON:API document`), never quoting the body: the
   server broke the protocol, which no application handles.
 - Any other status is a `ResponseError` (15.7). Redirects are fetch's (`redirect: 'follow'`); a
@@ -1526,9 +1546,9 @@ const remove = useMutation(contacts.remove({ invalidates: [meetings.all] }));
 
 ### 16.1 Surface and module map
 
-| Subpath                           | Exports                                                                                                                                                                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/tanstack-query-jsonapi` | Values: `resourceQueries`; types: `ResourceQueries`, `ReadOptions`, `PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`, `PageParam`, `KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey` |
+| Subpath                           | Exports                                                                                                                                                                                                                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/tanstack-query-jsonapi` | Values: `resourceQueries`, `operationsMutation`; types: `ResourceQueries`, `OperationsOptions`, `ReadOptions`, `PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`, `PageParam`, `KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey` |
 
 ```
 packages/tanstack-query-jsonapi/src/
@@ -1537,6 +1557,7 @@ packages/tanstack-query-jsonapi/src/
   pages.ts                     an infinite list's page parameters, from the query's cursors and the pages' links (16.3)
   query-types.ts               the options' types, holding only the members resourceQueries sets (16.5)
   queries.ts                   resourceQueries(), and the TypeErrors of an argument that is not a client (16.2 to 16.6)
+  operations.ts                operationsMutation(): one Atomic Operations request as mutation options (17.4)
 ```
 
 ### 16.2 Keys
@@ -1652,3 +1673,148 @@ that settle once the reads shown have refetched, and a refused write that leaves
 was. `e2e/jsonapi/smoke/query-checks.ts` reads and writes the blog in-process through a
 `QueryClient` on Bun, Deno, and workerd, where server rendering prefetches. The resource family
 drives it against a database (resource SPEC 20.8).
+
+## 17. Atomic Operations from the client (`@netvark/jsonapi-client`, `@netvark/tanstack-query-jsonapi`, ADR 0022, ADR 0023)
+
+A client sends several writes as one request through the Atomic Operations extension, which commits
+them all or none (11). Each operation is a value built from a definition, so a model that holds the
+definition builds them without a client; one call sends them through the transport, and the query
+binding gives that call as mutation options.
+
+```ts
+const contacts = operationsOf(Contacts);
+const meetings = operationsOf(Meetings);
+const { results } = await sendOperations(transport, [
+  contacts.create({ lid: 'ada', attributes: { name: 'Ada' } }),
+  meetings.create({
+    attributes: { title: 'Intro' },
+    relationships: { contact: { type: 'contacts', lid: 'ada' } },
+  }),
+  contacts.update(archivedId, { attributes: { status: 'active' } }),
+  contacts.remove(oldId),
+]);
+results[0].data; // the created contact's record, or undefined
+```
+
+### 17.1 `operationsOf(definition)` (`operations/operations-of.ts`)
+
+`operationsOf(definition)` returns `OperationBuilders<TDefinition>`, a builder per write of the
+resource client (15.4), each taking what the call of its name takes and returning an `Operation`
+instead of sending:
+
+| Builder                                     | `op`     | `ref`                              | `data`                                                                                                         |
+| ------------------------------------------- | -------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `create(input)`                             | `add`    | none                               | `{ type, id?, lid?, attributes?, relationships? }`, the resource object `create` sends, with the input's `lid` |
+| `update(id, input)`                         | `update` | none                               | `{ type, id, attributes?, relationships? }`, the resource object `update` sends                                |
+| `remove(id)`                                | `remove` | `{ type, id }`                     | none                                                                                                           |
+| `setRelationship(id, name, linkage)`        | `update` | `{ type, id, relationship: name }` | the linkage `setRelationship` sends                                                                            |
+| `addToRelationship(id, name, linkage)`      | `add`    | `{ type, id, relationship: name }` | the identifiers `addToRelationship` sends                                                                      |
+| `removeFromRelationship(id, name, linkage)` | `remove` | `{ type, id, relationship: name }` | the identifiers `removeFromRelationship` sends                                                                 |
+
+- An `Operation<TDefinition, TData>` is a frozen object: `definition`, the definition it writes,
+  `op`, `ref`, and `data`, the last two `undefined` where the table gives none, and `'~data'`, which
+  is type-only and always absent, as a definition's `'~types'` is (5.3): the data its result holds.
+  The extension's operation object is `{ op, ref, data }` with the absent members left out; an
+  update names its target by `data`'s `type` and `id`, as the extension's own example does.
+- A relationship value is what the call takes, an id, an identifier, `null`, or a list (15.4), or
+  `{ type, lid }`, a `LocalIdentifier` naming a resource an earlier operation of the request creates
+  with that `lid`; it is sent as it is. `create` takes `lid` beside `id`. A target is an id: a
+  resource the request creates is created with its relationships, so targeting it by its `lid` adds
+  nothing (ADR 0022).
+- A relationship the definition does not declare throws `TypeError` naming it, as the call does;
+  nothing else is checked, since the server answers it in one 400 (11.2, 11.4).
+- Types: `CreateOperationInput` and `UpdateOperationInput` are `CreateInput` and `UpdateInput`
+  (15.4) with relationship values that may be `LocalIdentifier`s, `create`'s with `lid`; the
+  relationship builders take the names the calls take. `TData` is the record of the definition
+  without a query (`RecordOf`, 15.6) for `create` and `update`, and `undefined` for the rest.
+
+### 17.2 `sendOperations(transport, operations, options?)` (`operations/send-operations.ts`, `operations/operation-results.ts`)
+
+In order, before anything is sent:
+
+1. `transport` must be one `createTransport` made, as for `createClients` (15.2).
+2. `operations` must be a non-empty list of `Operation`s, each with a `definition` that has a string
+   `type` and an `op` of the extension's; anything else throws `TypeError` naming the index, never a
+   value.
+3. Every operation's definition must name one operations path,
+   `resourcePaths(definition, { caller: 'sendOperations' }).operations` (5.4, ADR 0023); otherwise
+   `TypeError`, since one request reaches one endpoint. The cap is not counted: the server answers a
+   request over it with its 400 (11.2), and the definitions carry it for the screens (5.1).
+
+Then one `POST <operations path>` through the transport, as 15.3 sends a document, with the document
+`{ 'atomic:operations': [...] }`, each operation's object in order, and with `Content-Type` and
+`Accept` both `application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"`: a client that
+applies an extension "MUST specify the `ext` media type parameter in the `Content-Type` header", and
+the results are the extension's member, so the request requires the server to apply it
+(`#content-negotiation-clients`). `options` are the call's `CallOptions` (15.3).
+
+It resolves to `OperationsResult<TOperations> = { status, results, links, meta, jsonapi }`:
+
+- A `200` holds a document with `atomic:results`, a list with one result object per operation; a
+  document "MUST contain at least one of" `data`, `errors`, `meta`, or "a member defined by an
+  applied extension" (`#document-top-level`), so a results document holds no `data`. Each result is
+  `OperationResult<TData> = { data, meta }`: `meta` when it is an object; `data` the record of the
+  operation's definition (15.6, no include, since a results document holds none) for an `add` or an
+  `update` without `ref.relationship` whose result holds a resource object, and `undefined` when the
+  result holds no `data`. The document's `links`, `meta`, and `jsonapi` are read as 15.6 reads them.
+- A `204` holds no document: every result is `{ data: undefined, meta: undefined }`, since the
+  extension allows it only "if all results are empty".
+- Any other 2xx, a `200` without `atomic:results` or with a list of another length, and a result
+  whose `data` its operation cannot hold (a list, `null`, or any `data` on a removal or a
+  relationship operation, whose results "MUST NOT contain data") throw `TypeError`
+  (`<types> operations answered <status> ...`), never quoting the document.
+- Any other status rejects with `ResponseError` (15.7), `type` the operations' types in order of
+  first appearance joined with `, `, `call` `operations`.
+
+`results` is typed per operation: a tuple of operations, as a literal list passed to the call is (a
+`const` type parameter), gives a tuple of results, and a list type a list of them.
+
+### 17.3 Refusals: `operationOf(errorObject)` (`operations/operation-of.ts`)
+
+A server points an error at the operation that failed (11.1; the extension: errors SHOULD carry a
+`source.pointer` to "the source of the problem in the request document"). `operationOf(error)` takes
+an error object of a `ResponseError` and returns `OperationPointer = { index, pointer }` when its
+`source.pointer` is `/atomic:operations/<index>` alone or followed by `/` and further segments:
+`index` the operation's position in the request, an RFC 6901 array index (`0` or a digit `1` to `9`
+followed by digits), and `pointer` the rest, `''` for the operation itself, so
+`/data/attributes/email` names what a single call's refusal names (resource SPEC 20.4). Any other
+object gives `undefined`. An index past the request's operations is returned as it is; a caller that
+maps it to what it sent holds the list.
+
+### 17.4 The mutation: `operationsMutation(transport, settings?)` (`@netvark/tanstack-query-jsonapi`, `operations.ts`)
+
+```ts
+const operations = operationsMutation(transport);
+const bulk = useMutation(operations);
+await bulk.mutateAsync(
+  ids.map((id) => contacts.update(id, { attributes: { status: 'archived' } })),
+);
+```
+
+`OperationsOptions<TOperation>` holds `mutationKey: ['operations']`, a `mutationFn` that calls
+`sendOperations(transport, operations)`, and an `onSuccess` that, through the `QueryClient` TanStack
+Query passes it, first removes the `get` entries of every record a removal removed (an operation
+whose `op` is `remove` and whose `ref` names no relationship: `[type, 'get', id]`, 16.2), then
+invalidates `[type]` for every type the operations write and each key `settings.invalidates` names,
+and returns that promise, so the mutation stays pending until the reads a screen shows have
+refetched, as the single writes do (16.4). A refused request invalidates nothing. `TOperation` is
+`Operation` by default, so the variables are any list of operations and each result's data is
+`unknown`; an application narrows it with a type argument. The types hold only the members it sets
+(ADR 0020). It throws `TypeError` for `invalidates` that is not a list of query keys, as the single
+writes do (16.6); a transport `createTransport` did not make is refused by the first mutation, with
+`sendOperations`' `TypeError`.
+
+### 17.5 Tests
+
+`@netvark/jsonapi-client`: `operations-of.test.ts` (each builder's operation, read back by
+jsonapi-core's own `parseOperationsDocument`, a `lid` and a `LocalIdentifier`, an undeclared
+relationship), `send-operations.test.ts` (the request and its headers, each `TypeError` before
+sending, a 200 typed per operation, a 204, each result shape refused, a refusal's `ResponseError`)
+through a fetch double, `operation-of.test.ts`, and `operations.test-d.ts` (inputs and results typed
+by the definitions, a tuple of results for a tuple of operations); end to end,
+`e2e/jsonapi/client-operations.e2e.test.ts` sends operations to the blog's endpoint over HTTP with
+the built client: a create linked by its `lid`, a `204`, and a refusal pointing at its operation,
+nothing committed. `@netvark/tanstack-query-jsonapi`: `operations.test.ts` through a `QueryClient`
+and a `MutationObserver` (pending until the reads shown have refetched, the removed records' entries
+removed first, every written type invalidated, `invalidates`, a refused request), and the adapters'
+type checks of 16.7. The resource family drives both against a database (resource SPEC 21).
