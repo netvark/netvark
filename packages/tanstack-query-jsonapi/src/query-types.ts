@@ -1,12 +1,13 @@
 /**
- * What `resourceQueries` returns (SPEC 16.5): plain objects typed with
- * `@tanstack/query-core` alone, holding only the members the binding sets
- * (ADR 0020), so every adapter's hooks and `QueryClient` methods take them
- * as they are and infer their data. A read's key tags its data through
- * `DataTag`, so `queryClient.getQueryData(key)` is typed. A read's records
- * are the client's `RecordOf` for the query passed (SPEC 15.6), a literal
- * query read as a constant, as the client reads it; a write's variables
- * are what the client's call takes.
+ * What `resourceQueries` and `operationsMutation` return (SPEC 16.5, 17.4):
+ * plain objects typed with `@tanstack/query-core` alone, holding only the
+ * members the binding sets (ADR 0020), so every adapter's hooks and
+ * `QueryClient` methods take them as they are and infer their data. A read's
+ * key tags its data through `DataTag`, so `queryClient.getQueryData(key)` is
+ * typed. A read's records are the client's `RecordOf` for the query passed
+ * (SPEC 15.6), a literal query read as a constant, as the client reads it; a
+ * write's variables are what the client's call takes, and the operations'
+ * are the operations.
  * @ref https://tanstack.com/query/v5/docs/framework/react/typescript#typing-query-options
  * @ref https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions
  * @packageDocumentation
@@ -27,6 +28,8 @@ import type {
   CreateInput,
   GetQuery,
   ListQuery,
+  Operation,
+  OperationsResult,
   ReadResult,
   RecordOf,
   UpdateInput,
@@ -78,6 +81,18 @@ export interface WriteOptions<TData, TVariables> {
     context: MutationFunctionContext,
   ) => Promise<void>;
 }
+
+/**
+ * What `operationsMutation` returns (SPEC 17.4): a write's options whose
+ * variables are the operations `operationsOf` builds and whose data is
+ * their results. `TOperation` is any operation by default, so each
+ * result's data is `unknown`; a type argument narrows it.
+ */
+export type OperationsOptions<TOperation extends Operation = Operation> =
+  WriteOptions<
+    OperationsResult<ReadonlyArray<TOperation>>,
+    ReadonlyArray<TOperation>
+  >;
 
 /** A page of records, as the client's `list` of `TQuery` resolves to it. */
 export type ListResult<TDefinitions, TDefinition, TQuery> = ReadResult<

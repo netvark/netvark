@@ -1560,6 +1560,7 @@ packages/tanstack-query-jsonapi/src/
   pages.ts                     an infinite list's page parameters, from the query's cursors and the pages' links (16.3)
   query-types.ts               the options' types, holding only the members resourceQueries sets (16.5)
   queries.ts                   resourceQueries(), and the TypeErrors of an argument that is not a client (16.2 to 16.6)
+  invalidation.ts              the keys a write's invalidates adds, and the invalidation of every key together (16.4, 17.4)
   operations.ts                operationsMutation(): one Atomic Operations request as mutation options (17.4)
 ```
 
@@ -1632,12 +1633,13 @@ handed tagged: a Vue application spreads the pages options instead.
 
 `resourceQueries` throws `TypeError` for a value `createClients` did not return (one without
 `definition` and the calls), and a write for `invalidates` that is not a list of query keys, such as
-one key passed alone. Messages name the function and the definition's type, never a value.
+one key passed alone. Messages name the function, and the definition's type where they concern one,
+never a value.
 
-@ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys @ref
-https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions @ref
-https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations @ref
-https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-side-effects
+- @ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys
+- @ref https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions
+- @ref https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
+- @ref https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-side-effects
 
 ### 16.7 Packaging and tests
 
@@ -1823,7 +1825,13 @@ the server received it, a `204`, a refusal at an operation and at a member of on
 committed, a request over the cap refused by the server, and the `TypeError`s before sending,
 nothing sent; `e2e/jsonapi/smoke/client-checks.ts` sends operations linked by a `lid` and a refusal
 at its index in-process on Bun, Deno, and workerd (14.2). `@netvark/tanstack-query-jsonapi`:
-`operations.test.ts` through a `QueryClient` and a `MutationObserver` (pending until the reads shown
-have refetched, the removed records' entries removed first, every written type invalidated,
-`invalidates`, a refused request), and the adapters' type checks of 16.7. The resource family drives
-both against a database (resource SPEC 21).
+`operations.test.ts` through a `QueryClient` and a `MutationObserver` (one request for every
+operation, pending until the reads shown of each type written have refetched, the removed records'
+entries removed first and a relationship's removal keeping its record's, `invalidates`, a refused
+request, the `TypeError`s) and `operations.test-d.ts` (any list of operations and `unknown` data by
+default, narrowed by a type argument); the adapters' type checks of 16.7 pass `operationsMutation`
+to each adapter's mutation hook; `e2e/jsonapi/query/operations-cache.e2e.test.ts` runs it over HTTP
+against the blog (a person and an article linked to them by a `lid`, with a removal, settling once
+the reads shown have refetched, and a refused request leaving the cache and the store as they were);
+and `e2e/jsonapi/smoke/query-checks.ts` runs it in-process on Bun, Deno, and workerd. The resource
+family drives both against a database (resource SPEC 21).

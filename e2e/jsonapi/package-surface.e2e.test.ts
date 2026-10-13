@@ -168,6 +168,6 @@ describe('@netvark/jsonapi-client surface', () => {
 
 describe('@netvark/tanstack-query-jsonapi surface', () => {
   it('the root exports the SPEC section 16.1 values', () => {
-    expect(names(query)).toEqual(['resourceQueries']);
+    expect(names(query)).toEqual(['operationsMutation', 'resourceQueries']);
   });
 });
