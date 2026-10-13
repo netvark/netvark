@@ -21,20 +21,12 @@ import {
   TASK,
   postOperations,
   refusal,
+  rename,
   seeded,
   titles,
 } from './test-support/operations';
 
 const SEEDED_TITLES = { [TASK]: 'Boot', [CHILD]: 'Wire', [OTHER]: 'Theirs' };
-
-/** An `update` of task `id`'s attributes. */
-function rename(id: string, title: string) {
-  return {
-    op: 'update',
-    ref: { type: 'tasks', id },
-    data: { type: 'tasks', id, attributes: { title } },
-  };
-}
 
 describe('POST /api/operations (resource SPEC 19.4)', () => {
   it('runs every operation in one transaction as the actor, and answers their results', async () => {

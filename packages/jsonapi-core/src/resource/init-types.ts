@@ -8,6 +8,7 @@ import type {
   InferStandardOutput,
   StandardSchema,
 } from '../internal/standard-schema-types';
+import type { AtomicCapabilitiesInit } from './atomic-capabilities';
 import type { Empty, InferredTypes, MemberOf } from './client-types';
 import type { ResourceLinksInit } from './links';
 import type {
@@ -81,6 +82,8 @@ export interface ResourceDefinitionInit<
   readonly writable?: TWritable | undefined;
   /** Accept client-generated ids on create; default false (403). */
   readonly clientIds?: TClientIds | undefined;
+  /** The most operations one Atomic Operations request at the definition's base takes; default 10. */
+  readonly atomic?: AtomicCapabilitiesInit | undefined;
 }
 
 /**

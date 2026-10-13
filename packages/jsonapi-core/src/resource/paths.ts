@@ -1,14 +1,16 @@
 /**
  * The paths of a resource's operations (SPEC 5.4), read from its links:
  * the resource at `links.self(id)`, the collection at that path without
- * its last segment, and each relationship's `self` and `related` links. A
- * link is built for a marker id of unreserved characters, which
- * `encodeURIComponent` keeps, and the marker becomes the template `{id}`.
- * An absolute link splits into its origin and its path. The OpenAPI
- * document of `@netvark/resource-core`, the routes of
+ * its last segment, each relationship's `self` and `related` links, and
+ * the Atomic Operations endpoint at the collection's parent followed by
+ * `/operations` (ADR 0023). A link is built for a marker id of unreserved
+ * characters, which `encodeURIComponent` keeps, and the marker becomes the
+ * template `{id}`. An absolute link splits into its origin and its path.
+ * The OpenAPI document of `@netvark/resource-core`, the routes of
  * `@netvark/hono-resource`, and `@netvark/jsonapi-client` read paths only
  * through it, so all three name the same URLs (ADR 0017).
  * @ref https://jsonapi.org/recommendations/#urls
+ * @ref https://jsonapi.org/ext/atomic/#processing (the extension's examples post to `/operations`)
  * @ref https://spec.openapis.org/oas/v3.1.2.html#path-templating
  * @packageDocumentation
  */
@@ -25,10 +27,14 @@ export interface ResourcePaths {
     string,
     { readonly self?: string; readonly related?: string }
   >;
+  /** The Atomic Operations endpoint of the definitions under the collection's base. */
+  readonly operations: string;
 }
 
 const MARKER = 'netvark-resource-id';
 const TEMPLATE = '{id}';
+/** Where the Atomic Operations endpoint sits under a base. */
+const OPERATIONS_SEGMENT = '/operations';
 /** A base for parsing a root-relative link; never part of a result. */
 const PLACEHOLDER = 'http://placeholder.invalid';
 
@@ -120,10 +126,12 @@ export function resourcePaths(
       ] as const;
     }),
   );
+  const collection = self.path.slice(0, -suffix.length);
   return {
     origin: self.origin,
-    collection: self.path.slice(0, -suffix.length),
+    collection,
     resource: self.path,
     relationships,
+    operations: `${collection.slice(0, collection.lastIndexOf('/'))}${OPERATIONS_SEGMENT}`,
   };
 }

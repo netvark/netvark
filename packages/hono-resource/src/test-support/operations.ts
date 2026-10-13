@@ -5,6 +5,8 @@
  */
 import type { Hono } from 'hono';
 
+import type { DeclaredResource } from '@netvark/resource-core';
+
 import type { TestEnv } from './app';
 import type { MemoryRuntime } from './memory-runtime';
 
@@ -20,9 +22,11 @@ export const CHILD = '2d7c4f6a-8b2e-4b5a-9c3d-4e5f6a7b8c9d';
 export const OTHER = '1c6b3e5f-7a1d-4a4f-8b2c-3d4e5f6a7b8c';
 export const MISSING = '9f9f9f9f-9f9f-4f9f-8f9f-9f9f9f9f9f9f';
 
-/** The runtime over the seeded rows. */
-export function seeded(): MemoryRuntime {
-  return memoryRuntime(RESOURCES, {
+/** The runtime of `resources` over the seeded rows. */
+export function seeded(
+  resources: ReadonlyArray<DeclaredResource> = RESOURCES,
+): MemoryRuntime {
+  return memoryRuntime(resources, {
     workspaces: [
       { id: '1', name: 'One' },
       { id: '2', name: 'Two' },
@@ -50,6 +54,18 @@ export async function postOperations(
     },
     body: JSON.stringify({ 'atomic:operations': operations }),
   });
+}
+
+/** An `update` of task `id`'s attributes. */
+export function rename(
+  id: string,
+  title: string,
+): Readonly<Record<string, unknown>> {
+  return {
+    op: 'update',
+    ref: { type: 'tasks', id },
+    data: { type: 'tasks', id, attributes: { title } },
+  };
 }
 
 /** The status of `response`, and each error object's code and pointer. */

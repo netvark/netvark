@@ -11,6 +11,7 @@ import type {
   Meta,
   ResourceIdentifier,
 } from '../document/types';
+import type { AtomicCapabilities } from './atomic-capabilities';
 import type { ResourceTypes } from './client-types';
 import type { ResourceLinks } from './links';
 import type { ResourceValidators, WritableFields } from './write-types';
@@ -167,6 +168,8 @@ export interface ResourceDefinition<
   readonly validate: ResourceValidators<TCreate, TUpdate>;
   readonly writable: WritableFields;
   readonly clientIds: boolean;
+  /** The most operations one Atomic Operations request at the definition's base takes (SPEC 5.1). */
+  readonly atomic: AtomicCapabilities;
   /** Type-only, always absent at runtime: what a client reads and writes (SPEC 5.3). */
   readonly '~types'?: TTypes | undefined;
 }

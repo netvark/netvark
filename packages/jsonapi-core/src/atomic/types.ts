@@ -200,6 +200,4 @@ export interface AtomicOptions<TTransaction, TContext = unknown> {
   readonly resolveHref?:
     | ((href: string) => OperationTarget | undefined)
     | undefined;
-  /** Upper bound on operations per request. Default 10. */
-  readonly maxOperations?: number | undefined;
 }

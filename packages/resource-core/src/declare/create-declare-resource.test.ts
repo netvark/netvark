@@ -1,3 +1,5 @@
+import type { UntypedDeclare } from '../test-support/catalog-builder';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -58,6 +60,7 @@ describe('createDeclareResource: the catalog (SPEC 2)', () => {
       'domains',
       'links',
       'page',
+      'atomic',
     ]) {
       expect(failure({ ...valid, [name]: null })).toBe(
         `createDeclareResource.${name}: must be an object, received null`,
@@ -222,7 +225,7 @@ describe('createDeclareResource: the registries (SPEC 2, 3.6)', () => {
   });
 });
 
-describe('createDeclareResource: links and page (SPEC 2)', () => {
+describe('createDeclareResource: links, page, and atomic (SPEC 2)', () => {
   it('checks links.base by the jsonapi-core convention', () => {
     expect(failure({ ...valid, links: { base: '/api/' } })).toBe(
       'createDeclareResource.links.base must not end with "/"',
@@ -248,5 +251,29 @@ describe('createDeclareResource: links and page (SPEC 2)', () => {
     expect(failure({ ...valid, page: { range: 'yes' } })).toBe(
       'createDeclareResource.page.range: must be a boolean, received "yes"',
     );
+  });
+
+  it('sets its Atomic Operations cap on every declaration, checked by the jsonapi-core rule', () => {
+    const declaration = { operations: ['remove'], fields: {} };
+    const capped = configure({
+      ...valid,
+      atomic: { max: 50 },
+    }) as UntypedDeclare;
+    expect(capped('teams', declaration).resource.atomic).toEqual({ max: 50 });
+    const byDefault = configure(valid) as UntypedDeclare;
+    expect(byDefault('teams', declaration).resource.atomic).toEqual({
+      max: 10,
+    });
+    expect(failure({ ...valid, atomic: { max: 0 } })).toBe(
+      'createDeclareResource.atomic.max must be a positive safe integer, received 0',
+    );
+    expect(failure({ ...valid, atomic: { size: 10 } })).toBe(
+      'createDeclareResource.atomic: unknown member "size"',
+    );
+    expect(
+      typeErrorOf(() =>
+        capped('teams', { ...declaration, atomic: { max: 5 } }),
+      ),
+    ).toBe('teams: unknown member "atomic"');
   });
 });

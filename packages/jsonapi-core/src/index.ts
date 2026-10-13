@@ -118,14 +118,20 @@ export type {
   ResourceTypes,
   TypesOf,
 } from './resource/client-types';
-export type { DefineResource } from './resource/create-define-resource';
+export type {
+  AtomicCapabilities,
+  AtomicCapabilitiesInit,
+} from './resource/atomic-capabilities';
+export type {
+  DefineResource,
+  ResourceDefaults,
+} from './resource/create-define-resource';
 export type {
   DefinitionOf,
   ResourceDefinitionInit,
 } from './resource/init-types';
 export type {
   RelationshipLinks,
-  ResourceDefaults,
   ResourceLinks,
   ResourceLinksInit,
 } from './resource/links';

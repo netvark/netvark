@@ -47,12 +47,6 @@ export interface ResourceLinksInit extends ResourceLinks {
   readonly base?: string | undefined;
 }
 
-/** What a configured `defineResource` applies to every definition. */
-export interface ResourceDefaults {
-  /** Merged under each definition's own `links`, member by member. */
-  readonly links?: ResourceLinksInit | undefined;
-}
-
 /** A scheme followed by `//`: an absolute URL with an authority. */
 const ABSOLUTE_URL_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//u;
 

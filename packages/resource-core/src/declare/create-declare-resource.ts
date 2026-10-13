@@ -7,6 +7,7 @@
  */
 import type { PublicCatalog } from '@netvark/catalog-core';
 import type {
+  AtomicCapabilitiesInit,
   PageCapabilitiesInit,
   ResourceLinksInit,
 } from '@netvark/jsonapi-core';
@@ -59,6 +60,12 @@ export interface DeclareResourceConfig<
   readonly links?: ResourceLinksInit | undefined;
   /** Merged under every declaration's `page`, member by member. */
   readonly page?: PageCapabilitiesInit | undefined;
+  /**
+   * Every declaration's cap on one Atomic Operations request, 10
+   * operations by default (`@netvark/jsonapi-core`); one endpoint serves
+   * every resource of a runtime, so no declaration has its own.
+   */
+  readonly atomic?: AtomicCapabilitiesInit | undefined;
 }
 
 /**

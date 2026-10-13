@@ -232,6 +232,16 @@ const HANDLERS: ReadonlyArray<AnyResourceHandlers<Store, Caller>> = [
   tags,
 ];
 
+/** The handlers, over copies of their definitions whose `atomic.max` is `max`. */
+export function handlersCapped(
+  max: number,
+): ReadonlyArray<AnyResourceHandlers<Store, Caller>> {
+  return HANDLERS.map((handlers) => ({
+    ...handlers,
+    resource: { ...handlers.resource, atomic: { max } },
+  }));
+}
+
 /** A processor over `store` with a snapshot transaction that rolls back on failure. */
 export function createProcessor(
   store: Store,

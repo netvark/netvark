@@ -258,13 +258,15 @@ Best practices:
 
 `resourcePaths(definition)` reads where a resource's operations live from its links: the resource at
 `links.self(id)` with the id as `{id}`, the collection at that path without its last segment, each
-relationship's `self` and `related` path, and an absolute link's origin.
+relationship's `self` and `related` path, the Atomic Operations endpoint at the collection's base
+followed by `/operations`, and an absolute link's origin.
 
 ```ts
 resourcePaths(Articles);
 // { origin: undefined, collection: '/api/v1/articles', resource: '/api/v1/articles/{id}',
 //   relationships: Map { 'author' => { self: '/api/v1/articles/{id}/relationships/author',
-//                                      related: '/api/v1/articles/{id}/author' }, ... } }
+//                                      related: '/api/v1/articles/{id}/author' }, ... },
+//   operations: '/api/v1/operations' }
 ```
 
 The OpenAPI document of [`@netvark/resource-core`](../resource-core#readme), the routes of
@@ -558,6 +560,30 @@ A missing handler makes the operation a 403; an unknown type a 404; a structural
 with pointers like `/atomic:operations/1/data/relationships/author/data/lid`. The 405 for other
 methods is the host's: the processor never sees the request method.
 
+A request takes at most the `atomic.max` its resources' definitions share, 10 by default
+(`DEFAULT_MAX_OPERATIONS`, JsonApiDotNetCore's default); a longer one is a 400 at
+`/atomic:operations` before any handler runs. A definition takes the cap as `atomic: { max }`, a
+positive safe integer or a `TypeError`, and the processor throws `TypeError` at setup when its
+definitions' caps differ, since one endpoint takes one cap. A client or a screen reads the same
+value from the definition it imports, so a selection one request cannot hold is refused before
+anything is sent.
+
+Best practices:
+
+- **State the cap with the base.** Give the configured definer `atomic: { max }` next to
+  `links: { base }`, so every definition at one endpoint carries the same cap and the processor, the
+  OpenAPI document, and the screens agree on it:
+
+  ```ts
+  export const defineResource = createDefineResource({
+    links: { base: '/api/v1' },
+    atomic: { max: 50 },
+  });
+  ```
+
+- **Raise it only as far as one transaction should go.** Every operation runs in the one transaction
+  your `transaction` opens, so the cap bounds how long a request holds its locks.
+
 When your `transaction` turns a failure into the client's error only once the transaction ended,
 such as a constraint violation whose names are read on another connection, the processor no longer
 sees it. Point it at the operation whose call threw it with
@@ -566,10 +592,10 @@ operation's failure.
 
 ## Modules
 
-| Subpath                        | What it holds                                                                                                                                         |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@netvark/jsonapi-core`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants                    |
-| `@netvark/jsonapi-core/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, the operations document parser, and `DEFAULT_MAX_OPERATIONS`, the processor's default limit |
+| Subpath                        | What it holds                                                                                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/jsonapi-core`        | Resource definitions, documents, query parsing, request parsing, errors, content negotiation, cursor pagination, and the constants                                     |
+| `@netvark/jsonapi-core/atomic` | `operationsProcessor()`, `assertOperationsContentType()`, the operations document parser, and `DEFAULT_MAX_OPERATIONS`, a definition's `atomic.max` when it gives none |
 
 ## Documentation
 
