@@ -3,8 +3,8 @@
  * to-many relationship, `add` and `remove` change a to-many relationship's
  * membership. The operation targets the relationship through `ref` or
  * `href`.
- * @ref https://jsonapi.org/ext/atomic/#updating-to-one-relationships
- * @ref https://jsonapi.org/ext/atomic/#updating-to-many-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-one-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-many-relationships
  * @packageDocumentation
  */
 import type { BanError, ErrorItem } from '@netvark/ban-core';
@@ -62,8 +62,8 @@ function relationshipDefinition<TTransaction, TContext>(
 /**
  * A relationship target: `update` replaces (to-one or to-many), `add` and
  * `remove` change a to-many relationship's membership.
- * @ref https://jsonapi.org/ext/atomic/#updating-to-one-relationships
- * @ref https://jsonapi.org/ext/atomic/#updating-to-many-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-one-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-many-relationships
  */
 export async function relationship<TTransaction, TContext>(
   execution: Execution<TTransaction, TContext>,

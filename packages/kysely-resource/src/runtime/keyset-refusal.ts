@@ -9,7 +9,7 @@
  * written here names the parameter, never its value, and a field or
  * operator only once the keyset or the query parser has accepted it as
  * declared.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-error-cases
  * @ref https://jsonapi.org/format/1.1/#query-parameters ("the server MUST respond with 400 Bad Request")
  * @packageDocumentation
  */

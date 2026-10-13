@@ -6,7 +6,7 @@
  * on request, and refuses a cursor issued in another organization as one
  * it cannot read, at the parameter that carried it, so a cursor tells
  * nothing of the rows it was issued for.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#errors
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-error-cases
  */
 import type { RuntimeDatabase } from './runtime/database.ts';
 import type { AppRuntime } from './runtime/fixture.ts';

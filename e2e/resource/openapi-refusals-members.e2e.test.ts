@@ -7,7 +7,7 @@
  * request schema refuses the same documents, while a policy's 403 points
  * at no member and passes it (`support/refusals.ts`).
  * @ref https://jsonapi.org/format/1.1/#crud-creating-responses-403
- * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-403
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403 (the update's 403, which the page anchors under this id)
  */
 import type { ApiSession } from './support/api-session.ts';
 import type { Refusal } from './support/refusals.ts';

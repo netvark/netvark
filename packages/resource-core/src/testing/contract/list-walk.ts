@@ -4,7 +4,7 @@
  * with the error as its cause, and a walk over every page of a request,
  * forward with `next` from the first page and back with `prev` from the
  * last, which must give the same pages.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--links (prev and next, null when no page)
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-links (prev and next, null when no page)
  * @packageDocumentation
  */
 import type { PageInput } from '@netvark/keyset-core';

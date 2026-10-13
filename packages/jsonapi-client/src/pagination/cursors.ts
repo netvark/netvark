@@ -6,7 +6,7 @@
  * `page: { after }`; a page with no records ends the list in its
  * direction, since the profile lets `next` point at an empty page.
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-links
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-pagination-item-metadata
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#terms-pagination-item-metadata
  * @ref https://jsonapi.org/format/1.1/#document-links-link
  * @packageDocumentation
  */

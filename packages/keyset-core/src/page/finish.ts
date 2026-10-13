@@ -3,8 +3,8 @@
  * become a `Page` with a cursor per row, the boundary cursors, and whether
  * further pages exist. On a backward page the rows arrive inverted and
  * are put back in request order first.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--links (prev and next, null when no page)
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--query-parameters (range truncation)
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-links (prev and next, null when no page)
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#query-range-pagination (range truncation)
  * @packageDocumentation
  */
 import type { CursorCodec } from '../cursor/codec';

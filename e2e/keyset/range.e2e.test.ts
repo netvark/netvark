@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * the rows between two items, default to the max page size, and report
  * truncation, as the Cursor Pagination profile prescribes, through each
  * binding.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--query-parameters
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#query-range-pagination
  */
 import { RangeNotSupportedError } from '@netvark/kysely-keyset';
 

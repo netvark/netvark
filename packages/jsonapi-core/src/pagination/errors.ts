@@ -4,7 +4,7 @@
  * (from the catalog entry). The builders return items so `parseQuery` can
  * report them among its other problems; `unsupportedSort` and
  * `invalidCursor` wrap one for an engine that throws.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-error-cases
  * @packageDocumentation
  */
 import type { BanError, ErrorItem } from '@netvark/ban-core';

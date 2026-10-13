@@ -415,7 +415,8 @@ names, the fields each operation accepts, so a read-only field (`createdAt`, a c
 once (a slug, an author) is declared, served, filterable, and sortable while a request that writes
 it is refused with 403 (9.2, 10.4, 11.4). The specification makes the update's refusal a MUST and
 the create's a MAY ("A server MUST return 403 Forbidden in response to an unsupported request to
-update a resource or relationship"; `#crud-updating-responses-403`, `#crud-creating-responses-403`);
+update a resource or relationship"; `#crud-updating-relationship-responses-403`, the id the page
+gives the update's 403 as well as the relationship update's, and `#crud-creating-responses-403`);
 refusing beats a validator that strips the unknown key, which answers success for a write that never
 happened.
 
@@ -809,8 +810,8 @@ object at `pointer` (default `/data`):
    instead of `id`.
 6. `attributes`, when present, MUST be an object; each name MUST be a declared attribute (400 at
    `pointer/attributes/<name>`) that the operation writes (`writable`, 5.1; 403 `FORBIDDEN` at the
-   same pointer, `#crud-creating-responses-403`, `#crud-updating-responses-403`); @-Members are
-   skipped.
+   same pointer, `#crud-creating-responses-403`, `#crud-updating-relationship-responses-403`);
+   @-Members are skipped.
 7. `relationships`, when present, MUST be an object; each name MUST be a declared relationship (400)
    that the operation writes (403 at `pointer/relationships/<name>`), and each value a relationship
    object with a `data` member (400); `data` is parsed with 9.1 for the declared cardinality and

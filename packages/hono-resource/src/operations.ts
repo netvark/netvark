@@ -13,7 +13,7 @@
  * its type. Like every route, the endpoint answers another method 405 before
  * the actor; `jsonApi()` must list the extension.
  * @ref https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed atomically")
- * @ref https://jsonapi.org/ext/atomic/#updating-to-one-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-one-relationships
  * @packageDocumentation
  */
 import type { Context, Env } from 'hono';
