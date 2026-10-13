@@ -9,7 +9,8 @@ import type { AnyResource } from '@netvark/jsonapi-core';
 import type { Query } from '../query/types';
 import type { CallOptions } from '../transport/send';
 import type { WriteInput } from './request-documents';
-import type { LinkageInput, ReadResult, WriteResult } from './types';
+import type { ReadResult, WriteResult } from './types';
+import type { LinkageInput } from './write-types';
 
 /** What `get` and `related` send. */
 export type IncludeAndFields = Pick<Query, 'include' | 'fields'>;

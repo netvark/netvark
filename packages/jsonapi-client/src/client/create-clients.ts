@@ -26,7 +26,7 @@ import { resourceClient } from './resource-client';
 export function createClients<
   TDefinitions extends Readonly<Record<string, AnyResource>>,
 >(definitions: TDefinitions, transport: Transport): Clients<TDefinitions> {
-  const state = Transport.stateOf(transport);
+  const state = Transport.stateOf(transport, 'createClients');
   const names = new Map<string, string>();
   // Each value is a `WideClient`, held as `unknown`: its `definition` is any
   // definition, which the assertion below types as the one passed.

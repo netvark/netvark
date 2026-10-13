@@ -19,6 +19,7 @@ async function answer(response: Response) {
       origin: 'https://api.example.com',
       fetch: fetchDouble(response).fetch,
     }),
+    'test',
   );
   return send(state, LIST);
 }

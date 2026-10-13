@@ -108,7 +108,7 @@ const HONO = [
   'varyAccept',
 ];
 
-/** SPEC section 15.1: the client's values. */
+/** SPEC section 15.1: the client's values, the operations' of section 17 among them. */
 const CLIENT = [
   'ResponseError',
   'createClients',
@@ -116,7 +116,10 @@ const CLIENT = [
   'cursorOf',
   'deserialize',
   'isResponseError',
+  'operationOf',
+  'operationsOf',
   'pageCursors',
+  'sendOperations',
   'serializeQuery',
 ].toSorted();
 

@@ -1,12 +1,12 @@
 /**
- * The client's runtime checks (SPEC 14.2, 15.9): `@netvark/jsonapi-client`
- * calls a blog of its own through that blog's `fetch`, inside the runtime
- * under test, so the client's module graph loads and runs where the app
- * does. `app.ts` answers `GET /client-checks` with the outcome, which each
- * harness reports beside the app's checks. Web standards only, as the
- * client itself.
+ * The client's runtime checks (SPEC 14.2, 15.9, 17.5):
+ * `@netvark/jsonapi-client` calls a blog of its own through that blog's
+ * `fetch`, its calls and its Atomic Operations, inside the runtime under
+ * test, so the client's module graph loads and runs where the app does.
+ * `app.ts` answers `GET /client-checks` with the outcome, which each harness
+ * reports beside the app's checks. Web standards only, as the client itself.
  */
-import type { Clients } from '@netvark/jsonapi-client';
+import type { Clients, Transport } from '@netvark/jsonapi-client';
 
 import type { InRuntimeCheck, SmokeResult } from './checks.ts';
 
@@ -15,7 +15,10 @@ import {
   createTransport,
   cursorOf,
   isResponseError,
+  operationOf,
+  operationsOf,
   pageCursors,
+  sendOperations,
 } from '@netvark/jsonapi-client';
 
 import { createBlog } from '../support/blog.ts';
@@ -25,10 +28,12 @@ import { check, equal, runInRuntime } from './checks.ts';
 /** Where the client believes the blog is; each request is answered in-process. */
 const ORIGIN = 'http://client.invalid';
 const JSON_API = 'application/vnd.api+json';
+const ATOMIC_MEDIA_TYPE = `${JSON_API}; ext="https://jsonapi.org/ext/atomic"`;
 const DEFINITIONS = { articles: Articles, people: People, tags: Tags };
 
 interface ClientBlog {
   readonly api: Clients<typeof DEFINITIONS>;
+  readonly transport: Transport;
   /** The requests the client handed to fetch, in order. */
   readonly sent: ReadonlyArray<Request>;
 }
@@ -46,7 +51,7 @@ function openBlog(): ClientBlog {
       return app.fetch(request);
     },
   });
-  return { api: createClients(DEFINITIONS, transport), sent };
+  return { api: createClients(DEFINITIONS, transport), transport, sent };
 }
 
 async function refusal(call: Promise<unknown>): Promise<unknown> {
@@ -141,6 +146,43 @@ const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
     check(dots instanceof TypeError, 'a dot segment id is a TypeError');
     equal(sent.length, before, 'nothing sent');
   },
+  'operations in one request, linked by lid and refused at their index':
+    async () => {
+      const { transport, sent } = openBlog();
+      const { status, results } = await sendOperations(transport, [
+        operationsOf(People).create({
+          lid: 'ada',
+          attributes: { name: 'Ada' },
+        }),
+        operationsOf(Articles).create({
+          attributes: { title: 'Linked' },
+          relationships: { author: { type: 'people', lid: 'ada' } },
+        }),
+      ]);
+      equal(status, 200, 'status');
+      equal(results[0].data?.id, '6', 'created person');
+      equal(results[1].data?.author?.id, '6', 'linked by lid');
+      equal(
+        sent[0]?.headers.get('content-type'),
+        ATOMIC_MEDIA_TYPE,
+        'extension applied',
+      );
+      const refused = await refusal(
+        sendOperations(transport, [
+          operationsOf(Articles).update('1', { attributes: { title: 'Kept' } }),
+          operationsOf(Articles).remove('404'),
+        ]),
+      );
+      check(
+        isResponseError(refused, 'NOT_FOUND'),
+        'a refusal is a ResponseError',
+      );
+      equal(
+        refused.errors.map((object) => operationOf(object)?.index).join(),
+        '1',
+        'at its operation',
+      );
+    },
   'headers and language on every request': async () => {
     const { api, sent } = openBlog();
     await api.articles.get('1');

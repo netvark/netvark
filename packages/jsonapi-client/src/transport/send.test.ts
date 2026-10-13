@@ -7,6 +7,8 @@ import { send } from './send';
 import { createTransport, Transport } from './transport';
 
 const MEDIA_TYPE = 'application/vnd.api+json';
+const ATOMIC = 'https://jsonapi.org/ext/atomic';
+const ATOMIC_MEDIA_TYPE = `${MEDIA_TYPE}; ext="${ATOMIC}"`;
 const URL_OF_LIST = 'https://api.example.com/articles';
 const LIST = {
   type: 'articles',
@@ -27,6 +29,7 @@ const CREATE = {
 function stateWith(options: Omit<TransportOptions, 'origin'>) {
   return Transport.stateOf(
     createTransport({ origin: 'https://api.example.com', ...options }),
+    'test',
   );
 }
 
@@ -45,6 +48,35 @@ describe('send: the request (SPEC 15.3)', () => {
     expect(JSON.parse(sent.body)).toStrictEqual({
       data: { type: 'articles', attributes: { title: 'T' } },
     });
+  });
+
+  it('names an applied extension in Content-Type, as clients "MUST specify the ext media type parameter", and in Accept to require it', async () => {
+    const double = fetchDouble(jsonApi({ 'atomic:results': [{}] }));
+    const operations = {
+      type: 'articles',
+      call: 'operations',
+      method: 'POST',
+      url: 'https://api.example.com/operations',
+      document: { 'atomic:operations': [] },
+      extension: { uri: ATOMIC, members: ['atomic:results'] },
+    } as const;
+
+    const incoming = await send(stateWith({ fetch: double.fetch }), operations);
+
+    const sent = double.last();
+    expect(sent.headers.get('content-type')).toBe(ATOMIC_MEDIA_TYPE);
+    expect(sent.headers.get('accept')).toBe(ATOMIC_MEDIA_TYPE);
+    expect(incoming.document).toStrictEqual({ 'atomic:results': [{}] });
+  });
+
+  it('reads the members of an extension as a document only for a request that applies it', async () => {
+    const double = fetchDouble(jsonApi({ 'atomic:results': [] }));
+
+    await expect(
+      send(stateWith({ fetch: double.fetch }), CREATE),
+    ).rejects.toThrow(
+      new TypeError('articles create answered 200 without a JSON:API document'),
+    );
   });
 
   it('sends no Content-Type without a document, which would make a cross-origin GET preflighted', async () => {

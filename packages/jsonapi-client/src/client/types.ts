@@ -13,14 +13,21 @@ import type {
   JsonApiObject,
   Links,
   Meta,
-  TypesOf,
 } from '@netvark/jsonapi-core';
 
 import type { AnyRecord, Identifier } from '../document/types';
-import type { KnownDefinition, Simplify } from '../internal/definition-types';
+import type {
+  ByCardinality,
+  KnownDefinition,
+  RelationshipName,
+  RelationshipsOf,
+  ToManyName,
+  UpdatableName,
+} from '../internal/definition-types';
 import type { GetQuery, ListQuery } from '../query/types';
 import type { CallOptions } from '../transport/send';
 import type { RecordOf } from './record-types';
+import type { CreateInput, LinkageInput, UpdateInput } from './write-types';
 
 /** What a read resolves to: the status, the data, and the document's `links`, `meta`, and `jsonapi`. */
 export interface ReadResult<TData> {
@@ -49,48 +56,6 @@ export interface IdentifierObject<
 > extends Identifier<TType> {
   readonly meta?: Meta | undefined;
 }
-
-type RelationshipsOf<TDefinition> = TypesOf<TDefinition>['relationships'];
-
-type RelationshipName<TDefinition> = keyof RelationshipsOf<TDefinition> &
-  string;
-
-/**
- * The relationships a relationship call may write: the ones `updatable`
- * names, on a definition that serves updates. The server refuses any other
- * with 403, so a call naming one does not compile.
- * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403
- */
-type UpdatableName<TDefinition> = [TypesOf<TDefinition>['update']] extends [
-  never,
-]
-  ? never
-  : RelationshipName<TDefinition> & TypesOf<TDefinition>['updatable'];
-
-/** The updatable to-many relationships: what `addToRelationship` and `removeFromRelationship` take. */
-type ToManyName<TDefinition> = {
-  readonly [
-    K in UpdatableName<TDefinition>
-  ]: 'many' extends RelationshipsOf<TDefinition>[K]['cardinality'] ? K : never;
-}[UpdatableName<TDefinition>];
-
-/** `TOne` for a to-one, `TMany` for a to-many, either for a relationship typed wide. */
-type ByCardinality<TCardinality, TOne, TMany> = TCardinality extends 'one'
-  ? TOne
-  : TMany;
-
-/**
- * A relationship's value in a write: an id, which becomes an identifier of
- * the relationship's type, or an identifier object; `null` empties a
- * to-one, and a to-many takes a list.
- */
-export type LinkageInput<
-  TRelationship extends ClientRelationship = ClientRelationship,
-> = ByCardinality<
-  TRelationship['cardinality'],
-  string | Identifier<TRelationship['type']> | null,
-  ReadonlyArray<string | Identifier<TRelationship['type']>>
->;
 
 /** A relationship's linkage as a relationship document holds it. */
 type LinkageOf<TRelationship extends ClientRelationship> = ByCardinality<
@@ -130,57 +95,6 @@ type RelatedData<
       TQuery
     >
   >
->;
-
-/**
- * `attributes`, required when the write's input has a required member;
- * `never` for an operation the definition does not serve, so no input
- * compiles.
- */
-type AttributesMember<TAttributes> = [TAttributes] extends [never]
-  ? { readonly attributes: never }
-  : Partial<TAttributes> extends TAttributes
-    ? { readonly attributes?: TAttributes | undefined }
-    : { readonly attributes: TAttributes };
-
-/**
- * The relationships a write may carry, by the names its writable list
- * holds; `never` when it holds none, since an object type without members
- * would accept any relationship.
- */
-type WritableRelationships<TDefinition, TWritable extends string> = [
-  RelationshipName<TDefinition> & TWritable,
-] extends [never]
-  ? never
-  : {
-      readonly [K in RelationshipName<TDefinition> & TWritable]?:
-        | LinkageInput<RelationshipsOf<TDefinition>[K]>
-        | undefined;
-    };
-
-/**
- * What `create` sends: the create validator's input as `attributes`, the
- * relationships `creatable` names, and `id` where the definition takes
- * client ids.
- */
-export type CreateInput<TDefinition> = Simplify<
-  AttributesMember<TypesOf<TDefinition>['create']> & {
-    readonly id?:
-      | (TypesOf<TDefinition>['clientIds'] extends false ? never : string)
-      | undefined;
-    readonly relationships?:
-      | WritableRelationships<TDefinition, TypesOf<TDefinition>['creatable']>
-      | undefined;
-  }
->;
-
-/** What `update` sends: the update validator's input as `attributes`, and the relationships `updatable` names. */
-export type UpdateInput<TDefinition> = Simplify<
-  AttributesMember<TypesOf<TDefinition>['update']> & {
-    readonly relationships?:
-      | WritableRelationships<TDefinition, TypesOf<TDefinition>['updatable']>
-      | undefined;
-  }
 >;
 
 /** A call's query left out: no members, so nothing is included and every field is there. */
