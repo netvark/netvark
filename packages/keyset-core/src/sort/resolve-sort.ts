@@ -3,7 +3,7 @@
  * definition, and the key is appended as the tie-breaker so the order is
  * total. The profile requires an order that is unique per item; without
  * the key, equal values would make pages overlap or skip rows.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--concepts (sorting)
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#concepts-sorting (sorting)
  * @ref https://www.postgresql.org/docs/current/queries-order.html
  * @packageDocumentation
  */

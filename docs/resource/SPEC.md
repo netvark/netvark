@@ -1319,7 +1319,8 @@ unsupported request to update a resource and allows it for create, so such a mem
 never an `additionalProperties` issue. The relationship route and atomic operations refuse it the
 same way (jsonapi SPEC 10.4, 11.4), so no host repeats the check. A document that carries such a
 member beside another refusal of the document answers 400 with every item, the combined status (ban
-SPEC 7.2.4). @ref https://jsonapi.org/format/1.1/#crud-updating-responses-403 @ref
+SPEC 7.2.4). @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403 (the
+update's 403, which the page anchors under this id) @ref
 https://jsonapi.org/format/1.1/#crud-creating-responses-403
 
 ### 9.5 Database rejections (`server/constraint-error.ts`)
@@ -3707,7 +3708,7 @@ detail the runtime writes itself names the parameter, never its value; `unsuppor
 a refused field only when it is a plain token (jsonapi ADR 0016). Anything else an operation throws
 (a lost connection, a statement the adapter got wrong) is rethrown unchanged, so the host's ban
 renders it as a 500 without detail. @ref
-https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
+https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-error-cases
 
 ### 18.6 Events and the outbox
 
@@ -4021,7 +4022,7 @@ Like every route, the endpoint answers another method 405 with `Allow: POST` bef
 (19.2); then the actor resolves, then the processor checks the extension's media type (415) and the
 document. `jsonApi()` must list `ATOMIC_OPERATIONS_EXTENSION`, or it answers an operations request
 415 itself. @ref https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed
-atomically") @ref https://jsonapi.org/ext/atomic/#creating-resources ("MAY target a resource
+atomically") @ref https://jsonapi.org/ext/atomic/#auto-id-creating-resources ("MAY target a resource
 collection through the operation's href member") @ref
 https://jsonapi.org/ext/atomic/#processing-errors @ref
 https://www.rfc-editor.org/rfc/rfc3986#section-5.2

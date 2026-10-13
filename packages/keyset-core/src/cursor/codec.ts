@@ -9,7 +9,7 @@
  * decoding and never trustworthy without the key.
  * @ref https://www.rfc-editor.org/rfc/rfc2104#section-3 (keys shorter than the hash output are discouraged)
  * @ref https://www.rfc-editor.org/rfc/rfc4648#section-5
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--concepts (cursors are opaque)
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#concepts-cursors (cursors are opaque)
  * @packageDocumentation
  */
 import type { CursorInit, CursorSecret } from '../definition/types';

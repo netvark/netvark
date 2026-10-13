@@ -31,7 +31,7 @@ export interface ResourceValidators<TCreate, TUpdate> {
  * operation's list leaves out is refused as `FORBIDDEN`, since JSON:API
  * requires 403 for an unsupported update and allows it for an unsupported
  * create. An operation without a list accepts every field.
- * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-403
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403 (the update's 403, which the page anchors under this id)
  * @ref https://jsonapi.org/format/1.1/#crud-creating-responses-403
  */
 export interface WritableFieldsInit<TField extends string> {

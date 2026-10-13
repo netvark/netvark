@@ -173,7 +173,7 @@ export async function idConflict(
 /**
  * A 403 for a declared field the operation does not write (the definition's
  * `writable`), so the field never reaches the validator.
- * @ref https://jsonapi.org/format/1.1/#crud-updating-responses-403
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403 (the update's 403, which the page anchors under this id)
  * @ref https://jsonapi.org/format/1.1/#crud-creating-responses-403
  */
 function notWritable(

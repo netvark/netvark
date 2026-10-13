@@ -1,9 +1,9 @@
 /**
  * Resource operations (SPEC 11.4): `add` creates, `update` updates, and
  * `remove` deletes the resource an operation targets.
- * @ref https://jsonapi.org/ext/atomic/#creating-resources
- * @ref https://jsonapi.org/ext/atomic/#updating-resources
- * @ref https://jsonapi.org/ext/atomic/#deleting-resources
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-creating-resources
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-resources
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-deleting-resources
  * @packageDocumentation
  */
 import type { Execution, OperationResult } from './execute-support';
@@ -33,7 +33,7 @@ function typePointer(operation: RawOperation): string {
 /**
  * `add` without a relationship target creates a resource. The target, when
  * given, may only name the collection: a type without id or lid.
- * @ref https://jsonapi.org/ext/atomic/#creating-resources
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-creating-resources
  */
 export async function create<TTransaction, TContext>(
   execution: Execution<TTransaction, TContext>,
@@ -108,7 +108,7 @@ function updatedId<TTransaction, TContext>(
 /**
  * `update` without a relationship target updates the resource the target
  * names, or the one `data` identifies.
- * @ref https://jsonapi.org/ext/atomic/#updating-resources
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-resources
  */
 export async function update<TTransaction, TContext>(
   execution: Execution<TTransaction, TContext>,
@@ -151,7 +151,7 @@ export async function update<TTransaction, TContext>(
   return resultOf(handlers.resource, row);
 }
 
-/** @ref https://jsonapi.org/ext/atomic/#deleting-resources */
+/** @ref https://jsonapi.org/ext/atomic/#auto-id-deleting-resources */
 export async function remove<TTransaction, TContext>(
   execution: Execution<TTransaction, TContext>,
   operation: RawOperation,

@@ -2,7 +2,7 @@
  * Page request resolution (SPEC 7.1): the used page size and the cursors,
  * checked against the definition's bounds, as the Cursor Pagination
  * profile prescribes.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--query-parameters
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-query-parameters
  * @packageDocumentation
  */
 import type { KeysetDefinition } from '../definition/types';

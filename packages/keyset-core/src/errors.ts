@@ -4,7 +4,7 @@
  * in the text, and an API layer maps the class (or `code`) to its own error
  * document. Definition mistakes are `TypeError`s thrown by `defineKeyset`
  * and are not listed here.
- * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id--errors
+ * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-error-cases
  * @packageDocumentation
  */
 

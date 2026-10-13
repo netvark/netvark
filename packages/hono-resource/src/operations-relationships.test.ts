@@ -5,7 +5,7 @@
  * it and the resource declares `update`; its errors point at the
  * operation's data, where the request holds the linkage, as a
  * relationship link's errors point at `/data` (SPEC 19.3).
- * @ref https://jsonapi.org/ext/atomic/#updating-to-one-relationships
+ * @ref https://jsonapi.org/ext/atomic/#auto-id-updating-to-one-relationships
  * @ref https://jsonapi.org/ext/atomic/#processing-errors
  */
 import { describe, expect, it } from 'vitest';
