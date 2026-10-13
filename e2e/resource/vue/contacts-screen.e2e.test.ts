@@ -1,8 +1,8 @@
 /**
- * The contacts application's screen built with Vue (resource SPEC 20.8):
- * the list and the create form of `screens/`, written with Vue Query's and
- * Vue Form's composables in render functions, mounted by Vue in jsdom with
- * the built `@netvark/resource-ui`, `@netvark/tanstack-form-resource`, and
+ * The contacts application's screen built with Vue (resource SPEC 20.8): the
+ * list and the create form of `screens/`, written with Vue Query's and Vue
+ * Form's composables in render functions, mounted by Vue in jsdom with the
+ * built `@netvark/resource-ui`, `@netvark/tanstack-form-resource`, and
  * `@netvark/tanstack-query-jsonapi`, for a person whose browser prefers
  * German, against the application served over a socket
  * (`support/contacts-server.ts`) on PGlite and on the server
@@ -12,8 +12,10 @@
  * before anything is sent; the server's refusal of a taken email lands on
  * its field, the list left as it was, and the create that answers it
  * refetches the list; the plan's quota, which no field holds, lands in the
- * banner; and a removal refetches the list, which makes room for the same
- * create.
+ * banner; a removal refetches the list, which makes room for the same
+ * create; and a selection's removal, a bulk action of
+ * `@netvark/resource-ui`, is one Atomic Operations request through Vue Query
+ * that refetches the list too (SPEC 21.5).
  * @ref https://testing-library.com/docs/user-event/intro
  * @ref https://tanstack.com/query/v5/docs/framework/vue/guides/invalidations-from-mutations
  */
@@ -37,20 +39,23 @@ import { h } from 'vue';
 import { getLocale } from '../localization/paraglide/runtime.js';
 import { runtimeDatabases } from '../runtime/database.ts';
 import { ARCHIVED } from '../runtime/seed.ts';
-import { contactQueries } from '../support/contact-queries.ts';
+import { announces, barButton, checkbox } from '../support/action-screen.ts';
+import { contactActionQueries } from '../support/contact-queries.ts';
 import { openContactsServer } from '../support/contacts-server.ts';
-import { recordedClients } from '../support/recorded-clients.ts';
+import { recordedTransport, sentFrom } from '../support/recorded-clients.ts';
 import { errorOf, preferLanguages } from '../support/screen-person.ts';
 import { ContactList } from './screens/contact-list.ts';
 import { CreateContact } from './screens/create-contact.ts';
 import { cleanup, mountScreen } from './screens/mount-screen.ts';
+
+const BEA = '00000000-0000-4000-8000-0000000000b1';
 
 /** The names the list shows, in order. */
 function names(): Array<string | null> {
   return screen
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell')[0]?.textContent ?? null);
+    .map((row) => within(row).getAllByRole('cell')[1]?.textContent ?? null);
 }
 
 /** Waits for the list to show `expected`. */
@@ -89,19 +94,10 @@ describe.each(runtimeDatabases())(
       await database.close();
     });
 
-    /** The requests sent from the `from`th on, as method, path, and decoded query. */
-    function sent(from = 0) {
-      return departures
-        .slice(from)
-        .map(({ method, path, query }) =>
-          [method, path, decodeURIComponent(query)].join(' ').trim(),
-        );
-    }
-
     /** The form above the list, over the editor's clients, and what the person does on it. */
     function contactsScreen() {
-      const api = contactQueries(
-        recordedClients(server.origin, departures, getLocale),
+      const api = contactActionQueries(
+        recordedTransport(server.origin, departures, getLocale),
       );
       const user = mountScreen(queryClient, () => [
         h(CreateContact, { api }),
@@ -131,13 +127,13 @@ describe.each(runtimeDatabases())(
         screen
           .getAllByRole('columnheader')
           .map(({ textContent }) => textContent),
-      ).toEqual(['Name', 'E-Mail', '']);
+      ).toEqual(['', 'Name', 'E-Mail', '']);
       await user.type(
         screen.getByRole('searchbox', { name: 'Suche' }),
         'ada{Enter}',
       );
       await shows(['Ada']);
-      expect(sent()).toEqual([
+      expect(sentFrom(departures, 0)).toEqual([
         'GET /api/contacts',
         'GET /api/contacts filter[q]=ada',
       ]);
@@ -151,7 +147,7 @@ describe.each(runtimeDatabases())(
       await waitFor(() => {
         expect(errorOf('Name')).toBe('Name ist erforderlich.');
       });
-      expect(sent(listed)).toEqual([]);
+      expect(sentFrom(departures, listed)).toEqual([]);
       await retype('Name', 'Ada Twin');
       // The column is citext: Ada's email, in other letters.
       await retype('E-Mail', 'ADA@example.com');
@@ -162,7 +158,7 @@ describe.each(runtimeDatabases())(
         );
       });
       expect(errorOf('Name')).toBeUndefined();
-      expect(sent(listed)).toEqual(['POST /api/contacts']);
+      expect(sentFrom(departures, listed)).toEqual(['POST /api/contacts']);
       await retype('E-Mail', 'ada.twin@example.com');
       expect(errorOf('E-Mail')).toBeUndefined();
       await save();
@@ -171,7 +167,7 @@ describe.each(runtimeDatabases())(
       await waitFor(() => {
         expect(screen.getByLabelText<HTMLInputElement>('Name').value).toBe('');
       });
-      expect(sent(listed)).toEqual([
+      expect(sentFrom(departures, listed)).toEqual([
         'POST /api/contacts',
         'POST /api/contacts',
         'GET /api/contacts',
@@ -193,7 +189,7 @@ describe.each(runtimeDatabases())(
       const refused = departures.length;
       await remove('Old Name');
       await shows(['Ada', 'Bea']);
-      expect(sent(refused)).toEqual([
+      expect(sentFrom(departures, refused)).toEqual([
         `DELETE /api/contacts/${ARCHIVED}`,
         'GET /api/contacts',
       ]);
@@ -201,6 +197,33 @@ describe.each(runtimeDatabases())(
       await shows(['Ada', 'Bea', 'Cleo']);
       expect(screen.queryByRole('alert')).toBeNull();
       expect(await database.contacts(1)).toBe(3);
+    });
+
+    it('removes a selection in one Atomic Operations request through Vue Query, which refetches the list', async () => {
+      await database.exec(
+        `insert into contacts (id, organization_id, name) values ('${BEA}', 1, 'Bea')`,
+      );
+      const { user } = contactsScreen();
+      await shows(['Ada', 'Bea', 'Old Name']);
+      // Nothing selected, nothing to run.
+      expect(barButton('Entfernen').disabled).toBe(true);
+      await user.click(checkbox('Bea'));
+      await user.click(checkbox('Old Name'));
+      const from = departures.length;
+      await user.click(barButton('Entfernen'));
+      await shows(['Ada']);
+      await announces('2 Kontakte entfernt.');
+      expect(sentFrom(departures, from)).toEqual([
+        'POST /api/operations',
+        'GET /api/contacts',
+      ]);
+      expect(departures[from]?.body).toEqual({
+        'atomic:operations': [BEA, ARCHIVED].map((id) => ({
+          op: 'remove',
+          ref: { type: 'contacts', id },
+        })),
+      });
+      expect(await database.contacts(1)).toBe(1);
     });
   },
 );

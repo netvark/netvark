@@ -1,13 +1,18 @@
 /**
- * The contacts application's clients, as the built
- * `@netvark/jsonapi-client` makes them, over a transport to a contacts
- * server that records each request as it leaves: the method, the path,
- * the query, and the request document. Each request acts as the editor and sends
- * the language `language` returns when it leaves, as an application's
- * transport sends Paraglide's locale. Meetings answer where the server
- * serves them (`runtime/meetings.ts`).
+ * The contacts application's clients, as the built `@netvark/jsonapi-client`
+ * makes them, over a transport to a contacts server that records each
+ * request as it leaves: the method, the path, the query, and the request
+ * document. Each request acts as the editor and sends the language
+ * `language` returns when it leaves, as an application's transport sends
+ * Paraglide's locale. Meetings answer where the server serves them
+ * (`runtime/meetings.ts`). A screen that also sends Atomic Operations makes
+ * its clients over the same transport.
  */
-import type { Clients, ResponseError } from '@netvark/jsonapi-client';
+import type {
+  Clients,
+  ResponseError,
+  Transport,
+} from '@netvark/jsonapi-client';
 
 import {
   createClients,
@@ -40,13 +45,13 @@ export interface Departure {
   readonly body: unknown;
 }
 
-/** Clients to `origin` whose requests are pushed onto `departures`. */
-export function recordedClients(
+/** A transport to `origin` that pushes each request onto `departures` as it leaves. */
+export function recordedTransport(
   origin: string,
   departures: Array<Departure>,
   language: () => string,
-): ContactClients {
-  const transport = createTransport({
+): Transport {
+  return createTransport({
     origin,
     headers: { 'X-Actor': 'editor' },
     language,
@@ -62,7 +67,32 @@ export function recordedClients(
       return fetch(request);
     },
   });
+}
+
+/** The application's clients over `transport`. */
+export function contactClients(transport: Transport): ContactClients {
   return createClients(DEFINITIONS, transport);
+}
+
+/** Clients to `origin` whose requests are pushed onto `departures`. */
+export function recordedClients(
+  origin: string,
+  departures: Array<Departure>,
+  language: () => string,
+): ContactClients {
+  return contactClients(recordedTransport(origin, departures, language));
+}
+
+/** The requests of `departures` from the `from`th on, each as its method, path, and decoded query. */
+export function sentFrom(
+  departures: ReadonlyArray<Departure>,
+  from: number,
+): Array<string> {
+  return departures
+    .slice(from)
+    .map(({ method, path, query }) =>
+      [method, path, decodeURIComponent(query)].join(' ').trim(),
+    );
 }
 
 /** The `ResponseError` a write the server refuses rejects with. */

@@ -95,5 +95,45 @@
   "option_contacts_kind_person": "Person",
   "option_contacts_kind_company": "Company",
   "option_contacts_status_active": "Active",
-  "option_contacts_status_archived": "Archived"
+  "option_contacts_status_archived": "Archived",
+  "contact_archive": "Archive",
+  "contact_archived": "{name} archived.",
+  "contact_remove": "Remove",
+  "contact_remove_title": "Remove {name}?",
+  "contact_remove_body": "This cannot be undone.",
+  "contact_removed": "{name} removed.",
+  "contacts_restore": "Restore",
+  "contacts_restored": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} contact restored.",
+        "countPlural=*": "{count} contacts restored."
+      }
+    }
+  ],
+  "contacts_remove": "Remove",
+  "contacts_remove_title": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Remove {count} contact?",
+        "countPlural=*": "Remove {count} contacts?"
+      }
+    }
+  ],
+  "contacts_remove_confirm": "Remove for good",
+  "contacts_removed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} contact removed.",
+        "countPlural=*": "{count} contacts removed."
+      }
+    }
+  ],
+  "selection_too_many": "At most {max} at once."
 }

@@ -4714,8 +4714,9 @@ operators, and search, `withSearch` as `never` without one, and `@tanstack/table
     page; the create form through `useForm` with `resourceFormOptions`, refusing a missing name
     before anything is sent; the server's `CONTACT_EMAIL_TAKEN` bound onto its field with
     `bindResponseErrors`, the list left as it was, and the create that answers it refetching the
-    list; the plan's quota in the banner; and a removal that refetches the list, which makes room
-    for the same create.
+    list; the plan's quota in the banner; a removal that refetches the list, which makes room for
+    the same create; and a selection's removal, a bulk action (21.3) sent through `useMutation` of
+    `operationsMutation` in one request that refetches the list.
 - Smoke (`e2e/resource/smoke/ui-checks.ts`, `form-checks.ts`): the built `@netvark/resource-ui` runs
   a form model's validator and write and a list model's `query`, `withPageSize`, and `next`, and the
   built `@netvark/tanstack-form-resource` validates a submitted form-core `FormApi` made with its
@@ -4776,12 +4777,12 @@ const selectionActions = bulkActions(Contacts, {
   tooMany: m.selection_too_many, // ({ max }) => string
   actions: {
     restore: {
-      label: m.contact_restore,
+      label: m.contacts_restore,
       update: { attributes: { status: 'active' } },
       done: m.contacts_restored, // ({ count }) => string
     },
     remove: {
-      label: m.contact_remove,
+      label: m.contacts_remove,
       tone: 'danger',
       remove: true,
       confirm: { title: m.contacts_remove_title }, // ({ count }) => string
@@ -4957,13 +4958,18 @@ update input (jsonapi SPEC 15.4).
   update input, the records a list reads, by the list model's state or with includes, taken as
   `ActionRecord`s, `variables` taken by the mutations of `resourceQueries`, and `operations` by
   `operationsMutation`'s).
-- End to end, `e2e/resource/react/contact-actions.e2e.test.tsx`: the contacts list with a row menu
-  and a selection bar, built with the React adapters as the screens of 20.8 are, against the server
-  in one process on PGlite and, with `RESOURCE_PG_URL`, PostgreSQL: a removal from a row after its
-  confirmation; an archive from a row; a bulk restore and a bulk removal, each one request that
-  refetches the list; a bulk restore that the index on active names refuses with
-  `CONTACT_NAME_TAKEN`, shown on the record and the members it names, every selected contact still
-  archived; and a selection over the cap refused before anything is sent. The Vue screen (20.8) runs
-  a bulk action through Vue Query.
+- End to end, in `e2e/resource/react/`: the contacts list with a menu in each row and a bar over the
+  selection (`screens/contact-actions.tsx`), built with the React adapters as the screens of 20.8
+  are, against the server in one process on PGlite and, with `RESOURCE_PG_URL`, PostgreSQL, a
+  refusal read from the `aria-describedby` of the record's checkbox. `contact-actions.e2e.test.tsx`:
+  a removal from a row after its confirmation, nothing sent while the dialog is open or once it is
+  cancelled; an archive from a row, after which its menu offers none; and a removal the database
+  refuses, whose text names no member, in the alert. `selection-actions.e2e.test.tsx`: a bulk
+  restore and a bulk removal, each one request that refetches the list; a bulk restore that the
+  index on active names refuses with `CONTACT_NAME_TAKEN`, shown on the record of the operation it
+  names and on its name, every selected contact still archived, and the rest restored once the
+  person deselects that record; a bulk removal refused at the operation itself, its text under the
+  record's menu; and a selection over the cap held back before anything is sent. The Vue screen
+  (20.8) removes a selection through Vue Query (`vue/contacts-screen.e2e.test.ts`).
 - Smoke (`e2e/resource/smoke/ui-checks.ts`): the built package's `bulkActions` builds a selection's
   operations and maps a refusal, on Bun, Deno, and workerd.
