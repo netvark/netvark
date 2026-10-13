@@ -4687,9 +4687,15 @@ operators, and search, `withSearch` as `never` without one, and `@tanstack/table
     each request the state's own parameters; cursors over real pages to the end and back; a stale
     link read back leniently, none of what the state does not hold left in the URL; and the list
     refetched after a create on the same screen.
-  - `vue/`: a screen built with Vue Query and Vue Form renders in jsdom the same way: a list through
-    `useQuery(contacts.list(...))`, a create form through `useForm` with `resourceFormOptions`, a
-    refused write bound with `bindResponseErrors`, and a removal that refetches the list.
+  - `vue/`: the screens of `vue/screens/`, a list and a create form written with Vue Query's and Vue
+    Form's composables in render functions, mounted by Vue in jsdom the same way, a warning Vue
+    gives failing the test (`contacts-screen.e2e.test.ts`): the list through `useQuery` with its
+    options from a getter over the list model's state, so a search the person submits reads its own
+    page; the create form through `useForm` with `resourceFormOptions`, refusing a missing name
+    before anything is sent; the server's `CONTACT_EMAIL_TAKEN` bound onto its field with
+    `bindResponseErrors`, the list left as it was, and the create that answers it refetching the
+    list; the plan's quota in the banner; and a removal that refetches the list, which makes room
+    for the same create.
 - Smoke (`e2e/resource/smoke/ui-checks.ts`, `form-checks.ts`): the built `@netvark/resource-ui` runs
   a form model's validator and write and a list model's `query`, `withPageSize`, and `next`, and the
   built `@netvark/tanstack-form-resource` validates a submitted form-core `FormApi` made with its

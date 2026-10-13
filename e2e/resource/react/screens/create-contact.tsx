@@ -9,7 +9,7 @@
  */
 import type { ReactElement } from 'react';
 
-import type { ContactQueries } from './contact-queries.ts';
+import type { ContactQueries } from '../../support/contact-queries.ts';
 
 import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';

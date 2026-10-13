@@ -428,6 +428,12 @@ function ContactsScreen() {
   the first load at module scope. Key rows by `getRowId`, so a row keeps its state across pages and
   refetches.
 - Search when the person submits, or debounce typing: each state is a request and a history entry.
+- Without a router to keep the state, hold it in a reactive reference replaced whole by each change,
+  and pass the options from a getter: in Vue, `const state = shallowRef(contactsList.query({}))`,
+  `state.value = contactsList.withSearch(state.value, text)`, and
+  `useQuery(() => contacts.list(state.value))`. Each function returns a new state, so only the
+  replacement needs tracking
+  ([`shallowRef`](https://vuejs.org/api/reactivity-advanced.html#shallowref)).
 - `query` checks names and shapes, while the server alone checks values, such as a date or an
   expired cursor: it refuses one with a `400` whose error names its parameter in `source.parameter`.
   Recover by the state: `first(state)` for `page[after]` or `page[before]`, and `withColumnFilters`

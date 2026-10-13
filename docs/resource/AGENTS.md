@@ -96,12 +96,12 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   The binding's tests drive a form-core `FormApi` and its `FieldApi`s, as every adapter's forms and
   fields are made, over resources declared on the storage contract's catalog, and import no
   framework; the binding over the contacts server runs in `e2e/resource/form/`, and each adapter's
-  types in `e2e/resource/form/adapters/`. The screens (`e2e/resource/react/screens/`) run TanStack
-  Form, Query, Router, and Table v9 as an application does, rendered in jsdom beside the real server
-  under `support/screen-environment.ts`, which processes the modules as a server's (Vite's client
-  environment would process the server's for a browser, without `import.meta.url` as a file URL),
-  and drive each screen as a person does, through `userEvent`, reading an error from its control's
-  `aria-describedby`.
+  types in `e2e/resource/form/adapters/`. The screens run TanStack Form, Query, Router, and Table v9
+  (`e2e/resource/react/screens/`), and Vue Query and Vue Form (`e2e/resource/vue/screens/`), as an
+  application does, rendered in jsdom beside the real server under `support/screen-environment.ts`,
+  which processes the modules as a server's (Vite's client environment would process the server's
+  for a browser, without `import.meta.url` as a file URL), and drive each screen as a person does,
+  through `userEvent`, reading an error from its control's `aria-describedby`.
 
 ## Repository map
 
@@ -163,8 +163,8 @@ through `workspace:*` and never imports from `src/`: its fixture migrations and 
 catalogs, declarations over them, `fails/` declarations that must not compile, the oracle, the
 reference storage adapter that proves the contract suite, the runtime smoke test, the model's tests
 over the built `@netvark/resource-ui` (`ui/`), the query cache over the contacts server (`query/`),
-the form binding over it and each TanStack Form adapter's types (`form/`), and the React screens
-(`react/screens/`) that run against it.
+the form binding over it and each TanStack Form adapter's types (`form/`), and the React and Vue
+screens (`react/screens/`, `vue/screens/`) that run against it.
 
 - `docs/resource/DESIGN.md` what we are building and why; `docs/resource/SPEC.md` the normative
   contract; `docs/resource/adr/` decisions

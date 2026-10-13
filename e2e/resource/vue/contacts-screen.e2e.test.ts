@@ -1,0 +1,206 @@
+/**
+ * The contacts application's screen built with Vue (resource SPEC 20.8):
+ * the list and the create form of `screens/`, written with Vue Query's and
+ * Vue Form's composables in render functions, mounted by Vue in jsdom with
+ * the built `@netvark/resource-ui`, `@netvark/tanstack-form-resource`, and
+ * `@netvark/tanstack-query-jsonapi`, for a person whose browser prefers
+ * German, against the application served over a socket
+ * (`support/contacts-server.ts`) on PGlite and on the server
+ * `RESOURCE_PG_URL` names. Nothing between a keystroke and the database is
+ * mocked; the transport records each request as it leaves. A search the
+ * person submits reads its own page; the form refuses what the server would
+ * before anything is sent; the server's refusal of a taken email lands on
+ * its field, the list left as it was, and the create that answers it
+ * refetches the list; the plan's quota, which no field holds, lands in the
+ * banner; and a removal refetches the list, which makes room for the same
+ * create.
+ * @ref https://testing-library.com/docs/user-event/intro
+ * @ref https://tanstack.com/query/v5/docs/framework/vue/guides/invalidations-from-mutations
+ */
+import type { RuntimeDatabase } from '../runtime/database.ts';
+import type { ContactsServer } from '../support/contacts-server.ts';
+import type { Departure } from '../support/recorded-clients.ts';
+
+import { QueryClient } from '@tanstack/vue-query';
+import { screen, waitFor, within } from '@testing-library/dom';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
+import { h } from 'vue';
+
+import { getLocale } from '../localization/paraglide/runtime.js';
+import { runtimeDatabases } from '../runtime/database.ts';
+import { ARCHIVED } from '../runtime/seed.ts';
+import { contactQueries } from '../support/contact-queries.ts';
+import { openContactsServer } from '../support/contacts-server.ts';
+import { recordedClients } from '../support/recorded-clients.ts';
+import { errorOf, preferLanguages } from '../support/screen-person.ts';
+import { ContactList } from './screens/contact-list.ts';
+import { CreateContact } from './screens/create-contact.ts';
+import { cleanup, mountScreen } from './screens/mount-screen.ts';
+
+/** The names the list shows, in order. */
+function names(): Array<string | null> {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell')[0]?.textContent ?? null);
+}
+
+/** Waits for the list to show `expected`. */
+async function shows(expected: ReadonlyArray<string>): Promise<void> {
+  await waitFor(() => {
+    expect(names()).toEqual(expected);
+  });
+}
+
+describe.each(runtimeDatabases())(
+  "on %s, the contacts application's Vue screen, in German",
+  (_name, open) => {
+    let database: RuntimeDatabase;
+    let server: ContactsServer;
+    let queryClient: QueryClient;
+    const departures: Array<Departure> = [];
+
+    beforeAll(async () => {
+      preferLanguages(['de-DE', 'de']);
+      database = await open();
+      server = await openContactsServer(database);
+    });
+    beforeEach(async () => {
+      await database.reset();
+      departures.length = 0;
+      queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      });
+    });
+    afterEach(() => {
+      cleanup();
+      queryClient.clear();
+    });
+    afterAll(async () => {
+      await server.close();
+      await database.close();
+    });
+
+    /** The requests sent from the `from`th on, as method, path, and decoded query. */
+    function sent(from = 0) {
+      return departures
+        .slice(from)
+        .map(({ method, path, query }) =>
+          [method, path, decodeURIComponent(query)].join(' ').trim(),
+        );
+    }
+
+    /** The form above the list, over the editor's clients, and what the person does on it. */
+    function contactsScreen() {
+      const api = contactQueries(
+        recordedClients(server.origin, departures, getLocale),
+      );
+      const user = mountScreen(queryClient, () => [
+        h(CreateContact, { api }),
+        h(ContactList, { api }),
+      ]);
+      return {
+        user,
+        save: async () => {
+          await user.click(screen.getByRole('button', { name: 'Speichern' }));
+        },
+        retype: async (label: string, text: string) => {
+          await user.clear(screen.getByLabelText(label));
+          await user.type(screen.getByLabelText(label), text);
+        },
+        remove: async (name: string) => {
+          await user.click(
+            screen.getByRole('button', { name: `${name} entfernen` }),
+          );
+        },
+      };
+    }
+
+    it("lists the editor's contacts by the list model's state, and reads the page for a search the person submits", async () => {
+      const { user } = contactsScreen();
+      await shows(['Ada', 'Old Name']);
+      expect(
+        screen
+          .getAllByRole('columnheader')
+          .map(({ textContent }) => textContent),
+      ).toEqual(['Name', 'E-Mail', '']);
+      await user.type(
+        screen.getByRole('searchbox', { name: 'Suche' }),
+        'ada{Enter}',
+      );
+      await shows(['Ada']);
+      expect(sent()).toEqual([
+        'GET /api/contacts',
+        'GET /api/contacts filter[q]=ada',
+      ]);
+    });
+
+    it("refuses a missing name before anything is sent, puts the server's refusal of a taken email on its field, the list left as it was, and refetches the list once the create that answers it lands", async () => {
+      const { save, retype } = contactsScreen();
+      await shows(['Ada', 'Old Name']);
+      const listed = departures.length;
+      await save();
+      await waitFor(() => {
+        expect(errorOf('Name')).toBe('Name ist erforderlich.');
+      });
+      expect(sent(listed)).toEqual([]);
+      await retype('Name', 'Ada Twin');
+      // The column is citext: Ada's email, in other letters.
+      await retype('E-Mail', 'ADA@example.com');
+      await save();
+      await waitFor(() => {
+        expect(errorOf('E-Mail')).toBe(
+          'E-Mail gehört bereits einem anderen Kontakt.',
+        );
+      });
+      expect(errorOf('Name')).toBeUndefined();
+      expect(sent(listed)).toEqual(['POST /api/contacts']);
+      await retype('E-Mail', 'ada.twin@example.com');
+      expect(errorOf('E-Mail')).toBeUndefined();
+      await save();
+      await shows(['Ada', 'Ada Twin', 'Old Name']);
+      // The create settles once the list has refetched; the form resets then.
+      await waitFor(() => {
+        expect(screen.getByLabelText<HTMLInputElement>('Name').value).toBe('');
+      });
+      expect(sent(listed)).toEqual([
+        'POST /api/contacts',
+        'POST /api/contacts',
+        'GET /api/contacts',
+      ]);
+    });
+
+    it('puts the quota of a full plan in the banner, and a removal that refetches the list makes room for the same create', async () => {
+      const { save, retype, remove } = contactsScreen();
+      await shows(['Ada', 'Old Name']);
+      await retype('Name', 'Bea');
+      await save();
+      await shows(['Ada', 'Bea', 'Old Name']);
+      // Acme's plan holds three contacts.
+      await retype('Name', 'Cleo');
+      await save();
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        'Das Kontingent für diesen Vorgang ist aufgebraucht.',
+      );
+      const refused = departures.length;
+      await remove('Old Name');
+      await shows(['Ada', 'Bea']);
+      expect(sent(refused)).toEqual([
+        `DELETE /api/contacts/${ARCHIVED}`,
+        'GET /api/contacts',
+      ]);
+      await save();
+      await shows(['Ada', 'Bea', 'Cleo']);
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(await database.contacts(1)).toBe(3);
+    });
+  },
+);

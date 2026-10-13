@@ -15,7 +15,7 @@ import type { ReactElement } from 'react';
 
 import type { ListState } from '@netvark/resource-ui';
 
-import type { Contact, ContactQueries } from './contact-queries.ts';
+import type { Contact, ContactQueries } from '../../support/contact-queries.ts';
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {

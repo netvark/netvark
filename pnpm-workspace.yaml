@@ -51,6 +51,7 @@ catalog:
   '@tanstack/form-core': 1.33.5
   '@tanstack/query-core': 5.104.1
   '@tanstack/react-query': 5.104.1
+  '@tanstack/vue-query': 5.104.1
   tsdown: 0.23.0
   '@types/node': 26.6.4
   '@types/pg': 8.23.1
@@ -75,10 +76,10 @@ blockExoticSubdeps: true
 # Dependencies allowed to run install scripts. lefthook downloads its binary
 # in postinstall; workerd (pulled in by miniflare for the e2e smoke tests)
 # selects its platform binary in postinstall. vue-demi (pulled in by Vue
-# Query for e2e/jsonapi's adapter checks) is denied: its postinstall only
-# switches its files to the installed Vue's major, and the files it ships
-# are Vue 3's. Everything else is blocked (pnpm default), and an install
-# fails on a build nobody has ruled on (`strictDepBuilds`).
+# Query for the e2e suites' Vue checks and screen) is denied: its
+# postinstall only switches its files to the installed Vue's major, and the
+# files it ships are Vue 3's. Everything else is blocked (pnpm default), and
+# an install fails on a build nobody has ruled on (`strictDepBuilds`).
 # @ref https://pnpm.io/settings/build#allowbuilds
 allowBuilds:
   lefthook: true
