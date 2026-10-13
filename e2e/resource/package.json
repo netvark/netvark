@@ -47,6 +47,7 @@
     "@tanstack/solid-form": "1.33.5",
     "@tanstack/svelte-form": "1.33.5",
     "@tanstack/vue-form": "1.33.5",
+    "@tanstack/vue-query": "catalog:",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",

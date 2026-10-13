@@ -8,7 +8,7 @@
  */
 import type { ReactElement } from 'react';
 
-import type { Contact, ContactQueries } from './contact-queries.ts';
+import type { Contact, ContactQueries } from '../../support/contact-queries.ts';
 
 import { useForm } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';

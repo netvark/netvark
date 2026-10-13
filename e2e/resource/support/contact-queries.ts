@@ -5,10 +5,7 @@
 import type { RecordOf } from '@netvark/jsonapi-client';
 import type { ResourceQueries } from '@netvark/tanstack-query-jsonapi';
 
-import type {
-  ContactClients,
-  ContactDefinitions,
-} from '../../support/recorded-clients.ts';
+import type { ContactClients, ContactDefinitions } from './recorded-clients.ts';
 
 import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
 

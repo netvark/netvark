@@ -31,12 +31,13 @@ import {
 
 import { getLocale } from '../localization/paraglide/runtime.js';
 import { runtimeDatabases } from '../runtime/database.ts';
+import { contactQueries } from '../support/contact-queries.ts';
 import { openContactsServer } from '../support/contacts-server.ts';
 import { recordedClients } from '../support/recorded-clients.ts';
-import { contactQueries } from './screens/contact-queries.ts';
+import { preferLanguages } from '../support/screen-person.ts';
 import { contactsScreen } from './screens/contacts-screen.tsx';
 import { CreateContact } from './screens/create-contact.tsx';
-import { preferLanguages, renderScreen } from './screens/render-screen.tsx';
+import { renderScreen } from './screens/render-screen.tsx';
 
 /** A link to the list, its search as the router writes one. */
 function linked(search: Record<string, unknown>): string {

@@ -34,16 +34,13 @@ import {
 import { getLocale } from '../localization/paraglide/runtime.js';
 import { runtimeDatabases } from '../runtime/database.ts';
 import { ADA } from '../runtime/seed.ts';
+import { contactQueries } from '../support/contact-queries.ts';
 import { openContactsServer } from '../support/contacts-server.ts';
 import { recordedClients } from '../support/recorded-clients.ts';
-import { contactQueries } from './screens/contact-queries.ts';
+import { errorOf, preferLanguages } from '../support/screen-person.ts';
 import { CreateContact } from './screens/create-contact.tsx';
 import { EditContact } from './screens/edit-contact.tsx';
-import {
-  errorOf,
-  preferLanguages,
-  renderScreen,
-} from './screens/render-screen.tsx';
+import { renderScreen } from './screens/render-screen.tsx';
 
 const LABELS = ['Name', 'E-Mail', 'Website', 'Status'];
 
