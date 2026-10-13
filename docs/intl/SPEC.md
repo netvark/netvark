@@ -516,12 +516,14 @@ workerd. Each smoke script first compiles `support/catalogs.ts` with the built b
 `.tmp/smoke/` on the runtime under test, or on Node for workerd, which runs compiled messages but
 does not compile them. The checks import the output as `#compiled-messages`, a `package.json`
 subpath import whose `types` condition is `smoke/compiled-messages.d.ts`, so the smoke type-checks
-before any compile; Bun, Deno, Node, and the workerd bundle resolve it to the output. The smoke
-compile refuses Deno before 2.6.10 (section 8) instead of never exiting. On Bun and Deno,
-`smoke/watch.ts` then watches a new copy of the fixture, edits a catalog, waits for the compile, and
-closes, after which the process must exit on its own. The resolver's request scope is an
-`AsyncLocalStorage` from `node:async_hooks` on each; workerd runs with the `nodejs_als`
-compatibility flag, which compatibility dates before 2026-08-04 need.
+before any compile; Bun, Deno, Node, and the workerd bundle resolve it to the output. The package's
+`build` also compiles the fixture on Node, as `e2e/resource`'s compiles its project, so the import
+resolves for the deps check (knip) after `pnpm run build` on a fresh checkout. The smoke compile
+refuses Deno before 2.6.10 (section 8) instead of never exiting. On Bun and Deno, `smoke/watch.ts`
+then watches a new copy of the fixture, edits a catalog, waits for the compile, and closes, after
+which the process must exit on its own. The resolver's request scope is an `AsyncLocalStorage` from
+`node:async_hooks` on each; workerd runs with the `nodejs_als` compatibility flag, which
+compatibility dates before 2026-08-04 need.
 
 ## 8. Packaging and support
 
