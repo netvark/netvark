@@ -44,7 +44,9 @@ adds the middleware, validators, response helpers, error handlers, and the opera
 @netvark/ban-core's Hono adapter, through which its error handler renders (ADR 0002). Validators are
 consumed through Standard Schema V1, whose interfaces are vendored in
 `packages/jsonapi-core/src/internal/standard-schema-types.ts`, so installing either package never
-pulls in Zod, Valibot, ArkType, or Ajv.
+pulls in Zod, Valibot, ArkType, or Ajv. The declarations name no type only the DOM library declares:
+an error's `headers` are `BanErrorOptions['headers']`, the Fetch Standard's `HeadersInit` as
+@netvark/ban-core vendors it, so a Node consumer compiles them with Node's types alone (14.1).
 
 | Subpath                           | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1171,22 +1173,23 @@ like the collection. Each file starts it on `@hono/node-server` and asserts over
 `clients.ts` builds the client's transport at the server's origin and records each request as the
 server received it.
 
-| File                               | Covers                                                                                                                                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package-surface.e2e.test.ts`      | the exact export lists of all five subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings                                                                                       |
-| `fetch.e2e.test.ts`                | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500                                                                                                     |
-| `pagination.e2e.test.ts`           | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                                                                                                       |
-| `mutations.e2e.test.ts`            | create with 201 and `Location`, pointers for bad documents, 403 for a field a write does not accept, alone and beside a 400, update, relationship endpoints and a read-only relationship's 403, delete |
-| `negotiation.e2e.test.ts`          | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                   |
-| `atomic.e2e.test.ts`               | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                           |
-| `custom-catalog.e2e.test.ts`       | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                       |
-| `client-types.e2e.test.ts`         | the client types the blog's definitions carry, read through the built declarations (5.3)                                                                                                               |
-| `declarations.e2e.test.ts`         | `tsc --declaration` over modules that export definitions: no diagnostics, and only package entry points named                                                                                          |
-| `client-reads.e2e.test.ts`         | the built client's pages of records, the walk along `next` and `prev`, cursors, compound documents resolved along the include paths sent, sparse fieldsets, and their types (15.4, 15.6, 15.8)         |
-| `client-writes.e2e.test.ts`        | the documents a create and an update send and the server stores, the records of a 201 and a 200, a remove's 204, and a member the types refuse, answered 403 (15.4)                                    |
-| `client-relationships.e2e.test.ts` | linkage by cardinality, related records with the target's fieldset and paged, linkage replaced, added to, and removed from, and a read-only relationship refused in the types and with 403 (15.4)      |
-| `client-errors.e2e.test.ts`        | each error status into a `ResponseError` with its message naming only the call, ids refused before sending, an aborted request passed on (15.3, 15.7)                                                  |
-| `client-transport.e2e.test.ts`     | the headers and `Accept-Language` the server receives, in order and per request, and a page link to another origin refused (15.2, 15.8)                                                                |
+| File                               | Covers                                                                                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-surface.e2e.test.ts`      | the exact export lists of all five subpaths, and that `@netvark/hono-jsonapi` re-exports the core's own bindings                                                                                                                      |
+| `fetch.e2e.test.ts`                | resources, compound documents, sparse fieldsets, sort, filter, 400 and 404 documents, constant 500                                                                                                                                    |
+| `pagination.e2e.test.ts`           | profile on `Content-Type`, default and max size, walking `next` and `prev`, the profile's errors                                                                                                                                      |
+| `mutations.e2e.test.ts`            | create with 201 and `Location`, pointers for bad documents, 403 for a field a write does not accept, alone and beside a 400, update, relationship endpoints and a read-only relationship's 403, delete                                |
+| `negotiation.e2e.test.ts`          | 415, 406, usable instances, requested profiles, the atomic extension on both headers                                                                                                                                                  |
+| `atomic.e2e.test.ts`               | lid flow, positional results, 204, rollback with pointers, a field an operation does not write, 415 and 400 for bad requests                                                                                                          |
+| `custom-catalog.e2e.test.ts`       | an application's own @netvark/hono-ban instance rendering the packages' errors, its entries, and `HTTPException`                                                                                                                      |
+| `client-types.e2e.test.ts`         | the client types the blog's definitions carry, read through the built declarations (5.3)                                                                                                                                              |
+| `declarations.e2e.test.ts`         | `tsc --declaration` over modules that export definitions: no diagnostics, and only package entry points named                                                                                                                         |
+| `node-types.e2e.test.ts`           | every subpath of the three packages compiled by `tsc` as a Node consumer without the DOM library compiles it (`lib: ["es2023"]`, `types: ["node"]`, `skipLibCheck` off): no diagnostics in their declarations or in those they import |
+| `client-reads.e2e.test.ts`         | the built client's pages of records, the walk along `next` and `prev`, cursors, compound documents resolved along the include paths sent, sparse fieldsets, and their types (15.4, 15.6, 15.8)                                        |
+| `client-writes.e2e.test.ts`        | the documents a create and an update send and the server stores, the records of a 201 and a 200, a remove's 204, and a member the types refuse, answered 403 (15.4)                                                                   |
+| `client-relationships.e2e.test.ts` | linkage by cardinality, related records with the target's fieldset and paged, linkage replaced, added to, and removed from, and a read-only relationship refused in the types and with 403 (15.4)                                     |
+| `client-errors.e2e.test.ts`        | each error status into a `ResponseError` with its message naming only the call, ids refused before sending, an aborted request passed on (15.3, 15.7)                                                                                 |
+| `client-transport.e2e.test.ts`     | the headers and `Accept-Language` the server receives, in order and per request, and a page link to another origin refused (15.2, 15.8)                                                                                               |
 
 ### 14.2 Runtime smoke test (`e2e/jsonapi/smoke/`)
 
@@ -1206,8 +1209,11 @@ three; CI runs them on every pull request and every push to `main`.
 paths come from their links (5.4), the query from their capabilities (5.2), and every type from
 `'~types'` (5.3). It depends on `@netvark/jsonapi-core` and on nothing else, imports no framework,
 and uses web standards only (`fetch`, `Request`, `Response`, `Headers`, `URL`, `URLSearchParams`),
-so the same build runs in browsers, workers, Node, Bun, and Deno. The client reads a definition's
-`type`, `relationships`, `links`, and `query.search`; it never calls `serialize` or a validator.
+so the same build runs in browsers, workers, Node, Bun, and Deno. Its declarations name those and no
+alias only the DOM library declares: `headers` take `HeadersInit`, the Fetch Standard's, vendored in
+`internal/headers-init.ts` as the DOM library types it, since Node's types declare `Headers` but not
+the alias (14.1). The client reads a definition's `type`, `relationships`, `links`, and
+`query.search`; it never calls `serialize` or a validator.
 
 ### 15.1 Surface and module map
 
@@ -1220,6 +1226,7 @@ packages/jsonapi-client/src/
   index.ts                     root entry
   internal/object.ts           isRecord(), ownMember(), defineMember(): prototype-safe reads of response JSON
   internal/definition-types.ts the type helpers over definitions the query, record, and client types share
+  internal/headers-init.ts     HeadersInit, the Fetch Standard's, as the DOM library types it (15.2, 15.3)
   transport/
     origin.ts                  assertOrigin(), atOrigin(): the origin and the links the client follows (15.2, 15.8)
     transport.ts               createTransport() (15.2)

@@ -4,6 +4,8 @@
  * of the fallback (SPEC 6.4).
  * @packageDocumentation
  */
+import type { HeadersInit } from '../internal/headers-init';
+
 import { DEFAULT_CACHE_CONTROL } from '../internal/constants';
 
 const SET_COOKIE = 'set-cookie';

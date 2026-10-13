@@ -16,7 +16,13 @@
  * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (sections 4.2 and 7.2)
  * @packageDocumentation
  */
-import type { Ban, BanError, ErrorItem, ErrorKey } from '@netvark/ban-core';
+import type {
+  Ban,
+  BanError,
+  BanErrorOptions,
+  ErrorItem,
+  ErrorKey,
+} from '@netvark/ban-core';
 import type { JsonApiBody } from '@netvark/ban-core/formats/json-api';
 
 import type {
@@ -70,8 +76,8 @@ export interface ErrorItemInit {
 export interface JsonApiErrorOptions {
   /** The underlying failure, for reports; never rendered. */
   readonly cause?: unknown;
-  /** Headers every response for this error carries, such as `Allow` or `Vary`. */
-  readonly headers?: HeadersInit | undefined;
+  /** Headers every response for this error carries, such as `Allow` or `Vary`, as a `BanError` takes them. */
+  readonly headers?: BanErrorOptions['headers'];
 }
 
 export type ErrorObjectInit = ErrorItemInit & JsonApiErrorOptions;

@@ -1,3 +1,4 @@
+import type { HeadersInit } from '../internal/headers-init';
 import type { JsonRecord } from '../internal/object';
 import type { TransportState } from './transport';
 
