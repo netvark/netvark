@@ -24,7 +24,7 @@ implemented and pinned by a test, and every choice the specification leaves open
 |                           | [`@netvark/kysely-resource`](packages/kysely-resource#readme)               | The Kysely runtime on PostgreSQL: every operation in one transaction scoped to the actor's tenant, for row security policies and its own scope predicate alike. In development.                                                                                                                             |
 |                           | [`@netvark/hono-resource`](packages/hono-resource#readme)                   | The Hono routes: every operation a runtime runs, each relationship's links, the Atomic Operations endpoint, and the OpenAPI document, served where the declarations' links point, with JSON:API negotiation, validation, includes, localized errors, and the request's actor resolved once. In development. |
 |                           | [`@netvark/resource-ui`](packages/resource-ui#readme)                       | Forms and lists from those declarations, for any framework: labels and options from your messages, validation in the server's words, the write a form sends, refusals on their fields, and list state as TanStack Table v9 holds it. In development.                                                        |
-|                           | [`@netvark/react-resource`](packages/react-resource#readme)                 | TanStack Form bindings for React over those forms. In development.                                                                                                                                                                                                                                          |
+|                           | [`@netvark/tanstack-form-resource`](packages/tanstack-form-resource#readme) | [TanStack Form](https://tanstack.com/form/v1) options for those forms, which every adapter takes, and a refused write's texts on their fields. In development.                                                                                                                                              |
 
 Every package is ESM only and runs on Node 22.12+, Bun, and Deno. Every package but
 `@netvark/pg-catalog`, a build-time tool that reads files and drives PostgreSQL, and
@@ -32,17 +32,17 @@ Every package is ESM only and runs on Node 22.12+, Bun, and Deno. Every package 
 and reads nothing from the environment. The cores have no dependencies apart from each other
 (`@netvark/jsonapi-core` is built on `@netvark/ban-core`, and `@netvark/resource-core` on the
 catalog, jsonapi, and keyset cores). `@netvark/jsonapi-client` depends on `@netvark/jsonapi-core`
-alone and also runs in browsers, as do `@netvark/intl-core`, `@netvark/resource-ui`, and
-`@netvark/tanstack-query-jsonapi`. A binding takes its host as a peer dependency, and also each
-`@netvark` package whose values the application hands it
+alone and also runs in browsers, as do `@netvark/intl-core`, `@netvark/resource-ui`,
+`@netvark/tanstack-query-jsonapi`, and `@netvark/tanstack-form-resource`. A binding takes its host
+as a peer dependency, and also each `@netvark` package whose values the application hands it
 ([ADR 0006](docs/adr/0006-a-binding-takes-the-packages-the-application-hands-it-values-from-as-peers.md)):
 `@netvark/hono-jsonapi` takes `@netvark/hono-ban`, `@netvark/kysely-resource` takes
 `@netvark/resource-core` and `@netvark/keyset-core`, `@netvark/hono-resource` takes
 `@netvark/hono-jsonapi` and `@netvark/resource-core`, `@netvark/resource-ui` takes
-`@netvark/resource-core` and `@netvark/jsonapi-client`, and `@netvark/react-resource` takes those
-and `@netvark/resource-ui`. `@netvark/tanstack-query-jsonapi` takes `@netvark/jsonapi-client`, and
-TanStack Query's core, `@tanstack/query-core`, as an optional peer that the application's adapter
-brings
+`@netvark/resource-core` and `@netvark/jsonapi-client`. `@netvark/tanstack-query-jsonapi` takes
+`@netvark/jsonapi-client`, and `@netvark/tanstack-form-resource` takes `@netvark/resource-ui`, each
+with the TanStack core it binds, `@tanstack/query-core` or `@tanstack/form-core`, as an optional
+peer that the application's adapter brings
 ([ADR 0011](docs/adr/0011-a-binding-takes-the-core-an-adapter-brings-as-an-optional-peer.md)).
 `@netvark/pg-catalog` depends on `pg` and takes PGlite and `@netvark/resource-core` as optional
 peers. `@netvark/paraglide-intl` takes `@inlang/paraglide-js` and loads projects with the inlang SDK
@@ -67,7 +67,7 @@ pnpm add @netvark/resource-core                                # resources decla
 pnpm add @netvark/kysely-resource @netvark/keyset-core kysely  # those resources run on PostgreSQL through Kysely
 pnpm add @netvark/hono-resource @netvark/hono-jsonapi hono     # and served on Hono
 pnpm add @netvark/resource-ui @netvark/jsonapi-client          # and their forms and lists, in any framework
-pnpm add @netvark/react-resource                               # bound to TanStack Form in React
+pnpm add @netvark/tanstack-form-resource @tanstack/react-form  # bound to TanStack Form, any adapter
 pnpm add @netvark/intl-core                                    # formatting and time zones for Paraglide apps
 pnpm add -D @netvark/paraglide-intl @inlang/paraglide-js       # Paraglide's compile, values isolated
 pnpm add @netvark/ban-core                                     # a core on its own: a fetch handler, a worker, another framework

@@ -6,9 +6,10 @@ Thanks for helping. This repository holds every `@netvark` package, grouped in f
 (`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, `@netvark/jsonapi-client`,
 `@netvark/tanstack-query-jsonapi`), keyset (`@netvark/keyset-core`, `@netvark/kysely-keyset`,
 `@netvark/drizzle-keyset`), and resource (`@netvark/resource-core`, `@netvark/kysely-resource`,
-`@netvark/hono-resource`, `@netvark/resource-ui`, `@netvark/react-resource`). This guide covers what
-every family shares: setup, the quality gates, the conventions, commits, changesets, and releases.
-Each family adds its own guide with its layout, extension points, constraints, and checklist:
+`@netvark/hono-resource`, `@netvark/resource-ui`, `@netvark/tanstack-form-resource`). This guide
+covers what every family shares: setup, the quality gates, the conventions, commits, changesets, and
+releases. Each family adds its own guide with its layout, extension points, constraints, and
+checklist:
 
 - [`docs/ban/CONTRIBUTING.md`](docs/ban/CONTRIBUTING.md)
 - [`docs/catalog/CONTRIBUTING.md`](docs/catalog/CONTRIBUTING.md)
@@ -69,14 +70,14 @@ else, `e2e/*` included, resolves `dist/`.
 CI runs the same commands, plus these packages' tests on the floors of their peer ranges:
 `@netvark/kysely-keyset` on Kysely 0.28.17, `@netvark/kysely-resource` on Kysely 0.29.0,
 `@netvark/drizzle-keyset` on drizzle-orm 0.45.2, `@netvark/resource-core` on Zod 4.5.0,
-`@netvark/tanstack-query-jsonapi` on TanStack Query's core 5.89.0, `@netvark/react-resource` on
-TanStack Form 1.17.0, `@netvark/hono-ban`, `@netvark/hono-jsonapi`, and `@netvark/hono-resource` on
-Hono 4.13.7, `@netvark/pg-catalog` on PGlite 0.5.0, and `@netvark/paraglide-intl` on Paraglide JS
-2.11.0. It also runs the keyset e2e suite on a PostgreSQL server, and `@netvark/pg-catalog`'s tests
-and the catalog e2e suite on PostgreSQL servers. A pull request must be green on all of them: the
-last CI job, `CI passed`, needs every other job and is the one check `main` requires
-([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a new CI job goes into its
-`needs` list. To work on one package or family, filter by name:
+`@netvark/tanstack-query-jsonapi` on TanStack Query's core 5.89.0, `@netvark/tanstack-form-resource`
+on TanStack Form's core 1.17.0, `@netvark/hono-ban`, `@netvark/hono-jsonapi`, and
+`@netvark/hono-resource` on Hono 4.13.7, `@netvark/pg-catalog` on PGlite 0.5.0, and
+`@netvark/paraglide-intl` on Paraglide JS 2.11.0. It also runs the keyset e2e suite on a PostgreSQL
+server, and `@netvark/pg-catalog`'s tests and the catalog e2e suite on PostgreSQL servers. A pull
+request must be green on all of them: the last CI job, `CI passed`, needs every other job and is the
+one check `main` requires ([ADR 0004](docs/adr/0004-protect-main-with-one-aggregate-check.md)), so a
+new CI job goes into its `needs` list. To work on one package or family, filter by name:
 
 ```bash
 pnpm --filter @netvark/keyset-core test

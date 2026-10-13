@@ -179,12 +179,12 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      # @netvark/react-resource declares `@tanstack/react-form ^1.17.0`, the
-      # first release with `revalidateLogic` (resource SPEC 20.9); its
-      # typecheck and tests, the screen tests among them, run on it.
-      - run: pnpm --filter @netvark/react-resource add --save-dev @tanstack/react-form@1.17.0
-      - run: pnpm --filter @netvark/react-resource run typecheck
-      - run: pnpm --filter @netvark/react-resource run test
+      # @netvark/tanstack-form-resource declares `@tanstack/form-core
+      # ^1.17.0`, the first release with `revalidateLogic` (resource SPEC
+      # 20.9); its typecheck and tests run on it.
+      - run: pnpm --filter @netvark/tanstack-form-resource add --save-dev @tanstack/form-core@1.17.0
+      - run: pnpm --filter @netvark/tanstack-form-resource run typecheck
+      - run: pnpm --filter @netvark/tanstack-form-resource run test
 
   test-hono-floor:
     name: Test (Hono 4.13.7, the peer range floor)
