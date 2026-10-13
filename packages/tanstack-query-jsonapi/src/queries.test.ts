@@ -1,36 +1,21 @@
-import type { AnyResource } from '@netvark/jsonapi-core';
+import type { BlogApi } from './test-support/fetch-double';
 
-import type { QueryServer } from '../test-support/query-server';
-
-import { InfiniteQueryObserver, QueryObserver } from '@tanstack/react-query';
+import { InfiniteQueryObserver, QueryObserver } from '@tanstack/query-core';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  createClients,
-  createTransport,
-  isResponseError,
-} from '@netvark/jsonapi-client';
-import { createDefineResource } from '@netvark/jsonapi-core';
+import { isResponseError } from '@netvark/jsonapi-client';
 
-import {
-  contact,
-  ok,
-  queryServer,
-  untilAborted,
-} from '../test-support/query-server';
 import { resourceQueries } from './queries';
-
-/** Tags, which a raw definition declares without pages. */
-const Tags: AnyResource = createDefineResource({
-  links: { base: 'https://api.example.test' },
-})({
-  type: 'tags',
-  attributes: ['name'],
-  serialize: (row: { readonly id: string }) => ({ id: row.id }),
-});
+import { Tags } from './test-support/blog';
+import {
+  article,
+  blogApi,
+  ok,
+  untilAborted,
+} from './test-support/fetch-double';
 
 /** A read started as a component starts it, and the key it caches under. */
-type Started = (server: QueryServer) => {
+type Started = (api: BlogApi) => {
   readonly reading: Promise<unknown>;
   readonly queryKey: ReadonlyArray<unknown>;
 };
@@ -39,7 +24,7 @@ const READS: ReadonlyArray<readonly [string, Started]> = [
   [
     'a list',
     ({ clients, queryClient }) => {
-      const options = resourceQueries(clients.contacts).list();
+      const options = resourceQueries(clients.articles).list();
       const reading = new QueryObserver(queryClient, options).refetch();
       return { reading, queryKey: options.queryKey };
     },
@@ -47,7 +32,7 @@ const READS: ReadonlyArray<readonly [string, Started]> = [
   [
     'a page',
     ({ clients, queryClient }) => {
-      const options = resourceQueries(clients.contacts).pages();
+      const options = resourceQueries(clients.articles).pages();
       const reading = new InfiniteQueryObserver(queryClient, options).refetch();
       return { reading, queryKey: options.queryKey };
     },
@@ -55,29 +40,31 @@ const READS: ReadonlyArray<readonly [string, Started]> = [
   [
     'a record',
     ({ clients, queryClient }) => {
-      const options = resourceQueries(clients.contacts).get('7');
+      const options = resourceQueries(clients.articles).get('7');
       const reading = new QueryObserver(queryClient, options).refetch();
       return { reading, queryKey: options.queryKey };
     },
   ],
 ];
 
-describe('the reads of resourceQueries (resource SPEC 20.6)', () => {
+describe('the reads of resourceQueries (SPEC 16.3)', () => {
   it('lists through the client, resolving to its page of records with the links', async () => {
-    const links = { next: '/api/contacts?page%5Bafter%5D=c1' };
-    const { clients, arrivals, queryClient } = queryServer(() =>
-      ok([contact('1', 'Ada', 'c1')], links),
+    const links = { next: '/api/articles?page%5Bafter%5D=c1' };
+    const { clients, arrivals, queryClient } = blogApi(() =>
+      ok([article('1', 'Keys', 'c1')], links),
     );
-    const options = resourceQueries(clients.contacts).list({ sort: ['name'] });
+    const options = resourceQueries(clients.articles).list({
+      sort: ['title'],
+    });
     const { data } = await new QueryObserver(queryClient, options).refetch();
     expect(arrivals.map(({ method, target }) => [method, target])).toEqual([
-      ['GET', '/api/contacts?sort=name'],
+      ['GET', '/api/articles?sort=title'],
     ]);
     expect(data?.data).toEqual([
       {
-        type: 'contacts',
+        type: 'articles',
         id: '1',
-        name: 'Ada',
+        title: 'Keys',
         $meta: { page: { cursor: 'c1' } },
       },
     ]);
@@ -86,48 +73,44 @@ describe('the reads of resourceQueries (resource SPEC 20.6)', () => {
   });
 
   it('gets a record with the include and fields it asks for', async () => {
-    const { clients, arrivals, queryClient } = queryServer(() => ({
+    const { clients, arrivals, queryClient } = blogApi(() => ({
       status: 200,
       document: {
         data: {
-          ...contact('7', 'Ada'),
-          relationships: {
-            organization: { data: { type: 'organizations', id: '1' } },
-          },
+          ...article('7', 'Keys'),
+          relationships: { author: { data: { type: 'people', id: '9' } } },
         },
-        included: [
-          { type: 'organizations', id: '1', attributes: { name: 'Acme' } },
-        ],
+        included: [{ type: 'people', id: '9', attributes: { name: 'Ada' } }],
       },
     }));
-    const options = resourceQueries(clients.contacts).get('7', {
-      include: ['organization'],
-      fields: { contacts: ['name', 'organization'] },
+    const options = resourceQueries(clients.articles).get('7', {
+      include: ['author'],
+      fields: { articles: ['title', 'author'] },
     });
     const { data } = await new QueryObserver(queryClient, options).refetch();
     expect(arrivals.map(({ target }) => target)).toEqual([
-      '/api/contacts/7?include=organization&fields[contacts]=name,organization',
+      '/api/articles/7?include=author&fields[articles]=title,author',
     ]);
     expect(data?.data).toMatchObject({
       id: '7',
-      name: 'Ada',
-      organization: { type: 'organizations', id: '1', name: 'Acme' },
+      title: 'Keys',
+      author: { type: 'people', id: '9', name: 'Ada' },
     });
   });
 
   it.each(READS)(
     'aborts the request of %s whose query is cancelled',
     async (_name, start) => {
-      const server = queryServer(untilAborted);
-      const { reading, queryKey } = start(server);
+      const api = blogApi(untilAborted);
+      const { reading, queryKey } = start(api);
       await vi.waitFor(() => {
-        expect(server.arrivals).toHaveLength(1);
+        expect(api.arrivals).toHaveLength(1);
       });
-      expect(server.arrivals[0]?.signal.aborted).toBe(false);
-      await server.queryClient.cancelQueries({ queryKey });
-      expect(server.arrivals[0]?.signal.aborted).toBe(true);
+      expect(api.arrivals[0]?.signal.aborted).toBe(false);
+      await api.queryClient.cancelQueries({ queryKey });
+      expect(api.arrivals[0]?.signal.aborted).toBe(true);
       await reading;
-      expect(server.queryClient.getQueryState(queryKey)).toMatchObject({
+      expect(api.queryClient.getQueryState(queryKey)).toMatchObject({
         data: undefined,
         fetchStatus: 'idle',
       });
@@ -135,11 +118,11 @@ describe('the reads of resourceQueries (resource SPEC 20.6)', () => {
   );
 
   it("settles a refused read with the client's ResponseError", async () => {
-    const { clients, queryClient } = queryServer(() => ({
+    const { clients, queryClient } = blogApi(() => ({
       status: 404,
       document: { errors: [{ status: '404', code: 'NOT_FOUND' }] },
     }));
-    const options = resourceQueries(clients.contacts).get('9');
+    const options = resourceQueries(clients.articles).get('9');
     const { error } = await new QueryObserver(queryClient, options).refetch();
     expect(error).toSatisfy(
       (refusal) =>
@@ -155,13 +138,10 @@ describe('the reads of resourceQueries (resource SPEC 20.6)', () => {
         ),
       );
     }
-    const { tags } = createClients(
-      { tags: Tags },
-      createTransport({ origin: 'https://api.example.test' }),
-    );
-    const queries = resourceQueries(tags);
-    expect(queries.list().queryKey).toEqual(['tags', 'list', '']);
-    expect(() => queries.pages()).toThrow(
+    const { clients } = blogApi(() => ok([]));
+    const tags = resourceQueries(clients.tags);
+    expect(tags.list().queryKey).toEqual(['tags', 'list', '']);
+    expect(() => tags.pages()).toThrow(
       new TypeError(
         'resourceQueries: tags does not paginate, so it has no pages',
       ),

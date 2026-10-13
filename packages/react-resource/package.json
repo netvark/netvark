@@ -1,14 +1,13 @@
 {
   "name": "@netvark/react-resource",
   "version": "0.0.0",
-  "description": "TanStack Form and TanStack Query bindings for React over @netvark/resource-ui's form models and @netvark/jsonapi-client's clients: a form's options and refusals on its fields, and query options keyed by the request.",
+  "description": "TanStack Form bindings for React over @netvark/resource-ui's form models: a form's values and validator from the model, and a refused write's texts on their fields.",
   "keywords": [
     "forms",
     "json-api",
     "jsonapi",
     "react",
-    "tanstack-form",
-    "tanstack-query"
+    "tanstack-form"
   ],
   "homepage": "https://github.com/netvark/netvark/tree/main/packages/react-resource#readme",
   "bugs": "https://github.com/netvark/netvark/issues",
@@ -32,16 +31,11 @@
       "source": "./src/tanstack-form/index.ts",
       "default": "./dist/form.js"
     },
-    "./query": {
-      "source": "./src/tanstack-query/index.ts",
-      "default": "./dist/query.js"
-    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       "./form": "./dist/form.js",
-      "./query": "./dist/query.js",
       "./package.json": "./package.json"
     },
     "access": "public",
@@ -62,17 +56,18 @@
     "@netvark/jsonapi-client": "workspace:^",
     "@netvark/resource-core": "workspace:^",
     "@netvark/resource-ui": "workspace:^",
+    "@netvark/tanstack-query-jsonapi": "workspace:^",
     "@tanstack/react-form": "1.33.5",
-    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "1.170.42",
     "@tanstack/react-table": "9.2.8",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",
-    "@types/react": "19.3.0",
+    "@types/react": "catalog:",
     "@types/react-dom": "19.3.0",
     "jsdom": "catalog:",
-    "react": "19.3.0",
+    "react": "catalog:",
     "react-dom": "19.3.0",
     "zod": "catalog:"
   },
@@ -80,14 +75,10 @@
     "@netvark/jsonapi-client": "^0.1.0",
     "@netvark/resource-core": "^0.1.0",
     "@netvark/resource-ui": "^0.1.0",
-    "@tanstack/react-form": "^1.17.0",
-    "@tanstack/react-query": "^5.89.0"
+    "@tanstack/react-form": "^1.17.0"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-form": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
       "optional": true
     }
   },

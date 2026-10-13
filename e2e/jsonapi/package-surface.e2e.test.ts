@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Package surface. Every subpath of the three packages must resolve
+ * Package surface. Every subpath of the four packages must resolve
  * through the published `exports` maps at runtime and export exactly what
  * the SPEC lists. Value imports on purpose: a missing dist file or a wrong
  * `exports` entry fails here before any feature test runs.
@@ -12,6 +12,7 @@ import * as honoAtomic from '@netvark/hono-jsonapi/atomic';
 import * as client from '@netvark/jsonapi-client';
 import * as kit from '@netvark/jsonapi-core';
 import * as kitAtomic from '@netvark/jsonapi-core/atomic';
+import * as query from '@netvark/tanstack-query-jsonapi';
 
 function names(module: object): Array<string> {
   return Object.keys(module).toSorted();
@@ -159,5 +160,11 @@ describe('@netvark/hono-jsonapi surface', () => {
 describe('@netvark/jsonapi-client surface', () => {
   it('the root exports the SPEC section 15.1 values', () => {
     expect(names(client)).toEqual(CLIENT);
+  });
+});
+
+describe('@netvark/tanstack-query-jsonapi surface', () => {
+  it('the root exports the SPEC section 16.1 values', () => {
+    expect(names(query)).toEqual(['resourceQueries']);
   });
 });

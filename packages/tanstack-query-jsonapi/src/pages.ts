@@ -1,10 +1,10 @@
 /**
- * The pages of an infinite list (resource SPEC 20.6) under the Cursor
- * Pagination profile (jsonapi SPEC 15.8): the list starts at the query's
- * own cursors, the next page is after the `next` cursor of the last page
- * and the previous before the `prev` cursor of the first, each only
- * while that page holds records, since the profile lets a link point at
- * an empty page. `page[size]` stays the query's.
+ * The pages of an infinite list (SPEC 16.3) under the Cursor Pagination
+ * profile (SPEC 15.8): the list starts at the query's own cursors, the next
+ * page is after the `next` cursor of the last page and the previous before
+ * the `prev` cursor of the first, each only while that page holds records,
+ * since the profile lets a link point at an empty page. `page[size]` stays
+ * the query's.
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/#auto-id-links
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/infinite-queries
  * @packageDocumentation

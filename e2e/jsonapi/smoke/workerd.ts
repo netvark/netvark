@@ -5,14 +5,18 @@ import type { Dispatch } from './checks.ts';
  * Miniflare. workerd executes the module graph it is handed and never reads
  * `node_modules`, so `worker.ts` is bundled first with tsdown using
  * `platform: 'neutral'` (no Node shims), the way a consumer's Workers bundle
- * is built. Node runs this file: `node --experimental-strip-types`.
+ * is built, `process.env.NODE_ENV` replaced with `"production"` as Wrangler
+ * replaces it when it builds or deploys: workerd has no `process`, and
+ * query-core reads `process.env.NODE_ENV` for its development checks. Node
+ * runs this file: `node --experimental-strip-types`.
  * @ref https://developers.cloudflare.com/workers/testing/miniflare/get-started/
  * @ref https://tsdown.dev/options/platform
+ * @ref https://developers.cloudflare.com/workers/wrangler/bundling/ ("`process.env.NODE_ENV` is statically replaced at build time")
  */
 import { Miniflare } from 'miniflare';
 import { build } from 'tsdown';
 
-import { clientChecks, report, runChecks } from './checks.ts';
+import { report, routeChecks, runChecks } from './checks.ts';
 
 const OUT_DIR = 'smoke/.workerd';
 /** Any date at or before the pinned workerd release; current behavior is what is tested. */
@@ -26,6 +30,7 @@ await build({
   outDir: OUT_DIR,
   format: 'esm',
   platform: 'neutral',
+  env: { NODE_ENV: 'production' },
   fixedExtension: true,
   dts: false,
   clean: true,
@@ -42,7 +47,14 @@ const dispatch: Dispatch = async (path, init) =>
   mf.dispatchFetch(new URL(path, ORIGIN), init);
 try {
   report(await runChecks(dispatch));
-  report(await clientChecks(dispatch), '@netvark/jsonapi-client');
+  report(
+    await routeChecks(dispatch, '/client-checks'),
+    '@netvark/jsonapi-client',
+  );
+  report(
+    await routeChecks(dispatch, '/query-checks'),
+    '@netvark/tanstack-query-jsonapi',
+  );
 } finally {
   await mf.dispose();
 }

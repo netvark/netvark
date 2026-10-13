@@ -1,15 +1,15 @@
 /**
  * The queries the screen tests' screens read and write through (resource
- * SPEC 20.8), made once per API as an application makes them beside its
- * clients. Not published with the package.
+ * SPEC 20.6, `@netvark/tanstack-query-jsonapi`), made once per API as an
+ * application makes them beside its clients. Not published with the package.
  * @packageDocumentation
  */
 import type { AnyResource } from '@netvark/jsonapi-core';
+import type { ResourceQueries } from '@netvark/tanstack-query-jsonapi';
 
-import type { ResourceQueries } from '../../tanstack-query/query-types';
 import type { FixtureDefinitions, QueryServer } from '../query-server';
 
-import { resourceQueries } from '../../tanstack-query/queries';
+import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
 
 /** A record of the fixture's clients, typed as wide as their definitions. */
 export type ScreenRecord = Readonly<Record<string, unknown>> & {

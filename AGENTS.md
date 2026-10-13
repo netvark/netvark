@@ -60,18 +60,18 @@ and e2e directory imports; read the family's file before changing that family.
 
 A pnpm workspace of six families:
 
-| Family   | Core                      | Binding                    | Docs            | E2E            |
-| -------- | ------------------------- | -------------------------- | --------------- | -------------- |
-| ban      | `packages/ban-core`       | `packages/hono-ban`        | `docs/ban`      | `e2e/ban`      |
-| catalog  | `packages/catalog-core`   | `packages/pg-catalog`      | `docs/catalog`  | `e2e/catalog`  |
-| jsonapi  | `packages/jsonapi-core`   | `packages/hono-jsonapi`    | `docs/jsonapi`  | `e2e/jsonapi`  |
-|          | `packages/jsonapi-client` |                            |                 |                |
-| intl     | `packages/intl-core`      | `packages/paraglide-intl`  | `docs/intl`     | `e2e/intl`     |
-| keyset   | `packages/keyset-core`    | `packages/kysely-keyset`   | `docs/keyset`   | `e2e/keyset`   |
-|          |                           | `packages/drizzle-keyset`  |                 |                |
-| resource | `packages/resource-core`  | `packages/kysely-resource` | `docs/resource` | `e2e/resource` |
-|          | `packages/resource-ui`    | `packages/hono-resource`   |                 |                |
-|          |                           | `packages/react-resource`  |                 |                |
+| Family   | Core                      | Binding                           | Docs            | E2E            |
+| -------- | ------------------------- | --------------------------------- | --------------- | -------------- |
+| ban      | `packages/ban-core`       | `packages/hono-ban`               | `docs/ban`      | `e2e/ban`      |
+| catalog  | `packages/catalog-core`   | `packages/pg-catalog`             | `docs/catalog`  | `e2e/catalog`  |
+| jsonapi  | `packages/jsonapi-core`   | `packages/hono-jsonapi`           | `docs/jsonapi`  | `e2e/jsonapi`  |
+|          | `packages/jsonapi-client` | `packages/tanstack-query-jsonapi` |                 |                |
+| intl     | `packages/intl-core`      | `packages/paraglide-intl`         | `docs/intl`     | `e2e/intl`     |
+| keyset   | `packages/keyset-core`    | `packages/kysely-keyset`          | `docs/keyset`   | `e2e/keyset`   |
+|          |                           | `packages/drizzle-keyset`         |                 |                |
+| resource | `packages/resource-core`  | `packages/kysely-resource`        | `docs/resource` | `e2e/resource` |
+|          | `packages/resource-ui`    | `packages/hono-resource`          |                 |                |
+|          |                           | `packages/react-resource`         |                 |                |
 
 - `packages/<name>/`: one published package, `@netvark/<name>`. `src/` with colocated tests;
   `tsdown.config.ts`, whose entry map becomes the `exports` map in `package.json` on build;

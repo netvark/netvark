@@ -1,9 +1,9 @@
 /**
  * TanStack Query over the contacts application (resource SPEC 20.6): the
- * options `resourceQueries` of the built `@netvark/react-resource/query`
+ * options `resourceQueries` of the built `@netvark/tanstack-query-jsonapi`
  * makes from the built `@netvark/jsonapi-client`'s clients, read and
- * written through TanStack Query's observers, which its hooks are made
- * of, against the application served over a socket
+ * written through query-core's observers, which every adapter's hooks are
+ * made of, against the application served over a socket
  * (`support/contacts-server.ts`, with meetings, `runtime/meetings.ts`),
  * on PGlite and on the server `RESOURCE_PG_URL` names. A screen is an
  * observer with a listener, as a mounted `useQuery` is; the transport
@@ -15,7 +15,7 @@
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/infinite-queries
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
  */
-import type { QueryObserverOptions } from '@tanstack/react-query';
+import type { QueryObserverOptions } from '@tanstack/query-core';
 
 import type { RuntimeDatabase } from '../runtime/database.ts';
 import type { ContactsServer } from '../support/contacts-server.ts';
@@ -26,7 +26,7 @@ import {
   MutationObserver,
   QueryClient,
   QueryObserver,
-} from '@tanstack/react-query';
+} from '@tanstack/query-core';
 import {
   afterAll,
   afterEach,
@@ -39,7 +39,7 @@ import {
 } from 'vitest';
 
 import { isResponseError, pageCursors } from '@netvark/jsonapi-client';
-import { resourceQueries } from '@netvark/react-resource/query';
+import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
 
 import { runtimeDatabases } from '../runtime/database.ts';
 import { openMeetingsRuntime } from '../runtime/meetings.ts';

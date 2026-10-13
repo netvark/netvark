@@ -58,9 +58,9 @@ grammar, the derivations, or the error model.
   floor in the same PR, with a `major` changeset.
 - Errors from declarations are `TypeError`s whose message starts with the option path (SPEC 14);
   errors on the wire are catalog entries (SPEC 9).
-- `@netvark/react-resource` takes TanStack Form and TanStack Query as optional peers at the lowest
-  releases with what it uses (SPEC 20.9), and CI runs its tests there; code that needs a newer
-  release raises the floor in the same PR, with a `major` changeset.
+- `@netvark/react-resource` takes TanStack Form as an optional peer at the lowest release with what
+  it uses (SPEC 20.9), and CI runs its tests there; code that needs a newer release raises the floor
+  in the same PR, with a `major` changeset.
 - `e2e/resource/package-surface.e2e.test.ts` lists every value export of every entry point; a new
   export goes there and into an e2e file that runs it.
 
