@@ -1,11 +1,29 @@
 /**
- * `@netvark/resource-ui`: forms and lists from `@netvark/resource-core`
- * declarations, as a model of a declared resource that imports no
- * framework and nothing of TanStack, so a screen on any framework reads
- * it (ADR 0018). See `docs/resource/SPEC.md`, section 20, for the
- * contract.
+ * `@netvark/resource-ui`: forms, lists, and record and bulk actions from
+ * `@netvark/resource-core` declarations, as models of a declared resource
+ * that import no framework and nothing of TanStack, so a screen on any
+ * framework reads them (ADR 0018, ADR 0019). See `docs/resource/SPEC.md`,
+ * sections 20 and 21, for the contract.
  * @packageDocumentation
  */
+export type {
+  ActionConfirm,
+  ActionCount,
+  ActionRecord,
+  ActionResource,
+  ActionState,
+  ActionTone,
+  ActionValues,
+  BulkAction,
+  BulkActionInit,
+  BulkActions,
+  BulkActionsOptions,
+  RecordAction,
+  RecordActionInit,
+  RecordActions,
+  RecordActionsOptions,
+  SelectionErrors,
+} from './actions/action-types';
 export type { FilterKind } from './fields/filter-kind';
 export type {
   FormErrors,
@@ -33,6 +51,8 @@ export type {
   FieldOption,
 } from './fields/fields-of';
 
+export { bulkActions } from './actions/bulk-actions';
+export { recordActions } from './actions/record-actions';
 export { fieldsOf } from './fields/fields-of';
 export { resourceForm } from './form/resource-form';
 export { resourceList } from './list/resource-list';

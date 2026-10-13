@@ -1,19 +1,26 @@
 /**
- * Checks of the built `@netvark/resource-ui` (resource SPEC 20.8): the
- * model, which imports no framework and nothing of TanStack, describes the
- * contacts application's members and runs a form model, its start values,
- * its validator, its write, and the error mapping of a refused write, and
- * a list model, which reads a stale link back leniently and pages by a
- * page's links, and a mistake throws the documented `TypeError`. The messages are
- * `defaultMessages`', constant in every runtime, since no request sets a
- * locale here. No Node.js API, so the same module runs on Bun, Deno, and
- * workerd, where server rendering runs.
+ * Checks of the built `@netvark/resource-ui` (resource SPEC 20.8, 21.5):
+ * the models, which import no framework and nothing of TanStack, describe
+ * the contacts application's members and run a form model, its start
+ * values, its validator, its write, and the error mapping of a refused
+ * write; a list model, which reads a stale link back leniently and pages
+ * by a page's links; and a bulk action, which builds a selection's
+ * operations, disables a selection over the cap, and places a refusal on
+ * the record of its operation; and a mistake throws the documented
+ * `TypeError`. The messages are `defaultMessages`', constant in every
+ * runtime, since no request sets a locale here. No Node.js API, so the
+ * same module runs on Bun, Deno, and workerd, where server rendering runs.
  */
 import type { Checks } from './report.ts';
 
 import { ResponseError } from '@netvark/jsonapi-client';
 import { defaultMessages } from '@netvark/resource-core';
-import { fieldsOf, resourceForm, resourceList } from '@netvark/resource-ui';
+import {
+  bulkActions,
+  fieldsOf,
+  resourceForm,
+  resourceList,
+} from '@netvark/resource-ui';
 
 import { Contacts } from '../resources/contacts.ts';
 import { Organizations } from '../resources/organizations.ts';
@@ -121,6 +128,62 @@ export const uiChecks: Checks = {
       list.params(next ?? {}).toString(),
     );
   },
+  "builds a selection's operations and places a refusal on the record of its operation":
+    () => {
+      const { archive } = bulkActions(Contacts, {
+        tooMany: ({ max }) => `At most ${String(max)} at once.`,
+        actions: {
+          archive: {
+            label: () => 'Archive',
+            update: { attributes: { status: 'archived' } },
+          },
+        },
+      });
+      const ids = ['c1', 'c2'];
+      const sent = archive.operations(ids).map(({ op, data }) => [op, data]);
+      check(
+        JSON.stringify(sent) ===
+          JSON.stringify(
+            ids.map((id) => [
+              'update',
+              { type: 'contacts', id, attributes: { status: 'archived' } },
+            ]),
+          ),
+        JSON.stringify(sent),
+      );
+      const over = Array.from({ length: archive.max + 1 }, (_, index) =>
+        String(index),
+      );
+      check(
+        archive.state(over).reason === 'At most 10 at once.',
+        JSON.stringify(archive.state(over)),
+      );
+      const { records, form } = archive.errors(
+        new ResponseError({
+          type: 'contacts',
+          call: 'operations',
+          status: 409,
+          body: {
+            errors: [
+              {
+                status: '409',
+                detail: 'Name already taken.',
+                source: {
+                  pointer: '/atomic:operations/1/data/attributes/name',
+                },
+              },
+            ],
+          },
+        }),
+        ids,
+      );
+      check(
+        records['c2']?.fields.name === 'Name already taken.' &&
+          records['c1'] === undefined &&
+          form.length === 0,
+        JSON.stringify({ records, form }),
+      );
+    },
   'refuses an operation it does not write': () => {
     const message = messageOf(resourceForm, [Contacts, 'remove', { messages }]);
     check(

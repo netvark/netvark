@@ -1,22 +1,25 @@
 # @netvark/resource-ui
 
-Forms and lists from
+Forms, lists, and record and bulk actions from
 [`@netvark/resource-core`](https://github.com/netvark/netvark/tree/main/packages/resource-core)
 declarations, for any framework. A declared resource already knows each member's label, options,
-limits, and filters, and the server's words for every refusal; this package models a form and a list
-screen from them, so a form or a table restates none of them. It imports no framework and nothing of
-TanStack: a screen in React, Vue, Solid, Svelte, Angular, or Lit reads the same model, and TanStack
-Form and TanStack Table v9 take its values as they are. Every choice is written down in
+limits, and filters, which writes it serves, and the server's words for every refusal; this package
+models a form, a list screen, and the actions of a row and of a selection from them, so a screen
+restates none of them. It imports no framework and nothing of TanStack: a screen in React, Vue,
+Solid, Svelte, Angular, or Lit reads the same model, and TanStack Form and TanStack Table v9 take
+its values as they are. Every choice is written down in
 [`docs/resource/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/resource/SPEC.md),
-section 20, and the decisions behind it in
+sections 20 and 21, and the decisions behind it in
 [ADR 0014](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0014-react-bindings-render-the-applications-one-messages-object.md),
 [ADR 0015](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0015-react-bindings-a-model-under-tanstack-query-form-and-table.md),
 [ADR 0016](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0016-a-form-sends-a-cleared-input-as-null.md),
+[ADR 0018](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0018-forms-and-lists-are-a-model-and-a-tanstack-form-binding-in-two-packages.md),
 and
-[ADR 0018](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0018-forms-and-lists-are-a-model-and-a-tanstack-form-binding-in-two-packages.md).
+[ADR 0019](https://github.com/netvark/netvark/blob/main/docs/resource/adr/0019-record-and-bulk-actions-are-a-model-and-a-selection-writes-in-one-request.md).
 
 Status: in development and unreleased. Field descriptors (`fieldsOf`), the form model
-(`resourceForm`), and the list model (`resourceList`) have shipped.
+(`resourceForm`), the list model (`resourceList`), and record and bulk actions (`recordActions`,
+`bulkActions`) have shipped.
 
 ## Install
 
@@ -445,3 +448,154 @@ function ContactsScreen() {
   positive safe integer up to `page.max`; a result no `list` returned; and `withSearch` on a
   definition without a search parameter, which TypeScript refuses too. A message names the function
   and the type, never a value.
+
+## Record and bulk actions
+
+`recordActions(resource, options)` and `bulkActions(resource, options)` describe the actions of a
+row's menu and of a selection's bar: what each writes, whether the person may run it now, the texts
+it shows, and where a refusal lands. An action removes the record or updates it with fixed values,
+and the declaration must serve that write, so build both models at module scope: an action the
+declaration refuses throws `TypeError` at startup, not on a click.
+
+```ts
+// src/contacts/actions.ts
+import { bulkActions, recordActions } from '@netvark/resource-ui';
+
+import { m } from '../paraglide/messages';
+import { Contacts } from '../resources/contacts';
+import { permissions } from '../session';
+
+export const contactActions = recordActions(Contacts, {
+  can: (name) => permissions.has(`contacts.${name}`),
+  actions: {
+    archive: {
+      label: m.contact_archive,
+      update: { attributes: { status: 'archived' } },
+      hidden: (contact) => contact.status === 'archived',
+      done: (contact) => m.contact_archived({ name: contact.name }),
+    },
+    remove: {
+      label: m.contact_remove,
+      tone: 'danger',
+      remove: true,
+      confirm: { title: (contact) => m.contact_remove_title({ name: contact.name }) },
+    },
+  },
+});
+
+export const selectionActions = bulkActions(Contacts, {
+  tooMany: m.selection_too_many, // ({ max }) => string
+  actions: {
+    restore: {
+      label: m.contacts_restore,
+      update: { attributes: { status: 'active' } },
+      done: m.contacts_restored, // ({ count }) => string
+    },
+    remove: {
+      label: m.contacts_remove,
+      tone: 'danger',
+      remove: true,
+      confirm: { title: m.contacts_remove_title }, // ({ count }) => string
+    },
+  },
+});
+```
+
+A record action's texts take the record, as the list read it; a bulk action's take `{ count }`, so a
+Paraglide message with a `count` variable, plural variants included, fills the slot as it stands.
+Each model is a frozen record of its actions by name, in the order given:
+
+| An action                             | What it is                                                                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`, `call`                        | its name, and the call it makes: `'update'` or `'remove'`                                                                     |
+| `tone`                                | `'neutral'`, or `'danger'` for a write a person cannot take back                                                              |
+| `label`, `confirm`, `done`            | your functions as given; `confirm` is `null` without one, as are its absent `body` and `confirm` and an absent `done`         |
+| `state(target)`                       | `{ visible, disabled, reason }` for a record, or for a selection's ids                                                        |
+| `variables(record)`                   | a record action's: what `resourceQueries`' `update` or `remove` takes, `{ id, ...values }` or the id                          |
+| `operations(ids)`, `max`              | a bulk action's: one operation per id, what `operationsMutation` takes, and the most ids one request takes                    |
+| `errors(error)`, `errors(error, ids)` | a refusal's texts: `{ fields, form }` for a record, as a form's; `{ records, form }` for a selection, each record's by its id |
+
+A row makes the client's own calls through
+[`@netvark/tanstack-query-jsonapi`](https://github.com/netvark/netvark/tree/main/packages/tanstack-query-jsonapi)'s
+`resourceQueries`, and the bar sends the selection in one Atomic Operations request through its
+`operationsMutation`, which the server commits whole or not at all:
+
+```tsx
+const update = useMutation(contacts.update());
+const remove = useMutation(contacts.remove());
+const operations = useMutation(operationsMutation(transport));
+
+async function run(action: RecordAction<typeof Contacts>, contact: ActionRecord<typeof Contacts>) {
+  try {
+    await (action.call === 'remove'
+      ? remove.mutateAsync(action.variables(contact))
+      : update.mutateAsync(action.variables(contact)));
+    notify(action.done?.(contact));
+  } catch (error) {
+    const { fields, form } = action.errors(error);
+    // fields on the row's cells, form in a banner
+  }
+}
+
+async function runOnSelection(action: BulkAction<typeof Contacts>, ids: ReadonlyArray<string>) {
+  try {
+    await operations.mutateAsync(action.operations(ids));
+    notify(action.done?.({ count: ids.length }));
+  } catch (error) {
+    const { records, form } = action.errors(error, ids);
+    // mark each row records names, form in a banner
+  }
+}
+
+function RowMenu({ contact }: { readonly contact: ActionRecord<typeof Contacts> }) {
+  return Object.values(contactActions).map((action) => {
+    const { visible, disabled, reason } = action.state(contact);
+    return visible ? (
+      <button
+        key={action.name}
+        disabled={disabled}
+        title={reason ?? undefined}
+        onClick={() => run(action, contact)}
+      >
+        {action.label()}
+      </button>
+    ) : null;
+  });
+}
+```
+
+## Action rules
+
+- Build both models once, at module scope. They hold your functions and call them only when the
+  screen asks, so every text, a disabled action's reason included, renders in the locale of that
+  render.
+- Hand `can` what the application knows of the person; only `true` shows an action. A hidden action
+  is disabled too, so a menu that shows it anyway cannot run it. Without `can`, every action shows,
+  and the server still authorizes every write.
+- Read `state(target)` on every render: `visible` decides whether the action shows, `disabled`
+  whether it runs, and `reason`, when it is a text, goes in a tooltip.
+- Confirm every write a person cannot take back with `confirm`, and mark it `tone: 'danger'`. The
+  button takes the action's `label` when the confirmation gives no `confirm`.
+- Keep a selection as ids. TanStack Table's row selection, with rows keyed by
+  `getRowId: (row) => row.id`, holds them across pages and refetches, and every member of a bulk
+  action reads ids, never records.
+- Size the page to the cap. `max` is the definition's `atomic.max`, ten by default; a selection over
+  it is disabled with your `tooMany({ max })`, and `operations` throws for it. Where a bar should
+  take a whole page, raise `atomic.max` on the definition to the page's largest size: the server
+  reads the same value.
+- Send a selection in one request through `operationsMutation`. The server commits all of it or
+  none, so after a refusal every selected record is as it was: mark the rows `records` names, show
+  `form` in a banner, and keep the selection for a retry.
+- An update action's values are fixed, and checked once against the declaration and the update's
+  validator: a member the update does not write, or values the server would refuse, fail when the
+  model is built. A CHECK across members runs on the client only when the values carry all of them;
+  the server judges the rest at the write, and its refusal lands on the members it names.
+- A refusal lands on any member of the resource, not only on what the action writes: a row shows
+  every member a read returns, so a unique constraint across a name and its organization marks both
+  cells.
+- Show `done` once the mutation settles. A `resourceQueries` write settles after the reads it
+  invalidates have refetched, and `operationsMutation` after the reads of every type it wrote.
+- `recordActions` and `bulkActions` throw `TypeError` before they return for a write the declaration
+  does not serve and for each argument they cannot read; `variables` throws for a record without a
+  string id, and `operations` for a list that `state` disables. Each message names the function, the
+  action, and the member, never a value.

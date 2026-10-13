@@ -1,10 +1,10 @@
 /**
  * Package surface. `@netvark/resource-core` and its `server`, `testing`, and
  * `openapi` entries, `@netvark/kysely-resource`, `@netvark/hono-resource`,
- * `@netvark/resource-ui`, and `@netvark/tanstack-form-resource` must
- * resolve through the published `exports` map at runtime and export exactly
- * the values the SPEC lists (sections 1, 18.1, 19.1, and 20.1) for what has
- * shipped. Value imports on purpose: a missing dist file or a wrong
+ * `@netvark/resource-ui`, and `@netvark/tanstack-form-resource` must resolve
+ * through the published `exports` map at runtime and export exactly the
+ * values the SPEC lists (sections 1, 18.1, 19.1, 20.1, and 21.1) for what
+ * has shipped. Value imports on purpose: a missing dist file or a wrong
  * `exports` entry fails here before any feature test.
  */
 import { describe, expect, it } from 'vitest';
@@ -94,7 +94,9 @@ describe('package surface (SPEC 1, 18.1, 19.1, 20.1)', () => {
 
   it('@netvark/resource-ui exports the documented values', () => {
     expect(Object.keys(ui).toSorted()).toEqual([
+      'bulkActions',
       'fieldsOf',
+      'recordActions',
       'resourceForm',
       'resourceList',
     ]);

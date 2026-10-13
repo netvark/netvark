@@ -5,6 +5,7 @@
  * @packageDocumentation
  */
 import type {
+  FieldMeta,
   IssueText,
   Messages,
   ResourceIssue,
@@ -32,9 +33,11 @@ export interface FormPlan {
   readonly issueText: IssueText;
 }
 
-/** The part of a write, and of a request document, that holds `member`. */
-export function partOf(member: HeldMember): 'attributes' | 'relationships' {
-  return member.meta.kind === 'relationship' ? 'relationships' : 'attributes';
+/** The part of a write, and of a request document, that holds a member of `meta`'s kind. */
+export function partOf(
+  meta: Pick<FieldMeta, 'kind'>,
+): 'attributes' | 'relationships' {
+  return meta.kind === 'relationship' ? 'relationships' : 'attributes';
 }
 
 /** The member the form holds at `part` and `name`, as an issue path or a pointer names it. */
@@ -44,6 +47,6 @@ export function memberAt(
   name: unknown,
 ): HeldMember | undefined {
   return plan.members.find(
-    (member) => member.meta.name === name && partOf(member) === part,
+    (member) => member.meta.name === name && partOf(member.meta) === part,
   );
 }

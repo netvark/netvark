@@ -4170,7 +4170,7 @@ bulk actions are section 21.
 | `form/form-write.ts`          | the write a form's values make                                                      |
 | `form/form-plan.ts`           | what the validator, the write, and the error mapping read                           |
 | `form/form-validator.ts`      | the form's Standard Schema                                                          |
-| `form/form-errors.ts`         | a refused write's error objects by field                                            |
+| `form/form-errors.ts`         | a refused write's error objects by field, a mapping the actions share               |
 | `form/form-options.ts`        | the operation and options, and the `TypeError`s of ones a caller got wrong          |
 | `form/resource-form.ts`       | `resourceForm`                                                                      |
 | `list/list-types.ts`          | the types of the list model                                                         |
@@ -4792,14 +4792,14 @@ const selectionActions = bulkActions(Contacts, {
 // A row: the client's own calls (20.6).
 const update = useMutation(contacts.update());
 const remove = useMutation(contacts.remove());
-const run = (action: RowAction, contact: Contact) =>
+const run = (action: RecordAction<typeof Contacts>, contact: ActionRecord<typeof Contacts>) =>
   action.call === 'remove'
     ? remove.mutateAsync(action.variables(contact))
     : update.mutateAsync(action.variables(contact));
 
 // The bar: one request for the selection.
 const operations = useMutation(operationsMutation(transport));
-const runOnSelection = (action: SelectionAction, ids: ReadonlyArray<string>) =>
+const runOnSelection = (action: BulkAction<typeof Contacts>, ids: ReadonlyArray<string>) =>
   operations.mutateAsync(action.operations(ids));
 ```
 
@@ -4821,9 +4821,9 @@ const runOnSelection = (action: SelectionAction, ids: ReadonlyArray<string>) =>
 | `actions/record-actions.ts` | `recordActions`                                                                                         |
 | `actions/bulk-actions.ts`   | `bulkActions`                                                                                           |
 
-Types exported: `RecordActions`, `RecordAction`, `RecordActionInit`, `BulkActions`, `BulkAction`,
-`BulkActionInit`, `ActionTone`, `ActionConfirm`, `ActionState`, `ActionValues`, `ActionRecord`,
-`SelectionErrors`.
+Types exported: `RecordActions`, `RecordAction`, `RecordActionInit`, `RecordActionsOptions`,
+`BulkActions`, `BulkAction`, `BulkActionInit`, `BulkActionsOptions`, `ActionResource`, `ActionTone`,
+`ActionConfirm`, `ActionCount`, `ActionState`, `ActionValues`, `ActionRecord`, `SelectionErrors`.
 
 ### 21.2 Record actions: `recordActions(resource, options)`
 
@@ -4834,16 +4834,16 @@ Types exported: `RecordActions`, `RecordAction`, `RecordActionInit`, `BulkAction
 
 An action, `RecordActionInit`, is one write and its texts:
 
-| Member         | Meaning                                                                                                                                                                                                                                                                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `remove: true` | Removes the record; the declaration must declare `remove` (3.3).                                                                                                                                                                                                                                                                                                           |
-| `update`       | `ActionValues`, the fixed values an update writes, `{ attributes?, relationships? }` as the client's `update` takes them (jsonapi SPEC 15.4); the declaration must declare `update`, each member must be one the update writes (9.4), and the values must pass `write.update` (6.2), a relationship's id as its target's identifier, as a form's write converts it (20.3). |
-| `label`        | `() => string`.                                                                                                                                                                                                                                                                                                                                                            |
-| `tone`         | `'neutral'`, the default, or `'danger'`.                                                                                                                                                                                                                                                                                                                                   |
-| `confirm`      | `{ title, body?, confirm? }`: the confirmation's title and body, each `(record) => string`, and its confirming button's label, `() => string`, the action's `label` when absent. Without `confirm` the action runs at once.                                                                                                                                                |
-| `done`         | `(record) => string`, what a screen shows once the write committed.                                                                                                                                                                                                                                                                                                        |
-| `hidden`       | `(record) => boolean`, `true` where the action does not apply to the record.                                                                                                                                                                                                                                                                                               |
-| `disabled`     | `(record) => boolean \| string`, `true` or a reason where the action applies but cannot run now.                                                                                                                                                                                                                                                                           |
+| Member         | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remove: true` | Removes the record; the declaration must declare `remove` (3.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `update`       | `ActionValues`, the fixed values an update writes, `{ attributes?, relationships? }` as the client's `update` takes them (jsonapi SPEC 15.4); the declaration must declare `update`, the values must set a member, each one the update writes (9.4), and they must pass `write.update` (6.2), which reads a relationship's value as the identifiers the client sends for it: an id as its target's identifier, an identifier object as its `type` and `id`. A CHECK across members runs only when the values carry every member it reads; the database judges the others at the write (6.2, 9.5). |
+| `label`        | `() => string`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `tone`         | `'neutral'`, the default, or `'danger'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `confirm`      | `{ title, body?, confirm? }`: the confirmation's title, its body, and its confirming button's label, each `(record) => string`, the button the action's `label` when absent. Without `confirm` the action runs at once.                                                                                                                                                                                                                                                                                                                                                                           |
+| `done`         | `(record) => string`, what a screen shows once the write committed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `hidden`       | `(record) => boolean`, `true` where the action does not apply to the record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `disabled`     | `(record) => boolean \| string`, `true` or a reason where the action applies but cannot run now.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Exactly one of `remove` and `update` is given. The record is the client's record of the definition
 (`ActionRecord`, jsonapi SPEC 15.6), as a list reads it; a record read with includes has the members
@@ -4901,13 +4901,13 @@ A Paraglide message with a `count` variable fills each slot as it stands, and on
 choose a plural form by `count` words the count in every locale. `bulkActions` returns
 `BulkActions`, a frozen record of `BulkAction`s by name:
 
-| Member                                             | Is                                                                                                                                                                                      |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`, `call`, `tone`, `label`, `confirm`, `done` | as for a record action                                                                                                                                                                  |
-| `max`                                              | the most records one request takes: the definition's `atomic.max` (jsonapi SPEC 5.1, ADR 0023)                                                                                          |
-| `state(ids)`                                       | `ActionState`: hidden by `can` as a record action is; disabled without a reason for an empty selection, with `tooMany({ max })` for one of more than `max` ids, else by `disabled(ids)` |
-| `operations(ids)`                                  | one operation per id, in order, built with `operationsOf(resource.resource)` (jsonapi SPEC 17.1), `update(id, values)` or `remove(id)`: the variables of `operationsMutation` (17.4)    |
-| `errors(error, ids)`                               | `SelectionErrors`, below                                                                                                                                                                |
+| Member                                             | Is                                                                                                                                                                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`, `call`, `tone`, `label`, `confirm`, `done` | as for a record action                                                                                                                                                                                                                     |
+| `max`                                              | the most records one request takes: the definition's `atomic.max` (jsonapi SPEC 5.1, ADR 0023)                                                                                                                                             |
+| `state(ids)`                                       | `ActionState`: hidden by `can` as a record action is; disabled without a reason for a selection that is empty, is not a list of ids, or names an id twice, with `tooMany({ max })` for one of more than `max` ids, else by `disabled(ids)` |
+| `operations(ids)`                                  | one operation per id, in order, built with `operationsOf(resource.resource)` (jsonapi SPEC 17.1), `update(id, values)` or `remove(id)`: the variables of `operationsMutation` (17.4)                                                       |
+| `errors(error, ids)`                               | `SelectionErrors`, below                                                                                                                                                                                                                   |
 
 A selection is the ids of its records, as a table's row selection keyed by `id` holds them (20.7),
 so it survives paging; every member reads ids, never records. `operations(ids)` throws `TypeError`
@@ -4926,10 +4926,14 @@ it was, and a screen marks the rows `records` names. Anything but a `ResponseErr
 ### 21.4 Arguments
 
 Both functions throw `TypeError` before they return for a resource no `declareResource` returned
-(20.1); for `actions` that is not an object of actions; and for an action that gives both writes or
-neither, removes on a declaration without `remove`, updates on one without `update`, sets a member
-the update does not write, or holds values `write.update` refuses, naming each issue's path; for a
-text, `can`, `hidden`, or `disabled` that is not a function, and a `tone` that is neither tone;
+(20.1); for options that are not an object or hold a key that is no option of the function's, and
+for `actions` that is not an object of actions; for an action that is not an object, holds a member
+of no action of the function's (`hidden` is a record action's alone), gives both writes or neither
+or a `remove` that is not `true`, removes on a declaration without `remove`, or updates on one
+without `update`; for an update's values that are not an object of `attributes` and `relationships`,
+set a member the update does not write or no member at all, or that `write.update` refuses, naming
+each issue's path; for a text, `can`, `hidden`, or `disabled` that is not a function, a `confirm`
+that is not an object of `title`, `body`, and `confirm`, and a `tone` that is neither tone;
 `bulkActions` also for a `tooMany` that is not a function. Messages name the function, the action,
 and the member, never a value (resource AGENTS). The types refuse the same: an action whose write
 the declaration does not serve is `never`, and `update`'s values are typed by the definition's
@@ -4938,18 +4942,21 @@ update input (jsonapi SPEC 15.4).
 ### 21.5 Test plan
 
 - Unit tests beside each module, over the fixture of 20.8: `actions/action-init.test.ts` (each
-  action shape, texts held as given, each `TypeError`), `actions/action-values.test.ts` (members the
-  update writes, a relationship by id, values the validator refuses, a CHECK across a field and a
-  relationship that the values leave out), `actions/action-state.test.ts` (`can` and only `true`,
-  `hidden`, `disabled` with and without a reason, a reason in the locale of each call, an empty
-  selection, one over `max`), `actions/action-errors.test.ts` (a record's refusal by member, a
-  selection's by operation index and member, an index outside the selection, an object that names no
-  operation, a `TypeError`, a `ResponseError` from another copy of the client),
-  `actions/record-actions.test.ts` and `actions/bulk-actions.test.ts` (the variables, the operations
-  read back by jsonapi-core's `parseOperationsDocument`, each `TypeError` of `variables` and
-  `operations`), and `actions/actions.test-d.ts` (writes the declaration does not serve as `never`,
-  values typed by the update input, `variables` taken by the mutations of `resourceQueries`, and
-  `operations` by `operationsMutation`'s).
+  action shape, texts held as given, each `TypeError` of the arguments) and
+  `actions/action-init-refusals.test.ts` (each `TypeError` of an action),
+  `actions/action-values.test.ts` (members the update writes, a relationship by id, values the
+  validator refuses, a CHECK across a field and a relationship that the values leave out),
+  `actions/action-state.test.ts` (`can` and only `true`, `hidden`, `disabled` with and without a
+  reason, a reason in the locale of each call, an empty selection, one over `max`),
+  `actions/action-errors.test.ts` (a record's refusal by member, a selection's by operation index
+  and member, an index outside the selection, an object that names no operation, a `TypeError`, a
+  `ResponseError` from another copy of the client), `actions/record-actions.test.ts` and
+  `actions/bulk-actions.test.ts` (the variables, the operations read back by jsonapi-core's
+  `parseOperationsDocument`, each `TypeError` of `variables` and `operations`), and
+  `actions/actions.test-d.ts` (writes the declaration does not serve as `never`, values typed by the
+  update input, the records a list reads, by the list model's state or with includes, taken as
+  `ActionRecord`s, `variables` taken by the mutations of `resourceQueries`, and `operations` by
+  `operationsMutation`'s).
 - End to end, `e2e/resource/react/contact-actions.e2e.test.tsx`: the contacts list with a row menu
   and a selection bar, built with the React adapters as the screens of 20.8 are, against the server
   in one process on PGlite and, with `RESOURCE_PG_URL`, PostgreSQL: a removal from a row after its
