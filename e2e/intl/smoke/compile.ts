@@ -3,7 +3,9 @@
  * which the smoke checks import as `#compiled-messages` (SPEC 7.3). It runs on
  * the runtime under test, Bun or Deno, and on Node ahead of workerd, which
  * runs compiled messages but does not compile them: a Workers project
- * compiles in its build. It refuses Deno before 2.6.10 (`runtime.ts`).
+ * compiles in its build. The package's `build` runs it on Node too, so the
+ * import resolves for knip after `pnpm run build`, as `e2e/resource`'s build
+ * compiles its project. It refuses Deno before 2.6.10 (`runtime.ts`).
  */
 import { fileURLToPath } from 'node:url';
 
