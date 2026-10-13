@@ -5,7 +5,8 @@
  * are the client's update input of the definition (jsonapi SPEC 15.4), and a
  * record is the client's record of it (jsonapi SPEC 15.6). A resource
  * TypeScript does not know serves every write and types its records and
- * values wide.
+ * values wide. Each action of a model is typed by the call its write makes:
+ * the functions infer, by name, what each action gives as `remove`.
  * @packageDocumentation
  */
 import type { Operation, RecordOf, UpdateInput } from '@netvark/jsonapi-client';
@@ -14,6 +15,7 @@ import type { AnyResource } from '@netvark/jsonapi-core';
 import type { WriteValidator } from '../form/form-plan';
 import type { FormErrors } from '../form/form-types';
 import type { DeclaredShape } from '../internal/declared';
+import type { ActionCall, ActionInits, GivenRemove } from './action-calls';
 
 /** What the actions read of a declared resource besides its members. */
 export interface ActionResource extends DeclaredShape {
@@ -111,23 +113,27 @@ export type BulkActionInit<TResource extends ActionResource> =
       | undefined;
   };
 
-/** The options of `recordActions`: the actions by name, in a menu's order, and whether the person may run each. */
+/**
+ * The options of `recordActions`: the actions by name, in a menu's order,
+ * and whether the person may run each. `recordActions` infers `TRemove`,
+ * so the model types each action by its call.
+ */
 export interface RecordActionsOptions<
   TResource extends ActionResource,
-  TName extends string,
+  TRemove extends GivenRemove = Readonly<Record<string, true | undefined>>,
 > {
-  readonly actions: { readonly [K in TName]: RecordActionInit<TResource> };
-  readonly can?: ((name: TName) => boolean) | undefined;
+  readonly actions: ActionInits<RecordActionInit<TResource>, TRemove>;
+  readonly can?: ((name: keyof TRemove & string) => boolean) | undefined;
 }
 
 /** The options of `bulkActions`: as a record's, and the reason a selection is too large. */
 export interface BulkActionsOptions<
   TResource extends ActionResource,
-  TName extends string,
+  TRemove extends GivenRemove = Readonly<Record<string, true | undefined>>,
 > {
-  readonly actions: { readonly [K in TName]: BulkActionInit<TResource> };
+  readonly actions: ActionInits<BulkActionInit<TResource>, TRemove>;
   readonly tooMany: (input: { readonly max: number }) => string;
-  readonly can?: ((name: TName) => boolean) | undefined;
+  readonly can?: ((name: keyof TRemove & string) => boolean) | undefined;
 }
 
 /** Whether an action shows, whether it runs, and why it does not; a hidden action is disabled too. */
@@ -188,11 +194,18 @@ export type RecordAction<
       ? RecordRemoveAction<TResource, TName>
       : never);
 
-/** What `recordActions` returns: the actions by name, in the order given. */
+/** What `recordActions` returns: the actions by name, in the order given, each typed by its call. */
 export type RecordActions<
   TResource extends ActionResource,
-  TName extends string,
-> = { readonly [K in TName]: RecordAction<TResource, K> };
+  TCalls extends Readonly<Record<string, ActionCall>> = Readonly<
+    Record<string, ActionCall>
+  >,
+> = {
+  readonly [K in keyof TCalls & string]: Extract<
+    RecordAction<TResource, K>,
+    { readonly call: TCalls[K] }
+  >;
+};
 
 interface BulkActionBase<TResource extends ActionResource, TName> {
   readonly name: TName;
@@ -245,8 +258,15 @@ export type BulkAction<
       ? BulkRemoveAction<TResource, TName>
       : never);
 
-/** What `bulkActions` returns: the actions by name, in the order given. */
+/** What `bulkActions` returns: the actions by name, in the order given, each typed by its call. */
 export type BulkActions<
   TResource extends ActionResource,
-  TName extends string,
-> = { readonly [K in TName]: BulkAction<TResource, K> };
+  TCalls extends Readonly<Record<string, ActionCall>> = Readonly<
+    Record<string, ActionCall>
+  >,
+> = {
+  readonly [K in keyof TCalls & string]: Extract<
+    BulkAction<TResource, K>,
+    { readonly call: TCalls[K] }
+  >;
+};

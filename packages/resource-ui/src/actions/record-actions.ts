@@ -7,6 +7,7 @@
  * and holds no state; the screen's mutations hold each request's.
  * @packageDocumentation
  */
+import type { ActionCalls, GivenRemove } from './action-calls';
 import type { HeldAction } from './action-init';
 import type {
   ActionResource,
@@ -45,16 +46,17 @@ function variablesOf(action: HeldAction): (record: unknown) => unknown {
 
 /**
  * A record's actions on `resource`, by name in the order of
- * `options.actions`. Throws `TypeError` before it returns for a resource
- * no `declareResource` returned and for each argument SPEC 21.4 refuses.
+ * `options.actions`, each typed by the call it makes. Throws `TypeError`
+ * before it returns for a resource no `declareResource` returned and for
+ * each argument SPEC 21.4 refuses.
  */
 export function recordActions<
   TResource extends ActionResource,
-  const TName extends string,
+  TRemove extends GivenRemove,
 >(
   resource: TResource,
-  options: RecordActionsOptions<TResource, TName>,
-): RecordActions<TResource, TName> {
+  options: RecordActionsOptions<TResource, TRemove>,
+): RecordActions<TResource, ActionCalls<TRemove>> {
   checkDeclared(CALLER, resource);
   const { actions, can } = readOptions(RECORD_ACTIONS, resource, options);
   const model = Object.fromEntries(
@@ -73,6 +75,9 @@ export function recordActions<
       }),
     ]),
   );
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: readOptions held each action to the declaration, which RecordActions types by the same operations and update input, and each member holds the application's function as given
-  return Object.freeze(model) as unknown as RecordActions<TResource, TName>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: readOptions held each action to the declaration, which RecordActions types by the same operations and update input, gave each the call its remove names, and each member holds the application's function as given
+  return Object.freeze(model) as unknown as RecordActions<
+    TResource,
+    ActionCalls<TRemove>
+  >;
 }

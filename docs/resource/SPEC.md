@@ -4797,6 +4797,9 @@ const run = (action: RecordAction<typeof Contacts>, contact: ActionRecord<typeof
   action.call === 'remove'
     ? remove.mutateAsync(action.variables(contact))
     : update.mutateAsync(action.variables(contact));
+// One action on its own: typed by the call it makes.
+const archive = (contact: ActionRecord<typeof Contacts>) =>
+  update.mutateAsync(rowActions.archive.variables(contact));
 
 // The bar: one request for the selection.
 const operations = useMutation(operationsMutation(transport));
@@ -4815,6 +4818,7 @@ const runOnSelection = (action: BulkAction<typeof Contacts>, ids: ReadonlyArray<
 | Module                      | Holds                                                                                                   |
 | --------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `actions/action-types.ts`   | the types of both models                                                                                |
+| `actions/action-calls.ts`   | each action's call, inferred from what it gives as `remove`                                             |
 | `actions/action-init.ts`    | reading an action the application describes, and the `TypeError`s of one it got wrong                   |
 | `actions/action-values.ts`  | an update's fixed values held to the declaration: the members the update writes and its write validator |
 | `actions/action-state.ts`   | `state(target)`: whether the action shows, whether it runs, and why not                                 |
@@ -4823,8 +4827,9 @@ const runOnSelection = (action: BulkAction<typeof Contacts>, ids: ReadonlyArray<
 | `actions/bulk-actions.ts`   | `bulkActions`                                                                                           |
 
 Types exported: `RecordActions`, `RecordAction`, `RecordActionInit`, `RecordActionsOptions`,
-`BulkActions`, `BulkAction`, `BulkActionInit`, `BulkActionsOptions`, `ActionResource`, `ActionTone`,
-`ActionConfirm`, `ActionCount`, `ActionState`, `ActionValues`, `ActionRecord`, `SelectionErrors`.
+`BulkActions`, `BulkAction`, `BulkActionInit`, `BulkActionsOptions`, `ActionResource`, `ActionCall`,
+`ActionTone`, `ActionConfirm`, `ActionCount`, `ActionState`, `ActionValues`, `ActionRecord`,
+`SelectionErrors`.
 
 ### 21.2 Record actions: `recordActions(resource, options)`
 
@@ -4849,7 +4854,9 @@ An action, `RecordActionInit`, is one write and its texts:
 Exactly one of `remove` and `update` is given. The record is the client's record of the definition
 (`ActionRecord`, jsonapi SPEC 15.6), as a list reads it; a record read with includes has the members
 it needs. `recordActions` returns `RecordActions`, a frozen record of `RecordAction`s by name, in
-the order of `actions`:
+the order of `actions`, each typed by the call it makes (21.4), so `rowActions.archive.variables`
+gives what `resourceQueries`' `update` takes with no narrowing on `call`; `RecordAction`, either
+call the declaration serves, types code that runs any action, such as a menu:
 
 | Member                     | Is                                                                                                                                                    |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4900,7 +4907,8 @@ has them, and:
 
 A Paraglide message with a `count` variable fills each slot as it stands, and one whose variants
 choose a plural form by `count` words the count in every locale. `bulkActions` returns
-`BulkActions`, a frozen record of `BulkAction`s by name:
+`BulkActions`, a frozen record of `BulkAction`s by name, each typed by its call as a record action
+is:
 
 | Member                                             | Is                                                                                                                                                                                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -4937,8 +4945,17 @@ each issue's path; for a text, `can`, `hidden`, or `disabled` that is not a func
 that is not an object of `title`, `body`, and `confirm`, and a `tone` that is neither tone;
 `bulkActions` also for a `tooMany` that is not a function. Messages name the function, the action,
 and the member, never a value (resource AGENTS). The types refuse the same: an action whose write
-the declaration does not serve is `never`, and `update`'s values are typed by the definition's
-update input (jsonapi SPEC 15.4).
+the declaration does not serve is `never`, `update`'s values are typed by the definition's update
+input (jsonapi SPEC 15.4), and a member no action takes or an attribute no update writes is an
+unknown property of an object literal.
+
+Each action of a model is typed by its call, `ActionCall`: both functions infer, by name, what each
+action gives as `remove`, through a mapped type over the names whose template is the action's init,
+so every action is still checked against it. `true` makes a removal, nothing or `undefined` an
+update, and an action typed as its init before it reached the function, such as options annotated
+`RecordActionsOptions`, either call. Inferring each whole action instead would lose the check of
+unknown members, and TypeScript would fix it to its constraint while typing the parameter of a `can`
+written before the actions, so the model would lose its names.
 
 ### 21.5 Test plan
 
@@ -4953,11 +4970,14 @@ update input (jsonapi SPEC 15.4).
   and member, an index outside the selection, an object that names no operation, a `TypeError`, a
   `ResponseError` from another copy of the client), `actions/record-actions.test.ts` and
   `actions/bulk-actions.test.ts` (the variables, the operations read back by jsonapi-core's
-  `parseOperationsDocument`, each `TypeError` of `variables` and `operations`), and
+  `parseOperationsDocument`, each `TypeError` of `variables` and `operations`),
   `actions/actions.test-d.ts` (writes the declaration does not serve as `never`, values typed by the
-  update input, the records a list reads, by the list model's state or with includes, taken as
-  `ActionRecord`s, `variables` taken by the mutations of `resourceQueries`, and `operations` by
-  `operationsMutation`'s).
+  update input, each action typed by its call and either call for one typed as its init beforehand,
+  a member no action takes and an attribute no update writes refused, `can` given the names before
+  functions typed from context, the records a list reads, by the list model's state or with
+  includes, taken as `ActionRecord`s), and `actions/action-mutations.test-d.ts` (`variables` taken
+  by the mutation of `resourceQueries` its call names, on the action itself and after narrowing on
+  `call`, and `operations` by `operationsMutation`'s).
 - End to end, in `e2e/resource/react/`: the contacts list with a menu in each row and a bar over the
   selection (`screens/contact-actions.tsx`), built with the React adapters as the screens of 20.8
   are, against the server in one process on PGlite and, with `RESOURCE_PG_URL`, PostgreSQL, a
