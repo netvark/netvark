@@ -14,9 +14,10 @@ import type { CallOptions, Outgoing } from '../transport/send';
 import type { TransportState } from '../transport/transport';
 import type { WriteInput } from './request-documents';
 import type { RecordsShape } from './results';
-import type { LinkageInput, ReadResult, WriteResult } from './types';
+import type { ReadResult, WriteResult } from './types';
 import type { CallContext } from './urls';
 import type { IncludeAndFields, WideClient } from './wide-client';
+import type { LinkageInput } from './write-types';
 
 import { serializeQuery } from '../query/serialize-query';
 import { send } from '../transport/send';
@@ -142,7 +143,7 @@ async function writeRecord(
     call,
     method: call === 'create' ? 'POST' : 'PATCH',
     url: urlOf(context, path),
-    document: resourceDocument(context.definition, call, input, id),
+    document: resourceDocument(context.definition, call, input, { id }),
   };
   return recordResult(await send(context.state, outgoing, options), outgoing);
 }

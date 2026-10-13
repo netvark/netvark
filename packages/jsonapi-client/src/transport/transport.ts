@@ -40,9 +40,6 @@ export interface TransportState {
   readonly fetch: TransportOptions['fetch'];
 }
 
-const NOT_A_TRANSPORT =
-  'createClients: transport must be made by createTransport';
-
 /** Where and how the clients reach the server; made by `createTransport`. */
 export class Transport {
   readonly #state: TransportState;
@@ -56,14 +53,16 @@ export class Transport {
     return new Transport(state);
   }
 
-  /** The state of a transport `createTransport` made; throws `TypeError` for any other value. */
-  public static stateOf(transport: unknown): TransportState {
+  /** The state of a transport `createTransport` made; throws `TypeError`, starting with `caller`, for any other value. */
+  public static stateOf(transport: unknown, caller: string): TransportState {
     if (
       typeof transport !== 'object' ||
       transport === null ||
       !(#state in transport)
     ) {
-      throw new TypeError(NOT_A_TRANSPORT);
+      throw new TypeError(
+        `${caller}: transport must be made by createTransport`,
+      );
     }
     return transport.#state;
   }

@@ -1,13 +1,18 @@
 /**
- * The blog API called through the built client (SPEC 15.9). Each describe
- * block serves a blog of its own over a socket and builds clients on a
- * transport at the server's origin. The definitions link resources under
- * the blog's public origin, `BASE_URL`, which the client ignores: it reads
- * only their paths (SPEC 5.4). The pagination links name the origin a
- * request reached (SPEC 8.2), so the client follows them. The server
- * records each request as it arrived, headers and body included.
+ * The blog API called through the built client (SPEC 15.9, 17.5). Each
+ * describe block serves a blog of its own over a socket and builds clients,
+ * and sends operations, on a transport at the server's origin. The
+ * definitions link resources under the blog's public origin, `BASE_URL`,
+ * which the client ignores: it reads only their paths (SPEC 5.4). The
+ * pagination links name the origin a request reached (SPEC 8.2), so the
+ * client follows them. The server records each request as it arrived,
+ * headers and body included.
  */
-import type { Clients, TransportOptions } from '@netvark/jsonapi-client';
+import type {
+  Clients,
+  Transport,
+  TransportOptions,
+} from '@netvark/jsonapi-client';
 
 import type { RunningServer } from './server.ts';
 import type { Store } from './store.ts';
@@ -40,7 +45,9 @@ interface Arrival {
 }
 
 export interface ClientBlog {
-  /** Clients over a transport with `options`, at the server's origin unless they name one. */
+  /** A transport with `options`, at the server's origin unless they name one. */
+  readonly transport: (options?: Partial<TransportOptions>) => Transport;
+  /** Clients over `transport(options)`. */
   readonly clients: (options?: Partial<TransportOptions>) => BlogClients;
   /** The origin the server listens on, such as `http://127.0.0.1:53211`. */
   readonly origin: () => string;
@@ -79,12 +86,11 @@ export function useClientBlog(): ClientBlog {
     }
     return server;
   };
+  const transport = (options: Partial<TransportOptions> = {}): Transport =>
+    createTransport({ origin: running().url, ...options });
   return {
-    clients: (options = {}) =>
-      createClients(
-        DEFINITIONS,
-        createTransport({ origin: running().url, ...options }),
-      ),
+    transport,
+    clients: (options) => createClients(DEFINITIONS, transport(options)),
     origin: () => running().url,
     arrivals: () => arrivals,
     store: () => {

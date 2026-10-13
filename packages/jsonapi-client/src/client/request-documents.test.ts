@@ -65,7 +65,7 @@ describe('resourceDocument (SPEC 15.4)', () => {
       Notes,
       'create',
       { id: 'n-1', attributes: { text: 'x' } },
-      'n-1',
+      { id: 'n-1' },
     );
 
     await expect(
@@ -81,7 +81,7 @@ describe('resourceDocument (SPEC 15.4)', () => {
         attributes: { title: 'New', body: undefined },
         relationships: { author: null, tags: undefined },
       },
-      'a1',
+      { id: 'a1' },
     );
 
     expect(sent(document)).toStrictEqual({
@@ -102,7 +102,9 @@ describe('resourceDocument (SPEC 15.4)', () => {
   });
 
   it('leaves out attributes and relationships a write does not give', () => {
-    expect(resourceDocument(Articles, 'update', {}, 'a1')).toStrictEqual({
+    expect(
+      resourceDocument(Articles, 'update', {}, { id: 'a1' }),
+    ).toStrictEqual({
       data: { type: 'articles', id: 'a1' },
     });
   });
@@ -118,7 +120,7 @@ describe('resourceDocument (SPEC 15.4)', () => {
       Articles,
       'update',
       { relationships: { author: record } },
-      'a1',
+      { id: 'a1' },
     );
 
     expect(sent(document)).toStrictEqual({

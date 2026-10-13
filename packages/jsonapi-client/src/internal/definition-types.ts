@@ -1,7 +1,8 @@
 /**
- * Type helpers over definitions shared by the query, record, and client
- * types: a definition's type, the definition the client knows for a type,
- * and a definition's field names (SPEC 5.3). Types only; never exported.
+ * Type helpers over definitions shared by the query, record, client, and
+ * operation types: a definition's type, the definition the client knows
+ * for a type, a definition's field names, and the relationships a write
+ * may name (SPEC 5.3). Types only; never exported.
  * @packageDocumentation
  */
 import type { TypesOf } from '@netvark/jsonapi-core';
@@ -26,3 +27,34 @@ export type KnownDefinition<TKnown, TType> = Extract<
 export type FieldNameOf<TDefinition> =
   | (keyof TypesOf<TDefinition>['attributes'] & string)
   | (keyof TypesOf<TDefinition>['relationships'] & string);
+
+/** A definition's relationships, as its client types give them (SPEC 5.3). */
+export type RelationshipsOf<TDefinition> =
+  TypesOf<TDefinition>['relationships'];
+
+/** The names of a definition's relationships. */
+export type RelationshipName<TDefinition> = keyof RelationshipsOf<TDefinition> &
+  string;
+
+/**
+ * The relationships a relationship write may name: the ones `updatable`
+ * names, on a definition that serves updates. The server refuses any other
+ * with 403, so a write naming one does not compile.
+ * @ref https://jsonapi.org/format/1.1/#crud-updating-relationship-responses-403
+ */
+export type UpdatableName<TDefinition> = [
+  TypesOf<TDefinition>['update'],
+] extends [never]
+  ? never
+  : RelationshipName<TDefinition> & TypesOf<TDefinition>['updatable'];
+
+/** The updatable to-many relationships: what adding to and removing from a relationship take. */
+export type ToManyName<TDefinition> = {
+  readonly [
+    K in UpdatableName<TDefinition>
+  ]: 'many' extends RelationshipsOf<TDefinition>[K]['cardinality'] ? K : never;
+}[UpdatableName<TDefinition>];
+
+/** `TOne` for a to-one, `TMany` for a to-many, either for a relationship typed wide. */
+export type ByCardinality<TCardinality, TOne, TMany> =
+  TCardinality extends 'one' ? TOne : TMany;

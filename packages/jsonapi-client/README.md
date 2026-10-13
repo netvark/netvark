@@ -7,7 +7,8 @@ include path, sort, filter, fieldset, or attribute the server would refuse fails
 record holds exactly what the query asked for. Error documents become a `ResponseError` that keeps
 each error's code. Nothing is generated: the client imports the definitions. It uses web standards
 only (`fetch`, `Request`, `Headers`, `URL`, `URLSearchParams`), so one build runs in browsers,
-workers, Node, Bun, and Deno. The contract is section 15 of
+workers, Node, Bun, and Deno. Writes that must commit together go in one request through the Atomic
+Operations extension. The contract is sections 15 and 17 of
 [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md).
 
 ## Install
@@ -265,6 +266,76 @@ if (next !== undefined) {
 `cursorOf(record)` reads a record's item cursor, the profile's `meta.page.cursor`, which a record
 carries as `$meta.page.cursor`; list with `page: { after }` set to it to start after that record.
 
+## Atomic Operations
+
+Writes that must hold together go in one request through the
+[Atomic Operations](https://jsonapi.org/ext/atomic/) extension, which the server commits all or not
+at all. `operationsOf(definition)` builds each write as a value, each builder taking what the call
+of its name takes, so a model that holds the definition builds them without a client;
+`sendOperations(transport, operations)` sends them in one `POST` to the definitions' operations
+path, `/operations` beside the collections:
+
+```ts
+import { operationsOf, sendOperations } from '@netvark/jsonapi-client';
+
+const people = operationsOf(People);
+const articles = operationsOf(Articles);
+
+const { results } = await sendOperations(transport, [
+  people.create({ lid: 'ada', attributes: { name: 'Ada' } }),
+  articles.create({
+    attributes: { title: 'Linked' },
+    relationships: { author: { type: 'people', lid: 'ada' } },
+  }),
+  articles.addToRelationship('1', 'tags', ['t3']),
+  articles.remove('3'),
+]);
+results[0].data?.id; // the id the server gave Ada
+results[1].data?.author; // { type: 'people', id: that id }
+results[3].data; // undefined: a removal's result holds no data
+```
+
+| Builder                                                                             | Sends                                                  | Result `data` |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------- |
+| `create(input)`                                                                     | `add` of the resource object `create` sends, its `lid` | the record    |
+| `update(id, input)`                                                                 | `update` of the resource object `update` sends         | the record    |
+| `remove(id)`                                                                        | `remove` of the resource                               | `undefined`   |
+| `setRelationship(id, name, linkage)`, `addToRelationship`, `removeFromRelationship` | `update`, `add`, `remove` of the relationship          | `undefined`   |
+
+A `lid` names a resource the request creates, and a later operation links to it with `{ type, lid }`
+wherever a relationship value goes; the server puts the id it gave in its place. `results` holds a
+result per operation, in order: `{ data, meta }`, `data` the record of the operation's definition
+(each relationship its linkage, since a results document includes nothing) or `undefined` where the
+result holds none. For a list written in the call, `results` is a tuple, each result typed by its
+operation. A `204` gives every result `{ data: undefined, meta: undefined }`.
+
+A refusal rejects with a `ResponseError` whose message names the operations' types and `operations`,
+and the server stored none of them. `operationOf(errorObject)` reads which operation an error points
+at, `{ index, pointer }`, its `pointer` what a single call's refusal names; an error at no
+operation, such as a request over the cap, gives `undefined`:
+
+```ts
+import { isResponseError, operationOf } from '@netvark/jsonapi-client';
+
+try {
+  await sendOperations(transport, operations);
+} catch (error) {
+  if (!isResponseError(error)) throw error;
+  for (const object of error.errors) {
+    const at = operationOf(object); // { index: 1, pointer: '/data/attributes/title' }
+    if (at === undefined) showForRequest(object);
+    else showForRow(rows[at.index], at.pointer, object);
+  }
+}
+```
+
+The client throws `TypeError` before sending for a transport `createTransport` did not make, an
+empty list, a value that is not an operation (by its index), and operations whose definitions name
+different operations paths, since one request reaches one endpoint. It does not count operations:
+the definitions' `atomic.max` caps a request (10 unless the server's definitions say otherwise), the
+server refuses a request over it with a 400, and a screen reads the cap from the definition
+(`Articles.atomic.max`) to keep a selection within it.
+
 ## Best practices
 
 - **Import the server's definitions; generate nothing.** A renamed attribute or a dropped sort then
@@ -296,15 +367,27 @@ carries as `$meta.page.cursor`; list with `page: { after }` set to it to start a
   without a pointer as a form-level error.
 - **Read `retryAfter` before retrying** a 429 or a 503, and let every other `ResponseError` reach
   the caller.
+- **Send writes that must hold together in one `sendOperations`,** never in a loop of calls: a loop
+  that fails halfway leaves the writes before it stored.
+- **Link what a request creates by its `lid`,** in the same request, rather than waiting for the
+  server's id to send a second one.
+- **Keep a selection within the definition's `atomic.max`** for a bulk action, and split work that
+  need not commit together into requests of that size.
+- **Map each error of a refusal with `operationOf`** to the operation, and so the row or the form,
+  that sent it; show an error at no operation for the whole request.
 
 ## Documentation
 
 - [`docs/jsonapi/SPEC.md`](https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md),
-  section 15: the client's contract, with the tests that prove it
+  sections 15 and 17: the client's contract, with the tests that prove it
 - [ADR 0017](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0017-a-typed-client-on-fetch-over-the-servers-definitions.md):
   a typed client on fetch over the server's definitions
 - [ADR 0018](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0018-definitions-carry-the-types-a-client-reads-and-writes.md):
   definitions carry the types a client reads and writes
+- [ADR 0022](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0022-atomic-operations-are-values-built-from-definitions-and-sent-in-one-request.md):
+  Atomic Operations are values built from definitions and sent in one request
+- [ADR 0023](https://github.com/netvark/netvark/blob/main/docs/jsonapi/adr/0023-the-operations-endpoint-and-its-cap-are-the-definitions.md):
+  the operations endpoint and its cap are the definitions'
 
 ## License
 

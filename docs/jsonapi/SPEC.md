@@ -1235,7 +1235,8 @@ packages/jsonapi-client/src/
     include-tree.ts            include paths as a tree (15.6)
   errors/response-error.ts     ResponseError, isResponseError() (15.7)
   client/
-    types.ts                   Clients, ResourceClient, inputs and results (15.4)
+    types.ts                   Clients, ResourceClient, and the results (15.4)
+    write-types.ts             what the writes take, a call's and an operation's: CreateInput, LinkageInput, LocalIdentifier (15.4, 17.1)
     record-types.ts            RecordOf: records typed by the definitions and the query (15.6)
     create-clients.ts          createClients() (15.4)
     resource-client.ts         the methods of one resource (15.4)
@@ -1274,8 +1275,9 @@ object the clients send through.
   request time, so a polyfill or a test double installed later is used. It is called as a plain
   function, never as a method of the options, since a browser's `fetch` called on another object
   throws "Illegal invocation".
-- A `Transport` has no public members. `createClients` reads it through an ES private field, so a
-  value `createTransport` did not make throws `TypeError` there.
+- A `Transport` has no public members. `createClients` and `sendOperations` read it through an ES
+  private field, so a value `createTransport` did not make throws `TypeError` there
+  (`<caller>: transport must be made by createTransport`).
 
 ### 15.3 Requests and responses (`send.ts`)
 
@@ -1745,9 +1747,11 @@ In order, before anything is sent:
 Then one `POST <operations path>` through the transport, as 15.3 sends a document, with the document
 `{ 'atomic:operations': [...] }`, each operation's object in order, and with `Content-Type` and
 `Accept` both `application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"`: a client that
-applies an extension "MUST specify the `ext` media type parameter in the `Content-Type` header", and
-the results are the extension's member, so the request requires the server to apply it
-(`#content-negotiation-clients`). `options` are the call's `CallOptions` (15.3).
+applies an extension "MUST specify the `ext` media type parameter in the `Content-Type` header"
+(`#content-negotiation-all`), and the results are the extension's member, so `Accept` requires the
+server to apply it: a client "MAY use the `ext` media type parameter in an `Accept` header to
+require that a server apply all the specified extensions" (`#content-negotiation-clients`).
+`options` are the call's `CallOptions` (15.3).
 
 It resolves to `OperationsResult<TOperations> = { status, results, links, meta, jsonapi }`:
 
@@ -1810,12 +1814,16 @@ writes do (16.6); a transport `createTransport` did not make is refused by the f
 `@netvark/jsonapi-client`: `operations-of.test.ts` (each builder's operation, read back by
 jsonapi-core's own `parseOperationsDocument`, a `lid` and a `LocalIdentifier`, an undeclared
 relationship), `send-operations.test.ts` (the request and its headers, each `TypeError` before
-sending, a 200 typed per operation, a 204, each result shape refused, a refusal's `ResponseError`)
-through a fetch double, `operation-of.test.ts`, and `operations.test-d.ts` (inputs and results typed
-by the definitions, a tuple of results for a tuple of operations); end to end,
-`e2e/jsonapi/client-operations.e2e.test.ts` sends operations to the blog's endpoint over HTTP with
-the built client: a create linked by its `lid`, a `204`, and a refusal pointing at its operation,
-nothing committed. `@netvark/tanstack-query-jsonapi`: `operations.test.ts` through a `QueryClient`
-and a `MutationObserver` (pending until the reads shown have refetched, the removed records' entries
-removed first, every written type invalidated, `invalidates`, a refused request), and the adapters'
-type checks of 16.7. The resource family drives both against a database (resource SPEC 21).
+sending) and `operation-results.test.ts` (a 200 read per operation, a 204, each result shape
+refused, a refusal's `ResponseError`) through a fetch double, `operation-of.test.ts`, and
+`operations.test-d.ts` (inputs and results typed by the definitions, a tuple of results for a tuple
+of operations); end to end, `e2e/jsonapi/client-operations.e2e.test.ts` sends operations to the
+blog's endpoint over HTTP with the built client: a create linked by its `lid` with the request as
+the server received it, a `204`, a refusal at an operation and at a member of one, each with nothing
+committed, a request over the cap refused by the server, and the `TypeError`s before sending,
+nothing sent; `e2e/jsonapi/smoke/client-checks.ts` sends operations linked by a `lid` and a refusal
+at its index in-process on Bun, Deno, and workerd (14.2). `@netvark/tanstack-query-jsonapi`:
+`operations.test.ts` through a `QueryClient` and a `MutationObserver` (pending until the reads shown
+have refetched, the removed records' entries removed first, every written type invalidated,
+`invalidates`, a refused request), and the adapters' type checks of 16.7. The resource family drives
+both against a database (resource SPEC 21).
