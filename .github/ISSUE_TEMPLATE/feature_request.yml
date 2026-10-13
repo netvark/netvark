@@ -23,6 +23,7 @@ body:
           '@netvark/resource-core',
           '@netvark/kysely-resource',
           '@netvark/hono-resource',
+          '@netvark/resource-ui',
           '@netvark/react-resource',
           a new package,
           the repository or its docs,

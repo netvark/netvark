@@ -1,8 +1,9 @@
 /**
- * `@netvark/react-resource`: forms, lists, and query caches for React
- * applications from `@netvark/resource-core` declarations. The root entry
- * is a model of a declared resource that imports neither React nor
- * TanStack. See `docs/resource/SPEC.md`, section 20, for the contract.
+ * `@netvark/resource-ui`: forms and lists from `@netvark/resource-core`
+ * declarations, as a model of a declared resource that imports no
+ * framework and nothing of TanStack, so a screen on any framework reads
+ * it (ADR 0018). See `docs/resource/SPEC.md`, section 20, for the
+ * contract.
  * @packageDocumentation
  */
 export type { FilterKind } from './fields/filter-kind';

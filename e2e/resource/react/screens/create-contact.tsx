@@ -15,11 +15,11 @@ import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { fieldsOf, resourceForm } from '@netvark/react-resource';
 import {
   bindResponseErrors,
   resourceFormOptions,
 } from '@netvark/react-resource/form';
+import { fieldsOf, resourceForm } from '@netvark/resource-ui';
 
 import { contactMessages } from '../../localization/contact-messages.ts';
 import { Contacts } from '../../resources/contacts.ts';

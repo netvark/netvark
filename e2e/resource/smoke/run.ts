@@ -8,10 +8,10 @@
  */
 import { neutralChecks } from './checks.ts';
 import { openapiChecks } from './openapi-checks.ts';
-import { reactChecks } from './react-checks.ts';
 import { report, runChecks } from './report.ts';
 import { routeChecks } from './route-checks.ts';
 import { serverChecks } from './server-checks.ts';
+import { uiChecks } from './ui-checks.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -41,6 +41,6 @@ report(
     ...serverChecks,
     ...openapiChecks,
     ...routeChecks,
-    ...reactChecks,
+    ...uiChecks,
   }),
 );

@@ -1,5 +1,5 @@
 ---
-'@netvark/react-resource': patch
+'@netvark/resource-ui': patch
 ---
 
 `resourceList`'s `query(search)` names every member of the list query, `undefined` where the state

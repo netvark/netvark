@@ -1,6 +1,6 @@
 /**
  * The update form over the contacts application (resource SPEC 20.3,
- * 20.4): `resourceForm` from the built `@netvark/react-resource`, started
+ * 20.4): `resourceForm` from the built `@netvark/resource-ui`, started
  * from the record the built `@netvark/jsonapi-client` read from the
  * contacts API served over a socket, on PGlite and on the server
  * `RESOURCE_PG_URL` names, nothing mocked. An update sends what the
@@ -15,7 +15,7 @@ import type { Departure } from '../support/recorded-clients.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { resourceForm } from '@netvark/react-resource';
+import { resourceForm } from '@netvark/resource-ui';
 
 import { contactMessages } from '../localization/contact-messages.ts';
 import { Contacts } from '../resources/contacts.ts';

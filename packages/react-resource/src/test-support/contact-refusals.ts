@@ -7,12 +7,13 @@
  * with the package.
  * @packageDocumentation
  */
-import type { FormModel } from '../form/form-types';
+import type { FormModel } from '@netvark/resource-ui';
+
 import type { MountedForm } from './forms';
 
 import { ResponseError } from '@netvark/jsonapi-client';
+import { resourceForm } from '@netvark/resource-ui';
 
-import { resourceForm } from '../form/resource-form';
 import { bindResponseErrors } from '../tanstack-form/bind-errors';
 import { mountForm } from './forms';
 import { messages } from './messages';

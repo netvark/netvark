@@ -1,7 +1,5 @@
 /**
- * Prototype-safe lookups. Public names come from PostgreSQL names, and
- * `constructor` or `toString` is a valid one, so every lookup asks for an
- * own member and never meets `Object.prototype`.
+ * Prototype-safe checks of what a JavaScript caller hands the bindings.
  * @packageDocumentation
  */
 
@@ -15,12 +13,4 @@ export function isRecord(
   value: unknown,
 ): value is Readonly<Record<string, unknown>> {
   return isObject(value) && !Array.isArray(value);
-}
-
-/** The own member `key` of `record`, or `undefined` when it has none. */
-export function ownValue<TValue>(
-  record: Readonly<Record<string, TValue>>,
-  key: string,
-): TValue | undefined {
-  return Object.hasOwn(record, key) ? record[key] : undefined;
 }

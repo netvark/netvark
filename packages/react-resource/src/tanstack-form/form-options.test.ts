@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { resourceForm } from '../form/resource-form';
+import { resourceForm } from '@netvark/resource-ui';
+
 import { mountForm, shown } from '../test-support/forms';
 import { messages, setLocale } from '../test-support/messages';
 import { Contacts } from '../test-support/resources';

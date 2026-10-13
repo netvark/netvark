@@ -3,19 +3,17 @@ import type {
   OnChangeFn,
   SortingState,
   Updater,
-} from '@tanstack/react-table';
+} from '@tanstack/table-core';
 
 import type { DeclaredResource } from '@netvark/resource-core';
 
 import type { ListColumnFilters, ListSorting, ListState } from './list-types';
 
-import { useQuery } from '@tanstack/react-query';
 import { describe, expectTypeOf, it } from 'vitest';
 
 import { createClients, createTransport } from '@netvark/jsonapi-client';
 import { createDeclareResource } from '@netvark/resource-core';
 
-import { resourceQueries } from '../tanstack-query/queries';
 import { messages } from '../test-support/messages';
 import { publicCatalog } from '../test-support/public-catalog';
 import { FIXTURE_REGISTRIES } from '../test-support/registries';
@@ -121,12 +119,14 @@ describe('ListState: typed by the definition (resource SPEC 20.7)', () => {
       { organizations: Organizations.resource, contacts: Contacts.resource },
       createTransport({ origin: 'https://api.example.test' }),
     );
-    const contacts = resourceQueries(clients.contacts);
-    function ContactRows() {
-      return useQuery(contacts.list({ ...state, include: ['organization'] }))
-        .data?.data;
+    async function rowsOf() {
+      const result = await clients.contacts.list({
+        ...state,
+        include: ['organization'],
+      });
+      return result.data;
     }
-    expectTypeOf(ContactRows).returns.not.toBeAny();
+    expectTypeOf(rowsOf).returns.resolves.not.toBeAny();
     async function nextOf() {
       return contactsList.next(state, await clients.contacts.list(state));
     }

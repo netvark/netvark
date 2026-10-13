@@ -5,9 +5,10 @@
  * throws for one the declaration lacks. Not published with the package.
  * @packageDocumentation
  */
-import type { FieldDescriptor } from '../../fields/fields-of';
+import type { FieldDescriptor } from '@netvark/resource-ui';
 
-import { fieldsOf } from '../../fields/fields-of';
+import { fieldsOf } from '@netvark/resource-ui';
+
 import { messages } from '../messages';
 import { Contacts } from '../resources';
 

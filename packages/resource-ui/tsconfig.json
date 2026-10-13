@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Resolve `@netvark/resource-core`, and the packages it builds on, to
+    // their source through the `source` condition of their exports maps
+    // (written by tsdown's `devExports`), so the model type-checks against
+    // the declarations as they are edited, without a build in between.
+    // Consumers, e2e/resource/ included, never see the condition.
+    // @ref https://tsdown.dev/options/package-exports#devexports
+    // @ref https://www.typescriptlang.org/tsconfig/#customConditions
+    "customConditions": ["source"]
+  },
+  "include": ["src/**/*.ts", "*.config.ts"],
+  "exclude": ["dist", "node_modules", "coverage"]
+}

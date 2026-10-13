@@ -1,15 +1,14 @@
 {
   "name": "@netvark/react-resource",
   "version": "0.0.0",
-  "description": "React forms, lists, and query caches from @netvark/resource-core declarations: labels and options from the application's messages, validation in the server's words, the write a form sends, refusals on their fields, and list state as TanStack Table v9 holds it, bound to TanStack Form and TanStack Query.",
+  "description": "TanStack Form and TanStack Query bindings for React over @netvark/resource-ui's form models and @netvark/jsonapi-client's clients: a form's options and refusals on its fields, and query options keyed by the request.",
   "keywords": [
     "forms",
     "json-api",
     "jsonapi",
     "react",
     "tanstack-form",
-    "tanstack-query",
-    "tanstack-table"
+    "tanstack-query"
   ],
   "homepage": "https://github.com/netvark/netvark/tree/main/packages/react-resource#readme",
   "bugs": "https://github.com/netvark/netvark/issues",
@@ -29,10 +28,6 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": {
-      "source": "./src/index.ts",
-      "default": "./dist/index.js"
-    },
     "./form": {
       "source": "./src/tanstack-form/index.ts",
       "default": "./dist/form.js"
@@ -45,7 +40,6 @@
   },
   "publishConfig": {
     "exports": {
-      ".": "./dist/index.js",
       "./form": "./dist/form.js",
       "./query": "./dist/query.js",
       "./package.json": "./package.json"
@@ -67,6 +61,7 @@
   "devDependencies": {
     "@netvark/jsonapi-client": "workspace:^",
     "@netvark/resource-core": "workspace:^",
+    "@netvark/resource-ui": "workspace:^",
     "@tanstack/react-form": "1.33.5",
     "@tanstack/react-query": "5.104.1",
     "@tanstack/react-router": "1.170.42",
@@ -84,6 +79,7 @@
   "peerDependencies": {
     "@netvark/jsonapi-client": "^0.1.0",
     "@netvark/resource-core": "^0.1.0",
+    "@netvark/resource-ui": "^0.1.0",
     "@tanstack/react-form": "^1.17.0",
     "@tanstack/react-query": "^5.89.0"
   },
