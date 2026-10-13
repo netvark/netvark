@@ -6,9 +6,9 @@ Thanks for helping. This repository holds every `@netvark` package, grouped in f
 (`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, `@netvark/jsonapi-client`), keyset
 (`@netvark/keyset-core`, `@netvark/kysely-keyset`, `@netvark/drizzle-keyset`), and resource
 (`@netvark/resource-core`, `@netvark/kysely-resource`, `@netvark/hono-resource`,
-`@netvark/react-resource`). This guide covers what every family shares: setup, the quality gates,
-the conventions, commits, changesets, and releases. Each family adds its own guide with its layout,
-extension points, constraints, and checklist:
+`@netvark/resource-ui`, `@netvark/react-resource`). This guide covers what every family shares:
+setup, the quality gates, the conventions, commits, changesets, and releases. Each family adds its
+own guide with its layout, extension points, constraints, and checklist:
 
 - [`docs/ban/CONTRIBUTING.md`](docs/ban/CONTRIBUTING.md)
 - [`docs/catalog/CONTRIBUTING.md`](docs/catalog/CONTRIBUTING.md)

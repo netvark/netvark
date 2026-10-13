@@ -12,8 +12,7 @@
  */
 import type { ValidationLogicFn } from '@tanstack/react-form';
 
-import type { FormModel } from '../form/form-types';
-import type { SyncStandardSchema } from '../internal/standard-schema';
+import type { FormModel } from '@netvark/resource-ui';
 
 import { formOptions, revalidateLogic } from '@tanstack/react-form';
 
@@ -23,7 +22,9 @@ import { checkModel } from './form-model';
 export interface ResourceFormOptions<TValues extends object> {
   readonly defaultValues: TValues;
   readonly validationLogic: ValidationLogicFn;
-  readonly validators: { readonly onDynamic: SyncStandardSchema<TValues> };
+  readonly validators: {
+    readonly onDynamic: FormModel<TValues, unknown>['validator'];
+  };
 }
 
 /**

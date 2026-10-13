@@ -1,23 +1,23 @@
 /**
  * Package surface. `@netvark/resource-core` and its `server`, `testing`, and
  * `openapi` entries, `@netvark/kysely-resource`, `@netvark/hono-resource`,
- * and `@netvark/react-resource` and its `form` and `query` entries must
- * resolve through the published `exports` map at runtime and export exactly
- * the values the SPEC lists (sections 1, 18.1, 19.1, and 20.1) for what has
- * shipped. Value imports on purpose: a missing dist file or a wrong
- * `exports` entry fails here before any feature test.
+ * `@netvark/resource-ui`, and `@netvark/react-resource`'s `form` and `query`
+ * entries must resolve through the published `exports` map at runtime and
+ * export exactly the values the SPEC lists (sections 1, 18.1, 19.1, and
+ * 20.1) for what has shipped. Value imports on purpose: a missing dist file
+ * or a wrong `exports` entry fails here before any feature test.
  */
 import { describe, expect, it } from 'vitest';
 
 import * as routes from '@netvark/hono-resource';
 import * as runtime from '@netvark/kysely-resource';
-import * as react from '@netvark/react-resource';
 import * as reactForm from '@netvark/react-resource/form';
 import * as reactQuery from '@netvark/react-resource/query';
 import * as core from '@netvark/resource-core';
 import * as openapi from '@netvark/resource-core/openapi';
 import * as server from '@netvark/resource-core/server';
 import * as testing from '@netvark/resource-core/testing';
+import * as ui from '@netvark/resource-ui';
 
 describe('package surface (SPEC 1, 18.1, 19.1, 20.1)', () => {
   it('@netvark/resource-core exports the documented values', () => {
@@ -93,8 +93,8 @@ describe('package surface (SPEC 1, 18.1, 19.1, 20.1)', () => {
     ]);
   });
 
-  it('@netvark/react-resource exports the documented values', () => {
-    expect(Object.keys(react).toSorted()).toEqual([
+  it('@netvark/resource-ui exports the documented values', () => {
+    expect(Object.keys(ui).toSorted()).toEqual([
       'fieldsOf',
       'resourceForm',
       'resourceList',

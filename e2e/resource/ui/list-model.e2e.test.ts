@@ -1,6 +1,6 @@
 /**
  * The list model over the contacts application (resource SPEC 20.7): the
- * built `@netvark/react-resource`'s `resourceList` with the application's
+ * built `@netvark/resource-ui`'s `resourceList` with the application's
  * Paraglide messages, its states sent by the built
  * `@netvark/jsonapi-client`'s clients to the application served over a
  * socket (`support/contacts-server.ts`), on PGlite and on the server
@@ -14,7 +14,7 @@
  * @ref https://tanstack.com/table/v9/docs/framework/react/guide/sorting
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
  */
-import type { ListState } from '@netvark/react-resource';
+import type { ListState } from '@netvark/resource-ui';
 
 import type { RuntimeDatabase } from '../runtime/database.ts';
 import type { ContactsServer } from '../support/contacts-server.ts';
@@ -22,7 +22,7 @@ import type { Departure } from '../support/recorded-clients.ts';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { resourceList } from '@netvark/react-resource';
+import { resourceList } from '@netvark/resource-ui';
 
 import { contactMessages } from '../localization/contact-messages.ts';
 import { Contacts } from '../resources/contacts.ts';

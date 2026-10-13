@@ -9,7 +9,7 @@
  */
 import type { AnyFieldApi, AnyFormApi } from '@tanstack/react-form';
 
-import type { FormModel } from '../form/form-types';
+import type { FormModel } from '@netvark/resource-ui';
 
 import { FieldApi, FormApi } from '@tanstack/react-form';
 

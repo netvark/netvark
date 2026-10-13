@@ -1,0 +1,68 @@
+{
+  "name": "@netvark/resource-ui",
+  "version": "0.0.0",
+  "description": "Forms and lists from @netvark/resource-core declarations, for any framework: labels and options from the application's messages, validation in the server's words, the write a form sends, refusals on their fields, and list state as TanStack Table v9 holds it.",
+  "keywords": [
+    "forms",
+    "json-api",
+    "jsonapi",
+    "standard-schema",
+    "tanstack-table"
+  ],
+  "homepage": "https://github.com/netvark/netvark/tree/main/packages/resource-ui#readme",
+  "bugs": "https://github.com/netvark/netvark/issues",
+  "license": "MIT",
+  "author": "Ali Issa (https://github.com/ali-issa)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netvark/netvark.git",
+    "directory": "packages/resource-ui"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./package.json": "./package.json"
+    },
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:pkg": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netvark/jsonapi-core": "workspace:^"
+  },
+  "devDependencies": {
+    "@netvark/jsonapi-client": "workspace:^",
+    "@netvark/resource-core": "workspace:^",
+    "@tanstack/table-core": "9.2.8",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@netvark/jsonapi-client": "^0.1.0",
+    "@netvark/resource-core": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -15,7 +15,7 @@
  * answers.
  * @ref https://tanstack.com/form/v1/docs/framework/react/guides/validation
  */
-import type { FormModel } from '@netvark/react-resource';
+import type { FormModel } from '@netvark/resource-ui';
 
 import type { RuntimeDatabase } from '../runtime/database.ts';
 import type { ContactsServer } from '../support/contacts-server.ts';
@@ -24,12 +24,12 @@ import type { Departure } from '../support/recorded-clients.ts';
 import { FieldApi, FormApi } from '@tanstack/react-form';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { resourceForm } from '@netvark/react-resource';
 import {
   bindResponseErrors,
   resourceFormOptions,
 } from '@netvark/react-resource/form';
 import { defaultMessages } from '@netvark/resource-core';
+import { resourceForm } from '@netvark/resource-ui';
 
 import { contactMessages } from '../localization/contact-messages.ts';
 import { Contacts } from '../resources/contacts.ts';

@@ -6,10 +6,10 @@
  */
 import { neutralChecks } from './checks.ts';
 import { openapiChecks } from './openapi-checks.ts';
-import { reactChecks } from './react-checks.ts';
 import { runChecks } from './report.ts';
 import { routeChecks } from './route-checks.ts';
 import { serverChecks } from './server-checks.ts';
+import { uiChecks } from './ui-checks.ts';
 
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -20,7 +20,7 @@ export default {
         ...serverChecks,
         ...openapiChecks,
         ...routeChecks,
-        ...reactChecks,
+        ...uiChecks,
       }),
     );
   },

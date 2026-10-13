@@ -1,6 +1,6 @@
 /**
  * A create form over a table's defaults (resource SPEC 20.3):
- * `resourceForm` from the built `@netvark/react-resource`, over the table
+ * `resourceForm` from the built `@netvark/resource-ui`, over the table
  * of `support/defaults-table.ts`, starts each member from its default as
  * a read gives it, so the form shows what the database stores for a
  * member the person leaves alone. A create left alone writes nothing, and
@@ -17,8 +17,8 @@ import type { OracleDatabase } from '../support/oracle-database.ts';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { resourceForm } from '@netvark/react-resource';
 import { defaultMessages } from '@netvark/resource-core';
+import { resourceForm } from '@netvark/resource-ui';
 
 import {
   DEFAULTS_MIGRATION,

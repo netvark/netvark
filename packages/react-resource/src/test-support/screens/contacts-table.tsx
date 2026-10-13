@@ -12,7 +12,8 @@ import type { ReactElement } from 'react';
  * @ref https://tanstack.com/table/v9/docs/framework/react/guide/column-filtering
  * @packageDocumentation
  */
-import type { ListState } from '../../list/list-types';
+import type { ListState } from '@netvark/resource-ui';
+
 import type { ScreenQueries, ScreenRecord } from './screen-queries';
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -32,7 +33,8 @@ import {
   useTable,
 } from '@tanstack/react-table';
 
-import { resourceList } from '../../list/resource-list';
+import { resourceList } from '@netvark/resource-ui';
+
 import { messages } from '../messages';
 import { Contacts } from '../resources';
 import { contactField } from './contact-fields';

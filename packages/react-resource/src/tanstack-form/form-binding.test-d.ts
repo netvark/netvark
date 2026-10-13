@@ -1,4 +1,4 @@
-import type { FormErrors } from '../form/form-types';
+import type { FormErrors } from '@netvark/resource-ui';
 
 import {
   createFormHook,
@@ -11,8 +11,8 @@ import { describe, expectTypeOf, it } from 'vitest';
 
 import { createClients, createTransport } from '@netvark/jsonapi-client';
 import { createDeclareResource } from '@netvark/resource-core';
+import { resourceForm } from '@netvark/resource-ui';
 
-import { resourceForm } from '../form/resource-form';
 import { messages } from '../test-support/messages';
 import { publicCatalog } from '../test-support/public-catalog';
 import { FIXTURE_REGISTRIES } from '../test-support/registries';

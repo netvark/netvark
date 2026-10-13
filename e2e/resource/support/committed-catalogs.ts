@@ -3,7 +3,8 @@
  * extracted from, each as `pg-catalog extract` writes it from a directory
  * holding them as Flyway versions: the storage contract's (resource SPEC
  * 12.9), which `@netvark/resource-core/testing` ships, and the fixture of
- * `@netvark/react-resource`'s unit tests (SPEC 20.8). The suite checks each
+ * the unit tests of `@netvark/resource-ui` and of `@netvark/react-resource`
+ * (SPEC 20.8). The suite checks each
  * committed file is current; `pnpm run write:catalogs` in this package
  * rewrites them, the contract's from the built package's migrations, so
  * build first.
@@ -27,12 +28,15 @@ export interface CommittedCatalog {
   readonly interface: string;
 }
 
-const REACT_FIXTURE_DIR = fileURLToPath(
-  new URL(
-    '../../../packages/react-resource/src/test-support/',
-    import.meta.url,
-  ),
-);
+/** The test-support directory of a package's unit tests. */
+function testSupportDir(name: string): string {
+  return fileURLToPath(
+    new URL(`../../../packages/${name}/src/test-support/`, import.meta.url),
+  );
+}
+
+const UI_FIXTURE_DIR = testSupportDir('resource-ui');
+const REACT_FIXTURE_DIR = testSupportDir('react-resource');
 
 export const COMMITTED_CATALOGS: Readonly<Record<string, CommittedCatalog>> = {
   'the storage contract': {
@@ -45,6 +49,12 @@ export const COMMITTED_CATALOGS: Readonly<Record<string, CommittedCatalog>> = {
     migrations: contractFixture.migrations,
     tables: ['workspaces', 'tasks', 'labels', 'logs'],
     interface: 'ContractPublicCatalog',
+  },
+  "@netvark/resource-ui's fixture": {
+    file: join(UI_FIXTURE_DIR, 'public-catalog.ts'),
+    migrations: join(UI_FIXTURE_DIR, 'migrations'),
+    tables: ['contacts', 'organizations', 'plans'],
+    interface: 'FixturePublicCatalog',
   },
   "@netvark/react-resource's fixture": {
     file: join(REACT_FIXTURE_DIR, 'public-catalog.ts'),

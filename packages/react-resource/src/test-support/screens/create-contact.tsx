@@ -16,7 +16,8 @@ import { useForm } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { resourceForm } from '../../form/resource-form';
+import { resourceForm } from '@netvark/resource-ui';
+
 import { bindResponseErrors } from '../../tanstack-form/bind-errors';
 import { resourceFormOptions } from '../../tanstack-form/form-options';
 import { messages } from '../messages';

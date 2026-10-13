@@ -19,7 +19,7 @@
  */
 import type { AnyFormApi } from '@tanstack/react-form';
 
-import type { FormErrors, FormModel } from '../form/form-types';
+import type { FormErrors, FormModel } from '@netvark/resource-ui';
 
 import { isObject } from '../internal/object';
 import { checkModel } from './form-model';

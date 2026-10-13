@@ -70,7 +70,7 @@ A pnpm workspace of six families:
 | keyset   | `packages/keyset-core`    | `packages/kysely-keyset`   | `docs/keyset`   | `e2e/keyset`   |
 |          |                           | `packages/drizzle-keyset`  |                 |                |
 | resource | `packages/resource-core`  | `packages/kysely-resource` | `docs/resource` | `e2e/resource` |
-|          |                           | `packages/hono-resource`   |                 |                |
+|          | `packages/resource-ui`    | `packages/hono-resource`   |                 |                |
 |          |                           | `packages/react-resource`  |                 |                |
 
 - `packages/<name>/`: one published package, `@netvark/<name>`. `src/` with colocated tests;

@@ -13,7 +13,6 @@ import { defineConfig } from 'tsdown';
  */
 const config: UserConfig = defineConfig({
   entry: {
-    index: 'src/index.ts',
     form: 'src/tanstack-form/index.ts',
     query: 'src/tanstack-query/index.ts',
   },

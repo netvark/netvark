@@ -1,6 +1,6 @@
 /**
- * Checks of the built `@netvark/react-resource` (resource SPEC 20.8): the
- * root entry, which imports neither React nor TanStack, describes the
+ * Checks of the built `@netvark/resource-ui` (resource SPEC 20.8): the
+ * model, which imports no framework and nothing of TanStack, describes the
  * contacts application's members and runs a form model, its start values,
  * its validator, its write, and the error mapping of a refused write, and
  * a list model, which reads a stale link back leniently and pages by a
@@ -12,8 +12,8 @@
 import type { Checks } from './report.ts';
 
 import { ResponseError } from '@netvark/jsonapi-client';
-import { fieldsOf, resourceForm, resourceList } from '@netvark/react-resource';
 import { defaultMessages } from '@netvark/resource-core';
+import { fieldsOf, resourceForm, resourceList } from '@netvark/resource-ui';
 
 import { Contacts } from '../resources/contacts.ts';
 import { Organizations } from '../resources/organizations.ts';
@@ -37,7 +37,7 @@ function messageOf(
   return 'no TypeError';
 }
 
-export const reactChecks: Checks = {
+export const uiChecks: Checks = {
   'describes the members with their labels and filters': () => {
     const fields = fieldsOf(Contacts, messages);
     const { status, priority } = fields;

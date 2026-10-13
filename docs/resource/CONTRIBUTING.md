@@ -1,8 +1,8 @@
 # Contributing to the resource family
 
 `@netvark/resource-core` (declarations, derivations, messages, the `server` contracts, OpenAPI) and,
-as their epics start, `@netvark/kysely-resource`, `@netvark/hono-resource`, and
-`@netvark/react-resource`. The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md) covers setup, the
+as their epics start, `@netvark/kysely-resource`, `@netvark/hono-resource`, `@netvark/resource-ui`,
+and `@netvark/react-resource`. The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md) covers setup, the
 quality gates, the shared conventions, commits, changesets, and releases; this guide adds what is
 specific to the family. Design intent lives in [`DESIGN.md`](DESIGN.md), the normative contract in
 [`SPEC.md`](SPEC.md), and decisions in [`adr/`](adr); read those before proposing changes to the

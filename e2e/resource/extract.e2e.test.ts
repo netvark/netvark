@@ -6,8 +6,9 @@
  * catalogs type the declarations; the oracle's type the probes (SPEC 15.3);
  * the PostgreSQL 18 schema's type the NOT ENFORCED declarations. The
  * storage contract's catalog, which the testing entry ships next to its
- * migrations (SPEC 12.9), and the catalog of `@netvark/react-resource`'s
- * unit-test fixture (SPEC 20.8) are what extraction gives for theirs.
+ * migrations (SPEC 12.9), and the catalogs of the unit-test fixture of
+ * `@netvark/resource-ui` and of `@netvark/react-resource` (SPEC 20.8)
+ * are what extraction gives for theirs.
  */
 import { describe, expect, it } from 'vitest';
 

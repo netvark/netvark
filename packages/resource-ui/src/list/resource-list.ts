@@ -4,8 +4,9 @@
  * TanStack Table holds no data of its own: its sorting and column filters
  * are read from the state and written back to it, the request sorts and
  * filters, and paging happens outside the table, by cursor, since a
- * cursor API has no total and no page index. The model imports neither
- * React nor TanStack; its functions take the updaters Table hands them.
+ * cursor API has no total and no page index. The model imports no
+ * framework and nothing of TanStack; its functions take the updaters
+ * Table hands them.
  * @ref https://tanstack.com/table/v9/docs/framework/react/guide/pagination
  * @ref https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
  * @packageDocumentation

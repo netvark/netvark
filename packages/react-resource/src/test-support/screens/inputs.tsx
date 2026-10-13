@@ -10,7 +10,7 @@ import type { ReactElement } from 'react';
  * @ref https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21
  * @packageDocumentation
  */
-import type { FieldOption } from '../../fields/fields-of';
+import type { FieldOption } from '@netvark/resource-ui';
 
 /** A field and the label its control shows. */
 export interface InputProps {
