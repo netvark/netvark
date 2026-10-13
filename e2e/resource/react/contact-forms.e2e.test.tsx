@@ -1,14 +1,15 @@
 /**
  * The contacts application's forms on screen (resource SPEC 20.8): the
  * create and edit screens of `screens/`, rendered by React in jsdom with the
- * built `@netvark/resource-ui` and `@netvark/react-resource`'s `form` and
- * `query` entries, for a person whose browser prefers German, against the
- * application served over a socket (`support/contacts-server.ts`) on PGlite
- * and on the server `RESOURCE_PG_URL` names. Nothing between a keystroke and
- * the database is mocked; the transport records each request as it leaves,
- * with the `Accept-Language` Paraglide's locale gives. The form refuses what
- * the server would before anything is sent, in German; the server's refusals
- * of a taken email and a taken name land on their fields in the German the
+ * built `@netvark/resource-ui`, `@netvark/tanstack-form-resource`, and
+ * `@netvark/tanstack-query-jsonapi`, for a person whose browser prefers
+ * German, against the application served over a socket
+ * (`support/contacts-server.ts`) on PGlite and on the server
+ * `RESOURCE_PG_URL` names. Nothing between a keystroke and the database is
+ * mocked; the transport records each request as it leaves, with the
+ * `Accept-Language` Paraglide's locale gives. The form refuses what the
+ * server would before anything is sent, in German; the server's refusals of
+ * a taken email and a taken name land on their fields in the German the
  * request asked for, each cleared by the change that answers it; the plan's
  * quota, which no field holds, lands in the banner; and an update sends only
  * what the person changed.

@@ -4164,11 +4164,12 @@ application's one messages object, computed when it is asked for (ADR 0014).
 
 `@netvark/tanstack-form-resource`:
 
-| Module            | Holds                                                                    |
-| ----------------- | ------------------------------------------------------------------------ |
-| `form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one |
-| `form-options.ts` | `resourceFormOptions`                                                    |
-| `bind-errors.ts`  | `bindResponseErrors`                                                     |
+| Module               | Holds                                                                    |
+| -------------------- | ------------------------------------------------------------------------ |
+| `internal/object.ts` | the checks of what a JavaScript caller hands the binding                 |
+| `form-model.ts`      | reading a form model, and the `TypeError` of an argument that is not one |
+| `form-options.ts`    | `resourceFormOptions`                                                    |
+| `bind-errors.ts`     | `bindResponseErrors`                                                     |
 
 Types exported from `@netvark/resource-ui`: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`,
 `FilterKind`, `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`,

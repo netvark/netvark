@@ -25,7 +25,7 @@ body:
           '@netvark/kysely-resource',
           '@netvark/hono-resource',
           '@netvark/resource-ui',
-          '@netvark/react-resource',
+          '@netvark/tanstack-form-resource',
           a new package,
           the repository or its docs,
         ]

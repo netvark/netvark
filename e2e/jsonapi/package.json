@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@angular/common": "22.2.2",
-    "@angular/core": "22.2.2",
+    "@angular/common": "catalog:",
+    "@angular/core": "catalog:",
     "@hono/node-server": "catalog:",
     "@netvark/hono-ban": "workspace:*",
     "@netvark/hono-jsonapi": "workspace:*",
@@ -32,13 +32,13 @@
     "hono": "catalog:",
     "miniflare": "catalog:",
     "react": "catalog:",
-    "rxjs": "7.8.2",
-    "solid-js": "1.9.17",
-    "svelte": "5.57.2",
+    "rxjs": "catalog:",
+    "solid-js": "catalog:",
+    "svelte": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "vue": "3.5.43",
+    "vue": "catalog:",
     "zod": "catalog:"
   }
 }

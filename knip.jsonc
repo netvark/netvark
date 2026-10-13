@@ -62,19 +62,30 @@
       // extraction config the pg-catalog bin loads; `fails/`, which
       // fails.e2e.test.ts compiles with tsc instead of importing, and
       // `declarations/`, which declaration-emit.e2e.test.ts compiles to emit
-      // declarations; and `localization/transform-forms.ts`, which only the
-      // type check reads.
-      // The inlang project loads the message-format plugin by path.
+      // declarations; and `localization/transform-forms.ts` and
+      // `form/adapters/`, which only the type check reads. The adapters are
+      // TypeScript, with no `.vue` or `.svelte` components, so the Vue and
+      // Svelte plugins are turned off here, as for e2e/jsonapi.
+      // The inlang project loads the message-format plugin by path, and
+      // `@angular/common` is a peer of `@tanstack/angular-store`, which
+      // Angular Form depends on, declared so it installs at the release of
+      // `@angular/core` it requires exactly.
       "entry": [
         "smoke/worker.ts",
         "fixtures/*/*catalog.ts",
         "fixtures/*/netvark.config.mjs",
         "fails/*.ts",
         "declarations/*.ts",
-        "localization/transform-forms.ts"
+        "localization/transform-forms.ts",
+        "form/adapters/*.ts"
       ],
       "project": ["**/*.{ts,tsx}", "**/*.mjs"],
-      "ignoreDependencies": ["@inlang/plugin-message-format"]
+      "ignoreDependencies": [
+        "@inlang/plugin-message-format",
+        "@angular/common"
+      ],
+      "svelte": false,
+      "vue": false
     }
   }
 }

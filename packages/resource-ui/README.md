@@ -33,10 +33,9 @@ Deno, and Cloudflare Workers reads the same model as the browser.
 
 The screens bring their own form library and table, which take the model's values as they are: a
 form's validator is a [Standard Schema](https://standardschema.dev), and a list reads and writes
-[TanStack Table](https://tanstack.com/table/v9) v9's sorting and column filters as plain values. In
-React,
-[`@netvark/react-resource`](https://github.com/netvark/netvark/tree/main/packages/react-resource#readme)
-binds a form model to TanStack Form, and
+[TanStack Table](https://tanstack.com/table/v9) v9's sorting and column filters as plain values.
+[`@netvark/tanstack-form-resource`](https://github.com/netvark/netvark/tree/main/packages/tanstack-form-resource#readme)
+binds a form model to the TanStack Form of any framework, and
 [`@netvark/tanstack-query-jsonapi`](https://github.com/netvark/netvark/tree/main/packages/tanstack-query-jsonapi#readme)
 gives the clients' calls to the TanStack Query of any framework. The examples below render with
 React; a screen in another framework makes the same calls.
@@ -171,9 +170,9 @@ async function submit(values: typeof createContact.defaultValues) {
 }
 ```
 
-In React,
-[`@netvark/react-resource/form`](https://github.com/netvark/netvark/tree/main/packages/react-resource#tanstack-form)
-hands a form model to TanStack Form and binds a refused write's texts to its fields.
+[`@netvark/tanstack-form-resource`](https://github.com/netvark/netvark/tree/main/packages/tanstack-form-resource#forms)
+hands a form model to the TanStack Form of any framework and binds a refused write's texts to its
+fields.
 
 ## Form rules
 
