@@ -7,43 +7,14 @@
  * can be published for a client to import.
  * @ref https://www.typescriptlang.org/tsconfig/#declaration
  */
-import { spawn } from 'node:child_process';
+import type { Run } from './support/run-bin';
+
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const PACKAGE_DIR = import.meta.dirname;
-
-interface Run {
-  readonly code: number | null;
-  readonly output: string;
-}
-
-/** Runs the installed TypeScript's `tsc` bin with `args` in this package. */
-async function tsc(args: ReadonlyArray<string>): Promise<Run> {
-  const manifest = JSON.parse(
-    await readFile(
-      join(PACKAGE_DIR, 'node_modules/typescript/package.json'),
-      'utf8',
-    ),
-  ) as { readonly bin: { readonly tsc: string } };
-  const bin = join(PACKAGE_DIR, 'node_modules/typescript', manifest.bin.tsc);
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [bin, ...args], { cwd: PACKAGE_DIR });
-    let output = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      resolve({ code, output });
-    });
-  });
-}
+import { PACKAGE_DIR, binPath, runBin } from './support/run-bin';
 
 let outDir: string;
 let run: Run;
@@ -51,14 +22,19 @@ let run: Run;
 beforeAll(async () => {
   await mkdir(join(PACKAGE_DIR, '.tmp'), { recursive: true });
   outDir = await mkdtemp(join(PACKAGE_DIR, '.tmp', 'declarations-'));
-  run = await tsc([
-    '-p',
-    'declarations/tsconfig.json',
-    '--pretty',
-    'false',
-    '--outDir',
-    outDir,
-  ]);
+  const tsc = await binPath('typescript', 'tsc');
+  run = await runBin(
+    tsc,
+    [
+      '-p',
+      'declarations/tsconfig.json',
+      '--pretty',
+      'false',
+      '--outDir',
+      outDir,
+    ],
+    PACKAGE_DIR,
+  );
 });
 
 afterAll(async () => {
@@ -67,7 +43,8 @@ afterAll(async () => {
 
 describe('declarations of exported definitions', () => {
   it('compile with no diagnostics', () => {
-    expect(run.output).toBe('');
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toBe('');
     expect(run.code).toBe(0);
   });
 

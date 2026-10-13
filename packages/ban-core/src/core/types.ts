@@ -4,6 +4,7 @@
  */
 import type { RenderOptions } from '../formats/context';
 import type { ErrorFormat } from '../formats/types';
+import type { HeadersInit } from '../internal/headers-init';
 import type { IssueLocation, ValidationIssue } from '../validation/issue';
 import type { BanError, BanErrorOptions, RenderedError } from './ban-error';
 import type { BuiltinCatalog, FactoryName } from './catalog';

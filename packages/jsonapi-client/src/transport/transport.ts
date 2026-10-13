@@ -9,6 +9,8 @@
  * @ref https://www.rfc-editor.org/rfc/rfc9110#field.accept-language
  * @packageDocumentation
  */
+import type { HeadersInit } from '../internal/headers-init';
+
 import { assertOrigin } from './origin';
 
 /** What the client reads of a response: its status, its headers, and its body, once, as text. */

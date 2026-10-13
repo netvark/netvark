@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // A Node.js consumer without the DOM library: Node's types declare
+  // `Headers`, `Request`, and `Response`, and none of the DOM library's
+  // aliases. `skipLibCheck` off checks every declaration file the entry
+  // points reach, the packages' and those they import, so a name only the
+  // DOM library declares is an error here, where a consumer who skips the
+  // check would read it as `any`. node-types.e2e.test.ts runs it.
+  // @ref https://www.typescriptlang.org/tsconfig/#lib
+  // @ref https://www.typescriptlang.org/tsconfig/#skipLibCheck
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": ["node"],
+    "skipLibCheck": false
+  },
+  "include": ["entries.ts"],
+  "exclude": []
+}

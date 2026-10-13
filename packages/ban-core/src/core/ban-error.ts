@@ -1,4 +1,5 @@
 import type { RenderOptions } from '../formats/context';
+import type { HeadersInit } from '../internal/headers-init';
 import type { ResolvedDefinition } from './definition';
 import type { ErrorItem } from './error-item';
 import type { ErrorStatusCode } from './status';

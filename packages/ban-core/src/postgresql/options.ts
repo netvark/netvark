@@ -8,6 +8,7 @@ import type { BanError } from '../core/ban-error';
 import type { BuiltinKey } from '../core/catalog';
 import type { ErrorDefinition } from '../core/definition';
 import type { Ban, Catalog } from '../core/types';
+import type { HeadersInit } from '../internal/headers-init';
 import type { IssueLocation } from '../validation/issue';
 
 import { assertHeadersInit } from '../handler/headers';
