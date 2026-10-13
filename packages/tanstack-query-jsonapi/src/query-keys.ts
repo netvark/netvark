@@ -1,12 +1,11 @@
 /**
- * The keys `resourceQueries` caches under (resource SPEC 20.6). A key is
- * the request: the definition's type, the call, and the query string
- * `serializeQuery` writes (jsonapi SPEC 15.5), in its own order whatever
- * order a query's members were written in. Two queries that make one
- * request share one entry, a bigint filter value keys as its text, and
- * every key is JSON, as TanStack Query hashes it. Each key starts with
- * the type, so invalidating `[type]` reaches every list, page, and record
- * of it, and `[type, 'list']` every list.
+ * The keys `resourceQueries` caches under (SPEC 16.2). A key is the request:
+ * the definition's type, the call, and the query string `serializeQuery`
+ * writes (SPEC 15.5), in its own order whatever order a query's members were
+ * written in. Two queries that make one request share one entry, a bigint
+ * filter value keys as its text, and every key is JSON, as TanStack Query
+ * hashes it. Each key starts with the type, so invalidating `[type]` reaches
+ * every list, page, and record of it, and `[type, 'list']` every list.
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys
  * @ref https://tanstack.com/query/v5/docs/framework/react/guides/filters
  * @packageDocumentation
@@ -43,7 +42,7 @@ export function queryText(
   return serializeQuery(definition, query ?? {}).toString();
 }
 
-/** The query string a `get` of `query` sends: its `include` and `fields` alone (jsonapi SPEC 15.4). */
+/** The query string a `get` of `query` sends: its `include` and `fields` alone (SPEC 15.4). */
 export function recordText(
   definition: KeyedDefinition,
   query: Query | undefined,

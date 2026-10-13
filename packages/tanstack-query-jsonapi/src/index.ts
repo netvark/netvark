@@ -1,8 +1,9 @@
 /**
- * `@netvark/react-resource/query`: TanStack Query's options for a
- * client's reads and writes (resource SPEC 20.6), keyed by the request.
- * `resourceQueries` makes them from a client `createClients` returned.
- * TanStack Query is an optional peer, which only this entry imports.
+ * `@netvark/tanstack-query-jsonapi`: TanStack Query's options for a
+ * client's reads and writes (SPEC 16), keyed by the request, for every
+ * adapter. `resourceQueries` makes them from a client `createClients`
+ * returned. `@tanstack/query-core` is an optional peer, imported for
+ * types only (ADR 0020).
  * @packageDocumentation
  */
 export type { PageParam } from './pages';

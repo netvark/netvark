@@ -1,6 +1,7 @@
 # ADR 0020: TanStack Query options are the clients' binding, typed through query-core
 
-- Status: accepted
+- Status: accepted; amended by ADR-0021 (a list's pages key is tagged `InfiniteData<TPage>`, as
+  every adapter's `infiniteQueryOptions` tags an infinite key)
 - Date: 2026-10-12
 
 ## Context

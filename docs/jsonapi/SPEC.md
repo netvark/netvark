@@ -1593,13 +1593,16 @@ through query-core's `DataTag`, and its `queryFn`; a page list's key, `queryFn`,
 `onSuccess`. Every adapter's hooks take them as they are, with their data typed and `select`
 inferring from it, and `queryClient.getQueryData(contacts.get(id).queryKey)` is typed through the
 tag. The data of an infinite query's hook is `InfiniteData<ListResult, unknown>`, TanStack Query's
-default for an infinite query without `select`, while `getQueryData` of a pages key is
-`InfiniteData<ListResult, PageParam>`. Records are the client's `RecordOf` for the query passed
-(15.6), `create`'s variables its `CreateInput`, `update`'s `{ id } & UpdateInput`, and `remove`'s
-the id. The options are made over the client's calls typed wide, and typed by its definitions where
-`resourceQueries` returns them, as `createClients` types the calls. An application adds its own
-members by spreading them, `{ ...contacts.list(state), placeholderData: keepPreviousData }`, and may
-pass them through its adapter's `queryOptions`.
+default for an infinite query without `select`, and a pages key is tagged with the same, as every
+adapter's `infiniteQueryOptions` tags one (ADR 0021), so `getQueryData` of it reads as the hook
+does. Records are the client's `RecordOf` for the query passed (15.6), `create`'s variables its
+`CreateInput`, `update`'s `{ id } & UpdateInput`, and `remove`'s the id. The options are made over
+the client's calls typed wide, and typed by its definitions where `resourceQueries` returns them, as
+`createClients` types the calls. An application adds its own members by spreading them,
+`{ ...contacts.list(state), placeholderData: keepPreviousData }`, and may pass them through its
+adapter's `queryOptions`, `infiniteQueryOptions`, and `mutationOptions`, but for Vue's
+`infiniteQueryOptions`, whose result Vue's `useInfiniteQuery` refuses for a key the helper was
+handed tagged: a Vue application spreads the pages options instead.
 
 ### 16.6 Arguments
 
@@ -1639,8 +1642,10 @@ kin are deprecated for `queryClient.query`, which the 5.89 floor does not have. 
 query-core 5.89.0, and a floor that fails them is raised in the same change.
 
 End to end, against the built package: `e2e/jsonapi/query/adapters/` type-checks the options with
-the hooks of each adapter, React, Vue, Solid, Svelte, and Angular Query, their data typed exactly,
-`select` inferring from it, and `getQueryData` typed through the tags;
+the hooks of each adapter, React, Vue, Solid, Svelte, and Angular Query, passed as they are, from a
+getter where the adapter takes one, and through the adapter's own helpers, their data typed exactly,
+`select` inferring from it, and `getQueryData` typed through the tags, with Vue's
+`infiniteQueryOptions` kept under `@ts-expect-error` (ADR 0021);
 `e2e/jsonapi/query/query-cache.e2e.test.ts` drives the blog API over HTTP through query-core's
 observers: a list and a record keyed by the request, pages both ways by the server's links, writes
 that settle once the reads shown have refetched, and a refused write that leaves the cache as it

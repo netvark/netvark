@@ -2,7 +2,7 @@
   "name": "@netvark/jsonapi-e2e",
   "version": "0.0.0",
   "private": true,
-  "description": "End-to-end tests: a consumer of the built @netvark/jsonapi-core, @netvark/hono-jsonapi, and @netvark/jsonapi-client packages, exercised over real HTTP.",
+  "description": "End-to-end tests: a consumer of the built @netvark/jsonapi-core, @netvark/hono-jsonapi, @netvark/jsonapi-client, and @netvark/tanstack-query-jsonapi packages, exercised over real HTTP.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -13,17 +13,32 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@angular/common": "22.2.2",
+    "@angular/core": "22.2.2",
     "@hono/node-server": "catalog:",
     "@netvark/hono-ban": "workspace:*",
     "@netvark/hono-jsonapi": "workspace:*",
     "@netvark/jsonapi-client": "workspace:*",
     "@netvark/jsonapi-core": "workspace:*",
+    "@netvark/tanstack-query-jsonapi": "workspace:*",
+    "@tanstack/angular-query-experimental": "5.104.1",
+    "@tanstack/query-core": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/solid-query": "5.104.1",
+    "@tanstack/svelte-query": "6.3.1",
+    "@tanstack/vue-query": "5.104.1",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "hono": "catalog:",
     "miniflare": "catalog:",
+    "react": "catalog:",
+    "rxjs": "7.8.2",
+    "solid-js": "1.9.17",
+    "svelte": "5.57.2",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
+    "vue": "3.5.43",
     "zod": "catalog:"
   }
 }

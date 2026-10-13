@@ -1,11 +1,11 @@
 # Contributing to the jsonapi family
 
-`@netvark/jsonapi-core` (the framework-free core), `@netvark/hono-jsonapi` (the Hono binding), and
-`@netvark/jsonapi-client` (the typed client). The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
-covers setup, the quality gates, the shared conventions, commits, changesets, and releases; this
-guide adds what is specific to the family. Design intent lives in [`DESIGN.md`](DESIGN.md), the
-normative contract in [`SPEC.md`](SPEC.md), and decisions in [`adr/`](adr); read those before
-proposing API changes.
+`@netvark/jsonapi-core` (the framework-free core), `@netvark/hono-jsonapi` (the Hono binding),
+`@netvark/jsonapi-client` (the typed client), and `@netvark/tanstack-query-jsonapi` (the client's
+TanStack Query binding). The root [`CONTRIBUTING.md`](../../CONTRIBUTING.md) covers setup, the
+quality gates, the shared conventions, commits, changesets, and releases; this guide adds what is
+specific to the family. Design intent lives in [`DESIGN.md`](DESIGN.md), the normative contract in
+[`SPEC.md`](SPEC.md), and decisions in [`adr/`](adr); read those before proposing API changes.
 
 ## Conventions
 
@@ -20,11 +20,17 @@ proposing API changes.
 - **The client is typed by the definitions, never by hand.** What `packages/jsonapi-client/` sends
   and reads is typed from `'~types'` (SPEC 5.3); a capability a definition can declare gets its
   client type there first, so the server's definition stays the one source.
+- **The TanStack Query binding serves every adapter.** `packages/tanstack-query-jsonapi/` imports
+  only types from `@tanstack/query-core` and hands TanStack Query plain objects (ADR 0020); an
+  option it adds is type-checked with the hooks of every adapter in `e2e/jsonapi/query/adapters/`,
+  and its tests run on query-core 5.89.0, the floor, in CI. Its tests read the cache through
+  query-core's observers, which the floor has, never through the `QueryClient` methods TanStack
+  Query has deprecated since.
 - **End-to-end tests live in `e2e/jsonapi/`.** That directory is a private pnpm workspace package
-  that depends on `@netvark/jsonapi-core` and `@netvark/hono-jsonapi` through `workspace:*`, so its
-  imports resolve through the published `exports` maps into `dist/` and its `tsc` run checks the
-  emitted declarations. Each `*.e2e.test.ts` file starts the blog API in `e2e/jsonapi/support/` on
-  `@hono/node-server` and asserts over `fetch`. Never import from `src/` there. Run one file with
+  that depends on the family's packages through `workspace:*`, so its imports resolve through the
+  published `exports` maps into `dist/` and its `tsc` run checks the emitted declarations. Each
+  `*.e2e.test.ts` file starts the blog API in `e2e/jsonapi/support/` on `@hono/node-server` and
+  asserts over `fetch`. Never import from `src/` there. Run one file with
   `pnpm --filter @netvark/jsonapi-e2e exec vitest run <name>` after `pnpm build`.
 - **Client input is hostile.** Names from a request become object keys only through
   `internal/object.ts` or after a `PROTO_KEYS` check; reads of client-shaped objects use

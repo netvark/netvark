@@ -8,7 +8,7 @@
  */
 import type { Clients } from '@netvark/jsonapi-client';
 
-import type { SmokeResult } from './checks.ts';
+import type { InRuntimeCheck, SmokeResult } from './checks.ts';
 
 import {
   createClients,
@@ -20,7 +20,7 @@ import {
 
 import { createBlog } from '../support/blog.ts';
 import { Articles, People, Tags } from '../support/resources.ts';
-import { check, equal } from './checks.ts';
+import { check, equal, runInRuntime } from './checks.ts';
 
 /** Where the client believes the blog is; each request is answered in-process. */
 const ORIGIN = 'http://client.invalid';
@@ -58,9 +58,7 @@ async function refusal(call: Promise<unknown>): Promise<unknown> {
   throw new TypeError('the call resolved');
 }
 
-type ClientCheck = () => Promise<void>;
-
-const CHECKS: Readonly<Record<string, ClientCheck>> = {
+const CHECKS: Readonly<Record<string, InRuntimeCheck>> = {
   'pages of records along the links': async () => {
     const { articles } = openBlog().api;
     const first = await articles.list({ sort: ['title'], include: ['author'] });
@@ -163,17 +161,5 @@ const CHECKS: Readonly<Record<string, ClientCheck>> = {
 
 /** Runs every check in the current runtime; one report covers them all. */
 export async function runClientChecks(): Promise<SmokeResult> {
-  const failures: Array<string> = [];
-  let passed = 0;
-  for (const [name, run] of Object.entries(CHECKS)) {
-    try {
-      await run();
-      passed += 1;
-    } catch (error) {
-      failures.push(
-        `${name}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-  return { runtime: navigator.userAgent, passed, failures };
+  return runInRuntime(CHECKS);
 }

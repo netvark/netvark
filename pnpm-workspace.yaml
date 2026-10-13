@@ -42,9 +42,13 @@ catalog:
   # writes the entry as it stands, and applications share one copy of pg.
   pg: ^8.23.1
   postgres: 3.4.9
+  react: 19.3.0
+  '@tanstack/query-core': 5.104.1
+  '@tanstack/react-query': 5.104.1
   tsdown: 0.23.0
   '@types/node': 26.6.4
   '@types/pg': 8.23.1
+  '@types/react': 19.3.0
   typescript: 7.0.2
   valibot: 1.5.0
   vitest: 5.0.3
@@ -63,10 +67,15 @@ blockExoticSubdeps: true
 
 # Dependencies allowed to run install scripts. lefthook downloads its binary
 # in postinstall; workerd (pulled in by miniflare for the e2e smoke tests)
-# selects its platform binary in postinstall. Everything else is blocked
-# (pnpm default).
+# selects its platform binary in postinstall. vue-demi (pulled in by Vue
+# Query for e2e/jsonapi's adapter checks) is denied: its postinstall only
+# switches its files to the installed Vue's major, and the files it ships
+# are Vue 3's. Everything else is blocked (pnpm default), and an install
+# fails on a build nobody has ruled on (`strictDepBuilds`).
+# @ref https://pnpm.io/settings/build#allowbuilds
 allowBuilds:
   lefthook: true
+  vue-demi: false
   workerd: true
 
 # @netvark/hono-jsonapi declares `@netvark/hono-ban >= 2.0.0` (its API is the

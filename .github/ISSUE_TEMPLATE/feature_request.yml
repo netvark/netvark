@@ -17,6 +17,7 @@ body:
           '@netvark/jsonapi-core',
           '@netvark/hono-jsonapi',
           '@netvark/jsonapi-client',
+          '@netvark/tanstack-query-jsonapi',
           '@netvark/keyset-core',
           '@netvark/kysely-keyset',
           '@netvark/drizzle-keyset',

@@ -67,40 +67,42 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
   held in memory; a real runtime behind real HTTP runs in `e2e/resource`.
 - Forms and lists are a model first (ADR 0015, ADR 0018): `packages/resource-ui/` imports no
   framework and nothing of TanStack, and a table is driven by state TanStack Table v9 reads, with no
-  Table import; the bindings in `packages/react-resource/` are `./form`, which imports
-  `@tanstack/react-form`, and `./query`, which imports `@tanstack/react-query`, each an optional
-  peer. Every text comes from the application's messages object, passed in, and is computed when it
-  is asked for: no provider, no `useMessages`, no text built when a module loads (ADR 0014). Never
-  render an error's `message`; a response's error objects are shown by their `detail` as the server
-  localized it. A form's write carries only what the person changed and sends a cleared input as
-  `null` (ADR 0016); never fill a write from the record or drop a blank. A refusal of one field
-  binds into its `onSubmit` error and a refusal of several into their `onServer` errors (ADR 0017):
-  never bind every text into `onSubmit`, which keeps a joint refusal on a member after the person
-  answered it through another. A write's invalidations live in its options, the other types it
-  changes named in `invalidates`, never in a callback passed to `mutate`, which TanStack Query skips
-  once the component that called it unmounts. A list's state is its query, kept where the
-  application keeps it, such as a route's search: Table renders it through `manualSorting` and
-  `manualFiltering`, every change but paging drops the cursors, and paging follows the result's
-  links, never Table's pagination feature, which counts pages a cursor API has not. `query` reads a
-  search back leniently and keeps JSON in its own forms, since a router validates its search after
-  every navigation; it names every member of the list query, `undefined` where the state holds none,
-  since TanStack Router spreads the validated search over the URL's, so never drop an `undefined`
-  member from it; it checks names and shapes, never values, which the server words when it refuses
-  them. The query tests read through TanStack Query's observers: from 5.102 `fetchQuery` and its kin
-  are deprecated for `queryClient.query`, which the 5.89 floor lacks. `@netvark/resource-core` and
-  `@netvark/jsonapi-client` are peers of both packages, and `@netvark/resource-ui` of the bindings,
-  since the application hands them declarations, messages, clients, and models made with its own
-  copies. The model's e2e tests run over the built package in `e2e/resource/ui/`. The bindings'
-  screen tests run TanStack Form, Query, Router, and Table v9 as an application does, in jsdom with
-  Testing Library, against the contacts API of `src/test-support/contacts-api.ts`, whose documents
-  jsonapi-core builds; each names jsdom in a `// @vitest-environment jsdom` line, since the JSDoc
-  lint knows no such tag, and drives the screen as a person does, through `userEvent`, reading an
-  error from its control's `aria-describedby`. Vitest resolves a jsdom file through Vite's client
-  environment, so the package's config gives `source` to `resolve.conditions` as well as to
-  `ssr.resolve.conditions`: CI's test job builds nothing. The real server over HTTP runs in
-  `e2e/resource/react/`, whose screens (`react/screens/`) render in jsdom beside it under
-  `support/screen-environment.ts`, which processes the modules as a server's: Vite's client
-  environment would process the server's for a browser, without `import.meta.url` as a file URL.
+  Table import; the binding in `packages/react-resource/` is `./form`, which imports
+  `@tanstack/react-form`, an optional peer, and the clients' TanStack Query options are
+  `@netvark/tanstack-query-jsonapi`'s, of the jsonapi family (jsonapi SPEC 16). Every text comes
+  from the application's messages object, passed in, and is computed when it is asked for: no
+  provider, no `useMessages`, no text built when a module loads (ADR 0014). Never render an error's
+  `message`; a response's error objects are shown by their `detail` as the server localized it. A
+  form's write carries only what the person changed and sends a cleared input as `null` (ADR 0016);
+  never fill a write from the record or drop a blank. A refusal of one field binds into its
+  `onSubmit` error and a refusal of several into their `onServer` errors (ADR 0017): never bind
+  every text into `onSubmit`, which keeps a joint refusal on a member after the person answered it
+  through another. A write's invalidations live in its options, the other types it changes named in
+  `invalidates`, never in a callback passed to `mutate`, which TanStack Query skips once the
+  component that called it unmounts. A list's state is its query, kept where the application keeps
+  it, such as a route's search: Table renders it through `manualSorting` and `manualFiltering`,
+  every change but paging drops the cursors, and paging follows the result's links, never Table's
+  pagination feature, which counts pages a cursor API has not. `query` reads a search back leniently
+  and keeps JSON in its own forms, since a router validates its search after every navigation; it
+  names every member of the list query, `undefined` where the state holds none, since TanStack
+  Router spreads the validated search over the URL's, so never drop an `undefined` member from it;
+  it checks names and shapes, never values, which the server words when it refuses them.
+  `@netvark/resource-core` and `@netvark/jsonapi-client` are peers of both packages, and
+  `@netvark/resource-ui` of the binding, since the application hands them declarations, messages,
+  clients, and models made with its own copies. The model's e2e tests run over the built package in
+  `e2e/resource/ui/`, and the query cache over the contacts server, through
+  `@netvark/tanstack-query-jsonapi` and query-core's observers, in `e2e/resource/query/`. The
+  binding's screen tests run TanStack Form, Query through `@netvark/tanstack-query-jsonapi`, Router,
+  and Table v9 as an application does, in jsdom with Testing Library, against the contacts API of
+  `src/test-support/contacts-api.ts`, whose documents jsonapi-core builds; each names jsdom in a
+  `// @vitest-environment jsdom` line, since the JSDoc lint knows no such tag, and drives the screen
+  as a person does, through `userEvent`, reading an error from its control's `aria-describedby`.
+  Vitest resolves a jsdom file through Vite's client environment, so the package's config gives
+  `source` to `resolve.conditions` as well as to `ssr.resolve.conditions`: CI's test job builds
+  nothing. The real server over HTTP runs in `e2e/resource/react/`, whose screens (`react/screens/`)
+  render in jsdom beside it under `support/screen-environment.ts`, which processes the modules as a
+  server's: Vite's client environment would process the server's for a browser, without
+  `import.meta.url` as a file URL.
 
 ## Repository map
 
@@ -151,19 +153,18 @@ file adds what is specific to `@netvark/resource-core`, `@netvark/kysely-resourc
 
 `packages/react-resource/src/`:
 
-- `tanstack-form/` the `./form` entry; `tanstack-query/` the `./query` entry, its keys, and an
-  infinite list's pages; `screens/` the screen tests
+- `tanstack-form/` the `./form` entry; `screens/` the screen tests
 - `internal/` the checks of what a caller hands the bindings; `test-support/` a copy of the model's
-  fixture (`e2e/resource` proves it current too), the API the query tests meet (`query-server.ts`),
-  the contacts API the screen tests meet (`contacts-api.ts`), and the screens they render
-  (`screens/`)
+  fixture (`e2e/resource` proves it current too), the clients the screens' queries call and a
+  `QueryClient` that does not retry (`query-server.ts`), the contacts API the screen tests meet
+  (`contacts-api.ts`), and the screens they render (`screens/`)
 
 `e2e/resource/`: the end-to-end suite, a private workspace package that consumes the built packages
 through `workspace:*` and never imports from `src/`: its fixture migrations and their extracted
 catalogs, declarations over them, `fails/` declarations that must not compile, the oracle, the
 reference storage adapter that proves the contract suite, the runtime smoke test, the model's tests
-over the built `@netvark/resource-ui` (`ui/`), and the React screens (`react/screens/`) that run
-against the contacts server.
+over the built `@netvark/resource-ui` (`ui/`), the query cache over the contacts server (`query/`),
+and the React screens (`react/screens/`) that run against it.
 
 - `docs/resource/DESIGN.md` what we are building and why; `docs/resource/SPEC.md` the normative
   contract; `docs/resource/adr/` decisions

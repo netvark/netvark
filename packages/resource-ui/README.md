@@ -36,8 +36,10 @@ form's validator is a [Standard Schema](https://standardschema.dev), and a list 
 [TanStack Table](https://tanstack.com/table/v9) v9's sorting and column filters as plain values. In
 React,
 [`@netvark/react-resource`](https://github.com/netvark/netvark/tree/main/packages/react-resource#readme)
-binds a form model to TanStack Form and the clients to TanStack Query. The examples below render
-with React; a screen in another framework makes the same calls.
+binds a form model to TanStack Form, and
+[`@netvark/tanstack-query-jsonapi`](https://github.com/netvark/netvark/tree/main/packages/tanstack-query-jsonapi#readme)
+gives the clients' calls to the TanStack Query of any framework. The examples below render with
+React; a screen in another framework makes the same calls.
 
 ## Field descriptors
 
@@ -230,7 +232,7 @@ Keep the state in the route's search. With [TanStack Router](https://tanstack.co
 `validateSearch` reads it, the query key follows it, and every change is a navigation, so Back, a
 reload, and a shared link open the same page. `contacts` holds the client's TanStack Query options,
 made by `resourceQueries(clients.contacts)` from
-[`@netvark/react-resource/query`](https://github.com/netvark/netvark/tree/main/packages/react-resource#tanstack-query):
+[`@netvark/tanstack-query-jsonapi`](https://github.com/netvark/netvark/tree/main/packages/tanstack-query-jsonapi#queries):
 
 ```tsx
 // src/routes/contacts.tsx

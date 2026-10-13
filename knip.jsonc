@@ -39,9 +39,17 @@
     "e2e/jsonapi": {
       // As e2e/*, plus `declarations/`: modules declarations.e2e.test.ts
       // compiles with tsc to emit their declarations, so all of their
-      // exports are public.
-      "entry": ["smoke/worker.ts", "declarations/*.ts"],
-      "project": ["**/*.ts"]
+      // exports are public; and `query/adapters/`, which only the type
+      // check reads. The adapters are TypeScript, with no `.vue` or
+      // `.svelte` components, so the Vue and Svelte plugins, which the
+      // `vue` and `svelte` dependencies enable along with their compilers,
+      // are turned off here.
+      // @ref https://knip.dev/reference/configuration#plugins ("Disable a plugin by setting its value to `false`"; per workspace)
+      // @ref https://knip.dev/features/compilers ("Compilers are enabled only when a related dependency is found")
+      "entry": ["smoke/worker.ts", "declarations/*.ts", "query/adapters/*.ts"],
+      "project": ["**/*.ts"],
+      "svelte": false,
+      "vue": false
     },
     "e2e/catalog": {
       // As e2e/*, plus the generated files under `fixtures/*/expected/`:

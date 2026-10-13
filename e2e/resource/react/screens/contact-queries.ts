@@ -3,14 +3,14 @@
  * set of clients, as an application makes them beside its clients.
  */
 import type { RecordOf } from '@netvark/jsonapi-client';
-import type { ResourceQueries } from '@netvark/react-resource/query';
+import type { ResourceQueries } from '@netvark/tanstack-query-jsonapi';
 
 import type {
   ContactClients,
   ContactDefinitions,
 } from '../../support/recorded-clients.ts';
 
-import { resourceQueries } from '@netvark/react-resource/query';
+import { resourceQueries } from '@netvark/tanstack-query-jsonapi';
 
 type ContactsDefinition = ContactDefinitions['contacts'];
 

@@ -238,19 +238,45 @@ export async function runChecks(dispatch: Dispatch): Promise<SmokeResult> {
   return { runtime, passed, failures };
 }
 
+/** A check that runs inside the runtime under test, against a blog of its own. */
+export type InRuntimeCheck = () => Promise<void>;
+
+/** Runs each check in the current runtime; one report covers them all. */
+export async function runInRuntime(
+  checks: Readonly<Record<string, InRuntimeCheck>>,
+): Promise<SmokeResult> {
+  const failures: Array<string> = [];
+  let passed = 0;
+  for (const [name, run] of Object.entries(checks)) {
+    try {
+      await run();
+      passed += 1;
+    } catch (error) {
+      failures.push(
+        `${name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  return { runtime: navigator.userAgent, passed, failures };
+}
+
 /**
- * The client's checks, which the app runs inside the runtime under test
- * and answers at `/client-checks` (`client-checks.ts`).
+ * The checks the app runs inside the runtime under test and answers at
+ * `path`: the client's at `/client-checks` (`client-checks.ts`), and the
+ * TanStack Query binding's at `/query-checks` (`query-checks.ts`).
  */
-export async function clientChecks(dispatch: Dispatch): Promise<SmokeResult> {
-  const res = await dispatch('/client-checks');
-  equal(res.status, 200, 'client checks status');
+export async function routeChecks(
+  dispatch: Dispatch,
+  path: string,
+): Promise<SmokeResult> {
+  const res = await dispatch(path);
+  equal(res.status, 200, `${path} status`);
   const body = await json(res);
   const { runtime, passed } = body;
   const failures = list(body['failures'], 'failures');
   check(
     typeof runtime === 'string' && typeof passed === 'number',
-    'client checks report a runtime and a count',
+    `${path} reports a runtime and a count`,
   );
   return { runtime, passed, failures: failures.map(String) };
 }

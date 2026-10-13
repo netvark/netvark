@@ -2,8 +2,9 @@
 
 Read with the root [`AGENTS.md`](../../AGENTS.md), which holds the rules every family shares; this
 file adds what is specific to `@netvark/jsonapi-core` (the framework-free core),
-`@netvark/hono-jsonapi` (the Hono binding), and `@netvark/jsonapi-client` (the typed client).
-Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+`@netvark/hono-jsonapi` (the Hono binding), `@netvark/jsonapi-client` (the typed client), and
+`@netvark/tanstack-query-jsonapi` (the client's TanStack Query binding). Humans: see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Ground rules
 
@@ -29,15 +30,23 @@ Humans: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - The client runs wherever `fetch` does. Nothing under `packages/jsonapi-client/` imports a
   framework, a Node built-in, or `process`; it reads a definition's `type`, `relationships`,
   `links`, and `query`, and never calls its `serialize` or a validator (SPEC 15).
+- The TanStack Query binding binds the core every adapter is built on. Nothing under
+  `packages/tanstack-query-jsonapi/` imports a framework, an adapter, or a value of
+  `@tanstack/query-core`, only its types; the options are plain objects holding only the members the
+  binding sets (ADR 0020), a pages key tagged as the adapters tag an infinite key (ADR 0021), and
+  every adapter's hooks take them as they are (SPEC 16).
 
 ## Repository map
 
 A pnpm workspace: `packages/jsonapi-core` (the framework-free core, published as
 `@netvark/jsonapi-core`), `packages/hono-jsonapi` (the Hono adapter, published as
 `@netvark/hono-jsonapi`, depends on the core and re-exports it), `packages/jsonapi-client` (the
-typed client, published as `@netvark/jsonapi-client`, depends on the core alone), and `e2e/jsonapi/`
-(private). Root configs (`vitest.config.ts` with `test.projects`, `tsconfig.base.json`,
-`knip.jsonc`, `.oxlintrc.json`, `.oxfmtrc.json`) apply to all of them.
+typed client, published as `@netvark/jsonapi-client`, depends on the core alone),
+`packages/tanstack-query-jsonapi` (the TanStack Query binding, published as
+`@netvark/tanstack-query-jsonapi`, takes the client as a peer and query-core as an optional peer it
+imports types from), and `e2e/jsonapi/` (private). Root configs (`vitest.config.ts` with
+`test.projects`, `tsconfig.base.json`, `knip.jsonc`, `.oxlintrc.json`, `.oxfmtrc.json`) apply to all
+of them.
 
 `packages/jsonapi-core/src/`:
 
@@ -89,11 +98,24 @@ typed client, published as `@netvark/jsonapi-client`, depends on the core alone)
 - `test-support/` the blog's definitions (`blog.ts`), a compound document (`compound.ts`), and a
   fetch double (`fetch-double.ts`) for the package's own tests; not published
 
+`packages/tanstack-query-jsonapi/src/` (SPEC 16.1):
+
+- `query-keys.ts` the keys: the query string each call sends (16.2)
+- `pages.ts` an infinite list's page parameters, from the query's cursors and the pages' links
+  (16.3)
+- `query-types.ts` the options' types, holding only the members `resourceQueries` sets (16.5)
+- `queries.ts` `resourceQueries`, and the `TypeError`s of an argument that is not a client (16.2 to
+  16.6)
+- `test-support/` the blog's definitions (`blog.ts`) and a fetch double that holds each answer until
+  the test releases it (`fetch-double.ts`); not published
+
 `e2e/jsonapi/`: end-to-end suite, a private workspace package that consumes the built
-`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, and `@netvark/jsonapi-client` through
-`workspace:*` and drives a blog API over real HTTP with `@hono/node-server`, the `client-*` files
-through the client; never imports from `src/`. `e2e/jsonapi/smoke/` is the runtime smoke test (Bun,
-Deno, workerd), the client's checks running inside each runtime.
+`@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, `@netvark/jsonapi-client`, and
+`@netvark/tanstack-query-jsonapi` through `workspace:*` and drives a blog API over real HTTP with
+`@hono/node-server`, the `client-*` files through the client and `query/` through TanStack Query,
+whose `query/adapters/` type-checks the options with the hooks of React, Vue, Solid, Svelte, and
+Angular Query; never imports from `src/`. `e2e/jsonapi/smoke/` is the runtime smoke test (Bun, Deno,
+workerd), the client's and the binding's checks running inside each runtime.
 
 - `docs/jsonapi/DESIGN.md` what we are building and why; `docs/jsonapi/SPEC.md` the normative
   contract; `docs/jsonapi/adr/` decisions
