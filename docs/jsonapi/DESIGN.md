@@ -368,3 +368,5 @@ a cited clause with a test.
 | 0019 | Records are flat and resolve relationships along the requested include paths                                  |
 | 0020 | TanStack Query options are the clients' binding, typed through query-core                                     |
 | 0021 | A list's pages key is tagged as TanStack Query's adapters tag an infinite key                                 |
+| 0022 | Atomic Operations are values built from definitions and sent through the transport in one request             |
+| 0023 | The operations endpoint and its cap are the definitions'                                                      |
