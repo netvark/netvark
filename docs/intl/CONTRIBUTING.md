@@ -27,7 +27,8 @@ family. Design intent lives in [`DESIGN.md`](DESIGN.md), the normative contract 
   `workspace:*`; never import from `src/` there. Run one file with
   `pnpm --filter @netvark/intl-e2e exec vitest run <name>` after `pnpm build`, and the runtime smoke
   with `pnpm --filter @netvark/intl-e2e run smoke:bun` (`smoke:deno`, `smoke:workerd`): each
-  compiles the fixture on its runtime first, and `smoke:deno` needs Deno 2.6.10 or later.
+  compiles the fixture on its runtime first, `smoke:bun` and `smoke:deno` then watch an edit
+  compile, and `smoke:deno` needs Deno 2.6.10 or later.
 
 ## Adding a formatter
 

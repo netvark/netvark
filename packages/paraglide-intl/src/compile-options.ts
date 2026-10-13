@@ -57,8 +57,6 @@ export interface CompileConfig {
   readonly compilerOptions: CompilerOptions;
 }
 
-const CALLER = 'compile';
-
 function isLocaleList(value: unknown): value is ReadonlyArray<string> {
   return (
     Array.isArray(value) &&
@@ -70,7 +68,10 @@ function isFileSystem(value: unknown): value is typeof fs {
   return isRecord(value) && isRecord(value['promises']);
 }
 
-function isolateOption(value: unknown): boolean | ReadonlyArray<string> {
+function isolateOption(
+  value: unknown,
+  caller: string,
+): boolean | ReadonlyArray<string> {
   if (value === undefined) {
     return true;
   }
@@ -78,39 +79,45 @@ function isolateOption(value: unknown): boolean | ReadonlyArray<string> {
     return value;
   }
   throw new TypeError(
-    `${CALLER}: isolate is not a boolean or a list of locales`,
+    `${caller}: isolate is not a boolean or a list of locales`,
   );
 }
 
-function formattersOption(value: unknown): Formatters {
+function formattersOption(value: unknown, caller: string): Formatters {
   if (value === undefined) {
     return 'refuse';
   }
   if (value === 'refuse' || value === 'allow') {
     return value;
   }
-  throw new TypeError(`${CALLER}: formatters is not 'refuse' or 'allow'`);
+  throw new TypeError(`${caller}: formatters is not 'refuse' or 'allow'`);
 }
 
-function fileSystem(value: unknown): typeof fs {
+function fileSystem(value: unknown, caller: string): typeof fs {
   if (value === undefined) {
     return fs;
   }
   if (!isFileSystem(value)) {
-    throw new TypeError(`${CALLER}: fs is not a file system module`);
+    throw new TypeError(`${caller}: fs is not a file system module`);
   }
   return value;
 }
 
-/** Checks the options; throws naming the first one a compile cannot use (SPEC 5). */
-export function compileConfig(options: CompileOptions): CompileConfig {
+/**
+ * Checks the options; throws naming `caller` and the first option a compile
+ * cannot use (SPEC 5).
+ */
+export function compileConfig(
+  options: CompileOptions,
+  caller = 'compile',
+): CompileConfig {
   const value: unknown = options;
   if (!isRecord(value)) {
-    throw new TypeError(`${CALLER}: options is not an object`);
+    throw new TypeError(`${caller}: options is not an object`);
   }
   for (const name of ['project', 'outdir'] as const) {
     if (typeof value[name] !== 'string') {
-      throw new TypeError(`${CALLER}: ${name} is not a string`);
+      throw new TypeError(`${caller}: ${name} is not a string`);
     }
   }
   const { isolate, formatters, previousCompilation, ...paraglideOptions } =
@@ -118,9 +125,9 @@ export function compileConfig(options: CompileOptions): CompileConfig {
   return {
     project: options.project,
     outdir: options.outdir,
-    fs: fileSystem(value['fs']),
-    isolate: isolateOption(isolate),
-    formatters: formattersOption(formatters),
+    fs: fileSystem(value['fs'], caller),
+    isolate: isolateOption(isolate, caller),
+    formatters: formattersOption(formatters, caller),
     previousOutputHashes: previousCompilation?.outputHashes,
     compilerOptions: { ...defaultCompilerOptions, ...paraglideOptions },
   };

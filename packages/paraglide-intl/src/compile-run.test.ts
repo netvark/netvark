@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { compile, compileWith } from './compile';
+import { compile, compileWith, enqueue } from './compile';
 import { compileConfig } from './compile-options';
 import { paraglideSdk } from './paraglide-sdk';
 import {
@@ -13,6 +13,7 @@ import {
   MESSAGE_FORMAT_PLUGIN,
   MESSAGES,
 } from './test-support/fixture-project';
+import { gate } from './test-support/watching';
 
 const BY_HAND = '// changed by hand\n';
 
@@ -133,6 +134,24 @@ describe('compile runs (SPEC 6.1)', () => {
     const alone = join(dir, 'alone');
     await compile({ project, outdir: alone });
     expect(await filesUnder(outdir)).toEqual(await filesUnder(alone));
+  });
+
+  it('runs a queued task after the one before it, whether or not that one threw', async () => {
+    const opened = gate();
+    const first = enqueue(async () => {
+      await opened.opened;
+      throw new Error('the first task failed');
+    });
+    const second = vi.fn().mockResolvedValue('done');
+    const queued = enqueue(second);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    expect(second).not.toHaveBeenCalled();
+    opened.open();
+    await expect(first).rejects.toThrow('the first task failed');
+    await expect(queued).resolves.toBe('done');
+    expect(second).toHaveBeenCalledOnce();
   });
 });
 

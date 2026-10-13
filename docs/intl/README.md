@@ -6,7 +6,7 @@ Formatting and message isolation for server-rendered applications that use
 | Package                                                    | What it is                                                                                                                                                                                                                                                                                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`@netvark/intl-core`](../../packages/intl-core)           | Formatters that read the locale and the reader's time zone on every call, each through a cached `Intl` object built for a formatting tag that names its calendar and digits; the reader's time zone from a cookie, the same during SSR and after hydration; `isolate()`. Web standards only, no dependencies. |
-| [`@netvark/paraglide-intl`](../../packages/paraglide-intl) | Paraglide's `compile()` with every interpolated value wrapped in Unicode bidi isolates and every message that formats a value refused. Re-exports the core.                                                                                                                                                   |
+| [`@netvark/paraglide-intl`](../../packages/paraglide-intl) | Paraglide's `compile()` with every interpolated value wrapped in Unicode bidi isolates and every message that formats a value refused, and `watch()`, which compiles again on each change in development. Re-exports the core.                                                                                |
 
 Why each piece exists, with the measurements, is in [`DESIGN.md`](DESIGN.md); the contract is in
 [`SPEC.md`](SPEC.md); the decisions are in [`adr/`](adr).
@@ -70,7 +70,10 @@ for (const warning of warnings) console.warn(warning);
 ```
 
 `m.shared_by({ name: 'محمد', count: 2 })` now returns
-`'Shared by \u2068محمد\u2069 (\u20682\u2069)'`, which every browser displays in order.
+`'Shared by \u2068محمد\u2069 (\u20682\u2069)'`, which every browser displays in order. In
+development, `watch()` takes the same options and compiles again whenever the settings or a catalog
+change
+([Watch during development](../../packages/paraglide-intl/README.md#watch-during-development)).
 
 ## Best practices
 

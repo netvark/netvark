@@ -46,7 +46,8 @@ reports both (ADR 0009), so the family documents it instead of repeating it.
 
 - Locale negotiation, message storage, and message compilation: Paraglide's.
 - Catalog consistency: `inlang check` (ADR 0009).
-- A bundler plugin. `compile()` runs from a build script, before the bundler (ADR 0007).
+- A bundler plugin. `compile()` runs from a build script, before the bundler (ADR 0007), and
+  `watch()` from a dev server's hook or a script (ADR 0010).
 - Parsing dates. A date string's meaning depends on its format; the caller turns it into a `Date`.
 
 ## Shape
@@ -67,6 +68,8 @@ reports both (ADR 0009), so the family documents it instead of repeating it.
 - `compile(options)` is Paraglide's `compile()` with two steps added between loading the project and
   compiling it: refuse messages that format (ADR 0008), and wrap every interpolated value in FIRST
   STRONG ISOLATE and POP DIRECTIONAL ISOLATE (ADR 0006, ADR 0007).
+- `watch(options)` compiles the same way, and again whenever a file that loading the project read
+  changes, for development (ADR 0010).
 
 ## How an application wires it
 

@@ -12,8 +12,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "smoke:bun": "bun run smoke/compile.ts && bun run smoke/run.ts",
-    "smoke:deno": "deno run --allow-read --allow-write --allow-env smoke/compile.ts && deno run --allow-read smoke/run.ts",
+    "smoke:bun": "bun run smoke/compile.ts && bun run smoke/run.ts && bun run smoke/watch.ts",
+    "smoke:deno": "deno run --allow-read --allow-write --allow-env smoke/compile.ts && deno run --allow-read smoke/run.ts && deno run --allow-read --allow-write --allow-env smoke/watch.ts",
     "smoke:workerd": "node --experimental-strip-types smoke/compile.ts && node --experimental-strip-types smoke/workerd.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
