@@ -1,7 +1,8 @@
 # @netvark/jsonapi-core: implementation specification
 
-- Status: normative for the 0.x line of `@netvark/jsonapi-core`, `@netvark/hono-jsonapi`, and
-  `@netvark/jsonapi-client`; `docs/jsonapi/DESIGN.md` explains the why
+- Status: normative for the 0.x line of `@netvark/jsonapi-core`, `@netvark/hono-jsonapi`,
+  `@netvark/jsonapi-client`, and `@netvark/tanstack-query-jsonapi`; `docs/jsonapi/DESIGN.md`
+  explains the why
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source file that implements it and the tests that prove it. When this document and the code
@@ -25,6 +26,7 @@ Contents
 13. Constants
 14. Test plan
 15. The client (`@netvark/jsonapi-client`)
+16. TanStack Query (`@netvark/tanstack-query-jsonapi`)
 
 ---
 
@@ -43,15 +45,16 @@ consumed through Standard Schema V1, whose interfaces are vendored in
 `packages/jsonapi-core/src/internal/standard-schema-types.ts`, so installing either package never
 pulls in Zod, Valibot, ArkType, or Ajv.
 
-| Subpath                        | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@netvark/jsonapi-core`        | Values: `defineResource`, `createDefineResource`, `relatedResource`, `resourcePaths`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `BanError`, `isBanError`, `jsonApiBan`, `jsonApiError`, `errorItem`, `errorObjects`, `errorDocument`, `ERROR_CATALOG`, `ERROR_CODES`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5 (`ResourceTypes`, `TypesOf`, `JsonOf`, `InferredTypes`, `DefinitionOf`, `ResourcePaths`, and `ResourcePathsOptions` included, so a module that exports a definition emits declarations that name only exported types), 6.1, 7.2, 8, 9, with `Ban`, `BanError`, `ErrorItem`, and `ErrorStatusCode` re-exported from `@netvark/ban-core` |
-| `@netvark/jsonapi-core/atomic` | `operationsProcessor`, `assertOperationsContentType`, `errorAtOperation`, `parseOperationsDocument`, `DEFAULT_MAX_OPERATIONS`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `@netvark/hono-jsonapi`        | Everything of `@netvark/jsonapi-core` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `@netvark/hono-jsonapi/atomic` | Everything of `@netvark/jsonapi-core/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `@netvark/jsonapi-client`      | Section 15.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Subpath                           | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@netvark/jsonapi-core`           | Values: `defineResource`, `createDefineResource`, `relatedResource`, `resourcePaths`, `serializeResource`, `applyFields`, `identify`, `resourceDocument`, `collectionDocument`, `toOneRelationshipDocument`, `toManyRelationshipDocument`, `include`, `jsonApiObject`, `assertFullLinkage`, `isMemberName`, `isMemberPath`, `isAtMember`, `isExtensionMemberName`, `assertMemberName`, `BanError`, `isBanError`, `jsonApiBan`, `jsonApiError`, `errorItem`, `errorObjects`, `errorDocument`, `ERROR_CATALOG`, `ERROR_CODES`, `parseMediaType`, `parseAccept`, `isJsonApiMediaType`, `jsonApiParameters`, `formatJsonApiMediaType`, `negotiate`, `parseQuery`, `paginatedDocument`, `paginationLinks`, `pageMeta`, `itemCursorMeta`, `maxPageSizeExceededError`, `unsupportedSortError`, `unsupportedSort`, `rangePaginationNotSupportedError`, `invalidCursorError`, `invalidCursor`, `UNSUPPORTED_SORT_TYPE`, `MAX_SIZE_EXCEEDED_TYPE`, `RANGE_PAGINATION_NOT_SUPPORTED_TYPE`, `parseIdentifier`, `parseLinkage`, `parseResourceObject`, `parseCreateDocument`, `parseUpdateDocument`, `primaryData`, `parseToOneRelationshipDocument`, `parseToManyRelationshipDocument`, `toOneLinkage`, `toManyLinkage`, `JSON_API_MEDIA_TYPE`, `JSON_API_VERSION`, `ATOMIC_OPERATIONS_EXTENSION`, `CURSOR_PAGINATION_PROFILE`; and every type in sections 2, 3, 4, 5 (`ResourceTypes`, `TypesOf`, `JsonOf`, `InferredTypes`, `DefinitionOf`, `ResourcePaths`, and `ResourcePathsOptions` included, so a module that exports a definition emits declarations that name only exported types), 6.1, 7.2, 8, 9, with `Ban`, `BanError`, `ErrorItem`, and `ErrorStatusCode` re-exported from `@netvark/ban-core` |
+| `@netvark/jsonapi-core/atomic`    | `operationsProcessor`, `assertOperationsContentType`, `errorAtOperation`, `parseOperationsDocument`, `DEFAULT_MAX_OPERATIONS`, and the types `AtomicOptions`, `ResourceHandlers`, `AnyResourceHandlers`, `RelationshipHandlers`, `OperationContext`, `OperationTarget`, `OperationCode`, `OperationResult`, `OperationsOutcome`, `OperationsProcessor`, `OperationsResultDocument`, `ResolvedResourceObject`, `RawOperation`, `MaybePromise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `@netvark/hono-jsonapi`           | Everything of `@netvark/jsonapi-core` (the same bindings), plus `jsonApi`, `respond`, `respondError`, `isJsonApiResponse`, `varyAccept`, `readDocument`, `queryValidator`, `bodyValidator`, `relationshipValidator`, `errorHandler`, `notFoundHandler`; and every type in section 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `@netvark/hono-jsonapi/atomic`    | Everything of `@netvark/jsonapi-core/atomic`, plus `atomicOperations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `@netvark/jsonapi-client`         | Section 15.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `@netvark/tanstack-query-jsonapi` | Section 16.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
-`e2e/jsonapi/package-surface.e2e.test.ts` asserts the exact value export list of all five subpaths
+`e2e/jsonapi/package-surface.e2e.test.ts` asserts the exact value export list of all six subpaths
 against the built packages, and that the adapter's re-exports are the core's own bindings.
 
 Source layout. Every module with behavior has a sibling `*.test.ts`; contract types have
@@ -1304,8 +1307,7 @@ their definition by type (15.6). The result holds a `ResourceClient` per name:
 
 - `definition` is the definition the client was made from, as it was passed: a binding that keys a
   cache by the request reads its query capabilities and serializes with it (`serializeQuery`, 15.5;
-  resource SPEC 20.6) without being handed the definition a second time. It is typed as the
-  definition passed.
+  16.2) without being handed the definition a second time. It is typed as the definition passed.
 - An id fills the path's `{id}` percent-encoded (`encodeURIComponent`), as the links convention
   encodes it (5.1). An id that is empty, `.`, or `..` throws `TypeError` before anything is sent:
   the URL parser removes a dot segment, percent-encoded or not (URL Standard, single-dot and
@@ -1502,3 +1504,146 @@ and walk pages, compound documents into records, sparse fieldsets, each write an
 every error status the blog answers into a `ResponseError`, and the headers and `Accept-Language`
 the server receives. `e2e/jsonapi/smoke/client-checks.ts` runs the client against a blog in-process
 on Bun, Deno, and workerd (14.2).
+
+## 16. TanStack Query (`@netvark/tanstack-query-jsonapi`, `packages/tanstack-query-jsonapi/src/`, ADR 0020)
+
+The client's reads and writes as TanStack Query options, keyed by the request each call sends, so
+two calls that send one request share one cache entry and a write refetches what it changed. The
+package binds TanStack Query's framework-free core, `@tanstack/query-core` (root ADR 0010), so the
+options go into every adapter's hooks: React's and Vue's `useQuery`, Solid's
+`useQuery(() => options)`, Svelte's `createQuery(() => options)`, Angular's
+`injectQuery(() => options)`, and their infinite and mutation kin.
+
+```ts
+const contacts = resourceQueries(clients.contacts);
+const meetings = resourceQueries(clients.meetings);
+const page = useQuery(contacts.list({ ...query, include: ['organization'] }));
+const feed = useInfiniteQuery(contacts.pages({ sort: ['-created_at'] }));
+const contact = useQuery(contacts.get(id));
+const create = useMutation(contacts.create());
+const remove = useMutation(contacts.remove({ invalidates: [meetings.all] }));
+```
+
+### 16.1 Surface and module map
+
+| Subpath                           | Exports                                                                                                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@netvark/tanstack-query-jsonapi` | Values: `resourceQueries`; types: `ResourceQueries`, `ReadOptions`, `PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`, `PageParam`, `KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey` |
+
+```
+packages/tanstack-query-jsonapi/src/
+  index.ts                     root entry
+  query-keys.ts                the keys of 16.2: the query string a call sends
+  pages.ts                     an infinite list's page parameters, from the query's cursors and the pages' links (16.3)
+  query-types.ts               the options' types, holding only the members resourceQueries sets (16.5)
+  queries.ts                   resourceQueries(), and the TypeErrors of an argument that is not a client (16.2 to 16.6)
+```
+
+### 16.2 Keys
+
+| Member              | Options        | Key                                       | Runs                                              |
+| ------------------- | -------------- | ----------------------------------------- | ------------------------------------------------- |
+| `all`               |                | `[type]`                                  |                                                   |
+| `list(query?)`      | `ReadOptions`  | `[type, 'list', <query>]`                 | `client.list(query, { signal })`                  |
+| `pages(query?)`     | `PagesOptions` | `[type, 'pages', <query>]`                | `client.list` of the query at the page's cursor   |
+| `get(id, query?)`   | `ReadOptions`  | `[type, 'get', id, <include and fields>]` | `client.get(id, query, { signal })`               |
+| `create(settings?)` | `WriteOptions` | `mutationKey: [type, 'create']`           | `client.create(input)`                            |
+| `update(settings?)` | `WriteOptions` | `mutationKey: [type, 'update']`           | `client.update(id, input)` for `{ id, ...input }` |
+| `remove(settings?)` | `WriteOptions` | `mutationKey: [type, 'remove']`           | `client.remove(id)`                               |
+
+A key is the request. `<query>` is `serializeQuery(client.definition, query).toString()` (15.5), so
+two queries that make one request share one cache entry, a bigint filter value keys as its text, and
+every key is JSON. The parameters come in `serializeQuery`'s order of the families whatever order
+the query's members were written in; within a member the query's own order stands, so a filter whose
+fields are written in another order is another request and another entry. `type` is the
+definition's, so invalidating `[type]` reaches every list, page, and record of the type, and
+`[type, 'list']` every list. `client.definition` is the definition the client was made from (15.4).
+
+### 16.3 Reads and pages
+
+- Reads resolve to the client's `ReadResult` (15.4), the document's `links` and `meta` with the
+  records, which paging reads. Each passes TanStack Query's `signal`, so a cancelled query aborts
+  its request. A refused read settles the query with the client's `ResponseError`.
+- The page parameter is `{ after }` or `{ before }`, starting from the query's own cursors, which
+  the key holds as the list's start; the next is `{ after: pageCursors(last).next }` and the
+  previous `{ before: pageCursors(first).prev }` (15.8), none when the link is absent or the page
+  holds no records, since the profile lets a link point at an empty page. `page[size]` stays the
+  query's. `pages` is `never` on a definition whose list takes no `page`, and throws `TypeError` on
+  one typed wide.
+
+### 16.4 Writes
+
+Writes invalidate their type and the keys `settings.invalidates` names, the other types the write
+changes on the server (removing a contact sets their meetings' contact to null,
+`on delete set null`), and return that promise from `onSuccess`, with the `QueryClient` TanStack
+Query passes (`context.client`), so the mutation stays pending until the lists and records it
+touched have refetched; `remove` first removes the record's `get` entries, so a screen still showing
+it does not refetch a 404. A refused write invalidates nothing. An invalidation belongs in the
+options: TanStack Query runs a callback passed to `mutate` only while the component that called it
+is mounted, and for the last of consecutive calls only, so `mutate`'s callbacks are for what a
+screen does next, such as navigating; spreading the options and overriding `onSuccess` would drop
+the invalidation.
+
+### 16.5 Types
+
+The options are plain objects typed by `ReadOptions`, `PagesOptions`, and `WriteOptions`, which hold
+only the members `resourceQueries` sets (ADR 0020): a read's `queryKey`, tagged with its data
+through query-core's `DataTag`, and its `queryFn`; a page list's key, `queryFn`, `initialPageParam`,
+`getNextPageParam`, and `getPreviousPageParam`; a write's `mutationKey`, `mutationFn`, and
+`onSuccess`. Every adapter's hooks take them as they are, with their data typed and `select`
+inferring from it, and `queryClient.getQueryData(contacts.get(id).queryKey)` is typed through the
+tag. The data of an infinite query's hook is `InfiniteData<ListResult, unknown>`, TanStack Query's
+default for an infinite query without `select`, while `getQueryData` of a pages key is
+`InfiniteData<ListResult, PageParam>`. Records are the client's `RecordOf` for the query passed
+(15.6), `create`'s variables its `CreateInput`, `update`'s `{ id } & UpdateInput`, and `remove`'s
+the id. The options are made over the client's calls typed wide, and typed by its definitions where
+`resourceQueries` returns them, as `createClients` types the calls. An application adds its own
+members by spreading them, `{ ...contacts.list(state), placeholderData: keepPreviousData }`, and may
+pass them through its adapter's `queryOptions`.
+
+### 16.6 Arguments
+
+`resourceQueries` throws `TypeError` for a value `createClients` did not return (one without
+`definition` and the calls), and a write for `invalidates` that is not a list of query keys, such as
+one key passed alone. Messages name the function and the definition's type, never a value.
+
+@ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys @ref
+https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions @ref
+https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations @ref
+https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-side-effects
+
+### 16.7 Packaging and tests
+
+ESM only, as the other packages (12): `@netvark/jsonapi-client` (the application's clients and their
+`definition`) is a peer dependency and a `workspace:^` development dependency, and
+`@tanstack/query-core` `^5.89.0` an optional peer (`peerDependenciesMeta`, root ADR 0011), imported
+for types only: 5.89.0, the release after 5.87.4, is the first whose mutation callbacks receive the
+`QueryClient` (`context.client`). An application installs its TanStack Query adapter, which depends
+on one exact release of query-core and re-exports it, and lists query-core itself only under Yarn
+Plug'n'Play, at that release. Query-core at the catalog's release is a development dependency; there
+are no dependencies. One subpath, `.`, built with `platform: 'neutral'`.
+
+Unit tests sit beside each module, through a query-core `QueryClient` and the observers every
+adapter's hooks are made of (`QueryObserver`, `InfiniteQueryObserver`, `MutationObserver`), over the
+clients of the blog's definitions in `src/test-support/` and a fetch double that holds each answer
+until the test releases it or the request's signal aborts it: `query-keys.test.ts` (one key per
+request, the canonical order, bigints, what `[type]` and `[type, 'list']` reach), `queries.test.ts`
+(each read through a `QueryClient`, the signal of each, a refused read, the `TypeError`s),
+`pages.test.ts` (the pages in both directions from the query's cursors, an empty page that links on,
+a link absent or without its cursor), `writes.test.ts` (each write pending until the reads a screen
+shows have refetched, an entry no screen shows left stale, removal before the refetch,
+`invalidates`, a refused write, `mutate`'s `onSuccess` after the refetch), and `queries.test-d.ts`
+(data and variables typed by the definitions, `getQueryData` through the tagged keys, `pages`
+`never` without pagination). The tests read through the observers: from 5.102 `fetchQuery` and its
+kin are deprecated for `queryClient.query`, which the 5.89 floor does not have. CI runs them on
+query-core 5.89.0, and a floor that fails them is raised in the same change.
+
+End to end, against the built package: `e2e/jsonapi/query/adapters/` type-checks the options with
+the hooks of each adapter, React, Vue, Solid, Svelte, and Angular Query, their data typed exactly,
+`select` inferring from it, and `getQueryData` typed through the tags;
+`e2e/jsonapi/query/query-cache.e2e.test.ts` drives the blog API over HTTP through query-core's
+observers: a list and a record keyed by the request, pages both ways by the server's links, writes
+that settle once the reads shown have refetched, and a refused write that leaves the cache as it
+was. `e2e/jsonapi/smoke/query-checks.ts` reads and writes the blog in-process through a
+`QueryClient` on Bun, Deno, and workerd, where server rendering prefetches. The resource family
+drives it against a database (resource SPEC 20.8).

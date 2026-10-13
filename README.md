@@ -74,10 +74,13 @@ Package names are predictable, in the manner of `@tanstack/*`:
 | `@netvark/<thing>-<facet>` | a companion of a family that binds to no host      | `@netvark/jsonapi-client`                                            |
 
 `<thing>` is the family name (`ban`, `catalog`, `intl`, `jsonapi`, `keyset`), `<host>` the npm name
-of the host library (`hono`, `kysely`, `pg`, `drizzle`, `react`, `paraglide`). The directory under
-`packages/` is the package name without the scope. [ADR 0003](docs/adr/0003-package-naming.md)
-records the rule; new packages are tracked as epics in the
-[issues](https://github.com/netvark/netvark/issues?q=is%3Aissue+label%3Aepic).
+of the host library (`hono`, `kysely`, `pg`, `drizzle`, `react`, `paraglide`), or the library's own
+name where it is published as a framework-free core plus framework adapters (`tanstack-query`,
+`tanstack-form`,
+[ADR 0010](docs/adr/0010-a-binding-to-a-library-with-a-framework-free-core-binds-the-core.md)). The
+directory under `packages/` is the package name without the scope.
+[ADR 0003](docs/adr/0003-package-naming.md) records the rule; new packages are tracked as epics in
+the [issues](https://github.com/netvark/netvark/issues?q=is%3Aissue+label%3Aepic).
 
 ## Repository
 

@@ -1,8 +1,10 @@
 # ADR 0003: Package naming
 
 - Status: accepted; amended by ADR-0006 (a binding takes as peers the workspace packages whose
-  values the application hands it) and ADR-0009 (a binding takes as peers the packages whose values
-  it hands its host)
+  values the application hands it), ADR-0009 (a binding takes as peers the packages whose values it
+  hands its host), ADR-0010 (a binding to a library published as a framework-free core plus adapters
+  binds the core and is named for the library, `tanstack-query` or `tanstack-form`), and ADR-0011
+  (such a binding takes the core as an optional peer)
 - Date: 2026-10-10
 
 ## Context

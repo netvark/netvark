@@ -1,6 +1,7 @@
 # ADR 0014: The React bindings render the application's one messages object
 
-- Status: accepted; applies ADR 0009 to the browser
+- Status: accepted; applies ADR 0009 to the browser; amended by ADR-0018 (the functions it governs
+  are `@netvark/resource-ui`'s)
 - Date: 2026-10-12
 
 ## Context

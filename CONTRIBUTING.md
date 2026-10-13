@@ -142,8 +142,11 @@ CATALOG_PG_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filte
 ## Adding a package
 
 The name follows [ADR 0003](docs/adr/0003-package-naming.md): `<thing>-core` for a core,
-`<host>-<thing>` for a binding, `<thing>-<facet>` for a companion. Open an issue labeled `epic`
-first so the scope is settled before code exists, then:
+`<host>-<thing>` for a binding, `<thing>-<facet>` for a companion. A host published as a
+framework-free core plus framework adapters, as TanStack's libraries are, is named for the library
+(`tanstack-query`, `tanstack-form`), not for an adapter
+([ADR 0010](docs/adr/0010-a-binding-to-a-library-with-a-framework-free-core-binds-the-core.md)).
+Open an issue labeled `epic` first so the scope is settled before code exists, then:
 
 1. Copy the closest sibling under `packages/` (`keyset-core` for a core, `kysely-keyset` for a
    binding) to `packages/<name>` and set `name`, `description`, `keywords`, `homepage`, and
@@ -156,6 +159,11 @@ first so the scope is settled before code exists, then:
    A binding that makes values with one of its host's dependencies and hands them to the host
    imports that dependency from the host's package instead of declaring it
    ([ADR 0009](docs/adr/0009-a-binding-makes-what-it-hands-its-host-with-the-hosts-own-dependency.md)).
+   A binding to a host's framework-free core imports no adapter and takes the core as an optional
+   peer, importing from it at runtime only the values it hands the library, and its README tells a
+   Yarn Plug'n'Play application to list the core at its adapter's release
+   ([ADR 0011](docs/adr/0011-a-binding-takes-the-core-an-adapter-brings-as-an-optional-peer.md));
+   the family's e2e package type-checks it with each adapter.
 2. Keep `tsdown.config.ts` as the one source of the subpaths: `pnpm build` writes the `exports` maps
    into `package.json`, and CI fails on a diff. Name the Vitest project after the package.
 3. Add the package's re-export-only files, if any, to the coverage `exclude` list in the root

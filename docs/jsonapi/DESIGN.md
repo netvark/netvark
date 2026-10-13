@@ -1,7 +1,7 @@
 # @netvark/jsonapi-core: design
 
-This document describes what @netvark/jsonapi-core, @netvark/hono-jsonapi, and
-@netvark/jsonapi-client are, the API they expose, and how they are built.
+This document describes what @netvark/jsonapi-core, @netvark/hono-jsonapi, @netvark/jsonapi-client,
+and @netvark/tanstack-query-jsonapi are, the API they expose, and how they are built.
 
 Architecture decisions referenced as ADR-NNNN live in `docs/jsonapi/adr/`. The normative,
 clause-by-clause specification that implementers work from is `docs/jsonapi/SPEC.md`; this document
@@ -220,6 +220,21 @@ resolved into its included record on a path the query includes and left as linka
 every result is plain data a cache can hold (ADR-0019). An error response rejects with a
 `ResponseError` holding the status and the server's error objects, codes included.
 
+### 3.7 TanStack Query
+
+```ts
+const articles = resourceQueries(clients.articles);
+const page = useQuery(articles.list({ include: ['author'], sort: ['-createdAt'] }));
+const create = useMutation(articles.create());
+```
+
+`@netvark/tanstack-query-jsonapi` turns a client's calls into TanStack Query options keyed by the
+request each sends, so two calls that send one request share one cache entry, and each write
+invalidates its type and settles once the reads on screen have refetched. It binds TanStack Query's
+framework-free core, so the options go into the hooks of React, Vue, Solid, Svelte, and Angular
+alike, typed through query-core with only the members it sets (ADR-0020). It reads the client alone,
+so an application without the resource family uses it as it is.
+
 ## 4. Architecture
 
 ### 4.1 Modules
@@ -348,3 +363,7 @@ a cited clause with a test.
 | 0014 | Errors are @netvark/ban-core errors; the adapter renders through @netvark/hono-ban; everything throws         |
 | 0015 | Resource links by convention: opt-in `base`, a configured definer, no implicit defaults                       |
 | 0016 | Error details quote request text only as a plain token; `source` locates the rest                             |
+| 0017 | A typed client in the family, on fetch, over the server's definitions                                         |
+| 0018 | Definitions carry the types a client reads and writes                                                         |
+| 0019 | Records are flat and resolve relationships along the requested include paths                                  |
+| 0020 | TanStack Query options are the clients' binding, typed through query-core                                     |
