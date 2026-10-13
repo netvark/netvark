@@ -146,20 +146,26 @@ export async function compileWith(
 let pending: Promise<unknown> = Promise.resolve();
 
 /**
+ * Runs `task` once the compile that runs or last ran has finished: compiles
+ * run one at a time, as Paraglide's do, so two never write the same output
+ * directory at once.
+ * @ref https://github.com/opral/paraglide-js/issues/320#issuecomment-2596951222 (two compiles in one process, which Paraglide's compile() locks against)
+ */
+export async function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const result = pending.then(task);
+  pending = result.catch(() => null);
+  return result;
+}
+
+/**
  * Loads the project, refuses a message that formats unless `formatters`
  * is `'allow'`, isolates every interpolated value of the messages of the
  * `isolate` locales, compiles the project with Paraglide, and writes the
- * output, as Paraglide's `compile()` does. Compiles run one at a time,
- * as Paraglide's do, so two never write the same output directory at once.
+ * output, as Paraglide's `compile()` does, after any compile still running.
  * Throws `TypeError` for an option it cannot use before reading anything,
  * and `MessageFormattingError` before writing anything.
- * @ref https://github.com/opral/paraglide-js/issues/320#issuecomment-2596951222 (two compiles in one process, which Paraglide's compile() locks against)
  */
 export async function compile(options: CompileOptions): Promise<CompileResult> {
   const config = compileConfig(options);
-  const result = pending.then(async () =>
-    compileWith(await paraglideSdk(), config),
-  );
-  pending = result.catch(() => null);
-  return result;
+  return enqueue(async () => compileWith(await paraglideSdk(), config));
 }

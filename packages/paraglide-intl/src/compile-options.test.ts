@@ -89,4 +89,10 @@ describe('compileConfig (SPEC 6.1, 5)', () => {
       );
     }
   });
+
+  it('names the caller it is given', () => {
+    expect(() => compileConfig({ ...BASE, fs: {} }, 'watch')).toThrow(
+      new TypeError('watch: fs is not a file system module'),
+    );
+  });
 });

@@ -27,14 +27,14 @@ Contents
 
 Two packages (ADR 0002). `@netvark/intl-core` is the core: web standards only, no dependencies,
 nothing imported from Paraglide or the inlang SDK. `@netvark/paraglide-intl` is the Paraglide
-binding: it depends on the core through `workspace:^`, re-exports all of it, and adds `compile()`.
-`@inlang/paraglide-js` is its peer dependency, and it loads projects with the inlang SDK that
-Paraglide itself depends on (root ADR 0009).
+binding: it depends on the core through `workspace:^`, re-exports all of it, and adds `compile()`
+and `watch()`. `@inlang/paraglide-js` is its peer dependency, and it loads projects with the inlang
+SDK that Paraglide itself depends on (root ADR 0009).
 
 | Package                   | Exports                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@netvark/intl-core`      | Values: `isolate`, `createIntl`, `toTimeZone`, `detectTimeZone`, `timeZoneFromCookie`, `timeZoneCookie`, `createTimeZone`, and the constants `FIRST_STRONG_ISOLATE`, `POP_DIRECTIONAL_ISOLATE`, `DEFAULT_CACHE_SIZE`, `DEFAULT_TIME_ZONE`, `TIME_ZONE_COOKIE_MAX_AGE`. Types: `IntlOptions`, `IntlFormatters`, `DateInput`, `NumberInput`, `TimeZoneCookieOptions`, `TimeZoneOptions`, `TimeZoneResolver`, `RequestScope` |
-| `@netvark/paraglide-intl` | Everything of `@netvark/intl-core` (the same bindings), plus `compile` and `MessageFormattingError`; and the types `CompileOptions`, `CompileResult`, `FormattingFinding`                                                                                                                                                                                                                                                 |
+| `@netvark/paraglide-intl` | Everything of `@netvark/intl-core` (the same bindings), plus `compile`, `watch`, and `MessageFormattingError`; and the types `CompileOptions`, `CompileResult`, `FormattingFinding`, `WatchOptions`, `Watcher`                                                                                                                                                                                                            |
 
 `e2e/intl/package-surface.e2e.test.ts` asserts the exact value export list of both built packages
 and that the binding's re-exports are the core's own bindings.
@@ -62,6 +62,10 @@ packages/paraglide-intl/src/
   isolate-patterns.ts         the pattern rewrite (6.2)
   formatting-annotations.ts   the annotations a message formats with (6.3)
   escape-bidi-controls.ts     the bidi controls of the compiled code as escapes (6.4)
+  watch.ts                    watch (6.5)
+  tracked-fs.ts               the file system that records what a load reads (6.5)
+  directory-watchers.ts       the watchers of the directories a load read (6.5)
+  output-hashes.ts            the hashes of the files in an output directory (6.5)
   internal/
     is-record.ts              the options-object check
 ```
@@ -261,6 +265,7 @@ function. No message contains a cookie, a header, a request URL, or a value read
 | `TimeZoneResolver.run()`      | `TypeError`              | the resolver has no scope: none was given to `createTimeZone()` or `useScope()`                                                                                                                                                                                                                                                          |
 | `compile()`                   | `TypeError`              | the options are not an object; `project` or `outdir` is not a string; `isolate` is not a boolean or an array of strings, or lists a locale the project does not declare; `fs` is not a file system module; `formatters` is another value; Paraglide's SDK lacks a function the binding calls or returns a bundle the binding cannot read |
 | `compile()`                   | `MessageFormattingError` | a message formats and `formatters` is `'refuse'` (6.3)                                                                                                                                                                                                                                                                                   |
+| `watch()`                     | `TypeError`              | the options are not an object; `onCompile` or `onError` is not a function; an option `compile()` refuses before reading anything (6.1 step 1). What a compile throws goes to `onError` (6.5)                                                                                                                                             |
 
 ## 6. Paraglide binding (`@netvark/paraglide-intl`, `packages/paraglide-intl/src/`)
 
@@ -290,6 +295,7 @@ of Paraglide's `compile()`. `compile()` MUST:
 3. Wait for any compile still running, then run, so two compiles never write at once, as Paraglide's
    `compile()` does
    ([paraglide-js#320](https://github.com/opral/paraglide-js/issues/320#issuecomment-2596951222)).
+   The compiles of `watch()` (6.5) wait in the same queue.
 4. Import the inlang SDK that Paraglide depends on: `@inlang/sdk` resolved with `createRequire()`
    from the file `@inlang/paraglide-js` resolves to, where Paraglide's own imports resolve it (root
    ADR 0009). A module without the functions `loadProjectFromDirectory`, `selectBundleNested`, and
@@ -377,12 +383,76 @@ regular expression, or a comment, and in the first three the escape denotes the 
 [RFC 8259, 7](https://www.rfc-editor.org/rfc/rfc8259#section-7)), so the compiled messages return
 the same strings. Other files are written as Paraglide emits them.
 
-### 6.5 Peer and floor
+### 6.5 `watch(options)` (`watch.ts`, `tracked-fs.ts`, `directory-watchers.ts`, `output-hashes.ts`, ADR 0010)
+
+```ts
+type WatchOptions = CompileOptions & {
+  readonly onCompile?: (result: CompileResult) => void;
+  readonly onError?: (error: unknown) => void;
+};
+interface Watcher {
+  close(): Promise<void>;
+}
+```
+
+`watch()` MUST:
+
+1. Check the options before reading anything, and throw a `TypeError` naming `watch` when they are
+   not an object, `onCompile` or `onError` is not absent or a function, or another option fails 6.1
+   step 1.
+2. Compile as 6.1 does, in the same queue, loading the project through a file system that records,
+   before each call, the absolute path that `readFile`, `readFileSync`, `readdir`, or `readdirSync`
+   of the `fs` option or of its `promises` reads, and the path's state: its device, inode, size, and
+   birth, modification, and status change times, or absent. Only the load reads through it; the
+   output is written through the `fs` option.
+3. Give the first compile, unless `previousCompilation` is given and when `cleanOutdir` is set, the
+   hashes of the files already in `outdir`, in the form `writeOutput()` returns them from Paraglide
+   2.11 to 2.27: the hexadecimal SHA-256 of each file's text followed by its absolute path, by path
+   relative to `outdir` with `/` separators. That compile then rewrites the files that changed and
+   deletes the files it no longer writes, instead of removing the directory (6.1 step 10), as
+   Paraglide's CLI and bundler plugins seed theirs
+   ([`compile/command.ts`](https://github.com/opral/paraglide-js/blob/0c6cf2c971b667cedf133dea471101897c8c0ade/src/cli/commands/compile/command.ts)).
+   A file that cannot be read has no hash and is rewritten; a missing directory has none. Each later
+   compile is given the previous compile's output hashes, or after a compile that threw, those read
+   again from `outdir`.
+4. Watch with the `watch()` of the `fs` option the directory of each file read and each directory
+   listed, or the nearest existing ancestor of one that does not exist; stop watching any other
+   directory; and start a watcher again when its directory's device, inode, or birth time changed,
+   since a watcher follows the inode it started on
+   ([Node, Inodes](https://nodejs.org/docs/latest-v24.x/api/fs.html#inodes)), or when it emitted
+   `error`, which goes to `onError`. An inode number is unique only among the files that exist
+   ([inode(7)](https://man7.org/linux/man-pages/man7/inode.7.html)), so a new directory can get the
+   number of one just removed; the birth time tells them apart. An update that starts or stops a
+   watcher counts as an event (5): Node on macOS serves all of a process's watchers with one
+   FSEvents stream, which it replaces on each start or stop with one that reports from its own
+   creation, so a change made meanwhile is never reported
+   ([libuv `uv__fsevents_reschedule`](https://github.com/libuv/libuv/blob/v1.52.1/src/unix/fsevents.c#L398-L468)).
+5. After an event, once none came for `SETTLE_MS`, compare the state of each recorded path with its
+   recorded state, and compile only when one differs. After each compile, update the watchers (4)
+   and compare again, compiling until nothing differs: a change made while a compile ran, before the
+   watcher of its directory started, compiles too.
+6. Run one check or compile at a time, and resolve once the first compile, and any it led to, has
+   finished, whether or not it threw.
+7. Hand each compile's result to `onCompile` and what a compile throws to `onError`, `console.error`
+   by default; what `onCompile` throws goes to `onError`, and what `onError` throws is swallowed.
+   After a compile that threw, the recorded paths are those this compile read and those the one
+   before read, these with their state when this compile started, so the change that made it throw
+   does not compile again on its own.
+8. On `close()`, stop the watchers and a pending check, and resolve once the compile that runs, if
+   any, has finished; nothing compiles after it.
+
+On a project's first load the SDK writes its own files into the project directory (6.1), and a
+plugin it fetched from a URL into its `cache/plugins`, after listing it, so the first watch after a
+checkout compiles twice; later loads write nothing outside `outdir` (measured with SDK 2.10.2,
+3.1.0, and 4.0, with plugins from a path and from a URL). An editor's swap file beside a catalog
+compiles nothing; a new file in the project directory, which the SDK lists and reads, compiles.
+
+### 6.6 Peer and floor
 
 `@inlang/paraglide-js` is the one peer dependency (ADR 0002); the inlang SDK comes from Paraglide's
 own dependency (6.1, root ADR 0009). The range starts at the oldest release on which
 `compileProject()`, `writeOutput()`, and the SDK's `loadProjectFromDirectory()`,
-`selectBundleNested()`, and `upsertBundleNested()` behave as 6.1 to 6.4 require, past any published
+`selectBundleNested()`, and `upsertBundleNested()` behave as 6.1 to 6.5 require, past any published
 advisory (root ADR 0007). A CI job runs the binding's typecheck and tests there and on the last
 release of each SDK major between the floor and the current release. Section 8 lists the range.
 
@@ -404,6 +474,17 @@ release of each SDK major between the floor and the current release. Section 8 l
   `mkdtemp` directories compiled with Paraglide, the emitted functions called in each locale, the
   catalogs compared byte for byte before and after, the refusal raised before any output exists, and
   `formatters: 'allow'` rendering the same project as Paraglide does, each value isolated.
+- `tracked-fs.test.ts`, `directory-watchers.test.ts`, `output-hashes.test.ts`: the reads recorded in
+  each form by absolute path with their state before the first read; watchers on the nearest
+  existing directory, started again over a replaced directory or after an error, a late error
+  leaving the replacement, an update that starts or stops one reported as an event; the hashes equal
+  to those a compile returns, in both output structures.
+- `watch.test.ts`, `watch-cases.test.ts`: real `fs.watch()` over fixture projects: one compile per
+  change and none for a file no load reads, a change made during a compile, a compile that throws
+  and its fix, a first load that fails, `close()` waiting for a compile and a check queued behind
+  it, a new locale, a replaced messages directory, the first compile over an existing output with
+  and without `cleanOutdir`, a change made while the watchers start that no watcher reports,
+  callbacks that throw, and the option errors.
 
 ### 7.2 End-to-end suite (`e2e/intl/`)
 
@@ -422,6 +503,8 @@ A private package that consumes the built packages through `workspace:*` and nev
   it loads whether it runs on a server.
 - `visual-order.e2e.test.ts`: bidi-js (UAX #9 C1) resolves the compiled messages' visual order with
   each value in place, where the plain interpolation reorders it.
+- `watch.e2e.test.ts`: an edit compiled through the built package into the output a fresh
+  `compile()` writes, and nothing compiled after `close()`.
 - `support/catalogs.ts` and `support/project.ts`: the fixture catalogs, and projects written into
   `mkdtemp` directories by their real path. The temporary directory is a symlink on macOS, and
   Vitest loads a module imported through it and through its target twice, where Node loads it once.
@@ -434,8 +517,10 @@ workerd. Each smoke script first compiles `support/catalogs.ts` with the built b
 does not compile them. The checks import the output as `#compiled-messages`, a `package.json`
 subpath import whose `types` condition is `smoke/compiled-messages.d.ts`, so the smoke type-checks
 before any compile; Bun, Deno, Node, and the workerd bundle resolve it to the output. The smoke
-compile refuses Deno before 2.6.10 (section 8) instead of never exiting. The resolver's request
-scope is an `AsyncLocalStorage` from `node:async_hooks` on each; workerd runs with the `nodejs_als`
+compile refuses Deno before 2.6.10 (section 8) instead of never exiting. On Bun and Deno,
+`smoke/watch.ts` then watches a new copy of the fixture, edits a catalog, waits for the compile, and
+closes, after which the process must exit on its own. The resolver's request scope is an
+`AsyncLocalStorage` from `node:async_hooks` on each; workerd runs with the `nodejs_als`
 compatibility flag, which compatibility dates before 2026-08-04 need.
 
 ## 8. Packaging and support
@@ -448,7 +533,12 @@ writes files through the `fs` it is given (ADR 0002). inlang SDK 3.1 and 4 run t
 ([denoland/deno#32161](https://github.com/denoland/deno/pull/32161)): there the compile finishes, as
 Paraglide's own does, but the process does not exit (measured on Deno 2.1.4 and 2.6.9). On Deno a
 compile needs `--allow-read`, `--allow-write`, and `--allow-env`: Paraglide's logger, consola, reads
-`TERM` and about forty variables that name a CI provider (measured on Deno 2.9.7).
+`TERM` and about forty variables that name a CI provider (measured on Deno 2.9.7). A watch needs the
+same. It relies on the operating system's file events, which a network file system or a container's
+bind mount may not deliver
+([Node, Availability](https://nodejs.org/docs/latest-v24.x/api/fs.html#availability)). Deno reports
+file times to the millisecond, so there a directory replaced within the same millisecond, under the
+inode number of the one removed, is not told apart from it (6.5, step 4).
 
 | Peer                   | Range             | Floor                                                                                                                                                                                                           |
 | ---------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -463,3 +553,4 @@ compile needs `--allow-read`, `--allow-write`, and `--allow-env`: Paraglide's lo
 | `DEFAULT_CACHE_SIZE`       | `256`      | ADR 0003: a few locales, a few styles, the zones of concurrent readers |
 | `DEFAULT_TIME_ZONE`        | `'UTC'`    | ADR 0005: the same answer on every host                                |
 | `TIME_ZONE_COOKIE_MAX_AGE` | `34560000` | 400 days, Paraglide's locale cookie and RFC 6265bis-22, 5.5            |
+| `SETTLE_MS` (internal)     | `100`      | 6.5: the quiet a watch waits for, as Paraglide's `compile --watch`     |

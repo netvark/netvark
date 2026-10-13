@@ -35,7 +35,12 @@ const CORE = [
 ].toSorted();
 
 /** SPEC 1: the binding's values, the core's included. */
-const BINDING = [...CORE, 'compile', 'MessageFormattingError'].toSorted();
+const BINDING = [
+  ...CORE,
+  'compile',
+  'MessageFormattingError',
+  'watch',
+].toSorted();
 
 describe('package surface', () => {
   it('@netvark/intl-core exports the documented values', () => {

@@ -109,7 +109,7 @@ function pluralMessage(forms: {
 
 /** The messages most tests compile: values in text, a bare value, markup, and a plural. */
 export const MESSAGES: Readonly<
-  Record<string, Readonly<Record<string, unknown>>>
+  Record<'en' | 'ar', Readonly<Record<string, unknown>>>
 > = {
   en: {
     shared_by: 'Shared by {name} ({count})',
