@@ -32,8 +32,8 @@ names, from which the public API follows:
    derived surface is snapshotted and diffed in CI.
 5. **Serve.** The `server` subpath adds policies, scopes, quotas, rules, and effects;
    `@netvark/kysely-resource` runs the operations and `@netvark/hono-resource` serves them, while
-   `@netvark/jsonapi-client` and `@netvark/react-resource` consume the same declarations in clients
-   (ADR-0008).
+   `@netvark/jsonapi-client`, `@netvark/resource-ui`, and `@netvark/tanstack-form-resource` consume
+   the same declarations in clients (ADR-0008).
 
 ### Who it is for
 
@@ -50,8 +50,9 @@ plain data plus Zod schemas: anything can read it.
   code (`reject`), and the library only gives them a typed place to live.
 - Hiding SQL. Storage is Kysely through `@netvark/kysely-resource`; a custom query is still a Kysely
   query.
-- UI components. `@netvark/react-resource` provides a model and TanStack bindings, not widgets: an
-  application keeps its own field components, table markup, and router (ADR-0015).
+- UI components. `@netvark/resource-ui` provides a model and `@netvark/tanstack-form-resource` its
+  TanStack Form binding, not widgets: an application keeps its own field components, table markup,
+  and router (ADR-0015, ADR-0018).
 
 ## 2. Principles
 
@@ -269,17 +270,19 @@ fixtures then run against the new CHECK in CI.
 
 ### 4.1 The family
 
-| Package                    | Role                                                                                                   | Epic |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ | ---- |
-| `@netvark/resource-core`   | declarations, derivations, messages, the `server` contracts, OpenAPI, the storage contract suite       | E1   |
-| `@netvark/kysely-resource` | the runtime: the storage adapter over Kysely, boot checks against the full catalog, quotas, the outbox | E3   |
-| `@netvark/hono-resource`   | routes for every declared operation on Hono, localized errors, the OpenAPI route                       | E4   |
-| `@netvark/react-resource`  | a framework-free model of forms and lists, bound to TanStack Form, Query, and Table v9                 | E6   |
+| Package                           | Role                                                                                                   | Epic     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ | -------- |
+| `@netvark/resource-core`          | declarations, derivations, messages, the `server` contracts, OpenAPI, the storage contract suite       | E1       |
+| `@netvark/kysely-resource`        | the runtime: the storage adapter over Kysely, boot checks against the full catalog, quotas, the outbox | E3       |
+| `@netvark/hono-resource`          | routes for every declared operation on Hono, localized errors, the OpenAPI route                       | E4       |
+| `@netvark/resource-ui`            | a framework-free model of forms and lists, with TanStack Table v9's state as plain values              | E6, #174 |
+| `@netvark/tanstack-form-resource` | the form model bound to TanStack Form's core, for every adapter                                        | E6, #174 |
 
 Companions in other families: `@netvark/pg-catalog` extracts the catalog and runs the oracle
 (`rules --check`); `@netvark/jsonapi-client` is the typed fetch client over the JSON:API
-definitions; `@netvark/jsonapi-core`, `@netvark/keyset-core`, and `@netvark/ban-core` provide the
-definitions and the error model this family derives.
+definitions, and `@netvark/tanstack-query-jsonapi` keys TanStack Query by its requests;
+`@netvark/jsonapi-core`, `@netvark/keyset-core`, and `@netvark/ban-core` provide the definitions and
+the error model this family derives.
 
 ### 4.2 Modules
 
@@ -318,18 +321,20 @@ alone would map it. Effects write events to an outbox table in the operation's t
 `relayOutbox` delivers them after commit, at least once. Cursors are bound to the scope values, so a
 cursor from one tenant is refused in another. ADR 0012 records why.
 
-### 4.5 The React bindings
+### 4.5 Forms and lists
 
-`@netvark/react-resource` is a model of a declared resource under thin TanStack bindings. The model
-knows no framework: field descriptors whose labels are the application's message functions, a form
-model whose values are what inputs edit and whose write carries only what the person changed,
-validation by the declaration's own write validators with the server's words for each refusal, a
-refused write's error objects placed by pointer, and a list model whose state is the JSON:API query,
-read back leniently from a URL. `./form` turns the form model into TanStack Form options and binds a
-refusal onto the fields; `./query` keys TanStack Query by the request and invalidates a type after a
-write; TanStack Table v9 reads and writes the list's sorting and filters as state, with paging by
-cursor outside it. An application keeps its field components, its table markup, and its router. ADRs
-0014, 0015, 0016, and 0017 record why.
+`@netvark/resource-ui` is a model of a declared resource, and `@netvark/tanstack-form-resource`
+binds it to TanStack Form. The model knows no framework: field descriptors whose labels are the
+application's message functions, a form model whose values are what inputs edit and whose write
+carries only what the person changed, validation by the declaration's own write validators with the
+server's words for each refusal, a refused write's error objects placed by pointer, and a list model
+whose state is the JSON:API query, read back leniently from a URL. `@netvark/tanstack-form-resource`
+turns the form model into TanStack Form options and binds a refusal onto the fields, through
+TanStack Form's framework-free core, so every adapter's form takes them;
+`@netvark/tanstack-query-jsonapi`, of the jsonapi family, keys TanStack Query by the request and
+invalidates a type after a write; TanStack Table v9 reads and writes the list's sorting and filters
+as state, with paging by cursor outside it. An application keeps its framework, its field
+components, its table markup, and its router. ADRs 0014, 0015, 0016, 0017, and 0018 record why.
 
 ## 5. Decisions
 
@@ -352,6 +357,7 @@ cursor outside it. An application keeps its field components, its table markup, 
 | 0015 | The React bindings are a framework-free model under TanStack Query, Form, and Table                            |
 | 0016 | A form sends a cleared input as `null`, nullable or not                                                        |
 | 0017 | A refusal of several fields binds where a change to any of them clears it                                      |
+| 0018 | Forms and lists are a framework-free model and a TanStack Form binding, in two packages                        |
 
 ## 6. Later
 

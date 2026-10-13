@@ -1,7 +1,9 @@
 # ADR 0015: The React bindings are a framework-free model under TanStack Query, Form, and Table
 
 - Status: accepted; superseded in part by ADR-0016 (a form sends a cleared input as `null`, nullable
-  or not) and ADR-0017 (a refusal of several fields binds where a change to any of them clears it)
+  or not), ADR-0017 (a refusal of several fields binds where a change to any of them clears it), and
+  ADR-0018 (the model and the TanStack Form binding are two packages, `@netvark/resource-ui` and
+  `@netvark/tanstack-form-resource`, and the TanStack Query binding is the jsonapi family's)
 - Date: 2026-10-12
 
 ## Context

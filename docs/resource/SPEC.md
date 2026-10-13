@@ -1,10 +1,11 @@
 # resource: implementation specification
 
 - Status: normative for the 0.x line of `@netvark/resource-core`, `@netvark/kysely-resource`,
-  `@netvark/hono-resource`, and `@netvark/react-resource`; `docs/resource/DESIGN.md` explains the
-  why. Each binding adds its sections after the core's when its epic starts, from 18 on, so the
-  core's numbering stays stable: `@netvark/kysely-resource` holds 18, `@netvark/hono-resource` 19,
-  and `@netvark/react-resource` 20.
+  `@netvark/hono-resource`, `@netvark/resource-ui`, and `@netvark/tanstack-form-resource`;
+  `docs/resource/DESIGN.md` explains the why. Each binding adds its sections after the core's when
+  its epic starts, from 18 on, so the core's numbering stays stable: `@netvark/kysely-resource`
+  holds 18, `@netvark/hono-resource` 19, and `@netvark/resource-ui` and
+  `@netvark/tanstack-form-resource` 20.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119. Every section names the
 source files that implement it and the tests that prove it. When this document and the code
@@ -34,7 +35,7 @@ Contents
 17. Constants
 18. The Kysely runtime
 19. Hono routes
-20. React bindings
+20. Forms and lists
 
 ---
 
@@ -4109,71 +4110,71 @@ related route and the failing operation's on the operations endpoint, or `undefi
 
 ---
 
-## 20. React bindings (`@netvark/react-resource`, `packages/react-resource/src/`, ADR 0014, ADR 0015)
+## 20. Forms and lists (`@netvark/resource-ui`, `@netvark/tanstack-form-resource`, ADR 0014, ADR 0015, ADR 0018)
 
-A declared resource gives a browser application its forms, its lists, and its cache: labels,
-options, limits, validation, the write, where a refusal lands, and the query keys all come from the
-declaration, so a screen restates none of them. The root entry is a model of a declared resource
-that imports neither React nor TanStack; `./form` binds it to TanStack Form and `./query` to
-TanStack Query, and a table reads the list model's state as TanStack Table v9 holds it. Every text
-the model renders comes from the application's one messages object, computed when it is asked for
-(ADR 0014).
+A declared resource gives a browser application its forms and its lists: labels, options, limits,
+validation, the write, and where a refusal lands all come from the declaration, so a screen restates
+none of them. `@netvark/resource-ui` (`packages/resource-ui/src/`) is a model of a declared resource
+that imports no framework and no TanStack package. `@netvark/tanstack-form-resource`
+(`packages/tanstack-form-resource/src/`) binds its form model to TanStack Form's framework-free
+core, `@tanstack/form-core`, so the form of every TanStack Form adapter takes it (root ADR 0010). A
+table reads the list model's state as TanStack Table v9 holds it, and the reads and writes are the
+jsonapi family's TanStack Query binding (20.6). Every text the model renders comes from the
+application's one messages object, computed when it is asked for (ADR 0014).
 
 ### 20.1 Public surface and module map
 
 ```
-@netvark/react-resource                    the model: no React, no TanStack
+@netvark/resource-ui                       the model: no framework, no TanStack
 ├── fieldsOf(resource, messages)           fields/fields-of.ts           field descriptors (20.2)
 ├── resourceForm(resource, operation, o)   form/resource-form.ts         the form model (20.3, 20.4)
 └── resourceList(resource, messages)       list/resource-list.ts         the list model (20.7)
 
-@netvark/react-resource/form               TanStack Form
-├── resourceFormOptions(model)             tanstack-form/form-options.ts (20.5)
-└── bindResponseErrors(form, model, error) tanstack-form/bind-errors.ts  (20.5)
-
-@netvark/react-resource/query              TanStack Query
-└── resourceQueries(client)                tanstack-query/queries.ts     (20.6)
+@netvark/tanstack-form-resource            TanStack Form, through @tanstack/form-core
+├── resourceFormOptions(model)             form-options.ts               (20.5)
+└── bindResponseErrors(form, model, error) bind-errors.ts                (20.5)
 ```
 
-| Module                          | Holds                                                                               |
-| ------------------------------- | ----------------------------------------------------------------------------------- |
-| `internal/declared.ts`          | reading a declared resource, and the `TypeError`s of an argument that is not one    |
-| `internal/labels.ts`            | the labels of a type in the messages, and the `TypeError`s of messages without them |
-| `internal/object.ts`            | lookups of own members only                                                         |
-| `internal/standard-schema.ts`   | the Standard Schema V1 types a validator the package makes satisfies                |
-| `fields/fields-of.ts`           | `fieldsOf` and the descriptor of one member                                         |
-| `fields/filter-kind.ts`         | the control a member's filter takes                                                 |
-| `form/form-types.ts`            | the types of the form model                                                         |
-| `form/value-kind.ts`            | the kind of each member's value, and its blank                                      |
-| `form/form-values.ts`           | the value each member's input edits, and the values a form starts from              |
-| `form/form-write.ts`            | the write a form's values make                                                      |
-| `form/form-plan.ts`             | what the validator, the write, and the error mapping read                           |
-| `form/form-validator.ts`        | the form's Standard Schema                                                          |
-| `form/form-errors.ts`           | a refused write's error objects by field                                            |
-| `form/form-options.ts`          | the operation and options, and the `TypeError`s of ones a caller got wrong          |
-| `form/resource-form.ts`         | `resourceForm`                                                                      |
-| `list/list-types.ts`            | the types of the list model                                                         |
-| `list/list-state.ts`            | reading a state and a result, and the pages they lead to                            |
-| `list/sorting.ts`               | `sort` and Table's sorting state                                                    |
-| `list/column-filters.ts`        | `filter` and Table's column filters                                                 |
-| `list/search-shape.ts`          | a JSON search shaped member by member, and the members a refusal names dropped      |
-| `list/lenient-query.ts`         | a route's search read back against the definition                                   |
-| `list/resource-list.ts`         | `resourceList`                                                                      |
-| `tanstack-form/form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one            |
-| `tanstack-form/form-options.ts` | `resourceFormOptions`                                                               |
-| `tanstack-form/bind-errors.ts`  | `bindResponseErrors`                                                                |
-| `tanstack-query/query-keys.ts`  | the keys of 20.6: the query string a call sends                                     |
-| `tanstack-query/pages.ts`       | an infinite list's page parameters, from the query's cursors and the pages' links   |
-| `tanstack-query/query-types.ts` | the options' types, as TanStack Query's own helpers return them                     |
-| `tanstack-query/queries.ts`     | `resourceQueries`, and the `TypeError`s of an argument that is not a client         |
+`@netvark/resource-ui`:
 
-Types exported from the root: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`, `FilterKind`,
-`ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`, `FormResource`,
-`FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`, `FormErrors`, `ListModel`,
-`ListResource`, `ListState`, `ListSorting`, `ListColumnFilters`. Types exported from `./form`:
-`BindableForm`, `ResourceFormOptions`. Types exported from `./query`: `ResourceQueries`,
-`ReadOptions`, `PagesOptions`, `WriteOptions`, `WriteSettings`, `ListResult`, `UpdateVariables`,
-`PageParam`, `KeyedDefinition`, `AllKey`, `ListKey`, `PagesKey`, `GetKey`.
+| Module                        | Holds                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `internal/declared.ts`        | reading a declared resource, and the `TypeError`s of an argument that is not one    |
+| `internal/labels.ts`          | the labels of a type in the messages, and the `TypeError`s of messages without them |
+| `internal/object.ts`          | lookups of own members only                                                         |
+| `internal/standard-schema.ts` | the Standard Schema V1 types a validator the package makes satisfies                |
+| `fields/fields-of.ts`         | `fieldsOf` and the descriptor of one member                                         |
+| `fields/filter-kind.ts`       | the control a member's filter takes                                                 |
+| `form/form-types.ts`          | the types of the form model                                                         |
+| `form/value-kind.ts`          | the kind of each member's value, and its blank                                      |
+| `form/form-values.ts`         | the value each member's input edits, and the values a form starts from              |
+| `form/form-write.ts`          | the write a form's values make                                                      |
+| `form/form-plan.ts`           | what the validator, the write, and the error mapping read                           |
+| `form/form-validator.ts`      | the form's Standard Schema                                                          |
+| `form/form-errors.ts`         | a refused write's error objects by field                                            |
+| `form/form-options.ts`        | the operation and options, and the `TypeError`s of ones a caller got wrong          |
+| `form/resource-form.ts`       | `resourceForm`                                                                      |
+| `list/list-types.ts`          | the types of the list model                                                         |
+| `list/list-state.ts`          | reading a state and a result, and the pages they lead to                            |
+| `list/sorting.ts`             | `sort` and Table's sorting state                                                    |
+| `list/column-filters.ts`      | `filter` and Table's column filters                                                 |
+| `list/search-shape.ts`        | a JSON search shaped member by member, and the members a refusal names dropped      |
+| `list/lenient-query.ts`       | a route's search read back against the definition                                   |
+| `list/resource-list.ts`       | `resourceList`                                                                      |
+
+`@netvark/tanstack-form-resource`:
+
+| Module            | Holds                                                                    |
+| ----------------- | ------------------------------------------------------------------------ |
+| `form-model.ts`   | reading a form model, and the `TypeError` of an argument that is not one |
+| `form-options.ts` | `resourceFormOptions`                                                    |
+| `bind-errors.ts`  | `bindResponseErrors`                                                     |
+
+Types exported from `@netvark/resource-ui`: `FieldDescriptor`, `FieldDescriptors`, `FieldOption`,
+`FilterKind`, `ColumnFilterDescriptor`, `FormModel`, `FormModelOptions`, `FormOperation`,
+`FormResource`, `FormRecord`, `FormMemberName`, `FormValues`, `FormValue`, `FormWriteOf`,
+`FormErrors`, `ListModel`, `ListResource`, `ListState`, `ListSorting`, `ListColumnFilters`. Types
+exported from `@netvark/tanstack-form-resource`: `BindableForm`, `ResourceFormOptions`.
 
 Each function throws `TypeError` before it returns for an argument a JavaScript caller got wrong: a
 resource that is not a declared resource (one without `names`, `declaration`, `fields`, `write`,
@@ -4245,8 +4246,8 @@ Tests: `fields/fields-of.test.ts` (the fixture catalog: order, labels and option
 messages' own functions in either locale, element options, a relationship's, each kind of the table,
 frozen), `fields/fields-of-refusals.test.ts` (each `TypeError`), `fields/filter-kind.test.ts` (every
 member of the fixture, filtered or not, by the table), `fields/fields-of.test-d.ts` (names typed by
-the resource); end to end, `e2e/resource/react/fields.e2e.test.ts` (the built package over the
-contacts application's declarations, with its Paraglide messages in German and English).
+the resource); end to end, `e2e/resource/ui/fields.e2e.test.ts` (the built package over the contacts
+application's declarations, with its Paraglide messages in German and English).
 
 ### 20.3 The form model: `resourceForm(resource, operation, options)`
 
@@ -4401,7 +4402,7 @@ Tests: `form/form-errors.test.ts` (a 422 with items on two fields and one on `/d
 of two texts per field, `title` without `detail`, a member the form does not hold, a `ResponseError`
 without error objects, a `TypeError`, a `ResponseError` from another copy of the client).
 
-### 20.5 TanStack Form (`./form`, ADR 0017)
+### 20.5 TanStack Form (`@netvark/tanstack-form-resource`, ADR 0017, ADR 0018)
 
 ```ts
 const form = useForm({
@@ -4416,11 +4417,18 @@ const form = useForm({
 });
 ```
 
+The example is React's. The options spread alike into Vue's `useForm`, into Solid's and Svelte's
+`createForm(() => ({ ...options, onSubmit }))`, into Angular's `injectForm`, and into Lit's
+`new TanStackFormController(host, options)`, and `bindResponseErrors` takes the form each makes,
+Lit's as `controller.api`.
+
 - `resourceFormOptions(model)` is
-  `formOptions({ defaultValues, validationLogic: revalidateLogic(), validators: { onDynamic: model.validator } })`:
-  the form validates when it is first submitted and on every change after, so nobody sees an error
-  before submitting. It spreads into `useForm` and into the `useAppForm` of `createFormHook` alike,
-  so an application keeps its own field components. `ResourceFormOptions<TValues>` is its type.
+  `{ defaultValues, validationLogic: revalidateLogic(), validators: { onDynamic: model.validator } }`,
+  a plain object, with `revalidateLogic` from the application's `@tanstack/form-core`, its adapter's
+  own copy (root ADR 0011): the form validates when it is first submitted and on every change after,
+  so nobody sees an error before submitting. It spreads into an adapter's form and into the
+  `useAppForm` of React's `createFormHook` alike, so an application keeps its own field components.
+  `ResourceFormOptions<TValues>` is its type.
 - `bindResponseErrors(form, model, error)` reads `model.errors(error)` and sets each text on the
   field of its member, where the form has one (`getFieldMeta` returns its meta), as `{ message }`
   from the form (`errorSourceMap` `'form'`), and marks the field touched, so a field that shows its
@@ -4446,12 +4454,12 @@ const form = useForm({
 - `isSubmitSuccessful` is `true` after a refused write, since the handler resolves (ADR 0015); a
   screen reads a refusal from what `bindResponseErrors` returned.
 
-`form` is a TanStack Form `FormApi`: the `formApi` a submit handler receives, or what `useForm` or
-`useAppForm` returned. Its type, `BindableForm<TValues>`, is the form's `state.values`, which must
-hold the model's values, and the `getFieldMeta` and `setFieldMeta` the binding calls, typed so that
-every `FormApi` is one. TanStack Form's own `AnyFormApi` is not: its type parameters are invariant,
-and a form made without `onSubmitMeta` has the submit meta `never`. `resourceFormOptions` and
-`bindResponseErrors` throw `TypeError` for a model without the members every form model has
+`form` is a TanStack Form `FormApi`: the `formApi` a submit handler receives, or the form an adapter
+makes. Its type, `BindableForm<TValues>`, is the form's `state.values`, which must hold the model's
+values, and the `getFieldMeta` and `setFieldMeta` the binding calls, typed so that every `FormApi`
+is one. TanStack Form's own `AnyFormApi` is not: its type parameters are invariant, and a form made
+without `onSubmitMeta` has the submit meta `never`. `resourceFormOptions` and `bindResponseErrors`
+throw `TypeError` for a model without the members every form model has
 (`<function>: model must be what a resourceForm returned`), and `bindResponseErrors` for a form
 without those two methods (`bindResponseErrors: form must be a TanStack Form FormApi`). @ref
 https://tanstack.com/form/v1/docs/framework/react/guides/validation @ref
@@ -4459,90 +4467,32 @@ https://tanstack.com/form/v1/docs/framework/react/guides/dynamic-validation @ref
 https://tanstack.com/form/v1/docs/framework/react/guides/form-composition @ref
 https://tanstack.com/form/v1/docs/reference/classes/FormApi
 
-Tests: `tanstack-form/form-options.test.ts`, `tanstack-form/bind-errors.test.ts`, and
-`tanstack-form/bind-errors-result.test.ts` over a `FormApi` made with `new FormApi(...)` and a
-mounted `FieldApi` per member, driven by `handleChange` and `handleBlur`;
-`tanstack-form/form-binding.test-d.ts` (the options in `useForm` and in `useAppForm`, the values a
-submit handler receives, a field's errors, and the forms `bindResponseErrors` takes and refuses);
-`e2e/resource/react/form-binding.e2e.test.ts`; and the component tests of 20.8.
+Tests: `form-options.test.ts`, `bind-errors.test.ts`, and `bind-errors-result.test.ts` over a
+form-core `FormApi` made with `new FormApi(...)` and a mounted `FieldApi` per member, driven by
+`handleChange` and `handleBlur`, as every adapter's forms and fields are made;
+`form-binding.test-d.ts` (the options in a `FormApi`, the values a submit handler receives, a
+field's errors, and the forms `bindResponseErrors` takes and refuses); `e2e/resource/form/adapters/`
+(the options in the form of each TanStack Form adapter, React, Vue, Solid, Svelte, Angular, and Lit,
+the submit handler's values typed as the model's, and each form a `BindableForm`, type-checked
+against the built package); `e2e/resource/form/form-binding.e2e.test.ts`; and the screens of 20.8.
 
-### 20.6 TanStack Query (`./query`): `resourceQueries(client)`
+### 20.6 Reads and writes (`@netvark/tanstack-query-jsonapi`, jsonapi SPEC 16)
 
-```ts
-const contacts = resourceQueries(clients.contacts);
-const meetings = resourceQueries(clients.meetings);
-const page = useQuery(contacts.list({ ...query, include: ['organization'] }));
-const feed = useInfiniteQuery(contacts.pages({ sort: ['-created_at'] }));
-const contact = useQuery(contacts.get(id));
-const create = useMutation(contacts.create());
-const remove = useMutation(contacts.remove({ invalidates: [meetings.all] }));
-```
+A screen reads and writes through the jsonapi family's TanStack Query binding,
+`resourceQueries(client)` (jsonapi SPEC 16, jsonapi ADR 0020), over the client of the declaration's
+definition (`createClients({ contacts: Contacts.resource }, transport)`, jsonapi SPEC 15.4). It
+reads no declaration, so the models and the queries meet in values alone:
 
-| Member              | Made with              | Key                                       | Runs                                              |
-| ------------------- | ---------------------- | ----------------------------------------- | ------------------------------------------------- |
-| `all`               |                        | `[type]`                                  |                                                   |
-| `list(query?)`      | `queryOptions`         | `[type, 'list', <query>]`                 | `client.list(query, { signal })`                  |
-| `pages(query?)`     | `infiniteQueryOptions` | `[type, 'pages', <query>]`                | `client.list` of the query at the page's cursor   |
-| `get(id, query?)`   | `queryOptions`         | `[type, 'get', id, <include and fields>]` | `client.get(id, query, { signal })`               |
-| `create(settings?)` | `mutationOptions`      | `mutationKey: [type, 'create']`           | `client.create(input)`                            |
-| `update(settings?)` | `mutationOptions`      | `mutationKey: [type, 'update']`           | `client.update(id, input)` for `{ id, ...input }` |
-| `remove(settings?)` | `mutationOptions`      | `mutationKey: [type, 'remove']`           | `client.remove(id)`                               |
-
-- **A key is the request.** `<query>` is `serializeQuery(client.definition, query).toString()`
-  (jsonapi SPEC 15.5), so two queries that make one request share one cache entry, a bigint filter
-  value keys as its text, and every key is JSON. The parameters come in `serializeQuery`'s order of
-  the families whatever order the query's members were written in; within a member the query's own
-  order stands, so a filter whose fields are written in another order is another request and another
-  entry. `type` is the definition's, so invalidating `[type]` reaches every list, page, and record
-  of the type, and `[type, 'list']` every list. `client.definition` is the definition the client was
-  made from (jsonapi SPEC 15.4).
-- **Reads** resolve to the client's `ReadResult` (15.4), the document's `links` and `meta` with the
-  records, which paging reads (20.7). Each passes TanStack Query's `signal`, so a cancelled query
-  aborts its request. A refused read settles the query with the client's `ResponseError`.
-- **Pages.** The page parameter is `{ after }` or `{ before }`, starting from the query's own
-  cursors, which the key holds as the list's start; the next is `{ after: pageCursors(last).next }`
-  and the previous `{ before: pageCursors(first).prev }` (jsonapi SPEC 15.8), none when the link is
-  absent or the page holds no records, since the profile lets a link point at an empty page.
-  `page[size]` stays the query's. `pages` is `never` on a definition whose list takes no `page`, and
-  throws `TypeError` on one typed wide.
-- **Writes** invalidate their type and the keys `settings.invalidates` names, the other types the
-  write changes on the server (removing a contact sets their meetings' contact to null,
-  `on delete set null`), and return that promise from `onSuccess`, with the `QueryClient` TanStack
-  Query passes (`context.client`), so the mutation stays pending until the lists and records it
-  touched have refetched; `remove` first removes the record's `get` entries, so a screen still
-  showing it does not refetch a 404. A refused write invalidates nothing. An invalidation belongs in
-  the options: TanStack Query runs a callback passed to `mutate` only while the component that
-  called it is mounted, and for the last of consecutive calls only, so `mutate`'s callbacks are for
-  what a screen does next, such as navigating; spreading the options and overriding `onSuccess`
-  would drop the invalidation.
-- **Types.** Every option is made with TanStack Query's own `queryOptions`, `infiniteQueryOptions`,
-  and `mutationOptions`, and typed as they return it, so `useQuery` and its kin take it as it is and
-  `queryClient.getQueryData(contacts.get(id).queryKey)` is typed; records are the client's
-  `RecordOf` for the query passed (15.6), `create`'s variables its `CreateInput`, `update`'s
-  `{ id } & UpdateInput`, and `remove`'s the id. The options are made over the client's calls typed
-  wide, and typed by its definitions where `resourceQueries` returns them, as `createClients` types
-  the calls.
-- **Arguments.** `resourceQueries` throws `TypeError` for a value `createClients` did not return
-  (one without `definition` and the calls), and a write for `invalidates` that is not a list of
-  query keys, such as one key passed alone. Messages name the function and the definition's type,
-  never a value.
-
-@ref https://tanstack.com/query/v5/docs/framework/react/guides/query-keys @ref
-https://tanstack.com/query/v5/docs/framework/react/reference/mutationOptions @ref
-https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations @ref
-https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-side-effects
-
-Tests: `tanstack-query/query-keys.test.ts` (one key per request, the canonical order, bigints, what
-`[type]` and `[type, 'list']` reach), `tanstack-query/queries.test.ts` (each read against a fetch
-double through a `QueryClient`, the signal of each, a refused read, the `TypeError`s),
-`tanstack-query/pages.test.ts` (the pages in both directions from the query's cursors, an empty page
-that links on, a link absent or without its cursor), `tanstack-query/writes.test.ts` (each write
-pending until the reads a screen shows have refetched, an entry no screen shows left stale, removal
-before the refetch, `invalidates`, a refused write, `mutate`'s `onSuccess` after the refetch), and
-`tanstack-query/queries.test-d.ts` (data and variables typed by the definitions, `getQueryData`
-through the tagged keys, `pages` `never` without pagination). The tests read through TanStack
-Query's observers, which its hooks are made of: from 5.102 `fetchQuery` and its kin are deprecated
-for `queryClient.query`, which the 5.89 floor (20.9) does not have.
+- A list model's state (20.7) is a `ListQuery` of the client: `contacts.list(state)` and
+  `contacts.pages(state)` send it as it is, and `next(state, result)` and `previous(state, result)`
+  read the result a list resolves to.
+- A form model's `write(values)` (20.3) is the input of `contacts.create()`'s mutation, and with the
+  record's id, `{ id, ...model.write(values) }`, the input of `contacts.update()`'s.
+- A refused write rejects with the client's `ResponseError`, which `model.errors(error)` (20.4) and
+  `bindResponseErrors` (20.5) place.
+- An update form starts from the record `contacts.get(id)` reads (20.3). A write settles once the
+  reads a screen shows have refetched, that record among them, so the next write is measured against
+  what the server stored.
 
 ### 20.7 The list model: `resourceList(resource, messages)`
 
@@ -4586,7 +4536,11 @@ client's `ListQuery` (15.5), held where the application keeps it, in the route's
 sent as it is. TanStack Table holds no data of its own: its sorting and column filters are read from
 the state and written back to it, the request does the sorting and filtering, and paging happens
 outside the table, by cursor, since a cursor API has no total and no page index. Rows are keyed by
-`id`, so a row selection survives paging as the ids it names.
+`id`, so a row selection survives paging as the ids it names. The example is React's:
+`sorting(state)` and `columnFilters(state)` are table-core's `SortingState` and
+`ColumnFiltersState`, and `withSorting` and `withColumnFilters` take what its `OnChangeFn` passes,
+so the table of every TanStack Table v9 adapter, each built on `@tanstack/table-core`, reads and
+writes them alike.
 
 | Member                                 | Is                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4671,91 +4625,96 @@ JSON kept in its own forms through a JSON round trip, a search that is not an ob
 `params(query(search))` gives back), `list/lenient-query-faults.test.ts` (a refusal naming no
 parameter or none that was sent, an error that is no refusal, and each re-read, over a recorded
 `parseQuery`), and `list/resource-list.test-d.ts` (states typed by the definition's sort names,
-operators, and search, `withSearch` as `never` without one, and Table v9's `SortingState`,
-`ColumnFiltersState`, and `OnChangeFn` assigning to and from the model's).
+operators, and search, `withSearch` as `never` without one, and `@tanstack/table-core`'s
+`SortingState`, `ColumnFiltersState`, and `OnChangeFn` assigning to and from the model's).
 
 ### 20.8 Test plan
 
-- Unit and type tests beside each module (20.2 to 20.7), over the fixture in `src/test-support/`:
-  contacts, their organizations, and the plans an organization is on, a lookup table keyed by an
-  enum, declared over the public catalog `@netvark/pg-catalog` extracts from the fixture's
-  migrations (`e2e/resource` proves the committed file current), so between them every filter kind,
-  every wire type, every value kind of 20.3, a self-relationship, a write-only member, and a CHECK
-  across a field and a relationship occur; with messages from `defineMessages` whose texts are
-  closures reading a locale variable, so a test switches the language as Paraglide does it, by
-  changing what the functions read.
-- Screen tests (`*.test.tsx`, jsdom and Testing Library, with TanStack Form, Query, Router, and
-  Table v9 as an application uses them) over the screens of `src/test-support/screens/`, against the
-  contacts API of `src/test-support/contacts-api.ts`: the fixture's contacts and organizations in
-  memory, each list request read by jsonapi-core's `parseQuery` against the definition, and each
-  answer a document jsonapi-core builds from it (`paginatedDocument`, `resourceDocument`,
-  `errorDocument`), routed by the paths `resourcePaths` reads.
-  `tanstack-form/contact-forms.test.tsx`: a create form that shows no error before its first submit,
-  then a client `maxLength` refusal in German on its field and in English after the locale changes;
-  a create that sends the members the person set; a 422 and a 409 landing on their fields with the
-  server's detail, each cleared by the change that answers it; a 500 without error objects leaving
-  the fields empty and the banner to the screen's own text; an update form sending only the members
-  the person changed, measured against the record as it refetched, a cleared input as `null`.
-  `list/contacts-table.test.tsx`: a table whose header sends `sort=-name` and announces its order by
-  `aria-sort`, whose status choice sends `filter[status][in]` and no filter once emptied, which
-  pages both ways by the server's links and drops the cursor on a sort change, searches on submit,
-  opens a stale link through TanStack Router's search with what the definition accepts (20.7, step
-  5), and refetches after a create on the same screen.
-- End to end (`e2e/resource/react/`): the built package against the contacts application over HTTP
+- `@netvark/resource-ui`: unit and type tests beside each module (20.2 to 20.4, 20.7), over the
+  fixture in `src/test-support/`: contacts, their organizations, and the plans an organization is
+  on, a lookup table keyed by an enum, declared over the public catalog `@netvark/pg-catalog`
+  extracts from the fixture's migrations (`e2e/resource` proves the committed file current), so
+  between them every filter kind, every wire type, every value kind of 20.3, a self-relationship, a
+  write-only member, and a CHECK across a field and a relationship occur; with messages from
+  `defineMessages` whose texts are closures reading a locale variable, so a test switches the
+  language as Paraglide does it, by changing what the functions read. No test imports a framework or
+  a TanStack adapter.
+- `@netvark/tanstack-form-resource`: the tests of 20.5, over form models of resources declared over
+  the storage contract's catalog (`@netvark/resource-core/testing`, 12.9), as
+  `@netvark/hono-resource`'s tests declare theirs, with messages whose texts read a locale variable:
+  a refusal of one field, and one of two fields a unique constraint holds together (ADR 0017).
+- End to end (`e2e/resource/`): the built packages against the contacts application over HTTP
   (`support/contacts-server.ts`), on PGlite and, with `RESOURCE_PG_URL`, a PostgreSQL server, with
-  the application's Paraglide messages and nothing mocked. The screens of `react/screens/` render in
-  jsdom, for a person whose browser prefers German, beside the server and its database in one
-  process, under `support/screen-environment.ts`: jsdom with the modules processed as a server's.
-  `contact-forms.e2e.test.tsx`: the create form's client refusals in the server's words before
-  anything is sent; the server's `CONTACT_EMAIL_TAKEN` and `CONTACT_NAME_TAKEN` 409s on their fields
-  in the German the request asked for, each cleared by the change that answers it; the plan's quota,
-  which no field holds, in the banner; an update sending the changed members only, measured against
-  the record as it refetched. The form runs every rule of the contacts table, so the server's 422
-  answers only a write no form validated, which `form-create.e2e.test.ts` maps onto the fields.
-  `contacts-screen.e2e.test.tsx`, the README's list screen with its router registered: a header's
-  sort, a status filter, and a search, each request the state's own parameters; cursors over real
-  pages to the end and back; a stale link read back leniently, none of what the state does not hold
-  left in the URL; and the list refetched after a create on the same screen. Over the table of
-  `support/defaults-table.ts`, a create form starts where an update of the row PostgreSQL stores for
-  it starts (`form-defaults.e2e.test.ts`). A TanStack Form made with `resourceFormOptions`, whose
-  handler writes through the client and binds the refusal, over a runtime that serves meetings too
-  (`runtime/meetings.ts`): a taken email held on its field until the email changes, a submit of the
-  same values that sends nothing, and the 409 of a room booked twice for one period on the room and
-  the period, cleared when the person changes either (`form-binding.e2e.test.ts`). TanStack Query's
-  observers over `resourceQueries`, as its hooks read and write: an infinite list paging both ways
-  by the server's links from the query's own cursors, a create and an update settling once the list
-  and the record shown have refetched, a contact's removal that removes their record's entries and
-  refetches the meetings the database set to no contact, and a refused write that leaves the cache
-  as it was (`query-cache.e2e.test.ts`). The list model over the contacts client, each request
-  checked to carry the state's own parameters (`list-model.e2e.test.ts`): its columns labeled in
-  German and in English by a model built once, the default sort the order the server applies, a
-  sort, a filter, and a search, an emptied choice removing its filter, cursors over real pages to
-  the end and back, a stale or edited link read back as parameters, as JSON, and through a router's
-  JSON round trip, and the recovery from the 400 of an expired cursor and of a filter value the
-  server refuses.
-- Smoke (`e2e/resource/smoke/react-checks.ts`): the built root entry runs a form model's validator
-  and write and a list model's `query`, `withPageSize`, and `next` on Bun, Deno, and workerd, where
-  server rendering runs.
-- Floors: CI runs the package's tests on the lowest TanStack releases its peer ranges admit (20.9).
+  the application's Paraglide messages and nothing mocked.
+  - `ui/`, the model over the contacts client: descriptors built once, each label and option in the
+    language of the request that calls it, each filter's control, and what a create requires
+    (`fields.e2e.test.ts`); a create form started from the table's defaults, its refusals in the
+    server's words before anything is sent, the members it writes, and a 409 and the 422 of a write
+    no form validated on their fields (`form-create.e2e.test.ts`); an update sending only what the
+    person changed, and a cleared input that a member that is not nullable refuses before anything
+    is sent (`form-update.e2e.test.ts`); over the table of `support/defaults-table.ts`, a create
+    form that starts where an update of the row PostgreSQL stores for it starts
+    (`form-defaults.e2e.test.ts`); and the list model, each request checked to carry the state's own
+    parameters (`list-model.e2e.test.ts`): its columns labeled in German and in English by a model
+    built once, the default sort the order the server applies, a sort, a filter, and a search, an
+    emptied choice removing its filter, cursors over real pages to the end and back, a stale or
+    edited link read back as parameters, as JSON, and through a router's JSON round trip, and the
+    recovery from the 400 of an expired cursor and of a filter value the server refuses.
+  - `form/`: a form-core `FormApi` made with `resourceFormOptions`, whose handler writes through the
+    client and binds the refusal, over a runtime that serves meetings too (`runtime/meetings.ts`): a
+    taken email held on its field until the email changes, a submit of the same values that sends
+    nothing, and the 409 of a room booked twice for one period on the room and the period, cleared
+    when the person changes either (`form-binding.e2e.test.ts`); and the adapters' types of 20.5
+    (`form/adapters/`).
+  - `query/`: query-core's observers over `resourceQueries` (jsonapi SPEC 16), as an adapter's hooks
+    read and write: an infinite list paging both ways by the server's links from the query's own
+    cursors, a create and an update settling once the list and the record shown have refetched, a
+    contact's removal that removes their record's entries and refetches the meetings the database
+    set to no contact, and a refused write that leaves the cache as it was
+    (`query-cache.e2e.test.ts`).
+  - `react/`: the screens of `react/screens/`, built with the React adapters of TanStack Form,
+    Query, Router, and Table v9, render in jsdom, for a person whose browser prefers German, beside
+    the server and its database in one process, under `support/screen-environment.ts`: jsdom with
+    the modules processed as a server's. `contact-forms.e2e.test.tsx`: the create form's client
+    refusals in the server's words before anything is sent; the server's `CONTACT_EMAIL_TAKEN` and
+    `CONTACT_NAME_TAKEN` 409s on their fields in the German the request asked for, each cleared by
+    the change that answers it; the plan's quota, which no field holds, in the banner; an update
+    sending the changed members only, measured against the record as it refetched. The form runs
+    every rule of the contacts table, so the server's 422 answers only a write no form validated,
+    which `ui/form-create.e2e.test.ts` maps onto the fields. `contacts-screen.e2e.test.tsx`, the
+    README's list screen with its router registered: a header's sort, a status filter, and a search,
+    each request the state's own parameters; cursors over real pages to the end and back; a stale
+    link read back leniently, none of what the state does not hold left in the URL; and the list
+    refetched after a create on the same screen.
+  - `vue/`: a screen built with Vue Query and Vue Form renders in jsdom the same way: a list through
+    `useQuery(contacts.list(...))`, a create form through `useForm` with `resourceFormOptions`, a
+    refused write bound with `bindResponseErrors`, and a removal that refetches the list.
+- Smoke (`e2e/resource/smoke/ui-checks.ts`, `form-checks.ts`): the built `@netvark/resource-ui` runs
+  a form model's validator and write and a list model's `query`, `withPageSize`, and `next`, and the
+  built `@netvark/tanstack-form-resource` validates a submitted form-core `FormApi` made with its
+  options, on Bun, Deno, and workerd, where server rendering runs.
+- Floors: CI runs `@netvark/tanstack-form-resource`'s tests on `@tanstack/form-core` 1.17.0, the
+  lowest release its peer range admits (20.9).
 
 ### 20.9 Packaging
 
-- ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
-  `platform: 'neutral'`, `sideEffects: false`; `publint --strict` and `attw --profile esm-only` run
-  in the build. Three entries: `index`, `form`, `query`.
-- Peer dependencies: `@netvark/resource-core` (the application's declarations and messages, which
-  `localizeIssues` recognizes by the copy that made them, 10.1) and `@netvark/jsonapi-client` (the
-  application's clients, and `ResourceClient.definition`), each a `workspace:^` development
-  dependency too; `@tanstack/react-form` `^1.17.0` and `@tanstack/react-query` `^5.89.0`, optional
-  (`peerDependenciesMeta`), each needed only by its entry: `revalidateLogic` first shipped in
-  TanStack Form 1.17.0, and the `QueryClient` in a mutation's callbacks (`context.client`) in
-  TanStack Query 5.89.0, the release after 5.87.4. CI runs the package's tests on both floors, and a
-  floor that fails them is raised in the same change.
-- Dependencies: `@netvark/jsonapi-core`, for `parseQuery`.
-- TanStack Table is not a peer: the list model imports nothing of it and reads and writes its
-  sorting and column filters as plain values. `@tanstack/react-table` 9 is a development dependency,
-  for the type tests that assign Table's state to and from the model's and for the screen tests,
-  with `@tanstack/react-router`, `react-dom`, `jsdom`, and Testing Library
-  (`@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`).
-- React is not a peer: the package has no component and no hook of its own; TanStack's React
-  adapters bring it, and the root entry runs without it.
+- Both packages: ESM only, `engines.node >= 22.12.0`, built by tsdown with declarations through oxc,
+  `platform: 'neutral'`, `sideEffects: false`, one entry, `.`; `publint --strict` and
+  `attw --profile esm-only` run in the build.
+- `@netvark/resource-ui` takes `@netvark/resource-core` (the application's declarations and
+  messages, which `localizeIssues` recognizes by the copy that made them, 10.1) and
+  `@netvark/jsonapi-client` (the `ResponseError`s `isResponseError` recognizes, and the results a
+  list reads its pages from) as peers, each a `workspace:^` development dependency too, and depends
+  on `@netvark/jsonapi-core`, for `parseQuery`. TanStack Table is not a peer: the list model imports
+  nothing of it and reads and writes its sorting and column filters as plain values;
+  `@tanstack/table-core` 9 is a development dependency, for the type tests that assign Table's state
+  to and from the model's. No framework is a dependency of any kind.
+- `@netvark/tanstack-form-resource` takes `@netvark/resource-ui` (the application's form models) as
+  a peer, a `workspace:^` development dependency too, and `@tanstack/form-core` `^1.17.0` as an
+  optional peer (`peerDependenciesMeta`, root ADR 0011), from which it imports `revalidateLogic` and
+  types: `revalidateLogic` first shipped in TanStack Form 1.17.0. An application installs its
+  TanStack Form adapter, which depends on one exact release of form-core and re-exports it, and
+  lists form-core itself only under Yarn Plug'n'Play, at that release. Its development dependencies
+  add form-core at the catalog's release, and `@netvark/resource-core` and `@netvark/jsonapi-client`
+  for its tests' declarations and refusals. CI runs its tests on form-core 1.17.0, and a floor that
+  fails them is raised in the same change.
