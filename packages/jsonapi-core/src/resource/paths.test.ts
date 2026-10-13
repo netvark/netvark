@@ -50,8 +50,12 @@ describe('resourcePaths', () => {
           },
         ],
       ]),
+      operations: '/api/v1/operations',
     });
-    expect(resourcePaths(articles({ base: '' })).collection).toBe('/articles');
+    expect(resourcePaths(articles({ base: '' }))).toMatchObject({
+      collection: '/articles',
+      operations: '/operations',
+    });
   });
 
   it('splits an absolute base into the server and the paths', () => {
@@ -60,6 +64,7 @@ describe('resourcePaths', () => {
     );
     expect(paths.origin).toBe('https://api.example.com');
     expect(paths.resource).toBe('/v1/articles/{id}');
+    expect(paths.operations).toBe('/v1/operations');
     expect(paths.relationships.get('tags')?.related).toBe(
       '/v1/articles/{id}/tags',
     );
@@ -80,6 +85,7 @@ describe('resourcePaths', () => {
       }),
     );
     expect(paths.collection).toBe('/v2/writing');
+    expect(paths.operations).toBe('/v2/operations');
     expect(paths.relationships).toEqual(
       new Map([
         ['author', { related: '/v2/writing/{id}/by' }],

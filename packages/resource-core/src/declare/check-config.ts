@@ -8,7 +8,6 @@ import type { PublicCatalog } from '@netvark/catalog-core';
 import type {
   DefineResource,
   PageCapabilitiesInit,
-  ResourceLinksInit,
 } from '@netvark/jsonapi-core';
 
 import type { Codec, Validator } from '../codecs/types';
@@ -44,6 +43,7 @@ const CONFIG_KEYS: ReadonlyArray<string> = [
   'domains',
   'links',
   'page',
+  'atomic',
 ];
 
 /** The definer's configuration after its checks, shared by every declaration. */
@@ -53,7 +53,7 @@ export interface DefinerContext {
   readonly validators: ValidatorRegistry;
   readonly scopes: ScopeRegistry;
   readonly domains: DomainRules;
-  /** `@netvark/jsonapi-core`'s `defineResource` with the definer's `links` (SPEC 11.1). */
+  /** `@netvark/jsonapi-core`'s `defineResource` with the definer's `links` and `atomic` (SPEC 11.1). */
   readonly defineResource: DefineResource;
   readonly page: PageCapabilitiesInit;
 }
@@ -208,18 +208,28 @@ function checkDomains(
   });
 }
 
+/** An optional member that holds an object; only `undefined` means absent. */
+function optionalRecord(
+  name: string,
+  value: unknown,
+): Readonly<Record<string, unknown>> {
+  return expectRecord(`${DEFINER}.${name}`, value === undefined ? {} : value);
+}
+
 /**
  * The definer of every declaration's JSON:API definition, configured with
- * `links`, which `@netvark/jsonapi-core` checks by its own convention; the
- * message gains the definer's prefix.
+ * `links` and `atomic`, which `@netvark/jsonapi-core` checks by its own
+ * rules; the message gains the definer's prefix. A declaration has no
+ * `atomic` of its own, so every definition carries the definer's cap.
  */
-function definerOf(value: unknown): DefineResource {
-  const links = expectRecord(
-    `${DEFINER}.links`,
-    value === undefined ? {} : value,
-  ) as ResourceLinksInit;
+function definerOf(links: unknown, atomic: unknown): DefineResource {
+  const defaults = {
+    links: optionalRecord('links', links),
+    atomic: optionalRecord('atomic', atomic),
+  };
+  expectKnownKeys(`${DEFINER}.atomic`, defaults.atomic, ['max']);
   try {
-    return createDefineResource({ links });
+    return createDefineResource(defaults);
   } catch (error) {
     if (error instanceof TypeError) {
       throw new TypeError(`${DEFINER}.${error.message}`, { cause: error });
@@ -246,7 +256,7 @@ export function checkDefinerConfig(value: unknown): DefinerContext {
     validators,
     scopes: optionalRegistry('scopes', config['scopes'], checkScope),
     domains: checkDomains(config['domains'], catalog, validators),
-    defineResource: definerOf(config['links']),
+    defineResource: definerOf(config['links'], config['atomic']),
     page,
   };
 }

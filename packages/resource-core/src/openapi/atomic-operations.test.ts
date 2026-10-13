@@ -3,8 +3,8 @@
  * `<base>/operations` exactly when a resource declares a write, under the
  * extension's media type, with the components its operations read, its
  * results, which validate what the processor answers, the codes of every
- * write, and the refusals of a registry whose collections share no base
- * or whose resource takes the endpoint's path.
+ * write, and the refusals of a registry whose links give different
+ * operations paths or whose resource takes the endpoint's path.
  * @ref https://jsonapi.org/ext/atomic/
  */
 import { describe, expect, it } from 'vitest';
@@ -247,7 +247,7 @@ describe('the operations endpoint (SPEC 13.1)', () => {
     ]);
   });
 
-  it('refuses collections that share no base, and a collection at the endpoint path, listed or not', () => {
+  it('refuses links that give different operations paths, and a collection at the endpoint path, listed or not', () => {
     const elsewhere = definerAt('/v2');
     expect(() =>
       openapi(
@@ -262,7 +262,7 @@ describe('the operations endpoint (SPEC 13.1)', () => {
       ),
     ).toThrow(
       new TypeError(
-        "openapi: the resources' links have different bases (/api, /v2); the operations endpoint sits under one",
+        "openapi: the resources' links have different operations paths (/api/operations, /v2/operations); one endpoint has one path",
       ),
     );
     const Operations = definerAt('/api')('people', {

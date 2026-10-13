@@ -72,6 +72,25 @@ function indexHandlers<TTransaction, TContext>(
   return handlers;
 }
 
+/**
+ * The cap the resources' definitions share (SPEC 11.1, ADR 0023): one
+ * endpoint takes one, so definitions that differ are a `TypeError` here,
+ * at setup; without resources, the default.
+ */
+function sharedCap<TTransaction, TContext>(
+  resources: ReadonlyArray<AnyResourceHandlers<TTransaction, TContext>>,
+): number {
+  const caps = [
+    ...new Set(resources.map((entry) => entry.resource.atomic.max)),
+  ];
+  if (caps.length > 1) {
+    throw new TypeError(
+      `operationsProcessor: the resources' definitions have different atomic.max (${caps.join(', ')}); one endpoint takes one cap`,
+    );
+  }
+  return caps[0] ?? DEFAULT_MAX_OPERATIONS;
+}
+
 function resultsDocument(
   results: ReadonlyArray<OperationResult>,
 ): OperationsResultDocument | undefined {
@@ -86,14 +105,15 @@ function resultsDocument(
 
 /**
  * Builds the processor for a set of resource handlers. Listing a resource
- * type twice is a `TypeError` here, at setup, not per request.
+ * type twice, and definitions whose caps differ, are a `TypeError` here,
+ * at setup, not per request.
  */
 export function operationsProcessor<TTransaction, TContext = unknown>(
   options: AtomicOptions<TTransaction, TContext>,
 ): OperationsProcessor<TContext> {
   const handlers = indexHandlers(options.resources);
   const parseOptions = {
-    maxOperations: options.maxOperations ?? DEFAULT_MAX_OPERATIONS,
+    maxOperations: sharedCap(options.resources),
     resolveHref: options.resolveHref,
   };
   return async (body, ctx) => {

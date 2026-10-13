@@ -1,16 +1,17 @@
 /**
  * The Atomic Operations endpoint (resource SPEC 19.4): `POST
- * <base>/operations`, served when a resource of the runtime declares
- * `create`, `update`, or `remove`, through `atomicOperations`. A request's
- * operations run in one `runtime.transaction` as its actor, so they commit
- * together and the hook after commit runs once. Each runs an operation of
- * the transaction's domain: `add` is `create`, `update` is `update`,
- * `remove` is `remove`, and an `update` of a relationship is `update` with
- * that relationship alone, when it is `readWrite` and the resource
- * declares `update`. Every resource of the runtime has handlers, so an
- * operation its declaration lacks is the processor's 403, not a 404 for
- * its type. Like every route, the endpoint answers another method 405
- * before the actor; `jsonApi()` must list the extension.
+ * <base>/operations`, the operations path of the resources' links, served
+ * when a resource of the runtime declares `create`, `update`, or `remove`,
+ * through `atomicOperations`, which takes the cap the resources' definitions
+ * share. A request's operations run in one `runtime.transaction` as its
+ * actor, so they commit together and the hook after commit runs once. Each
+ * runs an operation of the transaction's domain: `add` is `create`, `update`
+ * is `update`, `remove` is `remove`, and an `update` of a relationship is
+ * `update` with that relationship alone, when it is `readWrite` and the
+ * resource declares `update`. Every resource of the runtime has handlers, so
+ * an operation its declaration lacks is the processor's 403, not a 404 for
+ * its type. Like every route, the endpoint answers another method 405 before
+ * the actor; `jsonApi()` must list the extension.
  * @ref https://jsonapi.org/ext/atomic/#processing ("all operations MUST be performed atomically")
  * @ref https://jsonapi.org/ext/atomic/#updating-to-one-relationships
  * @packageDocumentation
@@ -165,9 +166,9 @@ function handlersOf<TEnv extends Env>(
 }
 
 /**
- * Mounts the endpoint at `<base>/operations` when a resource of `plan`
- * declares a write. Throws `TypeError` when a resource's route has its
- * path.
+ * Mounts the endpoint at the plan's operations path when a resource of
+ * `plan` declares a write. Throws `TypeError` when a resource's route has
+ * its path, and the processor's when the definitions' caps differ.
  */
 export function operationsRoute<TEnv extends Env, TDomain extends DomainShape>(
   context: RouteContext<TEnv, TDomain>,
@@ -179,7 +180,7 @@ export function operationsRoute<TEnv extends Env, TDomain extends DomainShape>(
   if (!writes) {
     return;
   }
-  const path = `${plan.base}/operations`;
+  const path = plan.operations;
   claimRoute(plan, path);
   const { app, actors, methods, runtime } = context;
   const resolveHref = hrefTargets(plan, path);

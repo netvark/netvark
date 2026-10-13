@@ -244,7 +244,7 @@ export function openapi(
   }
   const lids = servesOperations(listed) ? lidTypes(listed) : undefined;
   if (lids !== undefined) {
-    const path = operationsPath(located.map(({ paths: of }) => of.collection));
+    const path = operationsPath(located.map(({ paths: of }) => of.operations));
     // Only a collection can: every other path of a resource holds its id.
     const taken = located.find(({ paths: of }) => of.collection === path);
     if (taken !== undefined) {

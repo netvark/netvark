@@ -1607,10 +1607,10 @@ HTTP in German and in English.
 ### 11.1 `resource`
 
 `resource` on a declared resource is a `@netvark/jsonapi-core` definition. The definer makes one
-`defineResource` with `createDefineResource({ links })`, so `links` jsonapi-core refuses fail at
-startup (14), and each declared resource builds its definition with it on the first read of
-`resource` and caches it: the relationships name their targets' types, and targets are read lazily
-(3.8).
+`defineResource` with `createDefineResource({ links, atomic })`, so `links` and an `atomic` cap
+jsonapi-core refuses fail at startup (14), and each declared resource builds its definition with it
+on the first read of `resource` and caches it: the relationships name their targets' types, and
+targets are read lazily (3.8).
 
 | Member          | Value                                                                                                                                                                                                                                                                                                                                           |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1626,6 +1626,7 @@ startup (14), and each declared resource builds its definition with it on the fi
 | `validate`      | `create` and `update` from 6.5, each only when the declaration serves that operation, and `id`, which checks a create's client id with `clientIds` and matches an update's id to the URL's (3.4)                                                                                                                                                |
 | `clientIds`     | the declaration's `clientIds`                                                                                                                                                                                                                                                                                                                   |
 | `writable`      | the members `write.create` and `write.update` hold, by public name (9.4)                                                                                                                                                                                                                                                                        |
+| `atomic`        | the definer's `atomic`, `{ max: 10 }` by default (2)                                                                                                                                                                                                                                                                                            |
 | `'~types'`      | type-only (jsonapi SPEC 5.3): the read types as `attributes`, each relationship's target type with `one`, each filter's operators, the includable relationships, `fields: true`, `search`, `page: true`, the create and update validators' inputs (`never` for an operation the declaration does not serve), `write`'s members, and `clientIds` |
 
 Relationship targets are read lazily (3.8), so `Contacts` and `Users` may reference each other in
@@ -2329,11 +2330,13 @@ resources, after the checks of every list of resources (4.2). The options:
   `openapi` reads the paths.
 - **The Atomic Operations endpoint**, `POST <base>/operations`, is listed when a listed resource
   declares `create`, `update`, or `remove`, as a host serves it (19.4), at the operations path
-  `resourcePaths` gives (jsonapi SPEC 5.4), `<base>` being the path the collections share.
-  Collections under different bases throw `TypeError`
-  (`openapi: the resources' links have different bases (/api, /v2); the operations endpoint sits under one`),
-  and so does a collection at the endpoint's path, listed or not, since a host routes every
-  collection (19.2):
+  `resourcePaths` gives (jsonapi SPEC 5.4), `<base>` being the path the collections share. Links
+  that give different operations paths, as collections under different bases do, throw `TypeError`
+  (`openapi: the resources' links have different operations paths (/api/operations, /v2/operations); one endpoint has one path`),
+  and so do definitions whose caps differ
+  (`openapi: the resources' definitions have different atomic.max (50, 10); one endpoint takes one cap`)
+  and a collection at the endpoint's path, listed or not, since a host routes every collection
+  (19.2):
   `openapi: the operations endpoint's path, /api/operations, is the collection path of operations`.
   Its operation id and tag are `atomic:operations`, which no other operation takes: a type is a
   member name, which holds no `:`. Its request and its 200 use the extension's media type,

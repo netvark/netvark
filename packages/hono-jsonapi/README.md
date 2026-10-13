@@ -460,6 +460,7 @@ import type { Context } from 'hono';
 
 import type { ResourceHandlers } from '@netvark/hono-jsonapi/atomic';
 
+import { resourcePaths } from '@netvark/hono-jsonapi';
 import { atomicOperations } from '@netvark/hono-jsonapi/atomic';
 
 const articleHandlers: ResourceHandlers<typeof Articles, Transaction, Context<JsonApiEnv>> = {
@@ -488,8 +489,9 @@ const articleHandlers: ResourceHandlers<typeof Articles, Transaction, Context<Js
   },
 };
 
+// The operations path of the links, /api/v1/operations under the base /api/v1.
 app.post(
-  '/operations',
+  resourcePaths(Articles).operations,
   atomicOperations({
     resources: [articleHandlers, peopleHandlers],
     transaction: (c, run) => db.transaction().execute(run),
@@ -499,7 +501,9 @@ app.post(
 
 A missing handler makes the operation a 403; an unknown type a 404; a structural problem a 400, all
 with pointers like `/atomic:operations/1/data/relationships/author/data/lid`; a method other than
-`POST` a 405 with `Allow: POST`; a `Content-Type` without the extension a 415.
+`POST` a 405 with `Allow: POST`; a `Content-Type` without the extension a 415. A request takes at
+most the `atomic.max` the definitions share, 10 unless their definer's `atomic` says otherwise, and
+`atomicOperations` throws `TypeError` when their caps differ, since one endpoint takes one cap.
 
 ### The core on its own
 

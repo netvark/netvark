@@ -2,12 +2,13 @@
  * Where the routes sit (resource SPEC 19.2): each resource's paths, read
  * from its JSON:API links by `resourcePaths` (jsonapi SPEC 5.4), the
  * function the OpenAPI document reads and a client calls through, so the
- * routes, the links, the document, and the client name the same URLs.
- * Every resource shares one origin and one base, the
- * collection path without its last segment, and no two name one path.
- * A route is written as Hono's router reads a request's path: `{id}` as
- * `:id`, and decoded by `decodeURI` but for `%25`, as Hono's `getPath`
- * decodes, so a type outside ASCII routes as its links spell it.
+ * routes, the links, the document, and the client name the same URLs. Every
+ * resource shares one origin, one base (the collection path without its last
+ * segment), and one Atomic Operations endpoint (the operations path its
+ * links give); no two routes name one path. A route is written as Hono's
+ * router reads a request's path: `{id}` as `:id`, and decoded by `decodeURI`
+ * but for `%25`, as Hono's `getPath` decodes, so a type outside ASCII routes
+ * as its links spell it.
  * @ref https://hono.dev/docs/api/routing
  * @ref https://github.com/honojs/hono/blob/v4.13.13/src/utils/url.ts (getPath: `path.replace(/%25/g, '%2525')`, then `tryDecodeURI`)
  * @packageDocumentation
@@ -45,6 +46,8 @@ export interface PathPlan {
   readonly origin: string | undefined;
   /** As Hono matches it: `''` for root-relative links. */
   readonly base: string;
+  /** The Atomic Operations endpoint's route: the operations path of the links (`ResourcePaths.operations`). */
+  readonly operations: string;
   readonly resources: ReadonlyArray<MountedResource>;
   /** Every route the plan holds: the resources', and each endpoint's `claimRoute` added. */
   readonly routes: Set<string>;
@@ -118,10 +121,10 @@ function routesOf(links: ResourcePaths): {
 }
 
 /**
- * Each resource's routes and the base they share. Throws `TypeError` when
- * there is no resource, when a resource's links give no paths
- * (`resourcePaths`), when the links have different origins or bases, or
- * when two routes have one path.
+ * Each resource's routes, and the base and the operations path they
+ * share. Throws `TypeError` when there is no resource, when a resource's
+ * links give no paths (`resourcePaths`), when the links have different
+ * origins, bases, or operations paths, or when two routes have one path.
  */
 export function planPaths(
   resources: ReadonlyArray<DeclaredResource>,
@@ -147,6 +150,11 @@ export function planPaths(
     'bases',
     'every collection sits under one',
   );
+  const operations = shared(
+    located.map(({ links }) => links.operations),
+    'operations paths',
+    'one endpoint has one path',
+  );
   const seen = new Set<string>();
   const mounted = located.map(({ declared, links }) => {
     const { paths, pairs } = routesOf(links);
@@ -161,6 +169,7 @@ export function planPaths(
   return {
     origin: origin === ROOT_RELATIVE ? undefined : origin,
     base: routeOf(base),
+    operations: routeOf(operations),
     resources: mounted,
     routes: seen,
   };

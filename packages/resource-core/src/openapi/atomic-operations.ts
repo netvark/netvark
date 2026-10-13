@@ -1,14 +1,14 @@
 /**
- * The Atomic Operations endpoint (SPEC 13.1): `POST <base>/operations`,
- * which a host serves when a listed resource declares a write (SPEC 19.4),
- * listed under the operation id and tag `atomic:operations`, which no
- * resource's operation can take: a type is a JSON:API member name, which
- * holds no `:`. Its request is an operations document of the extension's
- * media type (`atomic-requests.ts`), whose resource objects are the
- * components this module adds per resource. It answers 200 with
- * `atomic:results` when an operation can carry a resource object back, 204
- * when a result can be empty, and the error responses of every code an
- * operation can raise.
+ * The Atomic Operations endpoint (SPEC 13.1): `POST <base>/operations`, the
+ * operations path of the resources' links (jsonapi SPEC 5.4), which a host
+ * serves when a listed resource declares a write (SPEC 19.4), listed under
+ * the operation id and tag `atomic:operations`, which no resource's
+ * operation can take: a type is a JSON:API member name, which holds no `:`.
+ * Its request is an operations document of the extension's media type
+ * (`atomic-requests.ts`), whose resource objects are the components this
+ * module adds per resource. It answers 200 with `atomic:results` when an
+ * operation can carry a resource object back, 204 when a result can be
+ * empty, and the error responses of every code an operation can raise.
  * @ref https://jsonapi.org/ext/atomic/
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @ref https://jsonapi.org/ext/atomic/#result-objects
@@ -93,18 +93,16 @@ export function atomicSchemas(
   ];
 }
 
-/** `<base>/operations`, the base the collection paths share; a `TypeError` when they share none. */
-export function operationsPath(collections: ReadonlyArray<string>): string {
-  const bases = [
-    ...new Set(collections.map((path) => path.slice(0, path.lastIndexOf('/')))),
-  ];
-  const [base] = bases;
-  if (base === undefined || bases.length > 1) {
+/** The operations path the resources' links give (`resourcePaths`, jsonapi SPEC 5.4); a `TypeError` when they give more than one. */
+export function operationsPath(paths: ReadonlyArray<string>): string {
+  const distinct = [...new Set(paths)];
+  const [path] = distinct;
+  if (path === undefined || distinct.length > 1) {
     throw new TypeError(
-      `openapi: the resources' links have different bases (${bases.join(', ')}); the operations endpoint sits under one`,
+      `openapi: the resources' links have different operations paths (${distinct.join(', ')}); one endpoint has one path`,
     );
   }
-  return `${base}/operations`;
+  return path;
 }
 
 /** The results document: a result carries the resource object of an `add` or an `update`, and is empty otherwise. */

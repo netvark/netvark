@@ -55,6 +55,24 @@ describe('createDefineResource', () => {
     expect(() => createDefineResource({})).not.toThrow();
   });
 
+  it("merges a definition's atomic over the default, and validates the default when the definer is created", () => {
+    const capped = createDefineResource({ atomic: { max: 50 } });
+    const init = {
+      type: 'articles',
+      attributes: [],
+      serialize: (row: Row) => ({ id: row.id }),
+    };
+    expect(capped(init).atomic).toEqual({ max: 50 });
+    expect(capped({ ...init, atomic: { max: 5 } }).atomic).toEqual({ max: 5 });
+    expect(capped({ ...init, atomic: { max: undefined } }).atomic).toEqual({
+      max: 10,
+    });
+    expect(articles().atomic).toEqual({ max: 10 });
+    expect(() => createDefineResource({ atomic: { max: 0 } })).toThrow(
+      new TypeError('atomic.max must be a positive safe integer, received 0'),
+    );
+  });
+
   it('keeps every other check of defineResource', () => {
     expect(() =>
       define({

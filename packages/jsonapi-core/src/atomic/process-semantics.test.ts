@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { Authors, Store, createProcessor } from './test-fixtures';
+import {
+  Authors,
+  Store,
+  createProcessor,
+  handlersCapped,
+} from './test-fixtures';
 import { failure, run } from './test-run';
 
 let store: Store;
@@ -186,20 +191,42 @@ describe('operationsProcessor: operation semantics', () => {
 });
 
 describe('operationsProcessor: options', () => {
-  it('caps the number of operations', async () => {
-    const { status, error } = await failure(
-      store,
-      [
-        { op: 'remove', ref: { type: 'tags', id: 't1' } },
-        { op: 'remove', ref: { type: 'tags', id: 't1' } },
-      ],
-      { maxOperations: 1 },
-    );
+  it('caps the number of operations at the atomic.max the definitions share', async () => {
+    const removal = { op: 'remove', ref: { type: 'tags', id: 't1' } };
+    const capped = { resources: handlersCapped(1) };
+    const { status, error } = await failure(store, [removal, removal], capped);
     expect(status).toBe(400);
     expect(error).toMatchObject({
       detail: 'At most 1 operations are accepted per request',
       source: { pointer: '/atomic:operations' },
     });
+    const atCap = await run(createProcessor(store, capped), [removal]);
+    expect(atCap.status).toBe(204);
+    expect(store.tags.has('t1')).toBe(false);
+  });
+
+  it('refuses definitions whose caps differ, at setup', () => {
+    // authors capped at 1, articles at 2
+    const resources = [
+      ...handlersCapped(1).slice(0, 1),
+      ...handlersCapped(2).slice(1, 2),
+    ];
+    expect(() => createProcessor(store, { resources })).toThrow(
+      new TypeError(
+        "operationsProcessor: the resources' definitions have different atomic.max (1, 2); one endpoint takes one cap",
+      ),
+    );
+  });
+
+  it('takes the default cap without resources', async () => {
+    const removal = { op: 'remove', ref: { type: 'tags', id: 't1' } };
+    const { errors } = await run(
+      createProcessor(store, { resources: [] }),
+      Array.from({ length: 11 }, () => removal),
+    );
+    expect(errors).toMatchObject([
+      { detail: 'At most 10 operations are accepted per request' },
+    ]);
   });
 
   it('targets through href when a resolver is configured', async () => {

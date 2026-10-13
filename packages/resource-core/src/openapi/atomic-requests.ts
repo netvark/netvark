@@ -1,13 +1,13 @@
 /**
  * The request of the Atomic Operations endpoint (SPEC 13.1): an operations
- * document of at most the processor's limit of operations, each one a
- * resource takes, as the processor reads it (jsonapi SPEC 11.2, 11.4): an
- * `add` of a resource object with an optional `lid`, by collection `href`
- * or none, since a `ref` always names a resource; a resource's `update`
- * and `remove` by `ref`, by `id` or by the `lid` of an earlier `add`, or by
- * `href`; and an `update` of each relationship the resource updates, with
- * the target's linkage. An `href` is a string the schema cannot tell apart
- * by type, so the operations are `anyOf`.
+ * document of at most the cap the resources' definitions share, each
+ * operation one a resource takes, as the processor reads it (jsonapi SPEC
+ * 11.2, 11.4): an `add` of a resource object with an optional `lid`, by
+ * collection `href` or none, since a `ref` always names a resource; a
+ * resource's `update` and `remove` by `ref`, by `id` or by the `lid` of an
+ * earlier `add`, or by `href`; and an `update` of each relationship the
+ * resource updates, with the target's linkage. An `href` is a string the
+ * schema cannot tell apart by type, so the operations are `anyOf`.
  * @ref https://jsonapi.org/ext/atomic/#operation-objects
  * @ref https://github.com/netvark/netvark/blob/main/docs/jsonapi/SPEC.md (sections 11.2 and 11.4)
  * @packageDocumentation
@@ -15,8 +15,6 @@
 import type { JsonSchema } from '@netvark/ban-core';
 
 import type { DeclaredInternals } from '../declare/declared-resource';
-
-import { DEFAULT_MAX_OPERATIONS } from '@netvark/jsonapi-core/atomic';
 
 import { schemaRef } from './component-names';
 import { TOP_LEVEL } from './documents';
@@ -141,7 +139,27 @@ function distinct(schemas: ReadonlyArray<JsonSchema>): Array<JsonSchema> {
   });
 }
 
-/** The operations document: at most the processor's limit of operations, and the top-level members it allows. */
+/**
+ * The cap on one request that the definitions of `listed` share, their
+ * `atomic.max` (jsonapi SPEC 5.1), which the processor enforces; a
+ * `TypeError` when they differ, as the processor throws.
+ */
+function sharedCap(listed: ReadonlyArray<DeclaredInternals>): number {
+  const caps = [
+    ...new Set(
+      listed.map((internals) => internals.resource.resource.atomic.max),
+    ),
+  ];
+  const [cap] = caps;
+  if (cap === undefined || caps.length > 1) {
+    throw new TypeError(
+      `openapi: the resources' definitions have different atomic.max (${caps.join(', ')}); one endpoint takes one cap`,
+    );
+  }
+  return cap;
+}
+
+/** The operations document: at most the cap the definitions share, and the top-level members it allows. */
 export function requestDocumentSchema(
   listed: ReadonlyArray<DeclaredInternals>,
   lids: ReadonlySet<string>,
@@ -152,7 +170,7 @@ export function requestDocumentSchema(
       [OPERATIONS]: {
         type: 'array',
         minItems: 1,
-        maxItems: DEFAULT_MAX_OPERATIONS,
+        maxItems: sharedCap(listed),
         items: {
           anyOf: distinct(
             listed.flatMap((internals) => operationsOf(internals, lids)),

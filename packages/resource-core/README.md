@@ -72,8 +72,14 @@ export const declareResource = createDeclareResource({
   domains: { email: { email_check: { validator: 'email' } } },
   links: { base: '/api' },
   page: { max: 50 },
+  // The most operations one Atomic Operations request takes, 10 by default.
+  atomic: { max: 50 },
 });
 ```
+
+`links`, `page`, and `atomic` are defaults for every declaration: `links` and `page` merge under a
+declaration's own, and `atomic` is every definition's, since one endpoint serves every resource of a
+runtime and a declaration has no `atomic` of its own.
 
 Then declare each resource by its table:
 
@@ -659,10 +665,10 @@ and under the same public names (SPEC 11):
 - `Contacts.resource` is a `@netvark/jsonapi-core` resource: the attributes, the relationships,
   `serialize` for public rows, the create and update validators of the served operations, the id's
   validator, which checks a create's client id with `clientIds` and matches an update's id to its
-  URL's, the members each write accepts (`writable`), and the capabilities `parseQuery` holds a
-  request to: the declared sorts, the filters with their operators, the includes, `filter[q]` when
-  the declaration has `search`, and the page bounds. It is built on first read, since it names each
-  relationship target's type.
+  URL's, the members each write accepts (`writable`), the definer's cap on one Atomic Operations
+  request (`atomic.max`), and the capabilities `parseQuery` holds a request to: the declared sorts,
+  the filters with their operators, the includes, `filter[q]` when the declaration has `search`, and
+  the page bounds. It is built on first read, since it names each relationship target's type.
 - `Contacts.keyset` is a `@netvark/keyset-core` definition without the cursor: the same filters and
   sorts with each column's keyset type, the search column and its configuration, the key `id`, the
   default sort, and the same page bounds.
@@ -1124,12 +1130,13 @@ an error response for each status it can answer with, listing its codes; each co
 a component, written once and referenced, and so is the response of a status that carries one code,
 `components.responses['_error.<code>']`. Paths come from each resource's links, and an absolute base
 becomes the document's server. `@netvark/jsonapi-core`'s `resourcePaths(Contacts.resource)` returns
-the same paths, the collection, the resource with its `{id}`, each relationship's, and the origin,
-for a host that mounts its routes where the document says they are and a client that calls them. The
-schemas admit every request the server accepts, and may admit more: what JSON Schema cannot state
-compactly, such as a validator or a date-time's range, stays with the server, whose refusals the
-error responses document. An example that the server would refuse, or a code in `codes` the catalog
-lacks, throws `TypeError`, so the build fails instead of the document lying.
+the same paths, the collection, the resource with its `{id}`, each relationship's, the Atomic
+Operations endpoint's, and the origin, for a host that mounts its routes where the document says
+they are and a client that calls them. The schemas admit every request the server accepts, and may
+admit more: what JSON Schema cannot state compactly, such as a validator or a date-time's range,
+stays with the server, whose refusals the error responses document. An example that the server would
+refuse, or a code in `codes` the catalog lacks, throws `TypeError`, so the build fails instead of
+the document lying.
 
 When a resource declares `create`, `update`, or `remove`, the document also lists the
 [Atomic Operations](https://jsonapi.org/ext/atomic/) endpoint a host serves,
@@ -1138,11 +1145,11 @@ When a resource declares `create`, `update`, or `remove`, the document also list
 operation a resource takes: an `add` of `contacts.atomic-add`, which may carry a `lid` that a later
 operation names in a `ref` or in linkage (`contacts.local`); an `update` of `contacts.atomic-update`
 by `ref`, `href`, or its data; a `remove`; and an `update` of each `readWrite` relationship. At most
-`DEFAULT_MAX_OPERATIONS` (10, from `@netvark/jsonapi-core/atomic`) operations fit in a request, the
-processor's default. The 200 answers `atomic:results`, and the 204 a request whose operations have
-no result; the error responses list every code of each write. The collections must share one base,
-and no collection may sit at `<base>/operations`, or `openapi` throws `TypeError`, as the routes
-would.
+`atomic.max` operations fit in a request, the cap the definitions share and the processor enforces:
+10 by default, or what the definer's `atomic` says. The 200 answers `atomic:results`, and the 204 a
+request whose operations have no result; the error responses list every code of each write. The
+links must give one operations path, the definitions one cap, and no collection may sit at
+`<base>/operations`, or `openapi` throws `TypeError`, as the routes would.
 
 The surface is the part of the document a client can break on, as sorted JSON: its `format`, then
 per type the operations, each member's access, form, limits, options, nullability, requiredness,

@@ -141,16 +141,18 @@ Each route exists only when the declaration declares its operation:
 `jsonApiRoutes` throws `TypeError` before it serves anything when an option is wrong, a runtime
 without `transaction` among them, when the runtime runs no resource, when a resource's links give no
 paths, when the links have different origins or bases, when two routes have one path, the operations
-endpoint's among them, or when a relationship's target, includable or not, is not among the
-runtime's resources.
+endpoint's among them, when a relationship's target, includable or not, is not among the runtime's
+resources, or, when the operations endpoint is served, when the definitions' caps on one request
+differ.
 
 ## Atomic Operations
 
 When a resource declares `create`, `update`, or `remove`, the routes also serve
-`POST /api/operations`, the base of your links followed by `/operations`: the endpoint of the
-[Atomic Operations extension](https://jsonapi.org/ext/atomic/). Every operation of a request runs in
-one `runtime.transaction` as the request's actor, so they commit together, the first failure rolls
-every one back, and the hook after commit runs once with all their events.
+`POST /api/operations`, the operations path of your links (`resourcePaths`), their base followed by
+`/operations`: the endpoint of the [Atomic Operations extension](https://jsonapi.org/ext/atomic/).
+Every operation of a request runs in one `runtime.transaction` as the request's actor, so they
+commit together, the first failure rolls every one back, and the hook after commit runs once with
+all their events.
 
 ```http
 POST /api/operations HTTP/1.1
@@ -194,7 +196,8 @@ Accept: application/vnd.api+json; ext="https://jsonapi.org/ext/atomic"
   violation, which the runtime maps once the transaction ended, points at the operation whose call
   raised it all the same.
 - **An operation the resource does not declare answers 403**, a type the runtime does not run 404,
-  and a request of more than 10 operations 400.
+  and a request of more operations than the definitions' `atomic.max` 400, before any runs: 10
+  unless the definer's `atomic` says otherwise (`createDeclareResource({ atomic: { max: 50 } })`).
 
 ## The OpenAPI document
 

@@ -3,7 +3,8 @@
  * fills in defaults. Every check here is a rule a client would otherwise
  * trip over at request time: member-name grammar for types and fields,
  * fields sharing a namespace with `type` and `id`, query capabilities that
- * name declared fields, custom parameter names that the specification allows.
+ * name declared fields, custom parameter names that the specification allows,
+ * and an Atomic Operations cap that is a positive safe integer.
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-fields
  * @ref https://jsonapi.org/format/1.1/#document-resource-object-identification
  * @packageDocumentation
@@ -27,6 +28,7 @@ import type {
 
 import { assertMemberName } from '../document/member-name';
 import { isRecord, ownEntry } from '../internal/object';
+import { resolveAtomic } from './atomic-capabilities';
 import { resolveLinks } from './links';
 import { assertUnique, resolveQueryCapabilities } from './query-capabilities';
 
@@ -206,6 +208,7 @@ export function defineResource(
     validate,
     writable: resolveWritable(init.writable, fields),
     clientIds: init.clientIds ?? false,
+    atomic: resolveAtomic(init.atomic),
   };
 }
 

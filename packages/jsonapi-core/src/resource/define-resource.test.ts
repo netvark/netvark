@@ -47,6 +47,7 @@ describe('defineResource', () => {
     expect(resource.links).toEqual({});
     expect(resource.validate).toEqual({});
     expect(resource.clientIds).toBe(false);
+    expect(resource.atomic).toEqual({ max: 10 });
     // The client types (SPEC 5.3) are type-only.
     expect(Object.hasOwn(resource, '~types')).toBe(false);
   });
