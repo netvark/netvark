@@ -12,6 +12,7 @@
  */
 import type { Operation } from '@netvark/jsonapi-client';
 
+import type { ActionCalls, GivenRemove } from './action-calls';
 import type { HeldAction } from './action-init';
 import type { SelectionFault } from './action-state';
 import type {
@@ -62,16 +63,17 @@ function operationsFor(
 
 /**
  * A selection's actions on `resource`, by name in the order of
- * `options.actions`. Throws `TypeError` before it returns for a resource
- * no `declareResource` returned and for each argument SPEC 21.4 refuses.
+ * `options.actions`, each typed by the call it makes. Throws `TypeError`
+ * before it returns for a resource no `declareResource` returned and for
+ * each argument SPEC 21.4 refuses.
  */
 export function bulkActions<
   TResource extends ActionResource,
-  const TName extends string,
+  TRemove extends GivenRemove,
 >(
   resource: TResource,
-  options: BulkActionsOptions<TResource, TName>,
-): BulkActions<TResource, TName> {
+  options: BulkActionsOptions<TResource, TRemove>,
+): BulkActions<TResource, ActionCalls<TRemove>> {
   checkDeclared(CALLER, resource);
   const { actions, can } = readOptions(BULK_ACTIONS, resource, options);
   const tooMany = functionAt(CALLER, 'options.tooMany', options.tooMany);
@@ -94,6 +96,9 @@ export function bulkActions<
       }),
     ]),
   );
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: readOptions held each action to the declaration, which BulkActions types by the same operations and update input, and each operation is the definition's own builder's
-  return Object.freeze(model) as unknown as BulkActions<TResource, TName>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reason: readOptions held each action to the declaration, which BulkActions types by the same operations and update input, gave each the call its remove names, and each operation is the definition's own builder's
+  return Object.freeze(model) as unknown as BulkActions<
+    TResource,
+    ActionCalls<TRemove>
+  >;
 }

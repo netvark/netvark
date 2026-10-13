@@ -507,7 +507,7 @@ Each model is a frozen record of its actions by name, in the order given:
 
 | An action                             | What it is                                                                                                                    |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `name`, `call`                        | its name, and the call it makes: `'update'` or `'remove'`                                                                     |
+| `name`, `call`                        | its name, and the call it makes: `'update'` or `'remove'`, which types the action                                             |
 | `tone`                                | `'neutral'`, or `'danger'` for a write a person cannot take back                                                              |
 | `label`, `confirm`, `done`            | your functions as given; `confirm` is `null` without one, as are its absent `body` and `confirm` and an absent `done`         |
 | `state(target)`                       | `{ visible, disabled, reason }` for a record, or for a selection's ids                                                        |
@@ -593,6 +593,11 @@ function RowMenu({ contact }: { readonly contact: ActionRecord<typeof Contacts> 
 - A refusal lands on any member of the resource, not only on what the action writes: a row shows
   every member a read returns, so a unique constraint across a name and its organization marks both
   cells.
+- Call one action on its own where a screen has a button for it: each action is typed by its call,
+  so `update.mutateAsync(contactActions.archive.variables(contact))` compiles as it stands. Narrow
+  on `call` only in code that runs any action, as a menu does. Write the actions in the call, or
+  keep them in a constant written with `satisfies`: options annotated `RecordActionsOptions` type
+  every action as either call.
 - Show `done` once the mutation settles. A `resourceQueries` write settles after the reads it
   invalidates have refetched, and `operationsMutation` after the reads of every type it wrote.
 - `recordActions` and `bulkActions` throw `TypeError` before they return for a write the declaration

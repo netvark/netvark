@@ -6,6 +6,7 @@
  * sections 20 and 21, for the contract.
  * @packageDocumentation
  */
+export type { ActionCall } from './actions/action-calls';
 export type {
   ActionConfirm,
   ActionCount,

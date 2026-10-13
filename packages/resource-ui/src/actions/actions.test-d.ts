@@ -1,13 +1,11 @@
 /**
  * The types of record and bulk actions (resource SPEC 21.4): a write the
  * declaration does not serve is `never`, an update's values are the
- * definition's update input, the texts take the record or the count, and the
- * models fit the mutations a screen sends them through, read through
- * query-core's `MutationObserver`, which every adapter's `useMutation` is
- * made of: `variables` those of `resourceQueries`' `update` and `remove`
- * (jsonapi SPEC 16.2), and `operations` that of `operationsMutation`
- * (jsonapi SPEC 17.4). A record the list reads, by the list model's state or
- * with includes, is an `ActionRecord`.
+ * definition's update input, each action of a model is typed by the call its
+ * write makes, a member or an attribute no action takes is refused, and the
+ * texts take the record or the count. A record the list reads, by the list
+ * model's state or with includes, is an `ActionRecord`. The mutations a
+ * screen sends the models through are `action-mutations.test-d.ts`'.
  */
 import type { UpdateInput } from '@netvark/jsonapi-client';
 import type { DeclaredResource } from '@netvark/resource-core';
@@ -18,21 +16,13 @@ import type {
   ActionValues,
   BulkActionInit,
   RecordActionInit,
+  RecordActionsOptions,
 } from './action-types';
 
-import { MutationObserver, QueryClient } from '@tanstack/query-core';
 import { describe, expectTypeOf, it } from 'vitest';
 
-import {
-  createClients,
-  createTransport,
-  operationsOf,
-} from '@netvark/jsonapi-client';
+import { createClients, createTransport } from '@netvark/jsonapi-client';
 import { createDeclareResource } from '@netvark/resource-core';
-import {
-  operationsMutation,
-  resourceQueries,
-} from '@netvark/tanstack-query-jsonapi';
 
 import { publicCatalog } from '../test-support/public-catalog';
 import { FIXTURE_REGISTRIES } from '../test-support/registries';
@@ -89,8 +79,6 @@ const clients = createClients(
   },
   transport,
 );
-const contacts = resourceQueries(clients.contacts);
-const queryClient = new QueryClient();
 const listState: ListState<typeof Contacts> = {};
 /** A page of contacts read by the list model's state, as the screens of SPEC 20.8 read it. */
 const listedByState = async () => clients.contacts.list(listState);
@@ -99,20 +87,6 @@ const listedWithOrganizations = async () =>
   clients.contacts.list({ include: ['organization'] });
 const label = (): string => 'Archive';
 const tooMany = ({ max }: { readonly max: number }): string => `At most ${max}`;
-
-const rows = recordActions(Contacts, {
-  actions: {
-    archive: { label, update: { attributes: { status: 'archived' } } },
-    remove: { label, tone: 'danger', remove: true },
-  },
-});
-const selection = bulkActions(Contacts, {
-  tooMany,
-  actions: {
-    restore: { label, update: { attributes: { status: 'active' } } },
-    remove: { label, remove: true },
-  },
-});
 
 describe('the writes an action makes (resource SPEC 21.4)', () => {
   it('types an action whose write the declaration does not serve as never', () => {
@@ -167,31 +141,115 @@ describe('the writes an action makes (resource SPEC 21.4)', () => {
     });
   });
 
+  it('types each action by the call its write makes', () => {
+    const rows = recordActions(Contacts, {
+      actions: {
+        archive: { label, update: { attributes: { status: 'archived' } } },
+        undo: {
+          label,
+          update: { attributes: { status: 'active' } },
+          remove: undefined,
+        },
+        remove: { label, tone: 'danger', remove: true },
+      },
+    });
+    const selection = bulkActions(Contacts, {
+      tooMany,
+      actions: {
+        restore: { label, update: { attributes: { status: 'active' } } },
+        remove: { label, remove: true },
+      },
+    });
+
+    expectTypeOf(rows.archive.call).toEqualTypeOf<'update'>();
+    expectTypeOf(rows.undo.call).toEqualTypeOf<'update'>();
+    expectTypeOf(rows.remove.call).toEqualTypeOf<'remove'>();
+    expectTypeOf(selection.restore.call).toEqualTypeOf<'update'>();
+    expectTypeOf(selection.remove.call).toEqualTypeOf<'remove'>();
+  });
+
+  it('gives either call to an action typed as its init before it reached the function', () => {
+    const options: RecordActionsOptions<typeof Contacts> = {
+      actions: {
+        archive: { label, update: { attributes: { status: 'archived' } } },
+      },
+    };
+    const rows = recordActions(Contacts, options);
+
+    expectTypeOf<(typeof rows)[string]['call']>().toEqualTypeOf<
+      'update' | 'remove'
+    >();
+  });
+
+  it('refuses a member no action has and an attribute no update writes', () => {
+    recordActions(Contacts, {
+      actions: {
+        archive: {
+          label,
+          update: { attributes: { status: 'archived' } },
+          // @ts-expect-error -- tonee is no member of an action
+          tonee: 'danger',
+        },
+      },
+    });
+    bulkActions(Contacts, {
+      tooMany,
+      actions: {
+        restore: {
+          label,
+          update: {
+            // @ts-expect-error -- nmae is no attribute of contacts
+            attributes: { status: 'active', nmae: 'Ada' },
+          },
+        },
+      },
+    });
+  });
+
   it('serves every write of a resource TypeScript does not know, its values wide', () => {
     const wide = recordActions(WideContacts, {
-      actions: { archive: { label, update: { attributes: { any: 1 } } } },
+      actions: {
+        archive: { label, update: { attributes: { any: 1 } } },
+        remove: { label, remove: true },
+      },
     });
 
     expectTypeOf<RecordActionInit<DeclaredResource>>().not.toBeNever();
-    expectTypeOf(wide.archive.call).toEqualTypeOf<'update' | 'remove'>();
+    expectTypeOf(wide.archive.call).toEqualTypeOf<'update'>();
+    expectTypeOf(wide.remove.call).toEqualTypeOf<'remove'>();
   });
 });
 
 describe('the texts and names of the models (resource SPEC 21.2, 21.3)', () => {
-  it("names the model's actions, and what can takes, by the names given", () => {
+  it("names the model's actions, and what can takes, by the names given, before functions typed from context", () => {
     const named = recordActions(Contacts, {
       can: (name) => {
         expectTypeOf(name).toEqualTypeOf<'archive' | 'remove'>();
         return true;
       },
       actions: {
-        archive: { label, update: { attributes: { status: 'archived' } } },
-        remove: { label, remove: true },
+        archive: {
+          label,
+          update: { attributes: { status: 'archived' } },
+          hidden: (contact) => {
+            expectTypeOf(contact).toEqualTypeOf<
+              ActionRecord<typeof Contacts>
+            >();
+            return contact.status === 'archived';
+          },
+        },
+        remove: {
+          label,
+          remove: true,
+          confirm: { title: (contact) => `Remove ${contact.name}?` },
+        },
       },
     });
 
     expectTypeOf<keyof typeof named>().toEqualTypeOf<'archive' | 'remove'>();
     expectTypeOf(named.archive.name).toEqualTypeOf<'archive'>();
+    expectTypeOf(named.archive.call).toEqualTypeOf<'update'>();
+    expectTypeOf(named.remove.call).toEqualTypeOf<'remove'>();
   });
 
   it("types a record action's texts by the record, and a bulk action's by the count", () => {
@@ -229,58 +287,5 @@ describe('the texts and names of the models (resource SPEC 21.2, 21.3)', () => {
 
     expectTypeOf<Listed>().toExtend<ActionRecord<typeof Contacts>>();
     expectTypeOf<Included>().toExtend<ActionRecord<typeof Contacts>>();
-  });
-});
-
-describe('the mutations a screen sends them through (jsonapi SPEC 16.2, 17.4)', () => {
-  it("gives a record action's variables to resourceQueries' update and remove", () => {
-    const update = new MutationObserver(queryClient, contacts.update());
-    const remove = new MutationObserver(queryClient, contacts.remove());
-    type Archive = Extract<
-      (typeof rows)['archive'],
-      { readonly call: 'update' }
-    >;
-    type Remove = Extract<(typeof rows)['remove'], { readonly call: 'remove' }>;
-    const run = async (
-      action: (typeof rows)['archive' | 'remove'],
-      contact: ActionRecord<typeof Contacts>,
-    ): Promise<void> => {
-      await (action.call === 'update'
-        ? update.mutate(action.variables(contact))
-        : remove.mutate(action.variables(contact)));
-    };
-
-    expectTypeOf<ReturnType<Archive['variables']>>().toExtend<
-      Parameters<typeof update.mutate>[0]
-    >();
-    expectTypeOf<ReturnType<Remove['variables']>>().toEqualTypeOf<
-      Parameters<typeof remove.mutate>[0]
-    >();
-    expectTypeOf(run).toBeFunction();
-  });
-
-  it("gives a bulk action's operations to operationsMutation, typed as the definition's builders type them", () => {
-    const operations = new MutationObserver(
-      queryClient,
-      operationsMutation(transport),
-    );
-    const builders = operationsOf(Contacts.resource);
-    type Restore = Extract<
-      (typeof selection)['restore'],
-      { readonly call: 'update' }
-    >;
-    type Remove = Extract<
-      (typeof selection)['remove'],
-      { readonly call: 'remove' }
-    >;
-
-    void operations.mutate(selection.restore.operations(['c1']));
-    void operations.mutate(selection.remove.operations(['c1']));
-    expectTypeOf<ReturnType<Restore['operations']>>().toEqualTypeOf<
-      ReadonlyArray<ReturnType<typeof builders.update>>
-    >();
-    expectTypeOf<ReturnType<Remove['operations']>>().toEqualTypeOf<
-      ReadonlyArray<ReturnType<typeof builders.remove>>
-    >();
   });
 });

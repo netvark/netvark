@@ -119,9 +119,8 @@ describe('the operations of a bulk action (resource SPEC 21.3)', () => {
   ])(
     'refuses %s, which state disables, before anything is sent',
     (_, ids, takes) => {
-      const operations = selection.restore.operations as (
-        ids: unknown,
-      ) => unknown;
+      const operations = (given: unknown): unknown =>
+        selection.restore.operations(given as ReadonlyArray<string>);
 
       expect(() => operations(ids)).toThrow(
         new TypeError(`bulkActions: restore.operations takes ${takes}`),

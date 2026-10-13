@@ -26,10 +26,8 @@ const CONTACT = { type: 'contacts', id: 'c1', name: 'Ada', status: 'active' };
 
 describe('the variables of a record action (resource SPEC 21.2)', () => {
   it("gives an update the record's id beside the values, a new frozen object per call", () => {
-    const first =
-      rows.archive.call === 'update' && rows.archive.variables(CONTACT);
-    const second =
-      rows.archive.call === 'update' && rows.archive.variables(CONTACT);
+    const first = rows.archive.variables(CONTACT);
+    const second = rows.archive.variables(CONTACT);
 
     expect(first).toStrictEqual({
       id: 'c1',
